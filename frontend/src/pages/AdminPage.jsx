@@ -7,9 +7,15 @@ const API_BASE_URL = "http://localhost/mkffwebsystem/backend/api";
 const UNITS_ENDPOINT = `${API_BASE_URL}/units.php`;
 const REPORTS_ENDPOINT = `${API_BASE_URL}/daily_reports.php`;
 const USER_MANAGEMENT_ENDPOINT = `${API_BASE_URL}/user_management.php`; // NEW ENDPOINT
+// --- LOCAL PATHS ---
+// Conceptual path where avatars are served (relative to API_BASE_URL, but served from a sibling directory)
+const AVATAR_UPLOAD_PATH = `http://localhost/mkffwebsystem/backend/api/uploads/avatars/`;
+// Fallback for missing/broken avatar files
+const DEFAULT_AVATAR_PATH = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTE2IDguNWExLjUgMS41IDAgMSAxIDAgLTVhMS41IDEuNSAwIDAgMSAwIDVaTTkgMTMuNGM2LjUgMCA3IDUuMyA3IDV2Mi41aC0xNGwtLjItLjJjLS4xLS4xLS40LS41LS43LS45LS40LS41LS43LTEuMS0uNy0xLjhjMC0uNi40LTEuMS44LTEuNS41LS41IDEuMy0uNyAyLjItLjcgMS4yIDAgMi4xLjMgMyAxLjEgLjIgLjQgLjQgLjggLjQgMS4yIDAgLjkgLS41IDEuNi0xLjMgMi4zLS41LjUtMS4xLjgtMS44LjhoLTJjLS45IDAtMS42LS4zLTIuMS0uN2wxLjgtLjIgLjMtLjNjLS41LS41LS45LS44LTEuNC0xLjIgMS0uOSAxLjctMi40IDEuNy00LjUgMC0xLS40LTEuOS0xLjEtMi42LS42LS43LTEuNS0xLjEtMi41LTEuMi0xLjIgMC0yLjQuNS0zLjUgMS41LS41LjItLjkuNS0xLjQgLjcgLjIuNS40LjkuNSAxLjQgLjIgLjQgLjQgLjggLjQgMS4yIDAgLjggLS41IDEuNi0xLjQgMi4zLS4zLjItLjYuNS0uOS43bC0xLjguMi0uMi0uMmMtLjQtLjQtLjctLjgtLjctMS40IDAtLjggLjUtMS41IDEuMS0yLjIgLjUtLjUgMS4xLS44IDEuOC0uOC45IDAgMS43LjMgMi40LjkgLjQtLjIuOC0uNCAxLjItLjcgMC0uNy0uMy0xLjQtLjktMi4xLS41LS42LTEuMi0xLS43LTEuNyAwLS42LjUtMS4xIDEtMS41LjQtLjQgLjctLjUgMS4yLS42LjYtLjIgMS41LS4yIDIuMiAwIDAgLjUgLjQgLjcgLjggMS4xLjMtLjIuNi0uNCAxLS42LjktLjUgMi0uNyAyLjgtLjcgc20uMy0uNWMuOCAwIDEuNC41IDEuNSAxLjEuMS43LS41IDEuMy0xLjQgMS40LS44IDAtMS41LS42LTEuNS0xLjIgMC0uNS40LS45LjgtMS4zLjUtLjQgMS4yLS42IDEuNi0uNnptMi44IDYuOC40LjRjLjIgLjEuNC4yLjYgLjUgMCAuNy0uMyAxLjQtLjggMi4xLS40LjYtMSAxLjEtMS44IDEuNC0uMS4xLS4zLjEtLjQuM2wtLjMtLjNjLS41LS41LS44LTEuMS0uOC0xLjggMC0uOC40LTEuNSAxLjItMi4xem0tMS41LS40Yy0uMi0uMS0uMy0uMi0uNC0uMy0uMi0uMi0uMy0uNC0uNS0uNi0uMy0uMy0uNi0uNS0uOC0uNy0uMy0uMy0uNS0uNi0uNy0uOS0uNS0uNi0uOC0xLjQtLjgtMi40IDAtLjkuMy0xLjcgLjktMi40LjUtLjUgMS4zLS44IDIuMy0uOCAxLjIgMCAyLjEuMyAzIC45LjQuMi43LjUgMS4xLjcuNC4zLjcgLjYgLjggLjkgLjMgLjUgLjYgMSAuOCAxLjYgLjMgLjYgLjUgMS4yLjUgMS44IDAgLjgtLjIgMS41LS42IDIuMS0uNCAuNy0uOSAxLjMtMS41IDEuN3ptLTEuMy02LjNjaC0xLjMuNGMtLjEgLjQtLjIgLjktLjMgMS4yLS40LjctLjUgMS40LS41IDIuMiAwIC43LjMgMS4zLjkgMS44LjQtLjIuNy0uNSAxLS45LjUtLjUgLjctMS4xLjctMS44IDAtLjkgMC0xLjctLjUtMi40LS41LS42LTEuMy0xLTEuOC0xLjItLjEgLjMtLjIuNi0uNCAxeiIvPjwvc3ZnPg==';
 
 // --- Edit Unit Modal Component (Existing) ---
 const EditUnitModal = ({ unit, onClose, onSave }) => {
+    // ... (unchanged)
     const [formData, setFormData] = useState(unit ? {
         status: unit.status,
         remarks: unit.remarks,
@@ -77,6 +83,7 @@ const EditUnitModal = ({ unit, onClose, onSave }) => {
 
 // Report Detail Viewer Modal (Existing)
 const ReportDetailModal = ({ report, onClose }) => {
+    // ... (unchanged)
     if (!report) return null;
 
     const attachmentUrl = report.attachment_filename
@@ -138,6 +145,7 @@ const ManageUserModal = ({ userToEdit, stations, onClose, onSave }) => {
     // Determine if we are in Edit mode (userToEdit is passed and has an id)
     const isEditMode = userToEdit && userToEdit.id !== null;
     
+    // Define the structure for Add/Edit, including avatar fields
     const initialFormData = isEditMode ? {
         id: userToEdit.id,
         username: userToEdit.username,
@@ -145,6 +153,8 @@ const ManageUserModal = ({ userToEdit, stations, onClose, onSave }) => {
         role: userToEdit.role,
         full_name: userToEdit.full_name,
         station: userToEdit.station || '',
+        avatar_url: userToEdit.avatar_url || '', // Existing avatar file name from DB
+        avatar_file: null, // Placeholder for new file object
     } : {
         // This is the structure for 'Add New User' mode
         id: null,
@@ -153,11 +163,20 @@ const ManageUserModal = ({ userToEdit, stations, onClose, onSave }) => {
         role: 'Operator',
         full_name: '',
         station: '',
+        avatar_url: '',
+        avatar_file: null, 
     };
     
     const [formData, setFormData] = useState(initialFormData);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+
+    // State for the image preview
+    const [avatarPreview, setAvatarPreview] = useState(
+        (isEditMode && userToEdit.avatar_url) 
+        ? `${AVATAR_UPLOAD_PATH}${userToEdit.avatar_url}` 
+        : DEFAULT_AVATAR_PATH
+    );
 
     const roleOptions = ["Administrator", "IT Assistant", "Operator"];
 
@@ -167,24 +186,96 @@ const ManageUserModal = ({ userToEdit, stations, onClose, onSave }) => {
         setSuccess('');
     };
 
+    // Handle file selection and preview
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        
+        if (file) {
+            // Store file object and set avatar_url to the *new* filename
+            setFormData({ 
+                ...formData, 
+                avatar_file: file, 
+                avatar_url: file.name
+            }); 
+            // Create a temporary browser URL for immediate preview
+            setAvatarPreview(URL.createObjectURL(file)); 
+        } else {
+            // Clear or reset to existing avatar if they hit cancel/clear
+            setFormData({ 
+                ...formData, 
+                avatar_file: null, 
+                avatar_url: isEditMode ? initialFormData.avatar_url : '' 
+            });
+            setAvatarPreview(isEditMode && initialFormData.avatar_url ? `${AVATAR_UPLOAD_PATH}${initialFormData.avatar_url}` : DEFAULT_AVATAR_PATH);
+        }
+        setError('');
+        setSuccess('');
+    };
+
     const handleSave = async () => {
         if (!formData.username || !formData.password || !formData.role || !formData.full_name) {
-            setError('All fields (except Station) are required.');
+            setError('All required fields are needed.');
             return;
         }
 
+        // --- PREPARE DATA FOR BACKEND ---
+        const isFileUpdate = formData.avatar_file instanceof File;
+
+        let payload;
+        let headers = { };
+        let url;
+        const methodOverride = formData.id ? 'PUT' : 'POST';
+
+        if (isFileUpdate) {
+            // SCENARIO 1: FILE UPLOAD (Requires multipart/form-data)
+            payload = new FormData();
+            
+            // Append the new file
+            payload.append('avatar', formData.avatar_file, formData.avatar_file.name); 
+
+            // Append all other fields
+            payload.append('id', formData.id || ''); 
+            payload.append('username', formData.username);
+            payload.append('password', formData.password);
+            payload.append('role', formData.role);
+            payload.append('full_name', formData.full_name);
+            payload.append('station', formData.station || '');
+            
+            // Since the file upload logic might override the JSON logic, we send the intended 
+            // DB filename as avatar_url, although the PHP backend should ideally generate the unique name.
+            payload.append('avatar_url', formData.avatar_url); 
+            
+            url = `${USER_MANAGEMENT_ENDPOINT}?method=${methodOverride}`;
+
+        } else {
+            // SCENARIO 2: TEXT/URL ONLY UPDATE (Uses JSON)
+            payload = {
+                id: formData.id,
+                username: formData.username,
+                password: formData.password,
+                role: formData.role,
+                full_name: formData.full_name,
+                station: formData.station,
+                avatar_url: formData.avatar_url, // Send the URL/filename
+            };
+            headers['Content-Type'] = 'application/json';
+            url = `${USER_MANAGEMENT_ENDPOINT}?method=${methodOverride}`;
+        }
+        
         try {
-            await onSave(formData);
+            await axios.post(url, payload, { headers });
+            onSave(); // The parent function handles refresh
             setSuccess(`User ${isEditMode ? 'updated' : 'added'} successfully!`);
-            setTimeout(onClose, 1000); // Close after a short delay
-        } catch (err) {
-            setError(err.response?.data?.message || `Failed to ${isEditMode ? 'update' : 'add'} user.`);
+            setTimeout(onClose, 1000); 
+        } catch (error) {
+            console.error(`Error ${isEditMode ? 'updating' : 'adding'} user:`, error);
+            setError(error.response?.data?.message || `Failed to ${isEditMode ? 'update' : 'add'} user.`);
         }
     };
 
     return (
         <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
-            <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-dialog modal-dialog-centered modal-lg">
                 <div className="modal-content">
                     <div className="modal-header bg-danger text-white">
                         <h5 className="modal-title">{isEditMode ? `Edit User: ${userToEdit.username}` : 'Add New User'}</h5>
@@ -196,32 +287,64 @@ const ManageUserModal = ({ userToEdit, stations, onClose, onSave }) => {
                         {isEditMode && <p className="text-muted small">ID: {userToEdit.id} | Created: {userToEdit.created_at}</p>}
                         
                         <form>
-                            <div className="mb-3">
-                                <label className="form-label">Full Name</label>
-                                <input type="text" className="form-control" name="full_name" value={formData.full_name} onChange={handleChange} required />
-                            </div>
-                            <div className="mb-3">
-                                <label className="form-label">Username</label>
-                                <input type="text" className="form-control" name="username" value={formData.username} onChange={handleChange} required />
-                            </div>
-                            <div className="mb-3">
-                                <label className="form-label">{isEditMode ? 'Password (Current: ****)' : 'Password'}</label>
-                                <input type="text" className="form-control" name="password" value={formData.password} onChange={handleChange} required />
-                                {isEditMode && <div className="form-text text-danger">The current password is: **{userToEdit.password}**. Edit as needed.</div>}
-                            </div>
                             <div className="row">
-                                <div className="col-md-6 mb-3">
-                                    <label className="form-label">Role</label>
-                                    <select className="form-select" name="role" value={formData.role} onChange={handleChange} required>
-                                        {roleOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}
-                                    </select>
+                                {/* Left Column: Avatar Management */}
+                                <div className="col-md-4 text-center">
+                                    <h6 className="small text-muted">Profile Avatar</h6>
+                                    {/* Avatar Preview */}
+                                    <img 
+                                        src={avatarPreview} 
+                                        alt="Avatar Preview" 
+                                        className="img-fluid rounded-circle mb-2 border border-secondary"
+                                        style={{ width: '100px', height: '100px', objectFit: 'cover' }}
+                                        // Handle error if the existing URL is broken
+                                        onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }} 
+                                    />
+                                    {/* File Input */}
+                                    <div className="mb-3">
+                                        <input type="file" className="form-control form-control-sm" accept="image/*" onChange={handleFileChange} />
+                                        {formData.avatar_url && 
+                                            <div className="form-text small text-primary">
+                                                {formData.avatar_file ? 'New file selected' : `Current file: ${formData.avatar_url}`}
+                                            </div>
+                                        }
+                                        {!formData.avatar_url && 
+                                            <div className="form-text small text-muted">
+                                                No avatar set. Click to upload.
+                                            </div>
+                                        }
+                                    </div>
                                 </div>
-                                <div className="col-md-6 mb-3">
-                                    <label className="form-label">Station (Optional)</label>
-                                    <select className="form-select" name="station" value={formData.station} onChange={handleChange}>
-                                        <option value="">N/A (Admin/IT)</option>
-                                        {stations.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
-                                    </select>
+                                {/* Right Column: Fields */}
+                                <div className="col-md-8">
+                                    <div className="mb-3">
+                                        <label className="form-label">Full Name</label>
+                                        <input type="text" className="form-control" name="full_name" value={formData.full_name} onChange={handleChange} required />
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label">Username</label>
+                                        <input type="text" className="form-control" name="username" value={formData.username} onChange={handleChange} required />
+                                    </div>
+                                    <div className="mb-3">
+                                        <label className="form-label">{isEditMode ? 'Password (Current: ****)' : 'Password'}</label>
+                                        <input type="text" className="form-control" name="password" value={formData.password} onChange={handleChange} required />
+                                        {isEditMode && <div className="form-text text-danger">The current password is: **{userToEdit.password}**. Edit as needed.</div>}
+                                    </div>
+                                    <div className="row">
+                                        <div className="col-md-6 mb-3">
+                                            <label className="form-label">Role</label>
+                                            <select className="form-select" name="role" value={formData.role} onChange={handleChange} required>
+                                                {roleOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}
+                                            </select>
+                                        </div>
+                                        <div className="col-md-6 mb-3">
+                                            <label className="form-label">Station (Optional)</label>
+                                            <select className="form-select" name="station" value={formData.station} onChange={handleChange}>
+                                                <option value="">N/A (Admin/IT)</option>
+                                                {stations.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
+                                            </select>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </form>
@@ -238,7 +361,7 @@ const ManageUserModal = ({ userToEdit, stations, onClose, onSave }) => {
     );
 };
 
-// --- NEW: Delete User Modal ---
+// --- NEW: Delete User Modal (Existing, Unchanged) ---
 const DeleteUserModal = ({ user, onClose, onDelete }) => {
     return (
         <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1070 }}>
@@ -379,7 +502,7 @@ export default function AdminPage({ user, onLogout }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // Define the initial structure for a new user object (to fix the scope error)
+    // Define the initial structure for a new user object 
     const initialNewUserData = {
         id: null,
         username: '',
@@ -387,6 +510,8 @@ export default function AdminPage({ user, onLogout }) {
         role: 'Operator',
         full_name: '',
         station: '',
+        avatar_url: '', // Initialize new field
+        avatar_file: null, // Initialize file placeholder for modal
     };
 
 
@@ -408,6 +533,7 @@ export default function AdminPage({ user, onLogout }) {
             }
 
             // 3. Fetch User List (NEW)
+            // Assuming the PHP backend now returns the 'avatar_url' field
             const usersRes = await axios.get(USER_MANAGEMENT_ENDPOINT);
             if (Array.isArray(usersRes.data)) {
                 setUserList(usersRes.data);
@@ -509,11 +635,12 @@ export default function AdminPage({ user, onLogout }) {
 
     // --- NEW USER MANAGEMENT HANDLERS ---
     const handleAddUser = () => {
-        // FIXED: Using the defined initialNewUserData structure
+        // Pass the initial structure for 'Add' mode
         setSelectedUserToManage(initialNewUserData); 
     };
 
     const handleEditUser = (user) => {
+        // Pass the existing user object for 'Edit' mode
         setSelectedUserToManage(user);
     };
 
@@ -523,14 +650,55 @@ export default function AdminPage({ user, onLogout }) {
 
     const handleSaveUser = async (userData) => {
         const isEdit = userData.id !== null;
-        const method = isEdit ? 'PUT' : 'POST';
-        const url = isEdit ? `${USER_MANAGEMENT_ENDPOINT}?method=PUT` : USER_MANAGEMENT_ENDPOINT;
+        
+        // --- Determine Payload and Headers based on file presence ---
+        
+        // Check if there is an actual file object in the user data
+        const isFileUpdate = userData.avatar_file instanceof File;
+
+        let payload;
+        let headers = { };
+        let url;
+        const methodOverride = isEdit ? 'PUT' : 'POST';
+
+        if (isFileUpdate) {
+            // SCENARIO 1: FILE UPLOAD (Requires multipart/form-data)
+            payload = new FormData();
+            
+            // Append the new file
+            payload.append('avatar', userData.avatar_file, userData.avatar_file.name); 
+
+            // Append all other fields
+            payload.append('id', userData.id || ''); 
+            payload.append('username', userData.username);
+            payload.append('password', userData.password);
+            payload.append('role', userData.role);
+            payload.append('full_name', userData.full_name);
+            payload.append('station', userData.station || '');
+            
+            // Since the file upload logic might override the JSON logic, we send the intended 
+            // DB filename as avatar_url, although the PHP backend should ideally generate the unique name.
+            payload.append('avatar_url', userData.avatar_url); 
+            
+            url = `${USER_MANAGEMENT_ENDPOINT}?method=${methodOverride}`;
+
+        } else {
+            // SCENARIO 2: TEXT/URL ONLY UPDATE (Uses JSON)
+            payload = {
+                id: userData.id,
+                username: userData.username,
+                password: userData.password,
+                role: userData.role,
+                full_name: userData.full_name,
+                station: userData.station,
+                avatar_url: userData.avatar_url, // Send the URL/filename
+            };
+            headers['Content-Type'] = 'application/json';
+            url = `${USER_MANAGEMENT_ENDPOINT}?method=${methodOverride}`;
+        }
         
         try {
-            // Using POST with method=PUT for updates, and straight POST for creates
-            await axios.post(url, userData, {
-                headers: { 'Content-Type': 'application/json' }
-            });
+            await axios.post(url, payload, { headers });
             fetchData(); // Refresh list
         } catch (error) {
             console.error(`Error ${isEdit ? 'updating' : 'adding'} user:`, error);
@@ -583,6 +751,7 @@ export default function AdminPage({ user, onLogout }) {
             totalUnits: overallTotalLogs,
             yieldTotal: totalUnitsForYield,
             pendingUnits, // 'In Progress' units only
+            // Ensure avatar_url is included here if needed for live user display metrics
             pendingApprovalUnits: stationId ? currentLogs.filter(l => l.station === stationId && l.status === 'Pending Approval').length : pendingApprovalUnits,
             yieldRate: yieldRate.toFixed(2),
         };
@@ -896,15 +1065,33 @@ export default function AdminPage({ user, onLogout }) {
                             <div className="table-responsive">
                                 <table className="table table-hover table-striped mb-0 small">
                                     <thead className="table-dark">
-                                        <tr><th>ID</th><th>Username</th><th>Password</th><th>Full Name</th><th>Role</th><th>Station</th><th>Created At</th><th>Actions</th></tr>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>User / Avatar</th>
+                                            <th>Password</th>
+                                            <th>Full Name</th>
+                                            <th>Role</th>
+                                            <th>Station</th>
+                                            <th>Created At</th>
+                                            <th>Actions</th>
+                                        </tr>
                                     </thead>
                                     <tbody>
                                         {userList.length > 0 ? userList.map(u => (
                                             <tr key={u.id}>
                                                 <td>{u.id}</td>
-                                                <td>{u.username}</td>
-                                                {/* Display password as requested */}
-                                                <td className="text-info fw-bold">{u.password}</td> 
+                                                {/* Display Avatar and Username */}
+                                                <td className="d-flex align-items-center">
+                                                    <img 
+                                                        src={u.avatar_url ? `${AVATAR_UPLOAD_PATH}${u.avatar_url}` : DEFAULT_AVATAR_PATH} 
+                                                        alt={`${u.username} avatar`} 
+                                                        className="rounded-circle me-2" 
+                                                        style={{ width: '30px', height: '30px', objectFit: 'cover' }} 
+                                                        onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
+                                                    />
+                                                    <strong>{u.username}</strong>
+                                                </td>
+                                                <td><span className="text-info fw-bold">{u.password}</span></td> 
                                                 <td>{u.full_name}</td>
                                                 <td><span className={`badge ${u.role === 'Administrator' ? 'bg-danger' : u.role === 'Operator' ? 'bg-primary' : 'bg-warning text-dark'}`}>{u.role}</span></td>
                                                 <td>{u.station || 'N/A'}</td>
@@ -1031,7 +1218,8 @@ export default function AdminPage({ user, onLogout }) {
             {/* NEW: User Management Modals */}
             {selectedUserToManage && (
                 <ManageUserModal
-                    userToEdit={selectedUserToManage.id ? selectedUserToManage : initialNewUserData} // Use initialNewUserData if it's the 'Add' action (no ID)
+                    // The modal determines if it's Edit or Add based on userToEdit.id
+                    userToEdit={selectedUserToManage.id ? selectedUserToManage : initialNewUserData} 
                     stations={stations}
                     onClose={() => setSelectedUserToManage(null)}
                     onSave={handleSaveUser}
