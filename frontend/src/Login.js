@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import 'bootstrap-icons/font/bootstrap-icons.css';
-import logo from './logo.svg'; 
+import logo from './logo.png'; 
 
 // --- 1. NEW COMPONENT: Loading and Notification Overlay ---
 const LoadingOverlay = ({ status, message }) => {

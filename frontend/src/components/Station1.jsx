@@ -1,137 +1,152 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import axios from 'axios'; 
+import axios from 'axios';
+import 'bootstrap-icons/font/bootstrap-icons.css';
+// NEW IMPORTS FOR CHARTS
+import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
+import { Doughnut, Bar } from 'react-chartjs-2';
+
+// REGISTER CHART COMPONENTS GLOBALLY
+ChartJS.register(
+    ArcElement, // For Doughnut/Pie charts
+    CategoryScale, // For Bar charts (X-axis)
+    LinearScale, // For Bar charts (Y-axis)
+    BarElement, // For Bar charts
+    Tooltip,
+    Legend
+);
 
 // Base URL for the API 
 const API_BASE_URL = "http://localhost/mkffwebsystem/backend/api";
 const UNITS_ENDPOINT = `${API_BASE_URL}/units.php`;
-const REPORT_ENDPOINT = `${API_BASE_URL}/daily_reports.php`; // NEW ENDPOINT
-const CURRENT_STATION = "Station1"; 
+const HISTORY_ENDPOINT = `${API_BASE_URL}/unit_history.php`; // ASSUMED NEW HISTORY ENDPOINT
+const REPORT_ENDPOINT = `${API_BASE_URL}/daily_reports.php`;
+const CURRENT_STATION = "Station1"; // Current station of the logged-in user
 
 // --- UTILITY COMPONENTS ---
 
-// 1. Full-Screen Status Overlay (Custom/Utility Styling)
+// 1. Full-Screen Status Overlay (Custom/Utility Styling - UNCHANGED)
 const LoadingOverlay = ({ status, message }) => {
-    if (status === 'idle') return null;
+    if (status === 'idle') return null;
 
-    let iconClass, spinnerVisible = false, bgColor, statusText;
-    let visibilityClass = "d-flex";
+    let iconClass, spinnerVisible = false, bgColor, statusText;
+    let visibilityClass = "d-flex";
 
-    if (status === 'loading') {
-        spinnerVisible = true;
-        bgColor = "bg-dark opacity-75";
-        statusText = "PROCESSING DATA...";
-    } else if (status === 'success') {
-        iconClass = "bi bi-check-circle-fill text-success";
-        bgColor = "bg-success opacity-75";
-        statusText = "SAVED SUCCESSFULLY";
-    } else if (status === 'error') {
-        iconClass = "bi bi-x-octagon-fill text-danger";
-        bgColor = "bg-danger opacity-75";
-        statusText = "OPERATION FAILED";
-    }
+    if (status === 'loading') {
+        spinnerVisible = true;
+        bgColor = "bg-dark opacity-75";
+        statusText = "PROCESSING DATA...";
+    } else if (status === 'success') {
+        iconClass = "bi bi-check-circle-fill text-success";
+        bgColor = "bg-success opacity-75";
+        statusText = "SAVED SUCCESSFULLY";
+    } else if (status === 'error') {
+        iconClass = "bi bi-x-octagon-fill text-danger";
+        bgColor = "bg-danger opacity-75";
+        statusText = "OPERATION FAILED";
+    }
 
-    return (
-        <div 
-            className={`position-fixed w-100 h-100 top-0 start-0 ${bgColor} ${visibilityClass} justify-content-center align-items-center z-3`}
-            style={{ transition: 'opacity 0.3s' }}
-        >
-            <div className="bg-white p-5 rounded shadow-lg text-center" style={{ minWidth: '300px' }}>
-                <div className="mb-3">
-                    {spinnerVisible ? (
-                        <div className="spinner-border text-primary" role="status">
-                            <span className="visually-hidden">Loading...</span>
-                        </div>
-                    ) : (
-                        <i className={`${iconClass} fs-1`}></i>
-                    )}
-                </div>
-                
-                <h4 className={`fw-bold text-dark mb-1`}>
-                    {statusText}
-                </h4>
-                <p className="text-muted small">{message}</p>
-            </div>
-        </div>
-    );
+    return (
+        <div 
+            className={`position-fixed w-100 h-100 top-0 start-0 ${bgColor} ${visibilityClass} justify-content-center align-items-center z-3`}
+            style={{ transition: 'opacity 0.3s' }}
+        >
+            <div className="bg-white p-5 rounded shadow-lg text-center" style={{ minWidth: '300px' }}>
+                <div className="mb-3">
+                    {spinnerVisible ? (
+                        <div className="spinner-border text-primary" role="status">
+                            <span className="visually-hidden">Loading...</span>
+                        </div>
+                    ) : (
+                        <i className={`${iconClass} fs-1`}></i>
+                    )}
+                </div>
+                
+                <h4 className={`fw-bold text-dark mb-1`}>
+                    {statusText}
+                </h4>
+                <p className="text-muted small">{message}</p>
+            </div>
+        </div>
+    );
 };
 
-// 2. Edit Modal (CORRECTED LOGIC - UNCHANGED)
+// 2. Edit Modal (CORRECTED LOGIC - UNCHANGED from last turn)
 const EditUnitModal = ({ unit, onClose, onSave }) => {
-    const isReopening = unit.status === 'Completed' || unit.status === 'No Good (NG)';
-    const initialStatus = isReopening ? 'Pending Approval' : unit.status;
+    const isReopening = unit.status === 'Completed' || unit.status === 'No Good (NG)';
+    const initialStatus = isReopening ? 'Pending Approval' : unit.status;
 
-    const [status, setStatus] = useState(initialStatus);
-    const [remarks, setRemarks] = useState(unit.remarks);
+    const [status, setStatus] = useState(initialStatus);
+    const [remarks, setRemarks] = useState(unit.remarks);
 
-    const handleSave = () => {
-        onSave(unit.id, { 
-            ...unit,
-            status: status, 
-            remarks: remarks,
-        });
-    };
+    const handleSave = () => {
+        onSave(unit.id, { 
+            ...unit,
+            status: status, 
+            remarks: remarks,
+        });
+    };
 
-    const statusOptions = isReopening
-        ? ["Pending Approval"]
-        : ["In Progress", "Completed", "No Good (NG)", "Pending Approval"];
-        
-    const specialMessage = isReopening
-        ? "⚠️ **REOPENING UNIT:** Saving any changes will submit this unit to the **Pending Approval** queue for re-inspection and verification."
-        : "You can update the status and remarks for this In-Progress unit.";
+    const statusOptions = isReopening
+        ? ["Pending Approval"]
+        : ["In Progress", "Completed", "No Good (NG)", "Pending Approval"];
+        
+    const specialMessage = isReopening
+        ? "⚠️ **REOPENING UNIT:** Saving any changes will submit this unit to the **Pending Approval** queue for re-inspection and verification."
+        : "You can update the status and remarks for this In-Progress unit.";
 
-    return (
-        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
-            <div className="modal-dialog modal-dialog-centered">
-                <div className="modal-content">
-                    <div className="modal-header bg-primary text-white">
-                        <h5 className="modal-title">Edit Unit: {unit.device_serial_no}</h5>
-                        <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
-                    </div>
-                    <div className="modal-body">
-                        <p className={`small mb-4 ${isReopening ? 'text-danger fw-bold' : 'text-muted'}`}>{specialMessage}</p>
-                        
-                        <div className="mb-3">
-                            <label className="form-label fw-bold">Change Status</label>
-                            <select 
-                                className="form-select" 
-                                value={status} 
-                                onChange={(e) => setStatus(e.target.value)}
-                                disabled={isReopening}
-                            >
-                                {statusOptions.map(opt => (
-                                    <option key={opt} value={opt}>{opt}</option>
-                                ))}
-                            </select>
-                            {isReopening && (
-                                <div className="form-text text-info">
-                                    Status automatically set to 'Pending Approval' upon editing a final status.
-                                </div>
-                            )}
-                        </div>
+    return (
+        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
+            <div className="modal-dialog modal-dialog-centered">
+                <div className="modal-content">
+                    <div className="modal-header bg-primary text-white">
+                        <h5 className="modal-title">Edit Unit: {unit.device_serial_no}</h5>
+                        <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
+                    </div>
+                    <div className="modal-body">
+                        <p className={`small mb-4 ${isReopening ? 'text-danger fw-bold' : 'text-muted'}`}>{specialMessage}</p>
+                        
+                        <div className="mb-3">
+                            <label className="form-label fw-bold">Change Status</label>
+                            <select 
+                                className="form-select" 
+                                value={status} 
+                                onChange={(e) => setStatus(e.target.value)}
+                                disabled={isReopening}
+                            >
+                                {statusOptions.map(opt => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                            </select>
+                            {isReopening && (
+                                <div className="form-text text-info">
+                                    Status automatically set to 'Pending Approval' upon editing a final status.
+                                </div>
+                            )}
+                        </div>
 
-                        <div className="mb-3">
-                            <label className="form-label fw-bold">Remarks</label>
-                            <textarea 
-                                className="form-control" 
-                                rows="3"
-                                value={remarks}
-                                onChange={(e) => setRemarks(e.target.value)}
-                            ></textarea>
-                        </div>
-                    </div>
+                        <div className="mb-3">
+                            <label className="form-label fw-bold">Remarks</label>
+                            <textarea 
+                                className="form-control" 
+                                rows="3"
+                                value={remarks}
+                                onChange={(e) => setRemarks(e.target.value)}
+                            ></textarea>
+                        </div>
+                    </div>
 
-                    <div className="modal-footer">
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>
-                            Cancel
-                        </button>
-                        <button type="button" className="btn btn-primary" onClick={handleSave}>
-                            Save Changes
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
+                    <div className="modal-footer">
+                        <button type="button" className="btn btn-secondary" onClick={onClose}>
+                            Cancel
+                        </button>
+                        <button type="button" className="btn btn-primary" onClick={handleSave}>
+                            Save Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 // 3. Unit List Table Component (UNCHANGED)
@@ -162,8 +177,8 @@ const UnitListTable = ({ units, listStatus, loading, error, onEdit }) => {
     };
 
     const canEdit = listStatus.toLowerCase().includes('in progress') || 
-                    listStatus.toLowerCase().includes('completed') ||
-                    listStatus.toLowerCase().includes('no good');
+                     listStatus.toLowerCase().includes('completed') ||
+                     listStatus.toLowerCase().includes('no good');
 
     return (
         <div className="table-responsive shadow-sm rounded">
@@ -218,6 +233,61 @@ const UnitListTable = ({ units, listStatus, loading, error, onEdit }) => {
     );
 };
 
+// 4. History Log Table (NEW COMPONENT)
+const UnitHistoryTable = ({ historyLogs, loading, error }) => {
+    // Conditional Rendering for Loading/Error/Empty states
+    if (loading) return <div className="text-center py-5 text-muted"><div className="spinner-border" role="status"></div><p className="mt-2">Loading history...</p></div>;
+    if (error) return <div className="alert alert-danger" role="alert"><h4 className="alert-heading">Error!</h4><p>{error}</p></div>;
+    
+    if (historyLogs.length === 0) {
+        return (
+            <div className="text-center py-5 bg-light p-4 rounded border border-dashed text-muted">
+                <i className="bi bi-archive-slash fs-1 d-block mb-3"></i>
+                <p className="fs-5 fw-semibold">No History Found</p>
+                <p>No station movements or status changes have been logged for this station's units.</p>
+            </div>
+        );
+    }
+    
+    const getActionBadge = (type) => {
+        if (type.includes('MOVED')) return 'badge bg-success';
+        if (type.includes('UPDATED')) return 'badge bg-warning text-dark';
+        if (type.includes('CREATED')) return 'badge bg-info text-dark';
+        return 'badge bg-secondary';
+    };
+
+    return (
+        <div className="table-responsive shadow-sm rounded">
+            <table className="table table-hover table-striped mb-0 small">
+                <thead className="table-dark">
+                    <tr>
+                        <th scope="col">Unit ID</th>
+                        <th scope="col">Action Type</th>
+                        <th scope="col">Station</th>
+                        <th scope="col">Status After</th>
+                        <th scope="col">Performed By</th>
+                        <th scope="col">Remarks</th>
+                        <th scope="col">Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {historyLogs.map((log) => (
+                        <tr key={log.history_id}>
+                            <td className="fw-semibold">{log.unit_id}</td>
+                            <td><span className={getActionBadge(log.action_type)}>{log.action_type}</span></td>
+                            <td>{log.station_name}</td>
+                            <td>{log.status_after}</td>
+                            <td>{log.action_by}</td>
+                            <td className="small text-muted text-wrap" style={{ maxWidth: '150px' }}>{log.remarks || 'N/A'}</td>
+                            <td className="small">{new Date(log.timestamp).toLocaleString()}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+};
+
 
 // --- MAIN APP COMPONENT ---
 export default function Station1({ user, onLogout }) { 
@@ -231,6 +301,7 @@ export default function Station1({ user, onLogout }) {
 
     // State for Unit Listings
     const [unitList, setUnitList] = useState([]);
+    const [historyList, setHistoryList] = useState([]); // NEW STATE FOR HISTORY
     const [listLoading, setListLoading] = useState(false);
     const [listError, setListError] = useState(null);
     
@@ -274,7 +345,8 @@ export default function Station1({ user, onLogout }) {
         if (dbStatus === 'completed') dbStatus = 'Completed';
         if (dbStatus === 'no good') dbStatus = 'No Good (NG)';
         if (dbStatus === 'pending') dbStatus = 'Pending Approval'; 
-        if (['daily reports', 'account history', 'guide'].includes(dbStatus)) {
+        
+        if (['daily reports', 'account history', 'guide'].includes(dbStatus.toLowerCase())) {
             setListLoading(false);
             return;
         }
@@ -303,117 +375,202 @@ export default function Station1({ user, onLogout }) {
         
     }, []); 
     
-    // --- NEW HANDLER FOR REPORT SUBMISSION (ENHANCED FILE VALIDATION AND ERROR LOGGING) ---
-    // ... (Lines 1-320 remain unchanged) ...
+    // NEW: Fetch History Logs
+    const fetchHistory = useCallback(async () => {
+        setListLoading(true);
+        setListError(null);
+        setHistoryList([]);
 
-// --- NEW HANDLER FOR REPORT SUBMISSION (ENHANCED) ---
-const handleReportSubmit = async (e) => {
-    e.preventDefault();
-    
-    const MAX_FILE_SIZE = 2097152; // 2MB in bytes
-    const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
-    
-    // --- Front-end validation (required fields) ---
-    if (!dailyReportData.summary || dailyReportData.totalUnitsProcessed === 0) {
-        setProcessStatus('error');
-        setStatusMessage("Please fill out the required report details (Summary and Units Processed must be greater than 0).");
-        setTimeout(() => setProcessStatus('idle'), 3000);
-        return;
-    }
+        try {
+            // NOTE: This assumes your new unit_history.php endpoint allows filtering by station
+            const res = await axios.get(HISTORY_ENDPOINT, {
+                params: { station: CURRENT_STATION }
+            });
 
-    if (selectedFile) {
-        if (selectedFile.size > MAX_FILE_SIZE) {
-            setProcessStatus('error');
-            setStatusMessage("File upload failed: File size exceeds the 2MB limit.");
-            setTimeout(() => setProcessStatus('idle'), 4000);
-            return;
-        }
-        if (!ALLOWED_MIME_TYPES.includes(selectedFile.type)) {
-            setProcessStatus('error');
-            setStatusMessage("File upload failed: Only JPG, PNG, and PDF files are allowed.");
-            setTimeout(() => setProcessStatus('idle'), 4000);
-            return;
-        }
-    }
-    
-    // 🚨 FIX: Create FormData and ensure all number fields are sent as actual numbers or strings of numbers.
-    const reportData = new FormData();
-    reportData.append('station', CURRENT_STATION);
-    reportData.append('username', user.username);
-    reportData.append('date', dailyReportData.date || new Date().toISOString().split('T')[0]);
-    reportData.append('shift', dailyReportData.shift);
-    
-    // Ensure numerical fields are explicitly converted to string numbers, even if they are zero.
-    reportData.append('total_units_processed', String(dailyReportData.totalUnitsProcessed));
-    reportData.append('total_ng', String(dailyReportData.totalNG));
-    reportData.append('downtime_minutes', String(dailyReportData.downtimeMinutes));
-    
-    reportData.append('summary', dailyReportData.summary);
-    
-    if (selectedFile) {
-        reportData.append('file', selectedFile);
-    }
-
-    setProcessStatus('loading');
-    setStatusMessage("Submitting daily report and uploading file...");
-
-    try {
-        // REAL API CALL: POST to the new report endpoint
-        const res = await axios.post(REPORT_ENDPOINT, reportData, {
-            headers: {
-                'Content-Type': 'multipart/form-data'
+            if (Array.isArray(res.data)) {
+                setHistoryList(res.data.reverse()); // Show newest logs first
+            } else {
+                setHistoryList([]);
             }
-        });
+        } catch (err) {
+            console.error("Fetch History Error:", err);
+            setListError(`Failed to load history: ${err.message}. Ensure unit_history.php is configured.`);
+        } finally {
+            setListLoading(false);
+        }
+    }, []);
+
+
+    // --- NEW HANDLER FOR REPORT SUBMISSION (ENHANCED FILE VALIDATION AND ERROR LOGGING) ---
+    const handleReportSubmit = async (e) => {
+        e.preventDefault();
         
-        if (res.data.status === 'success') {
-            setProcessStatus('success');
-            setStatusMessage(`Daily Report submitted successfully! File saved: ${res.data.filename || 'N/A'}`);
-
-            setTimeout(() => {
-                setProcessStatus('idle');
-                // Reset report form
-                setDailyReportData(prev => ({
-                    ...prev,
-                    totalUnitsProcessed: 0,
-                    totalNG: 0,
-                    downtimeMinutes: 0,
-                    summary: '',
-                    date: new Date().toISOString().split('T')[0]
-                }));
-                setSelectedFile(null);
-            }, 3000);
-
-        } else {
+        const MAX_FILE_SIZE = 2097152; // 2MB in bytes
+        const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
+        
+        if (!dailyReportData.summary || dailyReportData.totalUnitsProcessed === 0) {
             setProcessStatus('error');
-            // If PHP returned a structured error, display it
-            setStatusMessage(`Report Submission Failed: ${res.data.message || res.data.error || 'Unknown error received from server.'}`);
-            setTimeout(() => setProcessStatus('idle'), 5000);
+            setStatusMessage("Please fill out the required report details (Summary and Units Processed must be greater than 0).");
+            setTimeout(() => setProcessStatus('idle'), 3000);
+            return;
         }
-    } catch (err) {
-        console.error("Report Submission Error:", err);
-        
-        // This still catches generic 400/500 errors if the server environment is misconfigured
-        if (err.response && err.response.status === 400) {
-            setStatusMessage(`Submission failed (400 Bad Request). Likely PHP limits exceeded or invalid data sent.`);
-        } else {
-            setStatusMessage(`Network or API Error: ${err.message}. Check if backend is running.`);
-        }
-        setProcessStatus('error');
-        setTimeout(() => setProcessStatus('idle'), 6000);
-    }
-};
 
-// ... (rest of the component remains unchanged) ...
+        if (selectedFile) {
+            if (selectedFile.size > MAX_FILE_SIZE) {
+                setProcessStatus('error');
+                setStatusMessage("File upload failed: File size exceeds the 2MB limit.");
+                setTimeout(() => setProcessStatus('idle'), 4000);
+                return;
+            }
+            if (!ALLOWED_MIME_TYPES.includes(selectedFile.type)) {
+                setProcessStatus('error');
+                setStatusMessage("File upload failed: Only JPG, PNG, and PDF files are allowed.");
+                setTimeout(() => setProcessStatus('idle'), 4000);
+                return;
+            }
+        }
+        
+        const reportData = new FormData();
+        reportData.append('station', CURRENT_STATION);
+        reportData.append('username', user.username);
+        reportData.append('date', dailyReportData.date || new Date().toISOString().split('T')[0]);
+        reportData.append('shift', dailyReportData.shift);
+        
+        reportData.append('total_units_processed', String(dailyReportData.totalUnitsProcessed));
+        reportData.append('total_ng', String(dailyReportData.totalNG));
+        reportData.append('downtime_minutes', String(dailyReportData.downtimeMinutes));
+        
+        reportData.append('summary', dailyReportData.summary);
+        
+        if (selectedFile) {
+            reportData.append('file', selectedFile);
+        }
+
+        setProcessStatus('loading');
+        setStatusMessage("Submitting daily report and uploading file...");
+
+        try {
+            // REAL API CALL: POST to the new report endpoint
+            const res = await axios.post(REPORT_ENDPOINT, reportData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+            
+            if (res.data.status === 'success') {
+                setProcessStatus('success');
+                setStatusMessage(`Daily Report submitted successfully!`);
+
+                setTimeout(() => {
+                    setProcessStatus('idle');
+                    // Reset report form
+                    setDailyReportData(prev => ({
+                        ...prev,
+                        totalUnitsProcessed: 0,
+                        totalNG: 0,
+                        downtimeMinutes: 0,
+                        summary: '',
+                        date: new Date().toISOString().split('T')[0]
+                    }));
+                    setSelectedFile(null);
+                }, 3000);
+
+            } else {
+                setProcessStatus('error');
+                setStatusMessage(`Report Submission Failed: ${res.data.message || res.data.error || 'Unknown error received from server.'}`);
+                setTimeout(() => setProcessStatus('idle'), 5000);
+            }
+        } catch (err) {
+            console.error("Report Submission Error:", err);
+            if (err.response && err.response.status === 400) {
+                setStatusMessage(`Submission failed (400 Bad Request). Likely PHP limits exceeded or invalid data sent.`);
+            } else {
+                setStatusMessage(`Network or API Error: ${err.message}. Check if backend is running.`);
+            }
+            setProcessStatus('error');
+            setTimeout(() => setProcessStatus('idle'), 6000);
+        }
+    };
+
+
+    // DATABASE UPDATE LOGIC (FOR EDIT MODAL) - 🚨 IMPLEMENTING CLONING/MOVEMENT
+    const handleSaveEdit = async (id, updatedData) => {
+        setUnitToEdit(null); 
+        
+        // Use the status from the modal form, even if it's 'Pending Approval' for reopening
+        const newStatus = updatedData.status; 
+        
+        setProcessStatus('loading');
+        setStatusMessage(`Updating unit ${id}. New status: ${newStatus}...`);
+        
+        try {
+            // Prepare data with all fields required for the comprehensive PUT handler in PHP
+            const dataToSend = {
+                id: id, 
+                model: updatedData.model,
+                revision: updatedData.revision,
+                base_unit_kitting_no: updatedData.base_unit_kitting_no,
+                assembly_no: updatedData.assembly_no,
+                device_serial_no: updatedData.device_serial_no,
+                accessory_kitting_no: updatedData.accessory_kitting_no,
+                
+                // CRITICAL FIELDS FOR PHP LOGIC:
+                status: newStatus, // This is the status achieved at the CURRENT_STATION
+                remarks: updatedData.remarks,
+                station: CURRENT_STATION, // Tell PHP which station initiated the action
+                // Pass user info for logging history
+                full_name: user.full_name, 
+                username: user.username,
+            };
+
+            // REAL API CALL: PUT (The PHP side handles advancement/cloning/logging)
+            const res = await axios.put(UNITS_ENDPOINT, dataToSend, {
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            if (res.data.status === 'success') {
+                setProcessStatus('success');
+                // Use the message returned by the PHP to confirm the unit's new status/location
+                setStatusMessage(res.data.message); 
+
+                setTimeout(() => {
+                    setProcessStatus('idle');
+                    // Refresh the current tab to show the remaining list, or switch tabs if unit moved
+                    fetchUnits(activeTab); 
+                }, 2000);
+                
+            } else {
+                setProcessStatus('error');
+                setStatusMessage(`Update Failed: ${res.data.error || 'Unknown server error.'}`);
+                setTimeout(() => setProcessStatus('idle'), 3000);
+            }
+            
+        } catch (err) {
+            console.error("Update Error:", err);
+            let errMsg = err.response?.data?.error || `Network Error: ${err.message}`;
+            setProcessStatus('error');
+            setStatusMessage(`API Update Error: ${errMsg}`);
+            setTimeout(() => setProcessStatus('idle'), 4000);
+        }
+    };
     
+    // Handler to open the Edit Modal
+    const handleEditClick = (unit) => {
+        setUnitToEdit(unit);
+    };
+
 
     // --- 3. HOOKED EFFECTS (useEffect) ---
     useEffect(() => { 
-        if (['in_progress', 'completed', 'no_good', 'pending'].includes(activeTab)) {
+        if (activeTab === 'account_history') {
+            fetchHistory();
+        } else if (['in_progress', 'completed', 'no_good', 'pending'].includes(activeTab)) {
             fetchUnits(activeTab);
         } else {
             setUnitList([]); 
+            setHistoryList([]);
         }
-    }, [activeTab, fetchUnits]);
+    }, [activeTab, fetchUnits, fetchHistory]); // Dependency cleanup is cleaner with fetchHistory added
 
     useEffect(() => { 
         if (activeTab === "input_unit" && scannerInputRef.current && processStatus === 'idle') {
@@ -430,9 +587,6 @@ const handleReportSubmit = async (e) => {
     // --- 5. Handlers and Logic (Safe access after the check) ---
     const currentUsername = user.username; 
     
-    // ... (rest of resetForm, handleScan, handleSubmit, handleSaveEdit, handleEditClick remain unchanged) ...
-    // Note: handleSaveEdit logic uses the global unitToEdit, which is fine but relies on the UnitListTable triggering it.
-
     const resetForm = () => {
         setFormData({
             model: "",
@@ -508,6 +662,9 @@ const handleReportSubmit = async (e) => {
                 status: formData.status,
                 remarks: formData.remarks,
                 station: CURRENT_STATION,
+                // Include user info for logging the initial creation
+                full_name: user.full_name,
+                username: user.username,
             };
 
             // REAL API CALL: POST
@@ -542,74 +699,6 @@ const handleReportSubmit = async (e) => {
         }
     };
     
-    // DATABASE UPDATE LOGIC (FOR EDIT MODAL) - 🚨 CORRECTED LOGIC HERE
-    const handleSaveEdit = async (id, updatedData) => {
-        setUnitToEdit(null); 
-        
-        const originalStatus = unitToEdit.status; 
-        const isReopening = originalStatus === 'Completed' || originalStatus === 'No Good (NG)' || originalStatus === 'Pending Approval';
-        
-        const newStatus = isReopening ? 'Pending Approval' : updatedData.status;
-
-        setProcessStatus('loading');
-        setStatusMessage(`Updating unit ${id}. New status: ${newStatus}...`);
-        
-        try {
-            // Remap front-end camelCase to database snake_case for PUT request
-            const dataToSend = {
-                id: id, 
-                model: updatedData.model,
-                revision: updatedData.revision,
-                base_unit_kitting_no: updatedData.base_unit_kitting_no,
-                assembly_no: updatedData.assembly_no,
-                device_serial_no: updatedData.device_serial_no,
-                accessory_kitting_no: updatedData.accessory_kitting_no,
-                status: newStatus, // Use the determined status
-                remarks: updatedData.remarks,
-                station: updatedData.station || CURRENT_STATION,
-            };
-
-            // REAL API CALL: PUT
-            const res = await axios.put(UNITS_ENDPOINT, dataToSend, {
-                headers: { 'Content-Type': 'application/json' }
-            });
-            
-            if (res.data.status === 'success') {
-                setProcessStatus('success');
-                setStatusMessage(res.data.message);
-
-                setTimeout(() => {
-                    setProcessStatus('idle');
-                    
-                    if (isReopening || newStatus === 'Pending Approval') {
-                        setActiveTab('pending');
-                        fetchUnits('pending'); 
-                    } else {
-                        fetchUnits(activeTab); 
-                    }
-                }, 2000);
-            
-            } else {
-                setProcessStatus('error');
-                setStatusMessage(`Update Failed: ${res.data.error || 'Unknown server error.'}`);
-                setTimeout(() => setProcessStatus('idle'), 3000);
-            }
-            
-        } catch (err) {
-            console.error("Update Error:", err);
-            let errMsg = err.response?.data?.error || `Network Error: ${err.message}`;
-            setProcessStatus('error');
-            setStatusMessage(`API Update Error: ${errMsg}`);
-            setTimeout(() => setProcessStatus('idle'), 4000);
-        }
-    };
-    
-    // Handler to open the Edit Modal
-    const handleEditClick = (unit) => {
-        setUnitToEdit(unit);
-    };
-
-
     // Determine progress percentage
     const essentialFields = [formData.model, formData.revision, formData.baseUnitKittingNo, formData.assemblyNo, formData.deviceSerialNo, formData.accessoryKittingNo];
     const filledFields = essentialFields.filter(val => val && val.trim() !== "").length;
@@ -795,7 +884,6 @@ const handleReportSubmit = async (e) => {
                         </div>
                     </div>
                 );
-            
             case "daily_reports":
                 return (
                     <div className="row justify-content-center">
@@ -893,9 +981,7 @@ const handleReportSubmit = async (e) => {
             case "completed":
             case "no_good":
             case "pending":
-            case "account_history":
-            case "guide":
-                // Handles all list views using UnitListTable or placeholder
+                // List view
                 return (
                     <UnitListTable 
                         units={unitList} 
@@ -904,6 +990,33 @@ const handleReportSubmit = async (e) => {
                         error={listError}
                         onEdit={handleEditClick} 
                     />
+                );
+
+            case "account_history":
+                // NEW: History View
+                return (
+                    <>
+                        <h4 className="mb-4">
+                            <i className="bi bi-clock-history me-2 text-primary"></i>
+                            Unit Processing History for {CURRENT_STATION}
+                        </h4>
+                        <UnitHistoryTable 
+                            historyLogs={historyList} 
+                            loading={listLoading}
+                            error={listError}
+                        />
+                        <small className="text-muted mt-3 d-block">
+                            *This log reflects all status changes and movements originating from this station.
+                        </small>
+                    </>
+                );
+
+            case "guide":
+                return (
+                    <div className="alert alert-info text-center">
+                        <i className="bi bi-info-circle-fill me-2"></i>
+                        The module **{activeTab.replace(/_/g, ' ')}** is under development.
+                    </div>
                 );
 
             default:
@@ -961,10 +1074,11 @@ const handleReportSubmit = async (e) => {
                             <li className="text-uppercase small fw-bold text-muted mt-3 mb-2">
                                 Unit Management
                             </li>
-                            {[{ key: 'in_progress', icon: 'bi-hourglass-split', color: 'btn-warning text-dark' },
-                              { key: 'completed', icon: 'bi-check-circle', color: 'btn-success' },
-                              { key: 'no_good', icon: 'bi-x-circle', color: 'btn-danger' },
-                              { key: 'pending', icon: 'bi-clock-history', color: 'btn-info text-dark' }
+                            {[
+                                { key: 'in_progress', icon: 'bi-hourglass-split', color: 'btn-warning text-dark' },
+                                { key: 'completed', icon: 'bi-check-circle', color: 'btn-success' },
+                                { key: 'no_good', icon: 'bi-x-circle', color: 'btn-danger' },
+                                { key: 'pending', icon: 'bi-clock-history', color: 'btn-info text-dark' }
                             ].map(({ key, icon, color }) => (
                                 <li key={key} className="nav-item mb-1">
                                     <button 
@@ -981,9 +1095,10 @@ const handleReportSubmit = async (e) => {
                             <li className="text-uppercase small fw-bold text-muted mt-3 mb-2 border-top pt-3">
                                 Reports & Utilities
                             </li>
-                            {[{ key: 'daily_reports', icon: 'bi-file-bar-graph' }, // New functional report link
-                              { key: 'account_history', icon: 'bi-person-lines-fill' },
-                              { key: 'guide', icon: 'bi-book' }
+                            {[
+                                { key: 'daily_reports', icon: 'bi-file-bar-graph' }, // New functional report link
+                                { key: 'account_history', icon: 'bi-person-lines-fill' },
+                                { key: 'guide', icon: 'bi-book' }
                             ].map(({ key, icon }) => (
                                 <li key={key} className="nav-item mb-1">
                                     <button 
