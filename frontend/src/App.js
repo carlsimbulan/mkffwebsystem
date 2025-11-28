@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Login from "./Login";
-import AdminPage from "./pages/AdminPage";
+import AdminPage from "./admin/AdminPage";
 import Station1 from "./components/Station1"; // Assuming path is correct
 import ITAssistantPage from "./pages/ITAssistantPage";
 

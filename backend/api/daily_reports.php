@@ -9,7 +9,6 @@ header("Access-Control-Allow-Methods: GET, POST");
 header("Access-Control-Max-Age: 3600");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
-// 🚨 Corrected Include Path (Assuming confirmed '../db.php' is correct)
 include '../db.php'; 
 
 // Check if $pdo variable is defined and connected (provided by db.php)
@@ -22,16 +21,26 @@ if (!isset($pdo)) {
 $response = ["status" => "error", "message" => ""];
 
 // -----------------------------------------------------------
-// A. HANDLE GET REQUEST (FETCHING REPORTS LIST)
+// A. HANDLE GET REQUEST (FETCHING REPORTS LIST) - UPDATED!
 // -----------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     try {
-        // Query to fetch all reports, ordered newest first
-        $stmt = $pdo->prepare("SELECT * FROM daily_reports ORDER BY created_at DESC");
+        // 🌟 UPDATED QUERY: Gumamit ng LEFT JOIN para i-fetch ang full_name mula sa 'users' table.
+        // Tiyaking tama ang paggamit ng table/column names: daily_reports (dr), users (u), submitted_by, at username.
+        $sql = "SELECT
+                    dr.*,  -- Lahat ng columns mula sa daily_reports
+                    u.full_name AS submitted_by_name  -- Kukunin ang Full Name at papangalanang 'submitted_by_name'
+                FROM
+                    daily_reports dr
+                LEFT JOIN
+                    users u ON dr.submitted_by = u.username -- I-join base sa submitted_by (report) at username (user)
+                ORDER BY dr.created_at DESC";
+
+        $stmt = $pdo->prepare($sql);
         $stmt->execute();
         $reports = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Success: Return the reports list
+        // Success: Return the reports list (kasama na ang submitted_by_name)
         http_response_code(200);
         echo json_encode($reports);
         exit();
@@ -109,7 +118,7 @@ else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // --- 3. Insert Data into Database ---
 
     $sql = "INSERT INTO daily_reports (station, report_date, shift, total_units_processed, total_ng, downtime_minutes, summary, attachment_filename, submitted_by) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     try {
         $stmt = $pdo->prepare($sql);

@@ -1,5 +1,5 @@
 <?php
-// backend/api/units.php - Unit Management and History Logging (FIXED: Status Update Only)
+// backend/api/units.php - Unit Management and History Logging
 
 require_once '../db.php'; // Ensure db.php connects the $pdo object
 
@@ -102,20 +102,35 @@ if ($method === 'GET') {
 }
 
 // ---------------------------------------------------------------------
-// --- PUT: Update Unit (Status Logging ONLY - Unit Remains at Station) ---
+// --- PUT: Update Unit (Status Logging ONLY - Unit Remains at Station) (UNCHANGED) ---
 // ---------------------------------------------------------------------
 if ($method === 'PUT') {
     
     // 1. Basic Validation
-    if (empty($data) || !isset($data['id']) || !isset($data['status']) || !isset($data['station'])) {
+    // NOTE: This PUT block is usually for SCANNERS/OPERATORS. The approval logic uses this.
+    if (empty($data) || !isset($data['id']) || !isset($data['status'])) {
         http_response_code(400);
-        echo json_encode(['error' => 'Missing critical fields (id, status, or station) in update data.']);
+        echo json_encode(['error' => 'Missing critical fields (id, status) in update data.']);
         exit;
     }
-
+    
+    // Fetch the existing unit data first if station is missing in payload
     $unitId = $data['id'];
+    $fetchStmt = $pdo->prepare("SELECT station FROM units WHERE id = ?");
+    $fetchStmt->execute([$unitId]);
+    $existingUnit = $fetchStmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$existingUnit) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Unit not found for update.']);
+        exit;
+    }
+    
+    // Use existing station if not provided, or ensure it's not empty
+    $currentStation = $data['station'] ?? $existingUnit['station'] ?? 'N/A'; 
+
+
     $newStatus = $data['status'];
-    $currentStation = $data['station']; // Station where the unit currently resides
     $newRemarks = $data['remarks'] ?? '';
 
     $finalStatus = $newStatus; 
@@ -130,27 +145,11 @@ if ($method === 'PUT') {
         $actionType = 'APPROVAL_REQUESTED';
     }
     
-    // CRITICAL FIX: The unit stays at the current station.
-    $nextStation = $currentStation; 
-    
-
     // --- TRANSACTION ---
     try {
         $pdo->beginTransaction();
         
-        // 1. Fetch existing unit data to ensure we don't wipe non-updated fields (robustness)
-        $fetchStmt = $pdo->prepare("SELECT * FROM units WHERE id = ?");
-        $fetchStmt->execute([$unitId]);
-        $existingUnit = $fetchStmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$existingUnit) {
-            $pdo->rollBack();
-            http_response_code(404);
-            echo json_encode(['error' => 'Unit not found for update.']);
-            exit;
-        }
-
-        // 2. Log the history entry (The clone/backtracking record is created here)
+        // 1. Log the history entry
         logUnitAction(
             $pdo, 
             $unitId, 
@@ -158,18 +157,11 @@ if ($method === 'PUT') {
             $finalStatus, 
             $actionType, 
             $newRemarks, 
-            $data['full_name'] ?? $data['username'] ?? 'Admin'
+            $data['full_name'] ?? $data['username'] ?? 'Admin' // Use data from the user session
         );
         
-        // 3. Update the unit record: ONLY STATUS, REMARKS, AND IDENTIFICATION FIELDS ARE CHANGED.
-        // The station remains $currentStation.
+        // 2. Update the unit record (simplified to only update status, remarks, and station)
         $updateSql = "UPDATE units SET 
-                      model = :model, 
-                      revision = :revision, 
-                      base_unit_kitting_no = :base, 
-                      assembly_no = :assy, 
-                      device_serial_no = :serial, 
-                      accessory_kitting_no = :acc,
                       status = :final_status, 
                       remarks = :new_remarks, 
                       station = :current_station_param 
@@ -179,15 +171,6 @@ if ($method === 'PUT') {
         
         $updateStmt->execute([
             'id' => $unitId,
-            // Use new data if sent by client, otherwise use existing data (robustness)
-            'model' => $data['model'] ?? $existingUnit['model'],
-            'revision' => $data['revision'] ?? $existingUnit['revision'],
-            'base' => $data['base_unit_kitting_no'] ?? $existingUnit['base_unit_kitting_no'],
-            'assy' => $data['assembly_no'] ?? $existingUnit['assembly_no'],
-            'serial' => $data['device_serial_no'] ?? $existingUnit['device_serial_no'],
-            'acc' => $data['accessory_kitting_no'] ?? $existingUnit['accessory_kitting_no'],
-            
-            // Critical update fields
             'final_status' => $finalStatus,
             'new_remarks' => $newRemarks,
             'current_station_param' => $currentStation // Unit remains here
@@ -197,64 +180,135 @@ if ($method === 'PUT') {
         // --- Transaction End ---
 
         $msg = ($finalStatus === 'Completed') 
-               ? "Unit status updated to 'Completed'. It remains visible in the current station's list." 
-               : "Unit status updated to '{$finalStatus}'.";
+              ? "Unit status updated to 'Completed'. It remains visible in the current station's list." 
+              : "Unit status updated to '{$finalStatus}'.";
 
         http_response_code(200);
         echo json_encode(["status" => "success", "message" => $msg]);
 
     } catch (PDOException $e) {
         $pdo->rollBack();
+        error_log("PUT Error: " . $e->getMessage()); // Log error for server debugging
         http_response_code(500);
         echo json_encode(['error' => 'Database error during update: ' . $e->getMessage()]);
     }
     exit;
 }
 
-// --- POST: Save New Unit (Initial Insert) (UNCHANGED) ---
+// ---------------------------------------------------------------------
+// --- POST: Save New Unit (FIXED: Handles BATCH_INSERT) ---
+// ---------------------------------------------------------------------
 if ($method === 'POST') {
     
-    if (!isset($data['model']) || !isset($data['device_serial_no'])) {
-        http_response_code(400);
-        echo json_encode(['error' => 'Missing required fields for POST (Insert).']);
+    // ✅ NEW CHECK: Check if this is a BATCH INSERT request
+    if (isset($data['method']) && strtoupper($data['method']) === 'BATCH_INSERT') {
+        
+        if (!isset($data['units']) || !is_array($data['units']) || empty($data['units'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Batch insert requires a non-empty "units" array.']);
+            exit;
+        }
+
+        $successfulInserts = 0;
+        
+        try {
+            $pdo->beginTransaction();
+
+            $sql = "INSERT INTO units (model, revision, base_unit_kitting_no, assembly_no, device_serial_no, accessory_kitting_no, status, remarks, station)
+                    VALUES (:model, :revision, :base, :assy, :serial, :acc, :status, :remarks, :station)";
+            $stmt = $pdo->prepare($sql);
+            
+            // Loop through the units array and insert each one
+            foreach ($data['units'] as $unit) {
+                // Default values from React payload
+                $initialStatus = $unit['status'] ?? 'For Scanning';
+                $initialRemarks = $unit['remarks'] ?? 'Initial unit creation by IT Assistant.';
+                $initialStation = $unit['station'] ?? 'N/A'; // N/A until first scan
+                $actionBy = $unit['created_by'] ?? $unit['username'] ?? 'System'; // Use the user data from client
+
+                $stmt->execute([
+                    'model' => $unit['model'] ?? null,
+                    'revision' => $unit['revision'] ?? null,
+                    'base' => $unit['base_unit_kitting_no'] ?? null,
+                    'assy' => $unit['assembly_no'] ?? null,
+                    'serial' => $unit['device_serial_no'] ?? null,
+                    'acc' => $unit['accessory_kitting_no'] ?? null,
+                    'status' => $initialStatus,
+                    'remarks' => $initialRemarks,
+                    'station' => $initialStation
+                ]);
+                
+                $newUnitId = $pdo->lastInsertId();
+                
+                // Log the creation of the unit
+                logUnitAction($pdo, $newUnitId, $initialStation, $initialStatus, 'UNIT_CREATED', $initialRemarks, $actionBy);
+                $successfulInserts++;
+            }
+            
+            $pdo->commit();
+            
+            http_response_code(201); // Created
+            echo json_encode(['status' => 'success', 'message' => "Successfully inserted {$successfulInserts} units.", 'count' => $successfulInserts]);
+
+        } catch (PDOException $e) {
+            $pdo->rollBack();
+            error_log("BATCH INSERT Error: " . $e->getMessage()); // Log error for server debugging
+            http_response_code(400); // Changed to 400 or 500
+            echo json_encode([
+                'error' => 'Database error during batch insert.', 
+                'details' => $e->getMessage(),
+                'units_inserted_before_failure' => $successfulInserts
+            ]);
+        }
         exit;
-    }
+    } 
+    
+    // --- Fallback to Single Unit Insert (If 'method' is not BATCH_INSERT) ---
+    else {
+        if (!isset($data['model']) || !isset($data['device_serial_no'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Missing required fields for POST (Single Insert).']);
+            exit;
+        }
 
-    $initialStation = $data['station'] ?? 'Station1';
-    $initialStatus = $data['status'] ?? 'In Progress';
-    $initialRemarks = $data['remarks'] ?? 'New unit created.';
+        $initialStation = $data['station'] ?? 'N/A';
+        $initialStatus = $data['status'] ?? 'For Scanning';
+        $initialRemarks = $data['remarks'] ?? 'New unit created.';
 
-    try {
-        $pdo->beginTransaction();
+        try {
+            $pdo->beginTransaction();
 
-        $sql = "INSERT INTO units (model, revision, base_unit_kitting_no, assembly_no, device_serial_no, accessory_kitting_no, status, remarks, station)
-                 VALUES (:model, :revision, :base, :assy, :serial, :acc, :status, :remarks, :station)";
-        
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            'model' => $data['model'] ?? null,
-            'revision' => $data['revision'] ?? null,
-            'base' => $data['base_unit_kitting_no'] ?? null,
-            'assy' => $data['assembly_no'] ?? null,
-            'serial' => $data['device_serial_no'] ?? null,
-            'acc' => $data['accessory_kitting_no'] ?? null,
-            'status' => $initialStatus,
-            'remarks' => $initialRemarks,
-            'station' => $initialStation
-        ]);
-        
-        $newUnitId = $pdo->lastInsertId();
-        
-        // Log the creation of the unit
-        logUnitAction($pdo, $newUnitId, $initialStation, $initialStatus, 'UNIT_CREATED', $initialRemarks, $data['full_name'] ?? $data['username'] ?? 'System');
-        
-        $pdo->commit();
-        
-        echo json_encode(['status' => 'success', 'message' => 'Unit saved and logged successfully', 'id' => $newUnitId]);
-    } catch (PDOException $e) {
-        $pdo->rollBack();
-        http_response_code(500);
-        echo json_encode(['error' => 'Database error during insert: ' . $e->getMessage()]);
+            $sql = "INSERT INTO units (model, revision, base_unit_kitting_no, assembly_no, device_serial_no, accessory_kitting_no, status, remarks, station)
+                    VALUES (:model, :revision, :base, :assy, :serial, :acc, :status, :remarks, :station)";
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([
+                'model' => $data['model'] ?? null,
+                'revision' => $data['revision'] ?? null,
+                'base' => $data['base_unit_kitting_no'] ?? null,
+                'assy' => $data['assembly_no'] ?? null,
+                'serial' => $data['device_serial_no'] ?? null,
+                'acc' => $data['accessory_kitting_no'] ?? null,
+                'status' => $initialStatus,
+                'remarks' => $initialRemarks,
+                'station' => $initialStation
+            ]);
+            
+            $newUnitId = $pdo->lastInsertId();
+            
+            // Log the creation of the unit
+            logUnitAction($pdo, $newUnitId, $initialStation, $initialStatus, 'UNIT_CREATED', $initialRemarks, $data['full_name'] ?? $data['username'] ?? 'System');
+            
+            $pdo->commit();
+            
+            http_response_code(201);
+            echo json_encode(['status' => 'success', 'message' => 'Unit saved and logged successfully', 'id' => $newUnitId]);
+        } catch (PDOException $e) {
+            $pdo->rollBack();
+            error_log("SINGLE INSERT Error: " . $e->getMessage()); // Log error for server debugging
+            http_response_code(400); 
+            echo json_encode(['error' => 'Database error during single insert: ' . $e->getMessage()]);
+        }
     }
     exit;
 }

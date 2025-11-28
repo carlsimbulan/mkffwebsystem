@@ -1,10 +1,21 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import 'bootstrap-icons/font/bootstrap-icons.css';
-// NEW IMPORTS FOR CHARTS
+
+// 1. CHART IMPORTS & REGISTRATION
 import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
-import { Doughnut, Bar } from 'react-chartjs-2';
-import logo from '../logo.png';
+import logo from '../logo.png'; // Assuming path remains the same
+
+// IMPORT SEPARATED COMPONENTS
+import { EditUnitModal } from './components/EditUnitModal';
+import { ReportDetailModal } from './components/ReportDetailModal';
+import { ManageUserModal } from './components/ManageUserModal';
+import { DeleteUserModal } from './components/DeleteUserModal';
+import { SubmitReportModal } from './components/SubmitReportModal';
+import { StationHistoryModal } from './components/StationHistoryModal';
+import { UnitPieChart } from './components/UnitPieChart';
+import { StationBarChart } from './components/StationBarChart';
+import { NotificationBell } from './components/NotificationBell';
 
 // REGISTER CHART COMPONENTS GLOBALLY
 ChartJS.register(
@@ -41,11 +52,11 @@ const DELAY_THRESHOLDS_MINUTES = {
 const API_BASE_URL = "http://localhost/mkffwebsystem/backend/api";
 const UNITS_ENDPOINT = `${API_BASE_URL}/units.php`;
 const REPORTS_ENDPOINT = `${API_BASE_URL}/daily_reports.php`;
-const USER_MANAGEMENT_ENDPOINT = `${API_BASE_URL}/user_management.php`; // NEW ENDPOINT
+const USER_MANAGEMENT_ENDPOINT = `${API_BASE_URL}/user_management.php`;
+const HISTORY_ENDPOINT = `${API_BASE_URL}/unit_history.php`; // Added back for modal prop
+
 // --- LOCAL PATHS ---
-// Conceptual path where avatars are served
-const AVATAR_UPLOAD_PATH = `http://localhost/mkffwebsystem/backend/api/uploads/avatars/`;
-// Fallback for missing/broken avatar files
+const AVATAR_UPLOAD_PATH = `${API_BASE_URL}/uploads/avatars/`;
 const DEFAULT_AVATAR_PATH = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTE2IDguNWExLjUgMS41IDAgMSAxIDAgLTVhMS41IDEuNSAwIDAgMSAwIDVaTTkgMTMuNGM2LjUgMCA3IDUuMyA3IDV2Mi41aC0xNGwtLjItLjJjLS4xLS4xLS40LS41LS43LS45LS40LS41LS43LTEuMS0uNy0xLjhjMC0uNi40LTEuMS44LTEuNS41LS41IDEuMy0uNyAyLjItLjcgMS4yIDAgMi4xLjMgMyAxLjEgLjIgLjQgLjQgLjggLjQgMS4yIDAgLjkgLS41IDEuNi0xLjMgMi4zLS41LjUtMS4xLjgtMS44LjhoLTJjLS45IDAtMS42LS4zLTIuMS0uN2wxLjgtLjIgLjMtLjNjLS41LS41LS45LS44LTEuNC0xLjIgMS0uOSAxLjctMi40IDEuNy00LjUgMC0xLS40LTEuOS0xLjEtMi42LS42LS43LTEuNS0xLjEtMi41LTEuMi0xLjIgMC0yLjQuNS0zLjUgMS41LS41LjItLjkuNS0xLjQgLjcgLjIuNS40LjkuNSAxLjQgLjIgLjQgLjQgLjggLjQgMS4yIDAgLjggLS41IDEuNi0xLjQgMi4zLS4zLjItLjYuNS0uOS43bC0xLjguMi0uMi0uMmMtLjQtLjQtLjctLjgtLjctMS40IDAtLjggLjUtMS41IDEuMS0yLjIgLjUtLjUgMS4xLS44IDEuOC0uOC45IDAgMS43LjMgMi40LjkgLjQtLjIuOC0uNCAxLjItLjcgMC0uNy0uMy0xLjQtLjktMi4xLS41LS42LTEuMi0xLS43LTEuNyAwLS42LjUtMS4xIDEtMS41LjQtLjQgLjctLjUgMS4yLS42LjYtLjIgMS41LS4yIDIuMiAwIDAgLjUgLjQgLjcgLjggMS4xLjMtLjIuNi0uNCAxLS42LjktLjUgMi0uNyAyLjgtLjcgc20uMy0uNWMuOCAwIDEuNC41IDEuNSAxLjEuMS43LS41IDEuMy0xLjQgMS40LS44IDAtMS41LS42LTEuNS0xLjIgMC0uNS40LS45LjgtMS4zLjUtLjQgMS4yLS42IDEuNi0uNnptMi44IDYuOC40LjRjLjIgLjEuNC4yLjYgLjUgMCAuNy0uMyAxLjQtLjggMi4xLS40LjYtMSAxLjEtMS44IDEuNC0uMS4xLS4zLjEtLjQuM2wtLjMtLjNjLS41LS41LS44LTEuMS0uOC0xLjggMC0uOC40LTEuNSAxLjItMi4xem0tMS41LS40Yy0uMi0uMS0uMy0uMi0uNC0uMy0uMi0uMi0uMy0uNC0uNS0uNi0uMy0uMy0uNi0uNS0uOC0uNy0uMy0uMy0uNS0uNi0uNy0uOS0uNS0uNi0uOC0xLjQtLjgtMi40IDAtLjkuMy0xLjcgLjktMi40LjUtLjUgMS4zLS44IDIuMy0uOCAxLjIgMCAyLjEuMyAzIC45LjQuMi43LjUgMS4xLjcuNC4zLjcgLjYgLjggLjkgLjMgLjUgLjYgMSAuOCAxLjYgLjMgLjYgLjUgMS4yLjUgMS44IDAgLjgtLjIgMS41LS42IDIuMS0uNC43LS45IDEuMy0xLjUgMS43em0tMS4zLTYuM2h-MS4zLjRjLS4xLjQtLjIuOS0uMyAxLjItLjQuNy0uNSAxLjQtLjUgMi4yIDAgLjcuMyAxLjMuOSAxLjguNC0uMi43LS41IDEtLjkuNS0uNS43LTEuMS43LTEuOCAwLS45IDAtMS43LS41LTIuNC0uNS0uNi0xLjMtMS0xLjgtMS4yLS4xLjMtLjIuNi0uNCAxeiIvPjwvc3ZnPg==';
 
 // Helper function to format date as YYYY-MM-DD
@@ -53,885 +64,6 @@ const getTodayDate = () => {
     const d = new Date();
     return d.toISOString().split('T')[0];
 };
-
-// --- Edit Unit Modal Component (Existing, Unchanged) ---
-const EditUnitModal = ({ unit, onClose, onSave }) => {
-    // ... (rest of EditUnitModal remains unchanged)
-    const [formData, setFormData] = useState(unit ? {
-        status: unit.status,
-        remarks: unit.remarks,
-        model: unit.model,
-        revision: unit.revision,
-        base_unit_kitting_no: unit.base_unit_kitting_no,
-        assembly_no: unit.assembly_no,
-        device_serial_no: unit.device_serial_no,
-        accessory_kitting_no: unit.accessory_kitting_no,
-        station: unit.station,
-    } : {});
-
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
-
-    const handleSave = () => {
-        onSave(unit.id, formData);
-    };
-
-    if (!unit) return null;
-
-    const statusOptions = ["In Progress", "Completed", "No Good (NG)", "Pending Approval"];
-
-    return (
-        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
-            <div className="modal-dialog modal-dialog-centered">
-                <div className="modal-content">
-                    <div className="modal-header bg-danger text-white">
-                        <h5 className="modal-title">Edit Unit: {unit.device_serial_no}</h5>
-                        <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
-                    </div>
-                    <div className="modal-body">
-                        <p className="text-muted small">ID: {unit.id} | Station: {unit.station}</p>
-                        <form>
-                            <div className="mb-3">
-                                <label className="form-label">Model</label>
-                                <input type="text" className="form-control" name="model" value={formData.model || ''} onChange={handleChange} readOnly />
-                            </div>
-                            <div className="mb-3">
-                                <label className="form-label">Status</label>
-                                <select className="form-select" name="status" value={formData.status} onChange={handleChange}>
-                                    {statusOptions.map(opt => (
-                                        <option key={opt} value={opt}>{opt}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="mb-3">
-                                <label className="form-label">Remarks</label>
-                                <textarea className="form-control" name="remarks" value={formData.remarks || ''} onChange={handleChange}></textarea>
-                            </div>
-                        </form>
-                    </div>
-                    <div className="modal-footer">
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
-                        <button type="button" className="btn btn-danger" onClick={handleSave}>Save changes</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-// --- END MODAL COMPONENT ---
-
-
-// Report Detail Viewer Modal (Existing, Unchanged)
-const ReportDetailModal = ({ report, onClose }) => {
-    // ... (rest of ReportDetailModal remains unchanged)
-    if (!report) return null;
-
-    const attachmentUrl = report.attachment_filename
-        ? `${API_BASE_URL}/uploads/${report.attachment_filename}`
-        : null;
-
-    const getMetricsCard = (label, value, className = "text-primary") => (
-        <div className="card shadow-sm p-3 h-100">
-            <div className="small text-muted">{label}</div>
-            <h5 className={`fw-bold mb-0 ${className}`}>{value}</h5>
-        </div>
-    );
-
-    return (
-        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
-            <div className="modal-dialog modal-dialog-centered modal-lg">
-                <div className="modal-content">
-                    <div className="modal-header bg-danger text-white">
-                        <h5 className="modal-title">Daily Report Details: {report.station} - {report.report_date}</h5>
-                        <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
-                    </div>
-                    <div className="modal-body">
-                        <div className="row g-3 mb-4">
-                            <div className="col-md-3">{getMetricsCard("Submitted By", report.submitted_by || 'N/A', "text-dark")}</div>
-                            <div className="col-md-3">{getMetricsCard("Shift", report.shift)}</div>
-                            <div className="col-md-3">{getMetricsCard("Units Processed", report.total_units_processed, "text-success")}</div>
-                            <div className="col-md-3">{getMetricsCard("NG Units", report.total_ng, "text-danger")}</div>
-                        </div>
-
-                        <h6>Shift Summary & Issues</h6>
-                        <div className="p-3 border rounded bg-light small whitespace-pre-wrap">{report.summary || "No detailed summary provided."}</div>
-
-                        <h6>Attachment</h6>
-                        {attachmentUrl ? (
-                            <div className="border p-3 bg-light text-center">
-                                <a href={attachmentUrl} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline-secondary">
-                                    <i className="bi bi-paperclip me-2"></i> View Attached File: {report.attachment_filename}
-                                </a>
-                            </div>
-                        ) : (
-                            <div className="text-muted small">No file was attached to this report.</div>
-                        )}
-                    </div>
-                    <div className="modal-footer">
-                        <button type="button" className="btn btn-secondary" onClick={() => { window.print(); }}>
-                            <i className="bi bi-printer"></i> Print Summary
-                        </button>
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-
-// --- NEW: User Management Modal (Create/Edit, Unchanged) ---
-const ManageUserModal = ({ userToEdit, stations, onClose, onSave }) => {
-    // Determine if we are in Edit mode (userToEdit is passed and has an id)
-    const isEditMode = userToEdit && userToEdit.id !== null;
-
-    // Define the structure for Add/Edit, including avatar fields
-    const initialFormData = isEditMode ? {
-        id: userToEdit.id,
-        username: userToEdit.username,
-        password: userToEdit.password || '', // Display current password for edit as requested
-        role: userToEdit.role,
-        full_name: userToEdit.full_name,
-        station: userToEdit.station || '',
-        avatar_url: userToEdit.avatar_url || '', // Existing avatar file name from DB
-        avatar_file: null, // Placeholder for new file object
-    } : {
-        // This is the structure for 'Add New User' mode
-        id: null,
-        username: '',
-        password: '',
-        role: 'Operator',
-        full_name: '',
-        station: '',
-        avatar_url: '',
-        avatar_file: null,
-    };
-
-    const [formData, setFormData] = useState(initialFormData);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
-
-    // State for the image preview
-    const [avatarPreview, setAvatarPreview] = useState(
-        (isEditMode && userToEdit.avatar_url)
-        ? `${AVATAR_UPLOAD_PATH}${userToEdit.avatar_url}`
-        : DEFAULT_AVATAR_PATH
-    );
-
-    const roleOptions = ["Administrator", "IT Assistant", "Operator"];
-
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-        setError('');
-        setSuccess('');
-    };
-
-    // Handle file selection and preview
-    const handleFileChange = (e) => {
-        const file = e.target.files[0];
-
-        if (file) {
-            // Store file object and set avatar_url to the *new* filename
-            setFormData({
-                ...formData,
-                avatar_file: file,
-                avatar_url: file.name
-            });
-            // Create a temporary browser URL for immediate preview
-            setAvatarPreview(URL.createObjectURL(file));
-        } else {
-            // Clear or reset to existing avatar if they hit cancel/clear
-            setFormData({
-                ...formData,
-                avatar_file: null,
-                avatar_url: isEditMode ? initialFormData.avatar_url : ''
-            });
-            setAvatarPreview(isEditMode && initialFormData.avatar_url ? `${AVATAR_UPLOAD_PATH}${initialFormData.avatar_url}` : DEFAULT_AVATAR_PATH);
-        }
-        setError('');
-        setSuccess('');
-    };
-
-    const handleSave = async () => {
-        if (!formData.username || !formData.password || !formData.role || !formData.full_name) {
-            setError('All required fields are needed.');
-            return;
-        }
-
-        // --- PREPARE DATA FOR BACKEND ---
-        const isFileUpdate = formData.avatar_file instanceof File;
-
-        let payload;
-        let headers = { };
-        let url;
-        const methodOverride = formData.id ? 'PUT' : 'POST';
-
-        if (isFileUpdate) {
-            // SCENARIO 1: FILE UPLOAD (multipart/form-data)
-            payload = new FormData();
-
-            // Append the new file
-            payload.append('avatar', formData.avatar_file, formData.avatar_file.name);
-
-            // Append all other fields
-            payload.append('id', formData.id || '');
-            payload.append('username', formData.username);
-            payload.append('password', formData.password);
-            payload.append('role', formData.role);
-            payload.append('full_name', formData.full_name);
-            payload.append('station', formData.station || '');
-            payload.append('avatar_url', formData.avatar_url);
-
-            url = `${USER_MANAGEMENT_ENDPOINT}?method=${methodOverride}`;
-
-        } else {
-            // SCENARIO 2: TEXT/URL ONLY UPDATE (JSON)
-            payload = {
-                id: formData.id,
-                username: formData.username,
-                password: formData.password,
-                role: formData.role,
-                full_name: formData.full_name,
-                station: formData.station,
-                avatar_url: formData.avatar_url, // Send the URL/filename
-            };
-            headers['Content-Type'] = 'application/json';
-            url = `${USER_MANAGEMENT_ENDPOINT}?method=${methodOverride}`;
-        }
-
-        try {
-            // The onSave function now handles the API call and refresh, eliminating redundancy.
-            await onSave(payload, headers, url);
-
-            setSuccess(`User ${isEditMode ? 'updated' : 'added'} successfully!`);
-            setTimeout(onClose, 1000);
-        } catch (error) {
-            // Error handling relies on the error thrown by the parent's onSave
-            console.error(`Error ${isEditMode ? 'updating' : 'adding'} user:`, error);
-            // Use error.message because handleSaveUser throws a new Error object
-            setError(error.message || `Failed to ${isEditMode ? 'update' : 'add'} user.`);
-        }
-    };
-
-    return (
-        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
-            <div className="modal-dialog modal-dialog-centered modal-lg">
-                <div className="modal-content">
-                    <div className="modal-header bg-danger text-white">
-                        <h5 className="modal-title">{isEditMode ? `Edit User: ${userToEdit.username}` : 'Add New User'}</h5>
-                        <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
-                    </div>
-                    <div className="modal-body">
-                        {error && <div className="alert alert-danger small">{error}</div>}
-                        {success && <div className="alert alert-success small">{success}</div>}
-                        {isEditMode && <p className="text-muted small">ID: {userToEdit.id} | Created: {userToEdit.created_at}</p>}
-
-                        <form>
-                            <div className="row">
-                                {/* Left Column: Avatar Management */}
-                                <div className="col-md-4 text-center">
-                                    <h6 className="small text-muted">Profile Avatar</h6>
-                                    {/* Avatar Preview */}
-                                    <img
-                                        src={avatarPreview}
-                                        alt="Avatar Preview"
-                                        className="img-fluid rounded-circle mb-2 border border-secondary"
-                                        style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                                        // Handle error if the existing URL is broken
-                                        onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
-                                    />
-                                    {/* File Input */}
-                                    <div className="mb-3">
-                                        <input type="file" className="form-control form-control-sm" accept="image/*" onChange={handleFileChange} />
-                                        {formData.avatar_url &&
-                                            <div className="form-text small text-primary">
-                                                {formData.avatar_file ? 'New file selected' : `Current file: ${formData.avatar_url}`}
-                                            </div>
-                                        }
-                                        {!formData.avatar_url &&
-                                            <div className="form-text small text-muted">
-                                                No avatar set. Click to upload.
-                                            </div>
-                                        }
-                                    </div>
-                                </div>
-                                {/* Right Column: Fields */}
-                                <div className="col-md-8">
-                                    <div className="mb-3">
-                                        <label className="form-label">Full Name</label>
-                                        <input type="text" className="form-control" name="full_name" value={formData.full_name} onChange={handleChange} required />
-                                    </div>
-                                    <div className="mb-3">
-                                        <label className="form-label">Username</label>
-                                        <input type="text" className="form-control" name="username" value={formData.username} onChange={handleChange} required />
-                                    </div>
-                                    <div className="mb-3">
-                                        <label className="form-label">{isEditMode ? 'Password (Current: ****)' : 'Password'}</label>
-                                        <input type="text" className="form-control" name="password" value={formData.password} onChange={handleChange} required />
-                                        {isEditMode && <div className="form-text text-danger">The current password is: **{userToEdit.password}**. Edit as needed.</div>}
-                                    </div>
-                                    <div className="row">
-                                        <div className="col-md-6 mb-3">
-                                            <label className="form-label">Role</label>
-                                            <select className="form-select" name="role" value={formData.role} onChange={handleChange} required>
-                                                {roleOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}
-                                            </select>
-                                        </div>
-                                        <div className="col-md-6 mb-3">
-                                            <label className="form-label">Station (Optional)</label>
-                                            <select className="form-select" name="station" value={formData.station} onChange={handleChange}>
-                                                <option value="">N/A (Admin/IT)</option>
-                                                {stations.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                    <div className="modal-footer">
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
-                        <button type="button" className="btn btn-danger" onClick={handleSave} disabled={!!success}>
-                            {isEditMode ? 'Save Changes' : 'Create User'}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// --- NEW: Delete User Modal (Existing, Unchanged) ---
-const DeleteUserModal = ({ user, onClose, onDelete }) => {
-    return (
-        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1070 }}>
-            <div className="modal-dialog modal-dialog-centered modal-sm">
-                <div className="modal-content">
-                    <div className="modal-header bg-warning text-dark">
-                        <h5 className="modal-title">Confirm Deletion</h5>
-                        <button type="button" className="btn-close btn-close-dark" onClick={onClose}></button>
-                    </div>
-                    <div className="modal-body">
-                        <p>Are you sure you want to **permanently delete** the user:</p>
-                        <p className="fw-bold text-danger mb-0">{user.full_name} ({user.username})?</p>
-                        <p className="small text-muted">ID: {user.id} | Role: {user.role}</p>
-                        {user.id === 1 && <div className="alert alert-danger small mt-2">Cannot delete the primary system admin (ID 1).</div>}
-                    </div>
-                    <div className="modal-footer">
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-                        <button
-                            type="button"
-                            className="btn btn-danger"
-                            onClick={() => onDelete(user.id)}
-                            disabled={user.id === 1} // Disable deletion for ID 1
-                        >
-                            <i className="bi bi-trash"></i> Delete User
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-// --- END NEW MODALS ---
-
-
-// --- NEW: Submit Report Modal (Existing, Unchanged) ---
-const SubmitReportModal = ({ user, stations, onClose, onSave }) => {
-    const [formData, setFormData] = useState({
-        station: user.station || (stations.length > 0 ? stations[0].id : ''),
-        shift: 'Day',
-        total_units_processed: '',
-        total_ng: '',
-        downtime_minutes: '',
-        summary: '',
-        attachment_file: null,
-    });
-    const [filePreview, setFilePreview] = useState(null);
-    const [error, setError] = useState('');
-    const shiftOptions = ["Day", "Night"];
-
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-        setError('');
-    };
-
-    const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        setFormData({ ...formData, attachment_file: file });
-        setFilePreview(file ? file.name : null);
-    };
-
-    const handleSave = async () => {
-        if (!formData.station || !formData.shift || !formData.total_units_processed) {
-            setError('Station, Shift, and Units Processed are required.');
-            return;
-        }
-
-        const dataToSend = new FormData();
-
-        // Append all text fields
-        dataToSend.append('submitted_by', user.full_name || user.username || 'Unknown');
-        dataToSend.append('report_date', getTodayDate());
-        dataToSend.append('shift', formData.shift);
-        dataToSend.append('station', formData.station);
-        dataToSend.append('total_units_processed', formData.total_units_processed);
-        dataToSend.append('total_ng', formData.total_ng || 0);
-        dataToSend.append('downtime_minutes', formData.downtime_minutes || 0);
-        dataToSend.append('summary', formData.summary);
-
-        // Append the file if present
-        if (formData.attachment_file) {
-            dataToSend.append('attachment', formData.attachment_file, formData.attachment_file.name);
-        }
-
-        try {
-            // Note: This assumes daily_reports.php supports POST for new reports and handles files.
-            await axios.post(REPORTS_ENDPOINT, dataToSend);
-            onSave(); // Parent function refresh
-            onClose();
-        } catch (err) {
-            console.error("Report submission failed:", err);
-            setError(err.response?.data?.message || "Failed to submit report. Check backend (daily_reports.php) POST method.");
-        }
-    };
-
-    return (
-        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
-            <div className="modal-dialog modal-dialog-centered modal-lg">
-                <div className="modal-content">
-                    <div className="modal-header bg-danger text-white">
-                        <h5 className="modal-title">Submit Daily Production Report</h5>
-                        <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
-                    </div>
-                    <div className="modal-body">
-                        {error && <div className="alert alert-danger small">{error}</div>}
-                        <p className="text-muted small">Reporting for: **{user.full_name || user.username}** | Date: **{getTodayDate()}**</p>
-
-                        <form>
-                            <div className="row">
-                                <div className="col-md-6 mb-3">
-                                    <label className="form-label">Station</label>
-                                    <select className="form-select" name="station" value={formData.station} onChange={handleChange} required>
-                                        <option value="">Select Station</option>
-                                        {stations.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
-                                    </select>
-                                </div>
-                                <div className="col-md-6 mb-3">
-                                    <label className="form-label">Shift</label>
-                                    <select className="form-select" name="shift" value={formData.shift} onChange={handleChange} required>
-                                        {shiftOptions.map(opt => (<option key={opt} value={opt}>{opt}</option>))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="row">
-                                <div className="col-md-4 mb-3">
-                                    <label className="form-label">Units Processed (Completed)</label>
-                                    <input type="number" className="form-control" name="total_units_processed" value={formData.total_units_processed} onChange={handleChange} min="0" required />
-                                </div>
-                                <div className="col-md-4 mb-3">
-                                    <label className="form-label">No Good (NG) Units</label>
-                                    <input type="number" className="form-control" name="total_ng" value={formData.total_ng} onChange={handleChange} min="0" />
-                                </div>
-                                <div className="col-md-4 mb-3">
-                                    <label className="form-label">Downtime (Minutes)</label>
-                                    <input type="number" className="form-control" name="downtime_minutes" value={formData.downtime_minutes} onChange={handleChange} min="0" />
-                                </div>
-                            </div>
-
-                            <div className="mb-3">
-                                <label className="form-label">Shift Summary / Issues Encountered</label>
-                                <textarea className="form-control" name="summary" value={formData.summary} onChange={handleChange} rows="3"></textarea>
-                            </div>
-
-                            <div className="mb-3">
-                                <label className="form-label">Attachment (Optional)</label>
-                                <input type="file" className="form-control" name="attachment" onChange={handleFileChange} accept="image/*,.pdf,.xlsx,.csv" />
-                                {filePreview && <p className="form-text text-muted">File selected: {filePreview}</p>}
-                            </div>
-                        </form>
-                    </div>
-                    <div className="modal-footer">
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-                        <button type="button" className="btn btn-danger" onClick={handleSave}>Submit Report</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-// --- END Submit Report Modal ---
-
-// --- NEW: Station History Modal Component (Unchanged) ---
-const StationHistoryModal = ({ stationId, onClose }) => {
-    const [historyLogs, setHistoryLogs] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-
-    // Assuming the backend path: http://localhost/mkffwebsystem/backend/api/unit_history.php
-    const HISTORY_ENDPOINT = `${API_BASE_URL}/unit_history.php`;
-
-    // Fetch history logs for the given station
-    useEffect(() => {
-        const fetchHistory = async () => {
-            setLoading(true);
-            setError(null);
-            try {
-                // Fetch logs, passing the station ID as a query parameter
-                const response = await axios.get(HISTORY_ENDPOINT, {
-                    params: { station: stationId }
-                });
-                // Ensure response.data is an array before setting state
-                if (Array.isArray(response.data)) {
-                    // Sort logs by timestamp descending (newest first, same as PHP ORDER BY)
-                    setHistoryLogs(response.data);
-                } else {
-                    setHistoryLogs([]);
-                    setError("Received non-array response from history endpoint. Please check PHP output.");
-                }
-            } catch (err) {
-                console.error("Error fetching station history:", err);
-                // Access nested message if available, otherwise use generic error
-                setError(err.response?.data?.message || "Failed to fetch unit history. Check backend (unit_history.php).");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        if (stationId) {
-            fetchHistory();
-        }
-    }, [stationId]);
-
-    if (!stationId) return null;
-
-    // Helper function to render status badges
-    const getStatusBadge = (status) => {
-        let className = 'bg-secondary';
-        if (status === 'Completed') className = 'bg-success';
-        else if (status === 'No Good (NG)') className = 'bg-danger';
-        else if (status === 'In Progress') className = 'bg-primary';
-        else if (status === 'Pending Approval') className = 'bg-warning text-dark';
-        
-        return <span className={`badge ${className}`}>{status}</span>;
-    };
-    
-    // Helper function to render Action Type badges
-    const getActionTypeBadge = (action) => {
-        let className = 'bg-info text-dark';
-        if (action === 'COMPLETED_AT_STATION') className = 'bg-success';
-        else if (action === 'APPROVAL_REQUESTED') className = 'bg-warning text-dark';
-        else if (action === 'STATUS_UPDATED') className = 'bg-primary';
-        
-        return <span className={`badge ${className}`}>{action.replace(/_/g, ' ')}</span>;
-    };
-
-
-    return (
-        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1080 }}>
-            <div className="modal-dialog modal-dialog-centered modal-xl">
-                <div className="modal-content">
-                    <div className="modal-header bg-dark text-white">
-                        <h5 className="modal-title"><i className="bi bi-clock-history me-2"></i> Unit History for: {stationId}</h5>
-                        <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
-                    </div>
-                    <div className="modal-body p-0">
-                        {loading && (
-                            <div className="text-center py-5">
-                                <div className="spinner-border text-danger" role="status"></div>
-                                <p className="mt-3 text-muted">Loading history...</p>
-                            </div>
-                        )}
-                        {error && (
-                            <div className="alert alert-danger m-3">{error}</div>
-                        )}
-                        
-                        {!loading && !error && (
-                            <div className="table-responsive" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-                                <table className="table table-sm table-hover table-striped mb-0 small">
-                                    <thead className="table-dark sticky-top">
-                                        <tr>
-                                            {/* UPDATED HEADERS TO MATCH AUDIT DATA */}
-                                            <th>H. ID</th>
-                                            <th>Unit ID</th>
-                                            <th>Action Type</th>
-                                            <th>Status After</th>
-                                            <th>Action By</th>
-                                            <th>Remarks</th>
-                                            <th>Timestamp</th>
-                                            <th>Station</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {historyLogs.length > 0 ? historyLogs.map(log => (
-                                            // Make sure your backend returns history_id, unit_id, action_type, status_after, remarks, action_by, timestamp, station_name
-                                            <tr key={log.history_id}> 
-                                                <td>{log.history_id}</td>
-                                                <td>{log.unit_id}</td> 
-                                                <td>{getActionTypeBadge(log.action_type)}</td> 
-                                                <td>{getStatusBadge(log.status_after)}</td>
-                                                <td>{log.action_by || 'System'}</td>
-                                                <td>{log.remarks || 'N/A'}</td>
-                                                <td className="text-muted">{new Date(log.timestamp).toLocaleString()}</td>
-                                                <td>{log.station_name || stationId}</td>
-                                            </tr>
-                                        )) : (
-                                            <tr>
-                                                <td colSpan="8" className="text-center py-4">No historical records found for **{stationId}**.</td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-
-                    </div>
-                    <div className="modal-footer">
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-// --- END NEW MODAL COMPONENT ---
-
-
-// --- CHART COMPONENTS (Updated to use Chart.js, Unchanged) ---
-const UnitPieChart = ({ metrics, title }) => {
-    // Convert metrics into Chart.js data object format
-    const chartData = {
-        labels: ['Completed', 'No Good (NG)', 'In Progress'],
-        datasets: [
-            {
-                label: 'Unit Count',
-                data: [metrics.completedUnits, metrics.ngUnits, metrics.pendingUnits],
-                backgroundColor: ['#198754', '#dc3545', '#0d6efd'],
-                borderColor: ['#fff', '#fff', '#fff'],
-                borderWidth: 1,
-            },
-        ],
-    };
-
-    const options = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: { position: 'bottom' },
-            title: { display: false, text: title },
-        },
-    };
-
-    const total = metrics.completedUnits + metrics.ngUnits + metrics.pendingUnits;
-
-    return (
-        <div className="card shadow-sm h-100">
-            <div className="card-header bg-white"><h6 className="mb-0 text-uppercase small fw-bold">{title}</h6></div>
-            <div className="card-body text-center d-flex flex-column justify-content-center align-items-center">
-                <div style={{ height: '150px', width: '100%', marginBottom: '10px' }}>
-                    {/* Render Doughnut Chart */}
-                    {total === 0 ? (
-                        <p className="text-muted">No units recorded.</p>
-                    ) : (
-                        <Doughnut data={chartData} options={options} />
-                    )}
-                </div>
-
-                {/* Manual breakdown below the chart */}
-                <div className="mt-2 w-100">
-                    {chartData.labels.map((label, index) => {
-                        const value = chartData.datasets[0].data[index];
-                        const color = chartData.datasets[0].backgroundColor[index];
-                        const percentage = total === 0 ? 0 : ((value / total) * 100).toFixed(1);
-                        return (
-                            <div key={label} className="d-flex justify-content-between small">
-                                <span className="fw-bold" style={{ color: color }}>• {label}</span>
-                                <span>{value} ({percentage}%)</span>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const StationBarChart = ({ logs, stations, calculateMetrics }) => {
-    const liveLogs = logs.filter(l => l.status !== 'Pending Approval');
-
-    const summaries = stations.map(station => ({
-        ...calculateMetrics(station.id, liveLogs),
-        name: station.name
-    }));
-
-    const chartLabels = summaries.map(s => s.name);
-    const chartData = {
-        labels: chartLabels,
-        datasets: [
-            {
-                label: 'Total Output (Completed + NG)',
-                data: summaries.map(s => s.yieldTotal),
-                backgroundColor: 'rgba(220, 53, 69, 0.8)', // Danger Red
-                borderColor: 'rgba(220, 53, 69, 1)',
-                borderWidth: 1,
-            },
-        ],
-    };
-
-    const options = {
-        responsive: true,
-        maintainAspectRatio: false,
-        indexAxis: 'y', // Make it a horizontal bar chart
-        scales: {
-            x: { beginAtZero: true, grid: { display: false } },
-            y: { grid: { display: true } }
-        },
-        plugins: {
-            legend: { display: false },
-            title: { display: false },
-        },
-    };
-
-    const totalOutput = summaries.reduce((sum, s) => sum + s.yieldTotal, 0);
-
-    return (
-        <div className="card shadow-sm h-100">
-            <div className="card-header bg-danger text-white">
-                <h5 className="mb-0"><i className="bi bi-bar-chart-fill me-2"></i>Daily Output Comparison (Excl. Pending)</h5>
-            </div>
-            <div className="card-body">
-                {totalOutput === 0 ? (
-                    <p className="text-muted text-center">No completed or NG units checked across all stations.</p>
-                ) : (
-                    <div style={{ height: '300px', width: '100%' }}>
-                        <Bar data={chartData} options={options} />
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
-// --- END CHART COMPONENTS ---
-
-// --------------------------------------------------------------------------------
-// --- UPDATED: NOTIFICATION COMPONENT (Unchanged, delegates logic) ---
-// --------------------------------------------------------------------------------
-
-const NotificationBell = ({ notifications, isOpen, toggleDropdown, onDismissAll, onClearReports, onClearDelayed, onNotificationClick }) => {
-    const dropdownRef = useRef(null);
-
-    // Close dropdown when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                if (isOpen) {
-                    toggleDropdown();
-                }
-            }
-        };
-
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-        };
-    }, [isOpen, toggleDropdown]);
-
-    const delayedUnits = notifications.filter(n => n.type === 'DelayedUnit');
-    const newReports = notifications.filter(n => n.type === 'NewReport');
-    const totalCount = notifications.length;
-
-    // --- UPDATED: Make item clickable ---
-    const notificationItem = (n, index) => (
-        <a 
-            key={n.id || index} 
-            href="#" 
-            className={`d-flex align-items-center p-2 border-bottom small list-group-item list-group-item-action ${n.type === 'NewReport' ? 'bg-light' : 'bg-white'}`}
-            onClick={(e) => {
-                e.preventDefault();
-                onNotificationClick(n);
-            }}
-        >
-            {n.type === 'NewReport' ? (
-                <i className="bi bi-file-earmark-text-fill text-primary me-2 flex-shrink-0"></i>
-            ) : (
-                <i className="bi bi-clock-history text-danger me-2 flex-shrink-0"></i>
-            )}
-            <div className="flex-grow-1">
-                <div className="fw-bold">{n.title}</div>
-                <div className="text-muted text-wrap" style={{ fontSize: '0.75rem' }}>{n.message}</div>
-            </div>
-        </a>
-    );
-
-    return (
-        <div className="dropdown" ref={dropdownRef}>
-            <button
-                className="btn btn-light border"
-                type="button"
-                onClick={toggleDropdown}
-            >
-                <i className="bi bi-bell fs-4 text-secondary position-relative">
-                    {totalCount > 0 && (
-                        <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger p-1" style={{ fontSize: '0.5rem' }}>
-                            {totalCount > 9 ? '9+' : totalCount}
-                        </span>
-                    )}
-                </i>
-            </button>
-
-            <div
-                className={`dropdown-menu dropdown-menu-end shadow-lg ${isOpen ? 'show' : ''}`}
-                style={{ width: '400px', maxHeight: '80vh', overflowY: 'auto' }}
-            >
-                <h6 className="dropdown-header d-flex justify-content-between align-items-center text-dark bg-light">
-                    Notifications ({totalCount})
-                    <button className="btn btn-sm btn-outline-danger py-0" onClick={onDismissAll} disabled={totalCount === 0}>
-                        Clear All
-                    </button>
-                </h6>
-                
-                {totalCount === 0 && <p className="dropdown-item text-center text-muted py-3 small">No new notifications.</p>}
-
-                {/* New Reports Section */}
-                {newReports.length > 0 && (
-                    <div className="pt-2">
-                        <h6 className="dropdown-header d-flex justify-content-between align-items-center text-primary border-top pt-2">
-                            New Daily Reports ({newReports.length})
-                            <button className="btn btn-sm btn-outline-secondary py-0" onClick={onClearReports}>
-                                Clear
-                            </button>
-                        </h6>
-                        <div className="list-group list-group-flush">
-                            {newReports.map(notificationItem)}
-                        </div>
-                    </div>
-                )}
-                
-                {/* Delayed Units Section */}
-                {delayedUnits.length > 0 && (
-                    <div className="pt-2">
-                        <h6 className="dropdown-header d-flex justify-content-between align-items-center text-danger border-top pt-2">
-                            Delayed Units ({delayedUnits.length})
-                            <button className="btn btn-sm btn-outline-secondary py-0" onClick={onClearDelayed}>
-                                Clear
-                            </button>
-                        </h6>
-                         <div className="list-group list-group-flush">
-                             {delayedUnits.map(notificationItem)}
-                         </div>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-};
-
-// --------------------------------------------------------------------------------
-// --- END: NOTIFICATION COMPONENT ---
-// --------------------------------------------------------------------------------
-
 
 export default function AdminPage({ user, onLogout }) {
     const [activeTab, setActiveTab] = useState("dashboard");
@@ -974,12 +106,11 @@ export default function AdminPage({ user, onLogout }) {
         avatar_file: null, // Initialize file placeholder for modal
     };
 
-    // --- UPDATED: LOGIC TO CHECK FOR DELAYED UNITS AND REPORTS (Deduplication fixed) ---
+    // --- UPDATED: LOGIC TO CHECK FOR DELAYED UNITS AND REPORTS ---
     const checkDelayedUnitsAndReports = useCallback((allUnits, allReports) => {
         const now = new Date();
         const newDelayedNotifications = [];
         
-        // Collect IDs of units currently flagged as delayed in the system check
         const currentDelayedUnitIds = new Set(); 
 
         // 1. Delayed Units Check 
@@ -995,10 +126,8 @@ export default function AdminPage({ user, onLogout }) {
                 const elapsedMinutes = Math.floor(elapsedMilliseconds / (1000 * 60));
 
                 if (elapsedMinutes > thresholdMinutes) {
-                    // This unit is delayed based on the threshold
                     currentDelayedUnitIds.add(unit.id);
                     
-                    // Create notification object for potential new entry
                     newDelayedNotifications.push({
                         id: `delayed-${unit.id}`, 
                         type: 'DelayedUnit',
@@ -1031,20 +160,16 @@ export default function AdminPage({ user, onLogout }) {
 
         // 3. Merge Notifications (Maintain existing delayed units that are still delayed)
         const existingNotifications = notifications.filter(n => {
-            // Keep existing delayed unit notifications ONLY if the unit is still delayed
             if (n.type === 'DelayedUnit') {
                 return currentDelayedUnitIds.has(n.unitId);
             }
-            // Keep existing new report notifications (until manually dismissed)
             return n.type === 'NewReport'; 
         });
 
-        // Add newly identified delayed units (avoid adding if already in existingNotifications)
         const updatedDelayedNotifications = newDelayedNotifications.filter(newN => 
             !existingNotifications.some(existingN => existingN.id === newN.id)
         );
 
-        // Combine all and update state
         setNotifications([
             ...existingNotifications.filter(n => n.type === 'DelayedUnit'),
             ...updatedDelayedNotifications,
@@ -1052,15 +177,13 @@ export default function AdminPage({ user, onLogout }) {
             ...newReportNotifications, // Add new reports
         ]);
 
-        // IMPORTANT: Update the last seen IDs to prevent double-notifying on reports in the *next* fetch
         setLastSeenReportIds(allFetchedReportIds);
 
     }, [notifications, lastSeenReportIds]);
 
 
-    // --- FETCH DATA (Updated to fetch Units, Reports, and Users) ---
+    // --- FETCH DATA ---
     const fetchData = async () => {
-        // Only show full-screen loading on initial fetch
         const isInitialLoad = logs.length === 0;
         if (isInitialLoad) setLoading(true);
         setError(null);
@@ -1075,7 +198,7 @@ export default function AdminPage({ user, onLogout }) {
             const fetchedReports = Array.isArray(reportsRes.data) ? reportsRes.data : [];
             setDailyReportsList(fetchedReports);
 
-            // 3. Fetch User List (NEW)
+            // 3. Fetch User List
             const usersRes = await axios.get(USER_MANAGEMENT_ENDPOINT);
             const fetchedUsers = Array.isArray(usersRes.data) ? usersRes.data : [];
             setUserList(fetchedUsers);
@@ -1105,9 +228,7 @@ export default function AdminPage({ user, onLogout }) {
         }
     };
 
-    // This is called by the Report Submission modal to refresh data after a successful save
     const refreshAndCloseReport = () => {
-        // Clear the initial lastSeenReportIds just before fetching, so the new report triggers a notification
         setLastSeenReportIds(new Set()); 
         fetchData();
         setShowReportModal(false);
@@ -1137,33 +258,25 @@ export default function AdminPage({ user, onLogout }) {
         setNotifications(prev => prev.filter(n => n.type !== 'DelayedUnit'));
     };
     
-    // --- FINAL UPDATE: Handle Clickable Notification ---
+    // --- Handle Clickable Notification ---
     const handleNotificationClick = (notification) => {
         setIsBellOpen(false); // Close the bell dropdown
         
         if (notification.type === 'NewReport') {
-            // 1. Clear any unit highlighting
             setHighlightedUnitId(null); 
-            // 2. Go to Reports Tab
             setActiveTab('reports');
 
-            // 3. Find the report object and OPEN THE MODAL
             const report = dailyReportsList.find(r => r.id === notification.reportId);
             if (report) {
-                // Set filters to match the report date/station
                 setReportDate(report.report_date.split(' ')[0]);
                 setReportFilterStationId(report.station);
                 
-                // OPEN THE REPORT DETAIL MODAL
                 setSelectedReportToView(report);
             }
             
         } else if (notification.type === 'DelayedUnit') {
-            // 1. Go to Station Monitor Tab
             setActiveTab('station_monitor');
-            // 2. Set the monitor ID to the delayed unit's station
             setStationMonitorId(notification.stationId);
-            // 3. SET THE HIGHLIGHTED UNIT ID
             setHighlightedUnitId(notification.unitId);
         }
 
@@ -1175,23 +288,21 @@ export default function AdminPage({ user, onLogout }) {
     // ----------------------------------------
 
 
-    // --- UNIT HANDLERS (Existing, Unchanged) ---
+    // --- UNIT HANDLERS ---
     const handleMonitorStation = (stationId) => {
         setStationMonitorId(stationId);
         setActiveTab('station_monitor');
-        setHighlightedUnitId(null); // Clear highlight when navigating via card button
+        setHighlightedUnitId(null); 
     };
 
     const handleEditClick = (log) => {
         setSelectedUnitToEdit(log);
     };
 
-    // NEW HANDLER: Open report detail modal
     const handleViewReport = (report) => {
         setSelectedReportToView(report);
     };
 
-    // --- NEW HANDLER: Open Station History Modal ---
     const handleViewHistory = (stationId) => {
         setStationHistoryId(stationId);
     };
@@ -1249,14 +360,12 @@ export default function AdminPage({ user, onLogout }) {
         }
     };
 
-    // --- NEW USER MANAGEMENT HANDLERS (Unchanged) ---
+    // --- USER MANAGEMENT HANDLERS ---
     const handleAddUser = () => {
-        // Pass the initial structure for 'Add' mode
         setSelectedUserToManage(initialNewUserData);
     };
 
     const handleEditUser = (user) => {
-        // Pass the existing user object for 'Edit' mode
         setSelectedUserToManage(user);
     };
 
@@ -1264,18 +373,16 @@ export default function AdminPage({ user, onLogout }) {
         setSelectedUserToDelete(user);
     };
 
-    const handleSaveUser = async (payload, headers, url) => {
-        // **Defensive check for invalid payload**
+    const handleSaveUser = async (payload, headers, urlQuery) => {
         if (!payload) {
             throw new Error("Invalid user data received. Cannot save.");
         }
 
         try {
-            await axios.post(url, payload, { headers });
+            await axios.post(USER_MANAGEMENT_ENDPOINT + urlQuery, payload, { headers });
 
-            // --- CRITICAL UPDATE FOR HEADER AVATAR/NAME ---
+            // CRITICAL UPDATE FOR HEADER AVATAR/NAME
             await fetchData();
-            // ---------------------------------------------
 
         } catch (error) {
             const isMultipartError = !headers['Content-Type'];
@@ -1294,9 +401,8 @@ export default function AdminPage({ user, onLogout }) {
     const handleDeleteUser = async (userId) => {
         setSelectedUserToDelete(null);
         try {
-            // Using POST with method=DELETE for deletions
             await axios.post(`${USER_MANAGEMENT_ENDPOINT}?method=DELETE`, { id: userId }, {
-                 headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' }
             });
             fetchData(); // Refresh list
         } catch (error) {
@@ -1305,17 +411,15 @@ export default function AdminPage({ user, onLogout }) {
         }
     };
 
-    // --- CALCULATE METRICS (Existing, Unchanged) ---
+    // --- CALCULATE METRICS (Exported for component use) ---
     const calculateStationMetrics = (stationId, currentLogs = logs) => {
 
-        // Filter out 'Pending Approval' units for live monitoring purposes
         const liveLogs = currentLogs.filter(l => l.status !== 'Pending Approval');
 
         const stationLogs = stationId
             ? liveLogs.filter(l => l.station === stationId)
             : liveLogs; // If no stationId, calculate for all live logs
 
-        // Calculate units specifically in 'Pending Approval' queue (not counted in live metrics)
         const pendingApprovalUnits = currentLogs.filter(l => l.status === 'Pending Approval').length;
 
         const completedUnits = stationLogs.filter(l => l.status === 'Completed').length;
@@ -1362,7 +466,7 @@ export default function AdminPage({ user, onLogout }) {
     // Determine the header full name (uses the current user prop)
     const headerFullName = user.full_name || user.username || 'Admin';
 
-    // --- RENDER CONTENT (Updated with Highlight Logic) ---
+    // --- RENDER CONTENT ---
     const renderContent = () => {
         if (loading && logs.length === 0) {
             return (
@@ -1385,7 +489,6 @@ export default function AdminPage({ user, onLogout }) {
         switch (activeTab) {
             case "dashboard":
                 return (
-                    // ... Dashboard content ...
                     <>
                         <div className="row g-4 mb-4">
                             <div className="col-md-3"><div className="card text-white bg-primary shadow-sm h-100"><div className="card-body"><h6 className="card-title text-uppercase mb-2">Total Completed (Live)</h6><h2 className="display-6 fw-bold">{totalOutput}</h2><p className="card-text small">Units successfully completed</p></div></div></div>
@@ -1418,7 +521,7 @@ export default function AdminPage({ user, onLogout }) {
                 );
 
             case "stations":
-                // --- STATIONS OVERVIEW (Fixed Logic) ---
+                // --- STATIONS OVERVIEW ---
                 return (
                     <div className="row g-3">
                         <div className="col-12 mb-3"><h4><i className="bi bi-grid-3x3-gap-fill me-2"></i>Stations Overview (1-15)</h4><p className="text-muted small">Shows live unit activity based on current metrics. Click **Monitor** for details or **History** for all recorded activity.</p></div>
@@ -1472,10 +575,9 @@ export default function AdminPage({ user, onLogout }) {
                 );
 
             case "station_monitor":
-                // ... Station Monitor (UPDATED to support row highlighting) ...
                 if (!stationMonitorId) { setActiveTab('stations'); return null; }
                 const station = stations.find(s => s.id === stationMonitorId);
-                const metrics = calculateStationMetrics(stationMonitorId);
+                const monitorMetrics = calculateStationMetrics(stationMonitorId);
 
                 return (
                     <div>
@@ -1491,16 +593,16 @@ export default function AdminPage({ user, onLogout }) {
                         <div className="row g-4 mb-4">
                             <div className="col-lg-9">
                                 <div className="row g-4">
-                                    <div className="col-md-4"><div className="card bg-success text-white shadow-sm h-100"><div className="card-body"><h6 className="card-title text-uppercase mb-2">Completed Units</h6><h2 className="display-6 fw-bold">{metrics.completedUnits}</h2><p className="card-text small">Total units successfully processed.</p></div></div></div>
-                                    <div className="col-md-4"><div className="card bg-info text-dark shadow-sm h-100"><div className="card-body"><h6 className="card-title text-uppercase mb-2">Overall Yield</h6><h2 className="display-6 fw-bold">{metrics.yieldRate}%</h2><p className="card-text small">Good Units / Total Units Checked ({metrics.yieldTotal})</p></div></div></div>
-                                    <div className="col-md-4"><div className="card bg-danger text-white shadow-sm h-100"><div className="card-body"><h6 className="card-title text-uppercase mb-2">No Good (NG)</h6><h2 className="display-6 fw-bold">{metrics.ngUnits}</h2><p className="card-text small">Total defective units recorded.</p></div></div></div>
-                                    <div className="col-md-4"><div className="card bg-warning text-dark shadow-sm h-100"><div className="card-body"><h6 className="card-title text-uppercase mb-2">In Progress</h6><h2 className="display-6 fw-bold">{metrics.pendingUnits}</h2><p className="card-text small">Units currently being processed.</p></div></div></div>
+                                    <div className="col-md-4"><div className="card bg-success text-white shadow-sm h-100"><div className="card-body"><h6 className="card-title text-uppercase mb-2">Completed Units</h6><h2 className="display-6 fw-bold">{monitorMetrics.completedUnits}</h2><p className="card-text small">Total units successfully processed.</p></div></div></div>
+                                    <div className="col-md-4"><div className="card bg-info text-dark shadow-sm h-100"><div className="card-body"><h6 className="card-title text-uppercase mb-2">Overall Yield</h6><h2 className="display-6 fw-bold">{monitorMetrics.yieldRate}%</h2><p className="card-text small">Good Units / Total Units Checked ({monitorMetrics.yieldTotal})</p></div></div></div>
+                                    <div className="col-md-4"><div className="card bg-danger text-white shadow-sm h-100"><div className="card-body"><h6 className="card-title text-uppercase mb-2">No Good (NG)</h6><h2 className="display-6 fw-bold">{monitorMetrics.ngUnits}</h2><p className="card-text small">Total defective units recorded.</p></div></div></div>
+                                    <div className="col-md-4"><div className="card bg-warning text-dark shadow-sm h-100"><div className="card-body"><h6 className="card-title text-uppercase mb-2">In Progress</h6><h2 className="display-6 fw-bold">{monitorMetrics.pendingUnits}</h2><p className="card-text small">Units currently being processed.</p></div></div></div>
                                 </div>
                             </div>
 
                             <div className="col-lg-3">
                                 <UnitPieChart
-                                    metrics={metrics}
+                                    metrics={monitorMetrics}
                                     title={`${station?.name || 'Station'} Status (Live)`}
                                 />
                             </div>
@@ -1515,7 +617,7 @@ export default function AdminPage({ user, onLogout }) {
                                         <tr><th>ID</th><th>Station</th><th>Model</th><th>Revision</th><th>Base Unit No.</th><th>Assembly No.</th><th>Serial No.</th><th>Accessory No.</th><th>Status</th><th>Remarks</th><th>Timestamp</th><th>Actions</th></tr>
                                     </thead>
                                     <tbody>
-                                        {metrics.stationLogs.length > 0 ? metrics.stationLogs.map(log => {
+                                        {monitorMetrics.stationLogs.length > 0 ? monitorMetrics.stationLogs.map(log => {
                                             const isHighlighted = highlightedUnitId === log.id;
                                             // Conditional class for highlighting
                                             const rowClass = isHighlighted ? 'table-danger fw-bold' : '';
@@ -1551,7 +653,7 @@ export default function AdminPage({ user, onLogout }) {
                 );
 
             case "reports":
-                // ... Reports content (Unchanged) ...
+                // ... Reports content ...
                 return (
                     <div>
                         <h3 className="mb-4 d-flex align-items-center">
@@ -1637,7 +739,7 @@ export default function AdminPage({ user, onLogout }) {
                 );
 
             case "approval":
-                // ... Approval Tab Logic (unchanged) ...
+                // ... Approval Tab Logic ...
                 const approvalQueueLogs = logs.filter(l => l.status === 'Pending Approval');
                 return (
                     <div>
@@ -1683,7 +785,7 @@ export default function AdminPage({ user, onLogout }) {
                     </div>
                 );
 
-            case "manage_account": // NEW TAB: Manage Account (Unchanged)
+            case "manage_account": // NEW TAB: Manage Account
                 return (
                     <div>
                         <h3 className="mb-4 d-flex align-items-center">
@@ -1720,7 +822,6 @@ export default function AdminPage({ user, onLogout }) {
                                         {userList.length > 0 ? userList.map(u => (
                                             <tr key={u.id}>
                                                 <td>{u.id}</td>
-                                                {/* Display Avatar and Username */}
                                                 <td className="d-flex align-items-center">
                                                     <img
                                                         src={u.avatar_url ? `${AVATAR_UPLOAD_PATH}${u.avatar_url}` : DEFAULT_AVATAR_PATH}
@@ -1781,7 +882,7 @@ export default function AdminPage({ user, onLogout }) {
 
     return (
         <div className="d-flex min-vh-100 bg-light overflow-hidden">
-            {/* --- SIDEBAR (Unchanged) --- */}
+            {/* --- SIDEBAR --- */}
             <div
                 className={`d-flex flex-column flex-shrink-0 p-3 text-white bg-dark transition-all`}
                 style={{
@@ -1796,10 +897,9 @@ export default function AdminPage({ user, onLogout }) {
                     <img 
                         src={logo} 
                         alt="MKFF Admin Logo" 
-                        style={{ height: '3rem', marginRight: '1rem' }} // Adjust height/styling as needed
+                        style={{ height: '3rem', marginRight: '1rem' }} 
                         className="logo-class" 
                     />
-                    {/* Re-adding the conditional text display */}
                     {isSidebarOpen && <span className="fs-5 fw-bold text-nowrap">MKFF Admin</span>}
                 </div>
                 <hr />
@@ -1830,7 +930,7 @@ export default function AdminPage({ user, onLogout }) {
                         </h5>
                     </div>
                     <div className="d-flex align-items-center gap-3">
-                        {/* UPDATED: NOTIFICATION BELL INTEGRATION */}
+                        {/* NOTIFICATION BELL INTEGRATION */}
                         <NotificationBell 
                             notifications={notifications}
                             isOpen={isBellOpen}
@@ -1875,6 +975,7 @@ export default function AdminPage({ user, onLogout }) {
                 <ReportDetailModal
                     report={selectedReportToView}
                     onClose={() => setSelectedReportToView(null)}
+                    API_BASE_URL={API_BASE_URL} // Pass the constant
                 />
             )}
 
@@ -1885,6 +986,7 @@ export default function AdminPage({ user, onLogout }) {
                     stations={stations}
                     onClose={() => setShowReportModal(false)}
                     onSave={refreshAndCloseReport} // Refreshes data after submission
+                    REPORTS_ENDPOINT={REPORTS_ENDPOINT} // Pass the constant
                 />
             )}
             
@@ -1893,6 +995,7 @@ export default function AdminPage({ user, onLogout }) {
                 <StationHistoryModal
                     stationId={stationHistoryId}
                     onClose={() => setStationHistoryId(null)}
+                    HISTORY_ENDPOINT={HISTORY_ENDPOINT} // Pass the constant
                 />
             )}
 
@@ -1903,6 +1006,8 @@ export default function AdminPage({ user, onLogout }) {
                     stations={stations}
                     onClose={() => setSelectedUserToManage(null)}
                     onSave={handleSaveUser}
+                    AVATAR_UPLOAD_PATH={AVATAR_UPLOAD_PATH}
+                    DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH}
                 />
             )}
             {selectedUserToDelete && (
