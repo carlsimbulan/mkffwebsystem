@@ -4,6 +4,7 @@ import 'bootstrap-icons/font/bootstrap-icons.css';
 // NEW IMPORTS FOR CHARTS
 import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
 import { Doughnut, Bar } from 'react-chartjs-2';
+import logo from '../logo.png';
 
 // REGISTER CHART COMPONENTS GLOBALLY
 ChartJS.register(
@@ -15,6 +16,26 @@ ChartJS.register(
     Legend
 );
 
+// --- CONFIGURATION CONSTANT: DELAY THRESHOLDS ---
+const DELAY_THRESHOLDS_MINUTES = {
+    'Station1': 6,
+    'Station2': 8,
+    'Station3': 3,
+    'Station4': 12,
+    'Station5': 15,
+    'Station6': 15,
+    'Station7': 3,
+    'Station8': 0, 
+    'Station9': 480, // 8 hours
+    'Station10': 8,
+    'Station11': 22,
+    'Station12': 5,
+    'Station13': 10,
+    'Station14': 8,
+    'Station15': 5,
+};
+// ----------------------------------------------------
+
 
 // Base URL for the API (replace with your actual server address)
 const API_BASE_URL = "http://localhost/mkffwebsystem/backend/api";
@@ -25,7 +46,7 @@ const USER_MANAGEMENT_ENDPOINT = `${API_BASE_URL}/user_management.php`; // NEW E
 // Conceptual path where avatars are served
 const AVATAR_UPLOAD_PATH = `http://localhost/mkffwebsystem/backend/api/uploads/avatars/`;
 // Fallback for missing/broken avatar files
-const DEFAULT_AVATAR_PATH = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTE2IDguNWExLjUgMS41IDAgMSAxIDAgLTVhMS41IDEuNSAwIDAgMSAwIDVaTTkgMTMuNGM2LjUgMCA3IDUuMyA3IDV2Mi41aC0xNGwtLjItLjJjLS4xLS4xLS40LS41LS43LS45LS40LS41LS43LTEuMS0uNy0xLjhjMC0uNi40LTEuMS44LTEuNS41LS41IDEuMy0uNyAyLjItLjcgMS4yIDAgMi4xLjMgMyAxLjEgLjIgLjQgLjQgLjggLjQgMS4yIDAgLjkgLS41IDEuNi0xLjMgMi4zLS41LjUtMS4xLjgtMS44LjhoLTJjLS45IDAtMS42LS4zLTIuMS0uN2wxLjgtLjIgLjMtLjNjLS41LS41LS45LS44LTEuNC0xLjIgMS0uOSAxLjctMi40IDEuNy00LjUgMC0xLS40LTEuOS0xLjEtMi42LS42LS43LTEuNS0xLjEtMi41LTEuMi0xLjIgMC0yLjQuNS0zLjUgMS41LS41LjItLjkuNS0xLjQgLjcgLjIuNS40LjkuNSAxLjQgLjIgLjQgLjQgLjggLjQgMS4yIDAgLjggLS41IDEuNi0xLjQgMi4zLS4zLjItLjYuNS0uOS43bC0xLjguMi0uMi0uMmMtLjQtLjQtLjctLjgtLjctMS40IDAtLjggLjUtMS41IDEuMS0yLjIgLjUtLjUgMS4xLS44IDEuOC0uOC45IDAgMS43LjMgMi40LjkgLjQtLjIuOC0uNCAxLjItLjcgMC0uNy0uMy0xLjQtLjktMi4xLS41LS42LTEuMi0xLS43LTEuNyAwLS42LjUtMS4xIDEtMS41LjQtLjQgLjctLjUgMS4yLS42LjYtLjIgMS41LS4yIDIuMiAwIDAgLjUgLjQgLjcgLjggMS4xLjMtLjIuNi0uNCAxLS42LjktLjUgMi0uNyAyLjgtLjcgc20uMy0uNWMuOCAwIDEuNC41IDEuNSAxLjEuMS43LS41IDEuMy0xLjQgMS40LS44IDAtMS41LS42LTEuNS0xLjIgMC0uNS40LS45LjgtMS4zLjUtLjQgMS4yLS42IDEuNi0uNnptMi44IDYuOC40LjRjLjIgLjEuNC4yLjYgLjUgMCAuNy0uMyAxLjQtLjggMi4xLS40LjYtMSAxLjEtMS44IDEuNC0uMS4xLS4zLjEtLjQuM2wtLjMtLjNjLS41LS41LS44LTEuMS0uOC0xLjggMC0uOC40LTEuNSAxLjItMi4xem0tMS41LS40Yy0uMi0uMS0uMy0uMi0uNC0uMy0uMi0uMi0uMy0uNC0uNS0uNi0uMy0uMy0uNi0uNS0uOC0uNy0uMy0uMy0uNS0uNi0uNy0uOS0uNS0uNi0uOC0xLjQtLjgtMi40IDAtLjkuMy0xLjcgLjktMi40LjUtLjUgMS4zLS44IDIuMy0uOCAxLjIgMCAyLjEuMyAzIC45LjQuMi43LjUgMS4xLjcuNC4zLjcgLjYgLjggLjkgLjMgLjUgLjYgMSAuOCAxLjYgLjMgLjYgLjUgMS4yLjUgMS44IDAgLjgtLjIgMS41LS42IDIuMS0uNCAuNy0uOSAxLjMtMS41IDEuN3ptLTEuMy02LjNjaC0xLjMuNGMtLjEgLjQtLjIgLjktLjMgMS4yLS40LjctLjUgMS40LS41IDIuMiAwIC43LjMgMS4zLjkgMS44LjQtLjIuNy0uNSAxLS45LjUtLjUgLjctMS4xLjctMS44IDAtLjkgMC0xLjctLjUtMi40LS41LS42LTEuMy0xLTEuOC0xLjItLjEgLjMtLjIuNi0uNCAxeiIvPjwvc3ZnPg==';
+const DEFAULT_AVATAR_PATH = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgZmlsbD0iI2NjYyI+PHBhdGggZD0iTTE2IDguNWExLjUgMS41IDAgMSAxIDAgLTVhMS41IDEuNSAwIDAgMSAwIDVaTTkgMTMuNGM2LjUgMCA3IDUuMyA3IDV2Mi41aC0xNGwtLjItLjJjLS4xLS4xLS40LS41LS43LS45LS40LS41LS43LTEuMS0uNy0xLjhjMC0uNi40LTEuMS44LTEuNS41LS41IDEuMy0uNyAyLjItLjcgMS4yIDAgMi4xLjMgMyAxLjEgLjIgLjQgLjQgLjggLjQgMS4yIDAgLjkgLS41IDEuNi0xLjMgMi4zLS41LjUtMS4xLjgtMS44LjhoLTJjLS45IDAtMS42LS4zLTIuMS0uN2wxLjgtLjIgLjMtLjNjLS41LS41LS45LS44LTEuNC0xLjIgMS0uOSAxLjctMi40IDEuNy00LjUgMC0xLS40LTEuOS0xLjEtMi42LS42LS43LTEuNS0xLjEtMi41LTEuMi0xLjIgMC0yLjQuNS0zLjUgMS41LS41LjItLjkuNS0xLjQgLjcgLjIuNS40LjkuNSAxLjQgLjIgLjQgLjQgLjggLjQgMS4yIDAgLjggLS41IDEuNi0xLjQgMi4zLS4zLjItLjYuNS0uOS43bC0xLjguMi0uMi0uMmMtLjQtLjQtLjctLjgtLjctMS40IDAtLjggLjUtMS41IDEuMS0yLjIgLjUtLjUgMS4xLS44IDEuOC0uOC45IDAgMS43LjMgMi40LjkgLjQtLjIuOC0uNCAxLjItLjcgMC0uNy0uMy0xLjQtLjktMi4xLS41LS42LTEuMi0xLS43LTEuNyAwLS42LjUtMS4xIDEtMS41LjQtLjQgLjctLjUgMS4yLS42LjYtLjIgMS41LS4yIDIuMiAwIDAgLjUgLjQgLjcgLjggMS4xLjMtLjIuNi0uNCAxLS42LjktLjUgMi0uNyAyLjgtLjcgc20uMy0uNWMuOCAwIDEuNC41IDEuNSAxLjEuMS43LS41IDEuMy0xLjQgMS40LS44IDAtMS41LS42LTEuNS0xLjIgMC0uNS40LS45LjgtMS4zLjUtLjQgMS4yLS42IDEuNi0uNnptMi44IDYuOC40LjRjLjIgLjEuNC4yLjYgLjUgMCAuNy0uMyAxLjQtLjggMi4xLS40LjYtMSAxLjEtMS44IDEuNC0uMS4xLS4zLjEtLjQuM2wtLjMtLjNjLS41LS41LS44LTEuMS0uOC0xLjggMC0uOC40LTEuNSAxLjItMi4xem0tMS41LS40Yy0uMi0uMS0uMy0uMi0uNC0uMy0uMi0uMi0uMy0uNC0uNS0uNi0uMy0uMy0uNi0uNS0uOC0uNy0uMy0uMy0uNS0uNi0uNy0uOS0uNS0uNi0uOC0xLjQtLjgtMi40IDAtLjkuMy0xLjcgLjktMi40LjUtLjUgMS4zLS44IDIuMy0uOCAxLjIgMCAyLjEuMyAzIC45LjQuMi43LjUgMS4xLjcuNC4zLjcgLjYgLjggLjkgLjMgLjUgLjYgMSAuOCAxLjYgLjMgLjYgLjUgMS4yLjUgMS44IDAgLjgtLjIgMS41LS42IDIuMS0uNC43LS45IDEuMy0xLjUgMS43em0tMS4zLTYuM2h-MS4zLjRjLS4xLjQtLjIuOS0uMyAxLjItLjQuNy0uNSAxLjQtLjUgMi4yIDAgLjcuMyAxLjMuOSAxLjguNC0uMi43LS41IDEtLjkuNS0uNS43LTEuMS43LTEuOCAwLS45IDAtMS43LS41LTIuNC0uNS0uNi0xLjMtMS0xLjgtMS4yLS4xLjMtLjIuNi0uNCAxeiIvPjwvc3ZnPg==';
 
 // Helper function to format date as YYYY-MM-DD
 const getTodayDate = () => {
@@ -543,7 +564,7 @@ const SubmitReportModal = ({ user, stations, onClose, onSave }) => {
 };
 // --- END Submit Report Modal ---
 
-// --- NEW: Station History Modal Component ---
+// --- NEW: Station History Modal Component (Unchanged) ---
 const StationHistoryModal = ({ stationId, onClose }) => {
     const [historyLogs, setHistoryLogs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -794,13 +815,130 @@ const StationBarChart = ({ logs, stations, calculateMetrics }) => {
 };
 // --- END CHART COMPONENTS ---
 
+// --------------------------------------------------------------------------------
+// --- UPDATED: NOTIFICATION COMPONENT (Unchanged, delegates logic) ---
+// --------------------------------------------------------------------------------
+
+const NotificationBell = ({ notifications, isOpen, toggleDropdown, onDismissAll, onClearReports, onClearDelayed, onNotificationClick }) => {
+    const dropdownRef = useRef(null);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                if (isOpen) {
+                    toggleDropdown();
+                }
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [isOpen, toggleDropdown]);
+
+    const delayedUnits = notifications.filter(n => n.type === 'DelayedUnit');
+    const newReports = notifications.filter(n => n.type === 'NewReport');
+    const totalCount = notifications.length;
+
+    // --- UPDATED: Make item clickable ---
+    const notificationItem = (n, index) => (
+        <a 
+            key={n.id || index} 
+            href="#" 
+            className={`d-flex align-items-center p-2 border-bottom small list-group-item list-group-item-action ${n.type === 'NewReport' ? 'bg-light' : 'bg-white'}`}
+            onClick={(e) => {
+                e.preventDefault();
+                onNotificationClick(n);
+            }}
+        >
+            {n.type === 'NewReport' ? (
+                <i className="bi bi-file-earmark-text-fill text-primary me-2 flex-shrink-0"></i>
+            ) : (
+                <i className="bi bi-clock-history text-danger me-2 flex-shrink-0"></i>
+            )}
+            <div className="flex-grow-1">
+                <div className="fw-bold">{n.title}</div>
+                <div className="text-muted text-wrap" style={{ fontSize: '0.75rem' }}>{n.message}</div>
+            </div>
+        </a>
+    );
+
+    return (
+        <div className="dropdown" ref={dropdownRef}>
+            <button
+                className="btn btn-light border"
+                type="button"
+                onClick={toggleDropdown}
+            >
+                <i className="bi bi-bell fs-4 text-secondary position-relative">
+                    {totalCount > 0 && (
+                        <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger p-1" style={{ fontSize: '0.5rem' }}>
+                            {totalCount > 9 ? '9+' : totalCount}
+                        </span>
+                    )}
+                </i>
+            </button>
+
+            <div
+                className={`dropdown-menu dropdown-menu-end shadow-lg ${isOpen ? 'show' : ''}`}
+                style={{ width: '400px', maxHeight: '80vh', overflowY: 'auto' }}
+            >
+                <h6 className="dropdown-header d-flex justify-content-between align-items-center text-dark bg-light">
+                    Notifications ({totalCount})
+                    <button className="btn btn-sm btn-outline-danger py-0" onClick={onDismissAll} disabled={totalCount === 0}>
+                        Clear All
+                    </button>
+                </h6>
+                
+                {totalCount === 0 && <p className="dropdown-item text-center text-muted py-3 small">No new notifications.</p>}
+
+                {/* New Reports Section */}
+                {newReports.length > 0 && (
+                    <div className="pt-2">
+                        <h6 className="dropdown-header d-flex justify-content-between align-items-center text-primary border-top pt-2">
+                            New Daily Reports ({newReports.length})
+                            <button className="btn btn-sm btn-outline-secondary py-0" onClick={onClearReports}>
+                                Clear
+                            </button>
+                        </h6>
+                        <div className="list-group list-group-flush">
+                            {newReports.map(notificationItem)}
+                        </div>
+                    </div>
+                )}
+                
+                {/* Delayed Units Section */}
+                {delayedUnits.length > 0 && (
+                    <div className="pt-2">
+                        <h6 className="dropdown-header d-flex justify-content-between align-items-center text-danger border-top pt-2">
+                            Delayed Units ({delayedUnits.length})
+                            <button className="btn btn-sm btn-outline-secondary py-0" onClick={onClearDelayed}>
+                                Clear
+                            </button>
+                        </h6>
+                         <div className="list-group list-group-flush">
+                             {delayedUnits.map(notificationItem)}
+                         </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// --------------------------------------------------------------------------------
+// --- END: NOTIFICATION COMPONENT ---
+// --------------------------------------------------------------------------------
+
 
 export default function AdminPage({ user, onLogout }) {
     const [activeTab, setActiveTab] = useState("dashboard");
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [logs, setLogs] = useState([]); // Unit logs
-    const [dailyReportsList, setDailyReportsList] = useState([]); // NEW: Report logs
-    const [userList, setUserList] = useState([]); // NEW: User list
+    const [dailyReportsList, setDailyReportsList] = useState([]); // Reports
+    const [userList, setUserList] = useState([]); // User list
     const [stations, setStations] = useState([]); // State for station list
     const [stationMonitorId, setStationMonitorId] = useState(null);
 
@@ -808,13 +946,19 @@ export default function AdminPage({ user, onLogout }) {
     const [reportDate, setReportDate] = useState(getTodayDate());
     const [reportFilterStationId, setReportFilterStationId] = useState('All');
     const [selectedUnitToEdit, setSelectedUnitToEdit] = useState(null);
-    const [selectedReportToView, setSelectedReportToView] = useState(null);
-    const [selectedUserToManage, setSelectedUserToManage] = useState(null); // NEW: User to Edit/Add
-    const [selectedUserToDelete, setSelectedUserToDelete] = useState(null); // NEW: User to Delete
-    const [showReportModal, setShowReportModal] = useState(false); // NEW: State for report creation modal
-    // --- NEW STATE FOR HISTORY ---
-    const [stationHistoryId, setStationHistoryId] = useState(null); // The ID of the station whose history we want to view
-    // -----------------------------
+    const [selectedReportToView, setSelectedReportToView] = useState(null); // Report Detail Modal State
+    const [selectedUserToManage, setSelectedUserToManage] = useState(null);
+    const [selectedUserToDelete, setSelectedUserToDelete] = useState(null);
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [stationHistoryId, setStationHistoryId] = useState(null);
+    
+    // --- NEW NOTIFICATION STATES ---
+    const [notifications, setNotifications] = useState([]);
+    const [isBellOpen, setIsBellOpen] = useState(false);
+    const [lastSeenReportIds, setLastSeenReportIds] = useState(new Set());
+    const [highlightedUnitId, setHighlightedUnitId] = useState(null);
+    // ----------------------------------
+    
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -830,52 +974,129 @@ export default function AdminPage({ user, onLogout }) {
         avatar_file: null, // Initialize file placeholder for modal
     };
 
+    // --- UPDATED: LOGIC TO CHECK FOR DELAYED UNITS AND REPORTS (Deduplication fixed) ---
+    const checkDelayedUnitsAndReports = useCallback((allUnits, allReports) => {
+        const now = new Date();
+        const newDelayedNotifications = [];
+        
+        // Collect IDs of units currently flagged as delayed in the system check
+        const currentDelayedUnitIds = new Set(); 
+
+        // 1. Delayed Units Check 
+        const inProgressUnits = allUnits.filter(l => l.status === 'In Progress');
+        
+        inProgressUnits.forEach(unit => {
+            const stationId = unit.station;
+            const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationId] || 0; 
+
+            if (thresholdMinutes > 0) {
+                const createdAt = new Date(unit.created_at);
+                const elapsedMilliseconds = now.getTime() - createdAt.getTime();
+                const elapsedMinutes = Math.floor(elapsedMilliseconds / (1000 * 60));
+
+                if (elapsedMinutes > thresholdMinutes) {
+                    // This unit is delayed based on the threshold
+                    currentDelayedUnitIds.add(unit.id);
+                    
+                    // Create notification object for potential new entry
+                    newDelayedNotifications.push({
+                        id: `delayed-${unit.id}`, 
+                        type: 'DelayedUnit',
+                        title: `⚠️ Unit Delay Alert at ${stationId}`,
+                        message: `Unit ${unit.device_serial_no} has been In Progress for ${elapsedMinutes} mins (Limit: ${thresholdMinutes} mins).`,
+                        timestamp: now.toISOString(),
+                        unitId: unit.id,
+                        stationId: stationId,
+                    });
+                }
+            }
+        });
+        
+        // 2. New Reports Check
+        const allFetchedReportIds = new Set(allReports.map(r => r.id));
+        const newReportNotifications = [];
+        
+        allReports.forEach(report => {
+            if (!lastSeenReportIds.has(report.id)) {
+                newReportNotifications.push({
+                    id: `report-${report.id}`,
+                    type: 'NewReport',
+                    title: `📄 New Report from ${report.station} (${report.shift})`,
+                    message: `Processed: ${report.total_units_processed}, NG: ${report.total_ng}. Submitted by: ${report.submitted_by}.`,
+                    timestamp: new Date(report.created_at).toISOString(),
+                    reportId: report.id,
+                });
+            }
+        });
+
+        // 3. Merge Notifications (Maintain existing delayed units that are still delayed)
+        const existingNotifications = notifications.filter(n => {
+            // Keep existing delayed unit notifications ONLY if the unit is still delayed
+            if (n.type === 'DelayedUnit') {
+                return currentDelayedUnitIds.has(n.unitId);
+            }
+            // Keep existing new report notifications (until manually dismissed)
+            return n.type === 'NewReport'; 
+        });
+
+        // Add newly identified delayed units (avoid adding if already in existingNotifications)
+        const updatedDelayedNotifications = newDelayedNotifications.filter(newN => 
+            !existingNotifications.some(existingN => existingN.id === newN.id)
+        );
+
+        // Combine all and update state
+        setNotifications([
+            ...existingNotifications.filter(n => n.type === 'DelayedUnit'),
+            ...updatedDelayedNotifications,
+            ...existingNotifications.filter(n => n.type === 'NewReport'), // Keep old reports
+            ...newReportNotifications, // Add new reports
+        ]);
+
+        // IMPORTANT: Update the last seen IDs to prevent double-notifying on reports in the *next* fetch
+        setLastSeenReportIds(allFetchedReportIds);
+
+    }, [notifications, lastSeenReportIds]);
+
 
     // --- FETCH DATA (Updated to fetch Units, Reports, and Users) ---
     const fetchData = async () => {
-        setLoading(true);
+        // Only show full-screen loading on initial fetch
+        const isInitialLoad = logs.length === 0;
+        if (isInitialLoad) setLoading(true);
         setError(null);
         try {
             // 1. Fetch Units/Logs
             const unitsRes = await axios.get(UNITS_ENDPOINT);
-            setLogs(unitsRes.data);
+            const fetchedUnits = unitsRes.data;
+            setLogs(fetchedUnits);
 
             // 2. Fetch Daily Reports
             const reportsRes = await axios.get(REPORTS_ENDPOINT);
-            if (Array.isArray(reportsRes.data)) {
-                 setDailyReportsList(reportsRes.data);
-            } else {
-                 setDailyReportsList([]);
-            }
+            const fetchedReports = Array.isArray(reportsRes.data) ? reportsRes.data : [];
+            setDailyReportsList(fetchedReports);
 
             // 3. Fetch User List (NEW)
             const usersRes = await axios.get(USER_MANAGEMENT_ENDPOINT);
-            if (Array.isArray(usersRes.data)) {
-                setUserList(usersRes.data);
+            const fetchedUsers = Array.isArray(usersRes.data) ? usersRes.data : [];
+            setUserList(fetchedUsers);
 
-                // IMPORTANT: Find the current logged-in user and update its avatar/name locally
-                const loggedInUserData = usersRes.data.find(u => u.id === user.id);
-                if (loggedInUserData) {
-                    // Update the user object prop directly, forcing the header display to refresh
-                    // NOTE: This relies on React seeing the 'user' object reference change for the header to fully refresh.
-                    // In a real app, you would use a global state (e.g., Redux/Context) to manage the user object.
-                    user.full_name = loggedInUserData.full_name;
-                    user.avatar_url = loggedInUserData.avatar_url;
-                }
-            } else {
-                setUserList([]);
+            const loggedInUserData = fetchedUsers.find(u => u.id === user.id);
+            if (loggedInUserData) {
+                user.full_name = loggedInUserData.full_name;
+                user.avatar_url = loggedInUserData.avatar_url;
             }
 
-
-            // 4. Mock Station Data (Used to build the station select list)
-            // Removed mock status (RUNNING/IDLE)
+            // 4. Mock Station Data
             const mockStations = Array.from({ length: 15 }, (_, i) => ({
                 id: `Station${i + 1}`,
                 name: `Station ${i + 1}`,
-                // status field removed
                 operator: `Operator-${100 + i}`
             }));
             setStations(mockStations);
+            
+            // 5. Run Notification Logic
+            checkDelayedUnitsAndReports(fetchedUnits, fetchedReports);
+
         } catch (err) {
             console.error("Error fetching data:", err);
             setError(`Failed to fetch data from the server. Error: ${err.message}`);
@@ -886,6 +1107,8 @@ export default function AdminPage({ user, onLogout }) {
 
     // This is called by the Report Submission modal to refresh data after a successful save
     const refreshAndCloseReport = () => {
+        // Clear the initial lastSeenReportIds just before fetching, so the new report triggers a notification
+        setLastSeenReportIds(new Set()); 
         fetchData();
         setShowReportModal(false);
     };
@@ -893,15 +1116,70 @@ export default function AdminPage({ user, onLogout }) {
     // UseEffect for Polling (Real-time update)
     useEffect(() => {
         fetchData();
-        // Poll every 3 seconds
-        const interval = setInterval(fetchData, 3000);
+        // Poll every 5 seconds 
+        const interval = setInterval(fetchData, 5000); 
         return () => clearInterval(interval); // Cleanup on unmount
-    }, []);
+    }, [checkDelayedUnitsAndReports]); 
+
+    // --- NOTIFICATION HANDLERS ---
+    const toggleBellDropdown = () => setIsBellOpen(prev => !prev);
+    
+    const handleDismissAllNotifications = () => {
+        setNotifications([]);
+        setIsBellOpen(false);
+    };
+
+    const handleClearNewReports = () => {
+        setNotifications(prev => prev.filter(n => n.type !== 'NewReport'));
+    };
+
+    const handleClearDelayedUnits = () => {
+        setNotifications(prev => prev.filter(n => n.type !== 'DelayedUnit'));
+    };
+    
+    // --- FINAL UPDATE: Handle Clickable Notification ---
+    const handleNotificationClick = (notification) => {
+        setIsBellOpen(false); // Close the bell dropdown
+        
+        if (notification.type === 'NewReport') {
+            // 1. Clear any unit highlighting
+            setHighlightedUnitId(null); 
+            // 2. Go to Reports Tab
+            setActiveTab('reports');
+
+            // 3. Find the report object and OPEN THE MODAL
+            const report = dailyReportsList.find(r => r.id === notification.reportId);
+            if (report) {
+                // Set filters to match the report date/station
+                setReportDate(report.report_date.split(' ')[0]);
+                setReportFilterStationId(report.station);
+                
+                // OPEN THE REPORT DETAIL MODAL
+                setSelectedReportToView(report);
+            }
+            
+        } else if (notification.type === 'DelayedUnit') {
+            // 1. Go to Station Monitor Tab
+            setActiveTab('station_monitor');
+            // 2. Set the monitor ID to the delayed unit's station
+            setStationMonitorId(notification.stationId);
+            // 3. SET THE HIGHLIGHTED UNIT ID
+            setHighlightedUnitId(notification.unitId);
+        }
+
+        // Optional: Remove the clicked *Report* notification from the list
+        if (notification.type === 'NewReport') {
+            setNotifications(prev => prev.filter(n => n.id !== notification.id));
+        }
+    };
+    // ----------------------------------------
+
 
     // --- UNIT HANDLERS (Existing, Unchanged) ---
     const handleMonitorStation = (stationId) => {
         setStationMonitorId(stationId);
         setActiveTab('station_monitor');
+        setHighlightedUnitId(null); // Clear highlight when navigating via card button
     };
 
     const handleEditClick = (log) => {
@@ -1084,7 +1362,7 @@ export default function AdminPage({ user, onLogout }) {
     // Determine the header full name (uses the current user prop)
     const headerFullName = user.full_name || user.username || 'Admin';
 
-    // --- RENDER CONTENT ---
+    // --- RENDER CONTENT (Updated with Highlight Logic) ---
     const renderContent = () => {
         if (loading && logs.length === 0) {
             return (
@@ -1194,7 +1472,7 @@ export default function AdminPage({ user, onLogout }) {
                 );
 
             case "station_monitor":
-                // ... Station Monitor (unchanged) ...
+                // ... Station Monitor (UPDATED to support row highlighting) ...
                 if (!stationMonitorId) { setActiveTab('stations'); return null; }
                 const station = stations.find(s => s.id === stationMonitorId);
                 const metrics = calculateStationMetrics(stationMonitorId);
@@ -1204,7 +1482,7 @@ export default function AdminPage({ user, onLogout }) {
                         <h3 className="mb-4 d-flex align-items-center">
                             <i className="bi bi-activity me-2 text-danger"></i>
                             Real-time Monitoring for <span className="text-primary ms-2">{station?.name || stationMonitorId}</span>
-                            <button className="btn btn-sm btn-outline-secondary ms-auto" onClick={() => setActiveTab('stations')}><i className="bi bi-arrow-left me-1"></i> Back to Stations</button>
+                            <button className="btn btn-sm btn-outline-secondary ms-auto" onClick={() => { setActiveTab('stations'); setHighlightedUnitId(null);}}><i className="bi bi-arrow-left me-1"></i> Back to Stations</button>
                         </h3>
 
                         <hr />
@@ -1237,25 +1515,32 @@ export default function AdminPage({ user, onLogout }) {
                                         <tr><th>ID</th><th>Station</th><th>Model</th><th>Revision</th><th>Base Unit No.</th><th>Assembly No.</th><th>Serial No.</th><th>Accessory No.</th><th>Status</th><th>Remarks</th><th>Timestamp</th><th>Actions</th></tr>
                                     </thead>
                                     <tbody>
-                                        {metrics.stationLogs.length > 0 ? metrics.stationLogs.map(log => (
-                                            <tr key={log.id}><td>{log.id}</td>
-                                                <td><span className="badge bg-secondary">{log.station}</span></td>
-                                                <td>{log.model}</td>
-                                                <td>{log.revision}</td>
-                                                <td>{log.base_unit_kitting_no}</td>
-                                                <td>{log.assembly_no}</td>
-                                                <td className="fw-bold">{log.device_serial_no}</td>
-                                                <td>{log.accessory_kitting_no}</td>
-                                                <td><span className={`badge ${log.status === 'Completed' ? 'bg-success' : log.status === 'No Good (NG)' ? 'bg-danger' : log.status === 'In Progress' ? 'bg-primary' : 'bg-warning text-dark'}`}>{log.status}</span></td>
-                                                <td>{log.remarks}</td>
-                                                <td className="small">{new Date(log.created_at).toLocaleString()}</td>
-                                                <td>
-                                                    <button className="btn btn-sm btn-outline-danger py-0" onClick={() => handleEditClick(log)}>
-                                                        <i className="bi bi-pencil"></i> Edit
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        )) : (
+                                        {metrics.stationLogs.length > 0 ? metrics.stationLogs.map(log => {
+                                            const isHighlighted = highlightedUnitId === log.id;
+                                            // Conditional class for highlighting
+                                            const rowClass = isHighlighted ? 'table-danger fw-bold' : '';
+
+                                            return (
+                                                <tr key={log.id} className={rowClass}>
+                                                    <td>{log.id}</td>
+                                                    <td><span className="badge bg-secondary">{log.station}</span></td>
+                                                    <td>{log.model}</td>
+                                                    <td>{log.revision}</td>
+                                                    <td>{log.base_unit_kitting_no}</td>
+                                                    <td>{log.assembly_no}</td>
+                                                    <td className="fw-bold">{log.device_serial_no}</td>
+                                                    <td>{log.accessory_kitting_no}</td>
+                                                    <td><span className={`badge ${log.status === 'Completed' ? 'bg-success' : log.status === 'No Good (NG)' ? 'bg-danger' : log.status === 'In Progress' ? 'bg-primary' : 'bg-warning text-dark'}`}>{log.status}</span></td>
+                                                    <td>{log.remarks}</td>
+                                                    <td className="small">{new Date(log.created_at).toLocaleString()}</td>
+                                                    <td>
+                                                        <button className="btn btn-sm btn-outline-danger py-0" onClick={() => handleEditClick(log)}>
+                                                            <i className="bi bi-pencil"></i> Edit
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }) : (
                                             <tr><td colSpan="12" className="text-center py-4">No live logs found for this station.</td></tr>
                                         )}
                                     </tbody>
@@ -1266,7 +1551,7 @@ export default function AdminPage({ user, onLogout }) {
                 );
 
             case "reports":
-                // ... Reports content ...
+                // ... Reports content (Unchanged) ...
                 return (
                     <div>
                         <h3 className="mb-4 d-flex align-items-center">
@@ -1496,7 +1781,7 @@ export default function AdminPage({ user, onLogout }) {
 
     return (
         <div className="d-flex min-vh-100 bg-light overflow-hidden">
-            {/* --- SIDEBAR --- */}
+            {/* --- SIDEBAR (Unchanged) --- */}
             <div
                 className={`d-flex flex-column flex-shrink-0 p-3 text-white bg-dark transition-all`}
                 style={{
@@ -1505,19 +1790,27 @@ export default function AdminPage({ user, onLogout }) {
                     backgroundColor: "#111827"
                 }}
             >
+
+
                 <div className="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none overflow-hidden">
-                    <i className="bi bi-cpu-fill fs-3 me-3 text-danger"></i>
+                    <img 
+                        src={logo} 
+                        alt="MKFF Admin Logo" 
+                        style={{ height: '3rem', marginRight: '1rem' }} // Adjust height/styling as needed
+                        className="logo-class" 
+                    />
+                    {/* Re-adding the conditional text display */}
                     {isSidebarOpen && <span className="fs-5 fw-bold text-nowrap">MKFF Admin</span>}
                 </div>
                 <hr />
                 <ul className="nav nav-pills flex-column mb-auto">
-                    <li><button className={`nav-link text-white w-100 text-start ${activeTab === 'dashboard' ? 'active bg-danger' : ''}`} onClick={() => { setActiveTab('dashboard'); setStationMonitorId(null); setReportFilterStationId('All'); setStationHistoryId(null); }}><i className="bi bi-speedometer2 me-3"></i>{isSidebarOpen && "Dashboard"}</button></li>
-                    <li><button className={`nav-link text-white w-100 text-start ${activeTab === 'stations' || activeTab === 'station_monitor' ? 'active bg-danger' : ''}`} onClick={() => { setActiveTab('stations'); setStationMonitorId(null); setReportFilterStationId('All'); setStationHistoryId(null); }}><i className="bi bi-grid-3x3-gap me-3"></i>{isSidebarOpen && "Stations"}</button></li>
-                    <li><button className={`nav-link text-white w-100 text-start ${activeTab === 'reports' ? 'active bg-danger' : ''}`} onClick={() => { setActiveTab('reports'); setStationMonitorId(null); setStationHistoryId(null); }}><i className="bi bi-file-text me-3"></i>{isSidebarOpen && "Reports"}</button></li>
-                    <li><button className={`nav-link text-white w-100 text-start ${activeTab === 'approval' ? 'active bg-danger' : ''}`} onClick={() => { setActiveTab('approval'); setStationHistoryId(null); }}><i className="bi bi-check-circle me-3"></i>{isSidebarOpen && "Approvals"}</button></li>
+                    <li><button className={`nav-link text-white w-100 text-start ${activeTab === 'dashboard' ? 'active bg-danger' : ''}`} onClick={() => { setActiveTab('dashboard'); setStationMonitorId(null); setReportFilterStationId('All'); setStationHistoryId(null); setHighlightedUnitId(null);}}><i className="bi bi-speedometer2 me-3"></i>{isSidebarOpen && "Dashboard"}</button></li>
+                    <li><button className={`nav-link text-white w-100 text-start ${activeTab === 'stations' || activeTab === 'station_monitor' ? 'active bg-danger' : ''}`} onClick={() => { setActiveTab('stations'); setStationMonitorId(null); setReportFilterStationId('All'); setStationHistoryId(null); setHighlightedUnitId(null);}}><i className="bi bi-grid-3x3-gap me-3"></i>{isSidebarOpen && "Stations"}</button></li>
+                    <li><button className={`nav-link text-white w-100 text-start ${activeTab === 'reports' ? 'active bg-danger' : ''}`} onClick={() => { setActiveTab('reports'); setStationMonitorId(null); setStationHistoryId(null); setHighlightedUnitId(null);}}><i className="bi bi-file-text me-3"></i>{isSidebarOpen && "Reports"}</button></li>
+                    <li><button className={`nav-link text-white w-100 text-start ${activeTab === 'approval' ? 'active bg-danger' : ''}`} onClick={() => { setActiveTab('approval'); setStationHistoryId(null); setHighlightedUnitId(null);}}><i className="bi bi-check-circle me-3"></i>{isSidebarOpen && "Approvals"}</button></li>
                     {/* NEW: Manage Account Tab */}
-                    <li><button className={`nav-link text-white w-100 text-start ${activeTab === 'manage_account' ? 'active bg-danger' : ''}`} onClick={() => { setActiveTab('manage_account'); setStationHistoryId(null); }}><i className="bi bi-person-gear me-3"></i>{isSidebarOpen && "Manage Account"}</button></li>
-                    <li><button className={`nav-link text-white w-100 text-start ${activeTab === 'analytics' ? 'active bg-danger' : ''}`} onClick={() => { setActiveTab('analytics'); setStationHistoryId(null); }}><i className="bi bi-graph-up me-3"></i>{isSidebarOpen && "Analytics"}</button></li>
+                    <li><button className={`nav-link text-white w-100 text-start ${activeTab === 'manage_account' ? 'active bg-danger' : ''}`} onClick={() => { setActiveTab('manage_account'); setStationHistoryId(null); setHighlightedUnitId(null);}}><i className="bi bi-person-gear me-3"></i>{isSidebarOpen && "Manage Account"}</button></li>
+                    <li><button className={`nav-link text-white w-100 text-start ${activeTab === 'analytics' ? 'active bg-danger' : ''}`} onClick={() => { setActiveTab('analytics'); setStationHistoryId(null); setHighlightedUnitId(null);}}><i className="bi bi-graph-up me-3"></i>{isSidebarOpen && "Analytics"}</button></li>
                 </ul >
                 <button className="btn btn-outline-light mt-auto w-100" onClick={onLogout}>
                     <i className="bi bi-box-arrow-left me-2"></i>{isSidebarOpen && "Logout"}
@@ -1537,9 +1830,18 @@ export default function AdminPage({ user, onLogout }) {
                         </h5>
                     </div>
                     <div className="d-flex align-items-center gap-3">
-                        <i className="bi bi-bell fs-4 text-secondary position-relative">
-                            <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger p-1" style={{fontSize:'0.5rem'}}>3</span>
-                        </i>
+                        {/* UPDATED: NOTIFICATION BELL INTEGRATION */}
+                        <NotificationBell 
+                            notifications={notifications}
+                            isOpen={isBellOpen}
+                            toggleDropdown={toggleBellDropdown}
+                            onDismissAll={handleDismissAllNotifications}
+                            onClearReports={handleClearNewReports}
+                            onClearDelayed={handleClearDelayedUnits}
+                            onNotificationClick={handleNotificationClick}
+                        />
+                        {/* END NOTIFICATION BELL */}
+
                         <div className="text-end me-2 d-none d-md-block">
                             {/* DISPLAY FULL NAME IN HEADER */}
                             <div className="fw-bold small">{headerFullName}</div>
