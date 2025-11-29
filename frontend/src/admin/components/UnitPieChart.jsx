@@ -1,9 +1,10 @@
 import React from 'react';
 import { Doughnut } from 'react-chartjs-2';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 
-// --- CHART COMPONENT: UnitPieChart ---
+ChartJS.register(ArcElement, Tooltip, Legend);
+
 export const UnitPieChart = ({ metrics, title }) => {
-    // Convert metrics into Chart.js data object format
     const chartData = {
         labels: ['Completed', 'No Good (NG)', 'In Progress'],
         datasets: [
@@ -11,8 +12,9 @@ export const UnitPieChart = ({ metrics, title }) => {
                 label: 'Unit Count',
                 data: [metrics.completedUnits, metrics.ngUnits, metrics.pendingUnits],
                 backgroundColor: ['#198754', '#dc3545', '#0d6efd'],
-                borderColor: ['#fff', '#fff', '#fff'],
-                borderWidth: 1,
+                borderWidth: 0,
+                hoverOffset: 10,       // Smooth hover effect
+                cutout: '65%',         // More modern donut size
             },
         ],
     };
@@ -21,40 +23,79 @@ export const UnitPieChart = ({ metrics, title }) => {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-            legend: { position: 'bottom' },
-            title: { display: false, text: title },
+            legend: {
+                display: false,        // We create a custom legend below
+            },
+            tooltip: {
+                backgroundColor: '#1e293b',
+                titleColor: '#fff',
+                bodyColor: '#fff',
+                padding: 10,
+                borderWidth: 0,
+            },
         },
     };
 
     const total = metrics.completedUnits + metrics.ngUnits + metrics.pendingUnits;
 
     return (
-        <div className="card shadow-sm h-100">
-            <div className="card-header bg-white"><h6 className="mb-0 text-uppercase small fw-bold">{title}</h6></div>
-            <div className="card-body text-center d-flex flex-column justify-content-center align-items-center">
-                <div style={{ height: '150px', width: '100%', marginBottom: '10px' }}>
-                    {/* Render Doughnut Chart */}
-                    {total === 0 ? (
-                        <p className="text-muted">No units recorded.</p>
-                    ) : (
-                        <Doughnut data={chartData} options={options} />
-                    )}
-                </div>
+        <div
+            className="p-3"
+            style={{
+                borderRadius: '16px',
+                background: '#ffffff',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.07)',
+                height: '100%'
+            }}
+        >
+            <h6
+                className="fw-bold text-uppercase small mb-3"
+                style={{ letterSpacing: '0.5px' }}
+            >
+                {title}
+            </h6>
 
-                {/* Manual breakdown below the chart */}
-                <div className="mt-2 w-100">
-                    {chartData.labels.map((label, index) => {
-                        const value = chartData.datasets[0].data[index];
-                        const color = chartData.datasets[0].backgroundColor[index];
-                        const percentage = total === 0 ? 0 : ((value / total) * 100).toFixed(1);
-                        return (
-                            <div key={label} className="d-flex justify-content-between small">
-                                <span className="fw-bold" style={{ color: color }}>• {label}</span>
-                                <span>{value} ({percentage}%)</span>
+            <div className="d-flex flex-column align-items-center justify-content-center" style={{ height: '200px' }}>
+                {total === 0 ? (
+                    <p className="text-muted">No units recorded.</p>
+                ) : (
+                    <Doughnut data={chartData} options={options} />
+                )}
+            </div>
+
+            {/* Modern Minimal Legend */}
+            <div className="mt-3">
+                {chartData.labels.map((label, index) => {
+                    const value = chartData.datasets[0].data[index];
+                    const color = chartData.datasets[0].backgroundColor[index];
+                    const percentage = total === 0 ? 0 : ((value / total) * 100).toFixed(1);
+
+                    return (
+                        <div
+                            key={label}
+                            className="d-flex justify-content-between align-items-center py-1 small"
+                            style={{ borderBottom: '1px solid #f1f5f9' }}
+                        >
+                            <div className="d-flex align-items-center gap-2">
+                                <span
+                                    style={{
+                                        display: 'inline-block',
+                                        width: '10px',
+                                        height: '10px',
+                                        backgroundColor: color,
+                                        borderRadius: '50%',
+                                    }}
+                                ></span>
+
+                                <span className="fw-semibold">{label}</span>
                             </div>
-                        );
-                    })}
-                </div>
+
+                            <span className="text-muted fw-semibold">
+                                {value} ({percentage}%)
+                            </span>
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );

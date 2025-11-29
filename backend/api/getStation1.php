@@ -1,135 +1,166 @@
 <?php
-// Tiyakin na WALANG kahit anong output, space, o blank line bago ang <?php tag.
+// backend/api/getStation1.php
 
-// --- CORS Headers (Simplified Wildcard for Local Dev) ---
-// Note: Hindi pwedeng gamitin ang Access-Control-Allow-Credentials kasabay ng wildcard (*), 
-// kaya aalisin natin ang conditional logic para maging universal ang access.
-
+// 1. CORS Headers
+// Allows access from any origin (localhost, network IP, etc.)
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS"); 
-// Inalis ang header("Access-Control-Allow-Credentials: true"); dahil sa wildcard.
 
-// Handle pre-flight check (Ito ay kailangan para sa PUT/POST requests)
+// Handle Pre-flight requests
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit();
+    http_response_code(200);
+    exit();
 }
 
 header("Content-Type: application/json");
 
-// Tiyakin na ang path sa db.php ay tama
-include '../db.php'; 
+// 2. Database Connection
+// Ensure db.php exists in the parent folder
+if (!file_exists('../db.php')) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Database configuration file (db.php) not found.']);
+    exit;
+}
+require_once '../db.php'; 
 
 $method = $_SERVER['REQUEST_METHOD'];
 
-// --- GET: Kunin ang mga Units (Logs) ---
+// --- GET: Fetch Units ---
 if ($method === 'GET') {
-    $station = $_GET['station'] ?? null;
-    $status = $_GET['status'] ?? null;
+    $station = $_GET['station'] ?? null;
+    $status = $_GET['status'] ?? null;
 
-    $sql = "SELECT * FROM units"; 
-    $params = [];
+    $sql = "SELECT * FROM units"; 
+    $params = [];
+    $conditions = [];
 
-    // Filter Logic
-    if ($station && $status) {
-        $sql .= " WHERE station = :station AND status = :status";
-        $params = ['station' => $station, 'status' => $status];
-    } elseif ($station) {
-        $sql .= " WHERE station = :station";
-        $params = ['station' => $station];
-    }
+    // Filter Logic
+    if ($station) {
+        $conditions[] = "station = :station";
+        $params['station'] = $station;
+    }
+    if ($status) {
+        $conditions[] = "status = :status";
+        $params['status'] = $status;
+    }
 
-    $sql .= " ORDER BY created_at DESC";
+    if (!empty($conditions)) {
+        $sql .= " WHERE " . implode(" AND ", $conditions);
+    }
 
-    try {
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
-        $units = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $sql .= " ORDER BY created_at DESC";
 
-        echo json_encode($units);
-    } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
-    }
-    exit;
+    try {
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $units = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode($units);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
+    }
+    exit;
 }
 
-// --- POST: Mag-save ng Bagong Unit ---
+// --- POST: Save New Unit ---
 if ($method === 'POST') {
-    $raw = file_get_contents("php://input");
-    $data = json_decode($raw, true);
+    $raw = file_get_contents("php://input");
+    $data = json_decode($raw, true);
 
-    if (!isset($data['model']) || !isset($data['device_serial_no'])) {
-        http_response_code(400);
-        echo json_encode(['error' => 'Missing required fields']);
-        exit;
-    }
+    // Support both camelCase (React) and snake_case keys
+    $serial = $data['deviceSerialNo'] ?? $data['device_serial_no'] ?? null;
+    $model = $data['model'] ?? null;
 
-    try {
-        $sql = "INSERT INTO units (model, revision, base_unit_kitting_no, assembly_no, device_serial_no, accessory_kitting_no, status, remarks, station)
-                VALUES (:model, :revision, :base, :assy, :serial, :acc, :status, :remarks, :station)";
-        
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            'model' => $data['model'] ?? null,
-            'revision' => $data['revision'] ?? null,
-            'base' => $data['baseUnitKittingNo'] ?? null,
-            'assy' => $data['assemblyNo'] ?? null,
-            'serial' => $data['deviceSerialNo'],
-            'acc' => $data['accessoryKittingNo'] ?? null,
-            'status' => $data['status'] ?? 'In Progress',
-            'remarks' => $data['remarks'] ?? null,
-            'station' => $data['station'] ?? 'Station1'
-        ]);
+    if (!$model || !$serial) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Missing required fields (model or device serial no)']);
+        exit;
+    }
 
-        echo json_encode(['status' => 'success', 'message' => 'Unit saved successfully', 'id' => $pdo->lastInsertId()]);
-    } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
-    }
-    exit;
+    try {
+        $sql = "INSERT INTO units (model, revision, base_unit_kitting_no, assembly_no, device_serial_no, accessory_kitting_no, status, remarks, station)
+                VALUES (:model, :revision, :base, :assy, :serial, :acc, :status, :remarks, :station)";
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            'model' => $model,
+            'revision' => $data['revision'] ?? null,
+            // Check both naming conventions to be safe
+            'base' => $data['baseUnitKittingNo'] ?? $data['base_unit_kitting_no'] ?? null,
+            'assy' => $data['assemblyNo'] ?? $data['assembly_no'] ?? null,
+            'serial' => $serial,
+            'acc' => $data['accessoryKittingNo'] ?? $data['accessory_kitting_no'] ?? null,
+            'status' => $data['status'] ?? 'In Progress',
+            'remarks' => $data['remarks'] ?? null,
+            'station' => $data['station'] ?? 'Station1'
+        ]);
+
+        echo json_encode(['status' => 'success', 'message' => 'Unit saved successfully', 'id' => $pdo->lastInsertId()]);
+    } catch (PDOException $e) {
+        // Handle Duplicate Entry
+        if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
+             http_response_code(409); // Conflict
+             echo json_encode(['error' => 'Duplicate Serial Number detected.']);
+        } else {
+             http_response_code(500);
+             echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
+        }
+    }
+    exit;
 }
 
 
-// --- PUT: I-update ang Unit (Admin Edit) ---
+// --- PUT: Update Unit ---
 if ($method === 'PUT') {
-    $raw = file_get_contents("php://input");
-    $data = json_decode($raw, true);
+    $raw = file_get_contents("php://input");
+    $data = json_decode($raw, true);
 
-    if (!isset($data['id'])) {
-        http_response_code(400);
-        echo json_encode(['error' => 'Missing unit ID for update.']);
-        exit;
-    }
+    if (!isset($data['id'])) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Missing unit ID for update.']);
+        exit;
+    }
 
-    try {
-        $sql = "UPDATE units SET 
-            status = :status, 
-            remarks = :remarks, 
-            model = :model 
-            WHERE id = :id";
-        
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            'id' => $data['id'],
-            'status' => $data['status'] ?? null, 
-            'remarks' => $data['remarks'] ?? null,
-            'model' => $data['model'] ?? null
-        ]);
+    try {
+        // Dynamic Update: Only update fields that are sent
+        $fields = [];
+        $params = ['id' => $data['id']];
 
-        if ($stmt->rowCount() > 0) {
-            http_response_code(200);
-            echo json_encode(['status' => 'success', 'message' => 'Unit ID ' . $data['id'] . ' updated successfully']);
-        } else {
-            http_response_code(404);
-            echo json_encode(['error' => 'Unit ID ' . $data['id'] . ' not found or no changes made.']);
-        }
+        if (isset($data['status'])) {
+            $fields[] = "status = :status";
+            $params['status'] = $data['status'];
+        }
+        if (isset($data['remarks'])) {
+            $fields[] = "remarks = :remarks";
+            $params['remarks'] = $data['remarks'];
+        }
+        if (isset($data['model'])) {
+            $fields[] = "model = :model";
+            $params['model'] = $data['model'];
+        }
 
-    } catch (PDOException $e) {
-        http_response_code(500);
-        echo json_encode(['error' => 'Database error during update: ' . $e->getMessage()]);
-    }
-    exit;
+        if (empty($fields)) {
+            echo json_encode(['status' => 'success', 'message' => 'No changes requested.']);
+            exit;
+        }
+
+        $sql = "UPDATE units SET " . implode(", ", $fields) . " WHERE id = :id";
+        
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        if ($stmt->rowCount() > 0) {
+            echo json_encode(['status' => 'success', 'message' => 'Unit updated successfully']);
+        } else {
+            // 200 OK but no rows changed (maybe data was same)
+            echo json_encode(['status' => 'success', 'message' => 'Unit found but no data changed.']);
+        }
+
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Database error during update: ' . $e->getMessage()]);
+    }
+    exit;
 }
 ?>

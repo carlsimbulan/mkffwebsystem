@@ -1,25 +1,37 @@
 import React from 'react';
 import { Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip } from 'chart.js';
 
-// --- CHART COMPONENT: StationBarChart ---
+ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip);
+
 export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
     const liveLogs = logs.filter(l => l.status !== 'Pending Approval');
 
-    const summaries = stations.map(station => ({
-        ...calculateMetrics(station.id, liveLogs),
-        name: station.name
-    }));
+    // Prepare dataset per station
+    const summaries = stations.map(station => {
+        const metrics = calculateMetrics(station.id, liveLogs) || { completedUnits: 0, ngUnits: 0 };
+        return {
+            name: station.name,
+            completed: metrics.completedUnits || 0,
+            ng: metrics.ngUnits || 0,
+        };
+    });
 
-    const chartLabels = summaries.map(s => s.name);
+    // Chart data
     const chartData = {
-        labels: chartLabels,
+        labels: summaries.map(s => s.name),
         datasets: [
             {
-                label: 'Total Output (Completed + NG)',
-                data: summaries.map(s => s.yieldTotal),
-                backgroundColor: 'rgba(220, 53, 69, 0.8)', // Danger Red
-                borderColor: 'rgba(220, 53, 69, 1)',
-                borderWidth: 1,
+                label: 'Completed',
+                data: summaries.map(s => s.completed),
+                backgroundColor: '#198754', // Green
+                borderRadius: 6,
+            },
+            {
+                label: 'No Good (NG)',
+                data: summaries.map(s => s.ng),
+                backgroundColor: '#dc3545', // Red
+                borderRadius: 6,
             },
         ],
     };
@@ -27,33 +39,56 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
     const options = {
         responsive: true,
         maintainAspectRatio: false,
-        indexAxis: 'y', // Make it a horizontal bar chart
+        indexAxis: 'y', // horizontal bars
         scales: {
-            x: { beginAtZero: true, grid: { display: false } },
-            y: { grid: { display: true } }
+            x: {
+                stacked: true, // key for stacked bars
+                beginAtZero: true,
+                grid: { color: 'rgba(203, 213, 225, 0.3)', drawBorder: false },
+                ticks: { color: '#475569', font: { size: 12, weight: '500' } },
+            },
+            y: {
+                stacked: true,
+                grid: { display: false },
+                ticks: { color: '#1e293b', font: { size: 13, weight: '600' } },
+            },
         },
         plugins: {
-            legend: { display: false },
-            title: { display: false },
+            legend: { position: 'bottom', labels: { boxWidth: 12, boxHeight: 12, padding: 15 } },
+            tooltip: {
+                backgroundColor: '#1e293b',
+                titleColor: '#fff',
+                bodyColor: '#fff',
+                padding: 10,
+                cornerRadius: 6,
+            },
         },
     };
 
-    const totalOutput = summaries.reduce((sum, s) => sum + s.yieldTotal, 0);
+    const totalOutput = summaries.reduce((sum, s) => sum + s.completed + s.ng, 0);
 
     return (
-        <div className="card shadow-sm h-100">
-            <div className="card-header bg-danger text-white">
-                <h5 className="mb-0"><i className="bi bi-bar-chart-fill me-2"></i>Daily Output Comparison (Excl. Pending)</h5>
-            </div>
-            <div className="card-body">
-                {totalOutput === 0 ? (
-                    <p className="text-muted text-center">No completed or NG units checked across all stations.</p>
-                ) : (
-                    <div style={{ height: '300px', width: '100%' }}>
-                        <Bar data={chartData} options={options} />
-                    </div>
-                )}
-            </div>
+        <div
+            className="p-3 h-100"
+            style={{
+                borderRadius: '16px',
+                background: '#ffffff',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.07)',
+            }}
+        >
+            <h5 className="fw-bold text-uppercase small mb-3" style={{ letterSpacing: '0.5px' }}>
+                Completed vs No Good Units per Station
+            </h5>
+
+            {totalOutput === 0 ? (
+                <p className="text-muted text-center">
+                    No completed or NG units checked across all stations.
+                </p>
+            ) : (
+                <div style={{ height: '450px', width: '100%' }}>
+                    <Bar data={chartData} options={options} />
+                </div>
+            )}
         </div>
     );
 };

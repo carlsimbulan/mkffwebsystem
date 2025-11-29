@@ -1,9 +1,8 @@
-// App.js
-
 import React, { useState } from "react";
 import Login from "./Login";
 import AdminPage from "./admin/AdminPage";
-import Station1 from "./components/Station1"; // Assuming path is correct
+// CHANGED: Import the generic dashboard instead of specific Station1
+import StationDashboard from "./components/StationDashboard"; 
 import ITAssistantPage from "./pages/ITAssistantPage";
 
 function App() {
@@ -30,26 +29,41 @@ function App() {
 
   // 4. OPERATOR LOGIC
   if (user.role === 'Operator') {
-    // Check kung saang station siya naka-assign
-    if (user.station === 'Station1') {
-      
-      // FIX: Diretso na sa Station1 component.
-      // Ang Station1 na ang may responsibilidad sa buong UI (Sidebar, Header, at Content).
-      return <Station1 user={user} onLogout={handleLogout} />;
-
+    
+    // CHANGED: We no longer check specifically for 'Station1'.
+    // We just check if a station is assigned at all.
+    // The StationDashboard component handles the logic for Station1, 2, 15, etc.
+    if (user.station) {
+      return <StationDashboard user={user} onLogout={handleLogout} />;
     }
     
-    // Kung Operator pero walang valid station
+    // If Operator but no station assigned in database
     return (
-        <div className="d-flex flex-column min-vh-100 justify-content-center align-items-center">
-            <h1>No Station Assigned</h1>
-            <p>Please contact admin to assign a station for {user.username}.</p>
-            <button className="btn btn-primary" onClick={handleLogout}>Logout</button>
+        <div className="d-flex flex-column min-vh-100 justify-content-center align-items-center bg-light">
+            <div className="card shadow p-5 text-center border-danger">
+                <i className="bi bi-exclamation-triangle-fill text-danger display-1 mb-3"></i>
+                <h1 className="h3">No Station Assigned</h1>
+                <p className="text-muted">
+                    The account <strong>{user.username}</strong> is an Operator but is not linked to a specific station.
+                </p>
+                <p className="mb-4">Please contact an Administrator to assign a station.</p>
+                <button className="btn btn-primary" onClick={handleLogout}>
+                    Back to Login
+                </button>
+            </div>
         </div>
     );
   }
 
-  return <div className="p-5 text-center"><h1>Unknown Role: {user.role}</h1><button className="btn btn-danger" onClick={handleLogout}>Logout</button></div>;
+  // Fallback for unknown roles
+  return (
+    <div className="d-flex min-vh-100 justify-content-center align-items-center">
+        <div className="text-center">
+            <h1>Unknown Role: {user.role}</h1>
+            <button className="btn btn-danger mt-3" onClick={handleLogout}>Logout</button>
+        </div>
+    </div>
+  );
 }
 
 export default App;

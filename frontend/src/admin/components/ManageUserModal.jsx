@@ -8,6 +8,9 @@ const DEFAULT_AVATAR_PATH_PLACEHOLDER = 'data:image/svg+xml;base64,PHN2ZyB4bWxuc
 export const ManageUserModal = ({ userToEdit, stations, onClose, onSave, AVATAR_UPLOAD_PATH = AVATAR_UPLOAD_PATH_PLACEHOLDER, DEFAULT_AVATAR_PATH = DEFAULT_AVATAR_PATH_PLACEHOLDER }) => {
     const isEditMode = userToEdit && userToEdit.id !== null;
 
+    // --- NEW: State for password visibility ---
+    const [showPassword, setShowPassword] = useState(false);
+
     const initialFormData = isEditMode ? {
         id: userToEdit.id,
         username: userToEdit.username,
@@ -171,11 +174,34 @@ export const ManageUserModal = ({ userToEdit, stations, onClose, onSave, AVATAR_
                                         <label className="form-label">Username</label>
                                         <input type="text" className="form-control" name="username" value={formData.username} onChange={handleChange} required />
                                     </div>
+                                    
+                                    {/* --- UPDATED PASSWORD FIELD WITH HIDE/SHOW --- */}
                                     <div className="mb-3">
-                                        <label className="form-label">{isEditMode ? 'Password (Current: ****)' : 'Password'}</label>
-                                        <input type="text" className="form-control" name="password" value={formData.password} onChange={handleChange} required />
-                                        {isEditMode && <div className="form-text text-danger">The current password is: **{userToEdit.password}**. Edit as needed.</div>}
+                                        <label className="form-label">Password</label>
+                                        <div className="input-group">
+                                            <input 
+                                                type={showPassword ? "text" : "password"} // Dynamic Type
+                                                className="form-control" 
+                                                name="password" 
+                                                value={formData.password} 
+                                                onChange={handleChange} 
+                                                required 
+                                            />
+                                            <button 
+                                                className="btn btn-outline-secondary" 
+                                                type="button" 
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                title={showPassword ? "Hide Password" : "Show Password"}
+                                            >
+                                                {showPassword ? <i className="bi bi-eye-slash"></i> : <i className="bi bi-eye"></i>}
+                                            </button>
+                                        </div>
+                                        {/* Removed the text that revealed the password */}
+                                        <div className="form-text text-muted">
+                                            {isEditMode ? "Enter a new password only if you wish to change it." : "Set a secure password."}
+                                        </div>
                                     </div>
+
                                     <div className="row">
                                         <div className="col-md-6 mb-3">
                                             <label className="form-label">Role</label>
