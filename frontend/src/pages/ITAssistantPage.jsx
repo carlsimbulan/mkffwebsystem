@@ -5,7 +5,7 @@ import axios from 'axios';
 const API_BASE_URL = "http://localhost/mkffwebsystem/backend/api";
 const UNITS_ENDPOINT = `${API_BASE_URL}/units.php`;
 const HISTORY_ENDPOINT = `${API_BASE_URL}/unit_history.php`; 
-const CURRENT_STATION = "IT_Assistant"; 
+const CURRENT_ROLE = "IT_Assistant"; 
 const MAX_QR_COUNT = 100000; 
 
 // Helper to format a number into a sequential serial string (e.g., 1 -> 00001)
@@ -17,7 +17,7 @@ const safeParseSerial = (serialStr, prefix) => {
     return parseInt(numStr, 10) || 0;
 }
 
-// --- QR LIST PRINT COMPONENT (UPDATED FOR ASSEMBLY NO) ---
+// --- QR LIST PRINT COMPONENT ---
 const GeneratedQRList = ({ list, onSave, onDiscard, isSaving }) => {
     if (list.length === 0) return null;
 
@@ -51,13 +51,13 @@ const GeneratedQRList = ({ list, onSave, onDiscard, isSaving }) => {
                     line-height: 1.3;
                 }
                 .qr-text strong {
-                    font-size: 11pt;
+                    font-size: 11pt; 
                     display: block;
                     margin-bottom: 2px;
                 }
                 .tag-label {
-                    font-size: 7pt;
-                    color: #555;
+                    font-size: 7pt; 
+                    color: #555; 
                     text-transform: uppercase;
                 }
             </style>
@@ -145,32 +145,28 @@ const UnscannedUnitsTable = ({ unscannedUnits }) => (
             <table className="table table-striped table-sm mb-0 small">
                 <thead className="table-light sticky-top">
                     <tr>
-                        <th>Assembly No. (Ref)</th>
-                        <th>Serial No.</th>
-                        <th>Model/Rev</th>
+                        <th>Assembly No.</th>
+                        <th>Model</th>
+                        <th>Revision</th>
                         <th>Kitting No.</th>
                         <th>Status</th>
-                        <th>Station Logged</th>
+                        <th>Station</th>
+                        <th>Created At</th>
                     </tr>
                 </thead>
                 <tbody>
                     {unscannedUnits.length > 0 ? unscannedUnits.map(unit => (
                         <tr key={unit.id} className="table-info">
                             <td className="fw-bold text-primary">{unit.assembly_no}</td>
-                            <td>
-                                {unit.device_serial_no ? (
-                                    <span className="fw-bold text-dark">{unit.device_serial_no}</span>
-                                ) : (
-                                    <span className="text-muted fst-italic">(Pending Scan)</span>
-                                )}
-                            </td>
-                            <td>{unit.model} ({unit.revision})</td>
+                            <td>{unit.model}</td>
+                            <td>{unit.revision}</td>
                             <td>{unit.base_unit_kitting_no}</td>
                             <td><span className="badge bg-primary">For Scanning</span></td>
                             <td>{unit.station}</td>
+                            <td>{new Date(unit.created_at).toLocaleString()}</td>
                         </tr>
                     )) : (
-                        <tr><td colSpan="6" className="text-center py-4">No units currently require initial scanning.</td></tr>
+                        <tr><td colSpan="7" className="text-center py-4">No units currently require initial scanning.</td></tr>
                     )}
                 </tbody>
             </table>
@@ -204,16 +200,6 @@ const StationHistoryModal = ({ stationId, onClose }) => {
         fetchHistory();
     }, [stationId]);
     
-    const getStatusBadge = (status) => {
-        let className = 'bg-secondary';
-        if (status === 'Completed') className = 'bg-success';
-        else if (status === 'No Good (NG)') className = 'bg-danger';
-        else if (status === 'In Progress') className = 'bg-primary';
-        else if (status === 'For Scanning') className = 'bg-info text-dark';
-        else if (status === 'Pending Approval') className = 'bg-warning text-dark';
-        return <span className={`badge ${className}`}>{status}</span>;
-    };
-
     return (
         <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1080 }}>
             <div className="modal-dialog modal-dialog-centered modal-xl">
@@ -231,9 +217,12 @@ const StationHistoryModal = ({ stationId, onClose }) => {
                                     <thead className="table-dark sticky-top">
                                         <tr>
                                             <th>Unit ID</th>
+                                            <th>Model</th>
+                                            <th>Assembly</th>
+                                            <th>Action Type</th>
+                                            <th>Station Name</th>
                                             <th>Status After</th>
                                             <th>Action By</th>
-                                            <th>Remarks</th>
                                             <th>Timestamp</th>
                                         </tr>
                                     </thead>
@@ -241,13 +230,16 @@ const StationHistoryModal = ({ stationId, onClose }) => {
                                         {historyLogs.length > 0 ? historyLogs.map(log => (
                                             <tr key={log.history_id}> 
                                                 <td>{log.unit_id}</td>
-                                                <td>{getStatusBadge(log.status_after)}</td>
+                                                <td>{log.model}</td>
+                                                <td>{log.assembly_no}</td>
+                                                <td>{log.action_type}</td>
+                                                <td>{log.station_name}</td>
+                                                <td>{log.status_after}</td>
                                                 <td>{log.action_by || 'System'}</td>
-                                                <td>{log.remarks || 'N/A'}</td>
                                                 <td className="text-muted">{new Date(log.timestamp).toLocaleString()}</td>
                                             </tr>
                                         )) : (
-                                            <tr><td colSpan="5" className="text-center py-4">No historical records found for **{stationId}**.</td></tr>
+                                            <tr><td colSpan="8" className="text-center py-4">No historical records found for **{stationId}**.</td></tr>
                                         )}
                                     </tbody>
                                 </table>
@@ -265,6 +257,7 @@ const StationHistoryModal = ({ stationId, onClose }) => {
 
 // --- MONITORING VIEW UTILITIES (Live Monitoring Table) ---
 const LiveMonitoringTable = ({ stationId, units, onBack, handleMonitorHistory }) => {
+    // Filter units that are currently at this station (not just history)
     const stationUnits = units.filter(u => u.station === stationId && u.status !== 'For Scanning');
 
     return (
@@ -282,7 +275,7 @@ const LiveMonitoringTable = ({ stationId, units, onBack, handleMonitorHistory })
                             <tr>
                                 <th>Assembly No.</th>
                                 <th>Serial No.</th>
-                                <th>Model/Rev</th>
+                                <th>Model</th>
                                 <th>Status</th>
                                 <th>Remarks</th>
                                 <th>Actions</th>
@@ -292,14 +285,8 @@ const LiveMonitoringTable = ({ stationId, units, onBack, handleMonitorHistory })
                             {stationUnits.length > 0 ? stationUnits.map(unit => (
                                 <tr key={unit.id}>
                                     <td className="fw-bold">{unit.assembly_no}</td>
-                                    <td>
-                                        {unit.device_serial_no ? (
-                                            <span className="text-dark">{unit.device_serial_no}</span>
-                                        ) : (
-                                            <span className="text-muted fst-italic">(Pending)</span>
-                                        )}
-                                    </td>
-                                    <td>{unit.model} ({unit.revision})</td>
+                                    <td>{unit.device_serial_no || <span className="text-muted fst-italic">Pending</span>}</td>
+                                    <td>{unit.model}</td>
                                     <td><span className={`badge ${unit.status === 'In Progress' ? 'bg-primary' : unit.status === 'Completed' ? 'bg-success' : 'bg-danger'}`}>{unit.status}</span></td>
                                     <td>{unit.remarks}</td>
                                     <td>
@@ -407,11 +394,12 @@ export default function ITAssistantPage({ user, onLogout }) {
     }, []);
 
     useEffect(() => {
+        // Define Stations 1-15
         const mockStations = Array.from({ length: 15 }, (_, i) => ({
-            id: `Station${i + 1}`,
+            id: `Station ${i + 1}`, // Matches DB station names
             name: `Station ${i + 1}`,
             operator: `Operator-${100 + i}`,
-            status: Math.random() > 0.8 ? "ERROR" : Math.random() > 0.6 ? "IDLE" : "RUNNING", 
+            status: "ACTIVE", 
         }));
         setStations(mockStations);
         fetchUnitData(true);
@@ -438,15 +426,10 @@ export default function ITAssistantPage({ user, onLogout }) {
         }
 
         const newQRList = [];
-        // We track Assembly No for uniqueness
         let currentAssembly = nextAssemblyNo; 
 
         for (let i = 0; i < quantity; i++) {
-            if (currentAssembly > 999999) { 
-                setModalConfig({ title: "Warning", message: `Generation stopped. Limit reached.`, type: "warning" });
-                setShowModal(true);
-                break;
-            }
+            if (currentAssembly > 999999) break;
 
             // 2. Generate Unique Assembly No
             const newAssemblyNum = `ASSY-${formatSerial(currentAssembly)}`; 
@@ -460,7 +443,7 @@ export default function ITAssistantPage({ user, onLogout }) {
             const base = qrFormData.baseKit?.trim() || "";
             const acc = qrFormData.accKit?.trim() || "";
 
-            // 5. Construct QR String - Format: MODEL|REV|BASE_KIT|ASSEMBLY|SERIAL|ACC_KIT
+            // 5. Construct QR String
             const qrString = `${model}|${rev}|${base}|${newAssemblyNum}|${newSerialNum}|${acc}`;
             
             newQRList.push({
@@ -474,7 +457,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                 qr_url: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrString)}`,
                 qr_string: qrString,
                 status: 'For Scanning', 
-                station: 'N/A', 
+                station: 'N/A', // [FIX] This ensures it is NOT in Station 1 yet
                 remarks: 'Batch generated.',
             });
 
@@ -485,53 +468,37 @@ export default function ITAssistantPage({ user, onLogout }) {
     };
 
     const handleSaveToDB = async () => {
-        if (generatedQRList.length === 0) {
-            setModalConfig({ title: "Warning", message: "No QRs generated to save.", type: "warning" });
-            setShowModal(true);
-            return;
-        }
+        if (generatedQRList.length === 0) return;
         
         setIsSaving(true);
         
         try {
-            // Prepare payload: Add creation context
-            const unitsWithContext = generatedQRList.map(unit => ({
-                ...unit,
-                created_by: user.full_name || user.username || 'System',
-                station: CURRENT_STATION, 
-            }));
-
-            const payload = {
-                units: unitsWithContext,
-                method: "BATCH_INSERT" 
-            };
-
-            const response = await axios.post(UNITS_ENDPOINT, payload, {
-                headers: { 'Content-Type': 'application/json' }
+            const promises = generatedQRList.map(unit => {
+                return axios.post(UNITS_ENDPOINT, {
+                    ...unit,
+                    action: 'create', // Use the 'create' action we defined in units.php
+                    username: user.username,
+                    station: 'N/A', // [FIX] Ensure it is saved as N/A
+                    status: 'For Scanning'
+                });
             });
 
-            if (response.status === 201 || response.data.status === 'success') {
-                setModalConfig({ 
-                    title: "Batch Save Successful", 
-                    message: `${generatedQRList.length} unique assembly QRs saved successfully!`, 
-                    type: "success" 
-                });
-                setShowModal(true);
-                setGeneratedQRList([]);
-                fetchUnitData(false); 
-            } else {
-                throw new Error(response.data.message || 'Unknown API error.');
-            }
-
-        } catch (error) {
-            console.error("Batch Unit Save Failed:", error.response?.data || error);
-            const detailedErrorMessage = error.response 
-                ? `Status ${error.response.status}: ${error.response.data?.message || error.response.data?.error || error.response.statusText}` 
-                : error.message;
+            await Promise.all(promises);
 
             setModalConfig({ 
+                title: "Batch Save Successful", 
+                message: `${generatedQRList.length} unique assembly QRs saved successfully!`, 
+                type: "success" 
+            });
+            setShowModal(true);
+            setGeneratedQRList([]);
+            fetchUnitData(false); 
+
+        } catch (error) {
+            console.error("Batch Unit Save Failed:", error);
+            setModalConfig({ 
                 title: "Save Failed", 
-                message: `Failed to save units. ${detailedErrorMessage}`, 
+                message: `Failed to save units. check console for details.`, 
                 type: "error" 
             });
             setShowModal(true);
@@ -543,7 +510,6 @@ export default function ITAssistantPage({ user, onLogout }) {
     const handleSaveInput = (e) => {
         let { name, value } = e.target;
         if (name === 'quantity') {
-            if (value === '') { setQrFormData(prev => ({...prev, [name]: ''})); return; }
             let parsed = parseInt(value, 10);
             if (isNaN(parsed) || parsed < 1) parsed = 1;
             if (parsed > 100) parsed = 100;
@@ -559,16 +525,18 @@ export default function ITAssistantPage({ user, onLogout }) {
                 id: unit.id,
                 status: 'In Progress', 
                 remarks: `Approved by ${user.full_name || user.username}. Re-entry permitted.`,
+                // Pass existing model/assy to preserve them in history
+                model: unit.model,
+                assemblyNo: unit.assembly_no
             };
             await axios.put(UNITS_ENDPOINT, dataToSend, {
                 headers: { 'Content-Type': 'application/json' }
             });
-            setModalConfig({ title: "Success", message: `Unit ${unit.device_serial_no || unit.assembly_no} approved!`, type: "success" });
+            setModalConfig({ title: "Success", message: `Unit approved!`, type: "success" });
             setShowModal(true);
             fetchUnitData(false);
         } catch (error) {
-            console.error("Approval Failed:", error);
-            setModalConfig({ title: "Approval Failed", message: `Could not approve unit. Check backend.`, type: "error" });
+            setModalConfig({ title: "Approval Failed", message: `Could not approve unit.`, type: "error" });
             setShowModal(true);
         } finally {
             setLoading(false);
@@ -583,7 +551,9 @@ export default function ITAssistantPage({ user, onLogout }) {
     const renderContent = () => {
         const metrics = calculateMetrics(unitLogs);
         const unitsForScanning = unitLogs.filter(u => u.status === 'For Scanning');
-        const pendingApprovals = unitLogs.filter(u => u.status === 'Pending Approval');
+        
+        // [FIX] Renamed to match the variable used in 'case "approvals"'
+        const pendingApprovalLogs = unitLogs.filter(u => u.status === 'Pending Approval');
         
         if (loading && !isInitialLoadComplete) return <div className="text-center py-5">Loading production data...</div>;
         if (error) return <div className="alert alert-danger">{error}</div>;
@@ -755,7 +725,6 @@ export default function ITAssistantPage({ user, onLogout }) {
                 );
             
             case "approvals":
-                const pendingApprovalLogs = unitLogs.filter(u => u.status === 'Pending Approval');
                 return (
                     <div className="card shadow-sm">
                         <div className="card-header bg-warning text-dark">

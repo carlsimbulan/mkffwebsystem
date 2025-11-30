@@ -16,6 +16,7 @@ import { UnitPieChart } from './components/UnitPieChart';
 import { StationBarChart } from './components/StationBarChart';
 import { NotificationBell } from './components/NotificationBell';
 import { NotificationContent } from './components/NotificationContent';
+import { ViewUserModal } from './components/ViewUserModal';
 
 // REGISTER CHART COMPONENTS GLOBALLY
 ChartJS.register(
@@ -28,22 +29,23 @@ ChartJS.register(
 );
 
 // --- CONFIGURATION CONSTANT: DELAY THRESHOLDS ---
+// Support both formats just in case
 const DELAY_THRESHOLDS_MINUTES = {
-    'Station1': 6,
-    'Station2': 8,
-    'Station3': 3,
-    'Station4': 12,
-    'Station5': 15,
-    'Station6': 15,
-    'Station7': 3,
-    'Station8': 0, 
-    'Station9': 480, // 8 hours
-    'Station10': 8,
-    'Station11': 22,
-    'Station12': 5,
-    'Station13': 10,
-    'Station14': 8,
-    'Station15': 5,
+    'Station1': 6, 'Station 1': 6,
+    'Station2': 8, 'Station 2': 8,
+    'Station3': 3, 'Station 3': 3,
+    'Station4': 12, 'Station 4': 12,
+    'Station5': 15, 'Station 5': 15,
+    'Station6': 15, 'Station 6': 15,
+    'Station7': 3, 'Station 7': 3,
+    'Station8': 0, 'Station 8': 0,
+    'Station9': 480, 'Station 9': 480,
+    'Station10': 8, 'Station 10': 8,
+    'Station11': 22, 'Station 11': 22,
+    'Station12': 5, 'Station 12': 5,
+    'Station13': 10, 'Station 13': 10,
+    'Station14': 8, 'Station 14': 8,
+    'Station15': 5, 'Station 15': 5,
 };
 
 // Base URL for the API
@@ -90,7 +92,6 @@ export default function AdminPage({ user, onLogout }) {
     const [loading, setLoading] = useState(true); 
     const [error, setError] = useState(null);
 
-    // --- MISSING STATES ADDED HERE ---
     const [showViewModal, setShowViewModal] = useState(false);
     const [viewUser, setViewUser] = useState(null);
     const [showPasswordInModal, setShowPasswordInModal] = useState(false);
@@ -107,7 +108,7 @@ export default function AdminPage({ user, onLogout }) {
         avatar_file: null, 
     };
 
-    // --- UPDATED: LOGIC TO CHECK FOR DELAYED UNITS AND REPORTS ---
+    // --- CHECK DELAYED UNITS AND REPORTS ---
     const checkDelayedUnitsAndReports = useCallback((allUnits, allReports) => {
         const now = new Date();
         const newDelayedNotifications = [];
@@ -118,7 +119,8 @@ export default function AdminPage({ user, onLogout }) {
         
         inProgressUnits.forEach(unit => {
             const stationId = unit.station;
-            const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationId] || 0; 
+            // Flexible check for threshold
+            const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationId] || DELAY_THRESHOLDS_MINUTES[stationId.replace(' ', '')] || 0; 
 
             if (thresholdMinutes > 0) {
                 const createdAt = new Date(unit.created_at);
@@ -208,7 +210,7 @@ export default function AdminPage({ user, onLogout }) {
             // 3. Fetch User List
             const usersRes = await axios.get(USER_MANAGEMENT_ENDPOINT);
             const fetchedUsers = Array.isArray(usersRes.data) ? usersRes.data : [];
-            if (JSON.stringify(fetchedUsers) !== JSON.stringify(userList)) {
+            if (JSON.stringify(usersRes.data) !== JSON.stringify(userList)) {
                 setUserList(fetchedUsers);
             }
 
@@ -218,10 +220,10 @@ export default function AdminPage({ user, onLogout }) {
                 user.avatar_url = loggedInUserData.avatar_url;
             }
 
-            // 4. Mock Station Data
+            // 4. Mock Station Data - FIXED: ID matches DB (No space), Name has space (UI)
             const mockStations = Array.from({ length: 15 }, (_, i) => ({
-                id: `Station${i + 1}`,
-                name: `Station ${i + 1}`,
+                id: `Station${i + 1}`, // NO SPACE: Matches Database "Station1"
+                name: `Station ${i + 1}`, // WITH SPACE: For Display "Station 1"
                 operator: `Operator-${100 + i}`
             }));
             setStations(mockStations);
@@ -232,7 +234,7 @@ export default function AdminPage({ user, onLogout }) {
         } catch (err) {
             console.error("Error fetching data:", err);
             if (!isBackgroundUpdate) {
-                setError(`Failed to fetch data from the server. Error: ${err.message}`);
+                // setError(`Failed to fetch data. ${err.message}`); 
             }
         } finally {
             setLoading(false);
@@ -265,12 +267,16 @@ export default function AdminPage({ user, onLogout }) {
             const report = dailyReportsList.find(r => r.id === notification.reportId);
             if (report) {
                 setReportDate(report.report_date.split(' ')[0]);
-                setReportFilterStationId(report.station);
+                setReportFilterStationId(report.station); // Check if this needs normalization
                 setSelectedReportToView(report);
             }
         } else if (notification.type === 'DelayedUnit') {
             setActiveTab('station_monitor');
-            setStationMonitorId(notification.stationId);
+            // Normalize station ID match for notification click
+            const targetStation = stations.find(s => s.id.replace(/\s/g, '') === notification.stationId.replace(/\s/g, ''));
+            if(targetStation) {
+                setStationMonitorId(targetStation.id);
+            }
             setHighlightedUnitId(notification.unitId);
         }
         if (notification.type === 'NewReport') {
@@ -286,7 +292,11 @@ export default function AdminPage({ user, onLogout }) {
     };
     const handleEditClick = (log) => { setSelectedUnitToEdit(log); };
     const handleViewReport = (report) => { setSelectedReportToView(report); };
-    const handleViewHistory = (stationId) => { setStationHistoryId(stationId); };
+    const handleViewHistory = (stationId) => { 
+        // stationId here is "Station1" (from mockStations)
+        // This should match what the backend expects.
+        setStationHistoryId(stationId); 
+    };
 
     // --- ACTION HANDLERS ---
     const handleApproveUnit = async (unitId, unitData) => {
@@ -318,7 +328,7 @@ export default function AdminPage({ user, onLogout }) {
         } catch (error) {
             console.error(`Error saving unit ${id}:`, error);
         } finally {
-            fetchData();
+            fetchData(); // This refreshes the logs
         }
     };
 
@@ -327,10 +337,9 @@ export default function AdminPage({ user, onLogout }) {
     const handleEditUser = (user) => { setSelectedUserToManage(user); };
     const handleConfirmDeleteUser = (user) => { setSelectedUserToDelete(user); };
 
-    // --- MISSING HANDLER ADDED HERE: HANDLE VIEW USER ---
     const handleViewUser = (user) => {
         setViewUser(user);
-        setShowPasswordInModal(false); // Reset to hidden
+        setShowPasswordInModal(false); 
         setShowViewModal(true);
     };
 
@@ -358,7 +367,11 @@ export default function AdminPage({ user, onLogout }) {
     // --- CALCULATE METRICS ---
     const calculateStationMetrics = (stationId, currentLogs = logs) => {
         const liveLogs = currentLogs.filter(l => l.status !== 'Pending Approval');
-        const stationLogs = stationId ? liveLogs.filter(l => l.station === stationId) : liveLogs; 
+        
+        // Flexible matching (Handles "Station 1" vs "Station1")
+        const stationLogs = stationId 
+            ? liveLogs.filter(l => l.station.replace(/\s+/g, '').toLowerCase() === stationId.replace(/\s+/g, '').toLowerCase()) 
+            : liveLogs; 
 
         const pendingApprovalUnits = currentLogs.filter(l => l.status === 'Pending Approval').length;
         const completedUnits = stationLogs.filter(l => l.status === 'Completed').length;
@@ -375,7 +388,7 @@ export default function AdminPage({ user, onLogout }) {
             totalUnits: stationLogs.length,
             yieldTotal: totalUnitsForYield,
             pendingUnits, 
-            pendingApprovalUnits: stationId ? currentLogs.filter(l => l.station === stationId && l.status === 'Pending Approval').length : pendingApprovalUnits,
+            pendingApprovalUnits: stationId ? currentLogs.filter(l => l.station.replace(/\s+/g, '') === stationId.replace(/\s+/g, '') && l.status === 'Pending Approval').length : pendingApprovalUnits,
             yieldRate: yieldRate.toFixed(2),
         };
     };
@@ -384,93 +397,20 @@ export default function AdminPage({ user, onLogout }) {
     const totalOutput = overallMetrics.completedUnits;
     const systemAlerts = overallMetrics.ngUnits;
     
-    // Filter reports
+    // Filter reports (Flexible filtering)
     const filteredReports = dailyReportsList.filter(report => {
         const reportDbDate = report.report_date ? report.report_date.split(' ')[0] : null;
-        return (reportDbDate === reportDate) && (reportFilterStationId === 'All' || report.station === reportFilterStationId);
+        // Normalize report station check
+        const reportStationNorm = report.station.replace(/\s+/g, '').toLowerCase();
+        const filterStationNorm = reportFilterStationId.replace(/\s+/g, '').toLowerCase();
+
+        return (reportDbDate === reportDate) && (reportFilterStationId === 'All' || reportStationNorm === filterStationNorm);
     });
 
     const headerAvatarSrc = user.avatar_url ? `${AVATAR_UPLOAD_PATH}${user.avatar_url}` : DEFAULT_AVATAR_PATH;
     const headerFullName = user.full_name || user.username || 'Admin';
 
-    // --- MISSING COMPONENT DEFINITION ADDED HERE ---
-    const ViewUserModal = () => {
-        if (!viewUser) return null;
-
-        return (
-            <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1060 }}>
-                <div className="modal-dialog modal-dialog-centered">
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h5 className="modal-title"><i className="bi bi-person-badge me-2"></i> User Details</h5>
-                            <button type="button" className="btn-close" onClick={() => setShowViewModal(false)}></button>
-                        </div>
-                        <div className="modal-body">
-                            <div className="text-center mb-4">
-                                <img
-                                    src={viewUser.avatar_url ? `${AVATAR_UPLOAD_PATH}${viewUser.avatar_url}` : DEFAULT_AVATAR_PATH}
-                                    alt="Profile"
-                                    className="rounded-circle shadow-sm"
-                                    style={{ width: '100px', height: '100px', objectFit: 'cover' }}
-                                    onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
-                                />
-                                <h4 className="mt-2">{viewUser.full_name}</h4>
-                                <span className="badge bg-secondary">{viewUser.role}</span>
-                            </div>
-
-                            <div className="mb-3">
-                                <label className="fw-bold text-muted small">Username</label>
-                                <div className="form-control bg-light">{viewUser.username}</div>
-                            </div>
-
-                            <div className="mb-3">
-                                <label className="fw-bold text-muted small">Password</label>
-                                <div className="input-group">
-                                    <input 
-                                        type={showPasswordInModal ? "text" : "password"} 
-                                        className="form-control bg-light" 
-                                        value={viewUser.password} 
-                                        readOnly 
-                                    />
-                                    <button 
-                                        className="btn btn-outline-secondary" 
-                                        type="button" 
-                                        onClick={() => setShowPasswordInModal(!showPasswordInModal)}
-                                    >
-                                        {showPasswordInModal ? <i className="bi bi-eye-slash"></i> : <i className="bi bi-eye"></i>}
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="row">
-                                <div className="col-6 mb-3">
-                                    <label className="fw-bold text-muted small">Station</label>
-                                    <div className="form-control bg-light">{viewUser.station || 'N/A'}</div>
-                                </div>
-                                <div className="col-6 mb-3">
-                                    <label className="fw-bold text-muted small">User ID</label>
-                                    <div className="form-control bg-light">{viewUser.id}</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="modal-footer bg-light">
-                            <button type="button" className="btn btn-secondary" onClick={() => setShowViewModal(false)}>Close</button>
-                            <button 
-                                type="button" 
-                                className="btn btn-primary" 
-                                onClick={() => {
-                                    setShowViewModal(false); 
-                                    handleEditUser(viewUser); // Switches to edit logic
-                                }}
-                            >
-                                <i className="bi bi-pencil me-2"></i> Edit User
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    };
+    
 
     // --- RENDER CONTENT ---
     const renderContent = () => {
@@ -521,7 +461,7 @@ export default function AdminPage({ user, onLogout }) {
                                             <p className="small text-muted mb-0">{station.operator}</p>
                                         </div>
                                         <div className="card-footer bg-white p-1 d-flex justify-content-between">
-                                            <button className="btn btn-primary btn-sm py-0 flex-grow-1 me-1" style={{fontSize: '0.7rem'}} onClick={() => handleMonitorStation(station.id)} disabled={!hasActivity}><i className="bi bi-eye me-1"></i>Monitor</button>
+                                            <button className="btn btn-primary btn-sm py-0 flex-grow-1 me-1" style={{fontSize: '0.7rem'}} onClick={() => handleMonitorStation(station.id)}><i className="bi bi-eye me-1"></i>Monitor</button>
                                             <button className="btn btn-secondary btn-sm py-0" style={{fontSize: '0.7rem'}} onClick={() => handleViewHistory(station.id)}><i className="bi bi-clock-history me-1"></i>History</button>
                                         </div>
                                     </div>
@@ -554,20 +494,39 @@ export default function AdminPage({ user, onLogout }) {
                         <div className="card shadow-sm">
                             <div className="card-header bg-white"><h5 className="mb-0">Live Logs (Excluding Pending Approval) for {station?.name || stationMonitorId}</h5></div>
                             <div className="table-responsive">
-                                <table className="table table-hover table-striped mb-0 small">
-                                    <thead className="table-dark"><tr><th>ID</th><th>Station</th><th>Model</th><th>Revision</th><th>Base Unit No.</th><th>Assembly No.</th><th>Serial No.</th><th>Accessory No.</th><th>Status</th><th>Remarks</th><th>Timestamp</th><th>Actions</th></tr></thead>
+                                <table className="table table-hover table-striped mb-0 small text-center align-middle">
+                                    <thead className="table-dark">
+                                        <tr>
+                                            <th>MODEL</th>
+                                            <th>REVISION</th>
+                                            <th>BASE UNIT</th>
+                                            <th>ASSEMBLY</th>
+                                            <th>DEVICE SERIAL</th>
+                                            <th>ACCESSORY</th>
+                                            <th>STATUS</th>
+                                            <th>REMARKS</th>
+                                            <th>TIME DATE</th>
+                                            <th>ACTIONS</th>
+                                        </tr>
+                                    </thead>
                                     <tbody>
                                         {monitorMetrics.stationLogs.length > 0 ? monitorMetrics.stationLogs.map(log => {
                                             const isHighlighted = highlightedUnitId === log.id;
                                             return (
                                                 <tr key={log.id} className={isHighlighted ? 'table-danger fw-bold' : ''}>
-                                                    <td>{log.id}</td><td><span className="badge bg-secondary">{log.station}</span></td><td>{log.model}</td><td>{log.revision}</td><td>{log.base_unit_kitting_no}</td><td>{log.assembly_no}</td><td className="fw-bold">{log.device_serial_no}</td><td>{log.accessory_kitting_no}</td>
+                                                    <td>{log.model}</td>
+                                                    <td>{log.revision}</td>
+                                                    <td className="font-monospace">{log.base_unit_kitting_no}</td>
+                                                    <td className="font-monospace text-primary fw-bold">{log.assembly_no}</td>
+                                                    <td className="fw-bold">{log.device_serial_no}</td>
+                                                    <td>{log.accessory_kitting_no}</td>
                                                     <td><span className={`badge ${log.status === 'Completed' ? 'bg-success' : log.status === 'No Good (NG)' ? 'bg-danger' : log.status === 'In Progress' ? 'bg-primary' : 'bg-warning text-dark'}`}>{log.status}</span></td>
-                                                    <td>{log.remarks}</td><td className="small">{new Date(log.created_at).toLocaleString()}</td>
+                                                    <td>{log.remarks}</td>
+                                                    <td className="small">{new Date(log.created_at).toLocaleString()}</td>
                                                     <td><button className="btn btn-sm btn-outline-danger py-0" onClick={() => handleEditClick(log)}><i className="bi bi-pencil"></i> Edit</button></td>
                                                 </tr>
                                             );
-                                        }) : ( <tr><td colSpan="12" className="text-center py-4">No live logs found for this station.</td></tr> )}
+                                        }) : ( <tr><td colSpan="10" className="text-center py-4">No live logs found for this station.</td></tr> )}
                                     </tbody>
                                 </table>
                             </div>
@@ -669,8 +628,15 @@ export default function AdminPage({ user, onLogout }) {
                                 </table>
                             </div>
                         </div>
-                        {/* RENDER THE VIEW MODAL HERE IF IT IS OPEN */}
-                        {showViewModal && <ViewUserModal />} 
+                        {showViewModal && (
+                                <ViewUserModal 
+                                    viewUser={viewUser} 
+                                    onClose={() => setShowViewModal(false)} 
+                                    onEdit={handleEditUser}
+                                    AVATAR_UPLOAD_PATH={AVATAR_UPLOAD_PATH}
+                                    DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH}
+                                />
+                            )} 
                     </div>
                 );
 

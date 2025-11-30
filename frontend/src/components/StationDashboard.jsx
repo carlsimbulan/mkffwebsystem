@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
-import { Doughnut, Bar } from 'react-chartjs-2';
 
 // REGISTER CHART COMPONENTS
 ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend);
@@ -52,7 +51,13 @@ const EditUnitModal = ({ unit, onClose, onSave }) => {
     const [remarks, setRemarks] = useState(unit.remarks);
 
     const handleSave = () => {
-        onSave(unit.id, { ...unit, status: status, remarks: remarks });
+        onSave(unit.id, { 
+            ...unit, 
+            status: status, 
+            remarks: remarks,
+            model: unit.model,
+            assembly_no: unit.assembly_no 
+        });
     };
 
     const statusOptions = isReopening ? ["Pending Approval"] : ["In Progress", "Completed", "No Good (NG)", "Pending Approval"];
@@ -62,7 +67,7 @@ const EditUnitModal = ({ unit, onClose, onSave }) => {
             <div className="modal-dialog modal-dialog-centered">
                 <div className="modal-content">
                     <div className="modal-header bg-primary text-white">
-                        <h5 className="modal-title">Edit Unit: {unit.device_serial_no || 'No Serial'}</h5>
+                        <h5 className="modal-title">Edit Unit: {unit.device_serial_no || unit.assembly_no}</h5>
                         <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
                     </div>
                     <div className="modal-body">
@@ -97,22 +102,44 @@ const UnitListTable = ({ units, listStatus, loading, error, onEdit }) => {
     
     return (
         <div className="table-responsive shadow-sm rounded">
-            <table className="table table-hover table-striped table-bordered mb-0 small">
-                <thead className="table-dark">
+            <table className="table table-hover table-striped table-bordered mb-0 small text-nowrap">
+                <thead className="table-dark text-center">
                     <tr>
-                        <th>Serial No.</th><th>Model</th><th>Assy No.</th><th>Status</th><th>Remarks</th><th>Time</th>{canEdit && <th>Action</th>}
+                        <th>MODEL</th>
+                        <th>REVISION</th>
+                        <th>BASE UNIT</th>
+                        <th>ASSEMBLY</th>
+                        <th>DEVICE SERIAL</th>
+                        <th>ACCESSORY</th>
+                        <th>STATUS</th>
+                        <th>REMARKS</th>
+                        <th>TIME DATE</th>
+                        {canEdit && <th>ACTIONS</th>}
                     </tr>
                 </thead>
-                <tbody>
+                <tbody className="align-middle">
                     {units.map((unit) => (
                         <tr key={unit.id}>
+                            <td className="fw-bold">{unit.model}</td>
+                            <td>{unit.revision || '-'}</td>
+                            <td className="font-monospace">{unit.base_unit_kitting_no || '-'}</td>
+                            <td className="font-monospace text-primary">{unit.assembly_no}</td>
                             <td className="fw-semibold">{unit.device_serial_no || '-'}</td>
-                            <td>{unit.model}</td>
-                            <td className="font-monospace">{unit.assembly_no}</td>
-                            <td><span className={`badge ${unit.status.includes('Progress') ? 'bg-warning text-dark' : unit.status.includes('Completed') ? 'bg-success' : 'bg-danger'}`}>{unit.status}</span></td>
-                            <td>{unit.remarks}</td>
+                            <td>{unit.accessory_kitting_no || '-'}</td>
+                            <td className="text-center">
+                                <span className={`badge ${unit.status.includes('Progress') ? 'bg-warning text-dark' : unit.status.includes('Completed') ? 'bg-success' : 'bg-danger'}`}>
+                                    {unit.status}
+                                </span>
+                            </td>
+                            <td><small className="text-muted">{unit.remarks}</small></td>
                             <td>{new Date(unit.created_at).toLocaleString()}</td>
-                            {canEdit && <td><button onClick={() => onEdit(unit)} className="btn btn-sm btn-outline-warning py-0"><i className="bi bi-pencil"></i></button></td>}
+                            {canEdit && (
+                                <td className="text-center">
+                                    <button onClick={() => onEdit(unit)} className="btn btn-sm btn-outline-primary py-0 px-2" title="Edit Status">
+                                        <i className="bi bi-pencil-square"></i>
+                                    </button>
+                                </td>
+                            )}
                         </tr>
                     ))}
                 </tbody>
@@ -130,12 +157,23 @@ const UnitHistoryTable = ({ historyLogs, loading, error }) => {
         <div className="table-responsive shadow-sm rounded">
             <table className="table table-hover table-striped mb-0 small">
                 <thead className="table-dark">
-                    <tr><th>Unit ID</th><th>Action</th><th>Station</th><th>Status</th><th>User</th><th>Time</th></tr>
+                    <tr>
+                        <th>Unit ID</th>
+                        <th>Model</th>
+                        <th>Assembly</th>
+                        <th>Action</th>
+                        <th>Station</th>
+                        <th>Status</th>
+                        <th>User</th>
+                        <th>Time</th>
+                    </tr>
                 </thead>
                 <tbody>
                     {historyLogs.map((log) => (
                         <tr key={log.history_id}>
                             <td>{log.unit_id}</td>
+                            <td className="fw-bold">{log.model || '-'}</td>
+                            <td className="font-monospace">{log.assembly_no || '-'}</td>
                             <td>{log.action_type}</td>
                             <td>{log.station_name}</td>
                             <td>{log.status_after}</td>
@@ -154,19 +192,20 @@ export default function StationDashboard({ user, onLogout }) {
     
     // --- DYNAMIC STATION LOGIC ---
     const getStationName = () => {
-        if (user && user.station) return user.station;
-        if (user && user.username) {
-            // Capitalize first letter of username to match "Station 1" format if needed
-            // NOTE: Ensure your DB usernames map to "Station X" correctly
-            // Example: "station1" -> "Station 1" logic might be needed here depending on your DB
-            let s = user.username;
-            if(s.toLowerCase().startsWith('station')) {
-                const num = s.replace(/\D/g, '');
-                return `Station ${num}`;
-            }
-            return s.charAt(0).toUpperCase() + s.slice(1);
+        // Get the raw string from user.station OR user.username
+        const rawName = (user?.station || user?.username || "").toLowerCase();
+
+        // If the name contains the word "station"
+        if (rawName.includes('station')) {
+            // Extract the numbers only (e.g., "station1" -> "1")
+            const num = rawName.replace(/\D/g, ''); 
+            
+            // Return with the correct format "Station X" (Capital S, Space, Number)
+            if (num) return `Station ${num}`;
         }
-        return "Unknown Station";
+
+        // Fallback for names like "admin", "james", etc.
+        return rawName.charAt(0).toUpperCase() + rawName.slice(1);
     };
 
     const currentStation = getStationName();
@@ -181,6 +220,8 @@ export default function StationDashboard({ user, onLogout }) {
     const [listLoading, setListLoading] = useState(false);
     const [listError, setListError] = useState(null);
     const [unitToEdit, setUnitToEdit] = useState(null); 
+    
+    const [scannedUnitId, setScannedUnitId] = useState(null); 
 
     const [formData, setFormData] = useState({
         model: "", revision: "", baseUnitKittingNo: "", assemblyNo: "",
@@ -193,6 +234,12 @@ export default function StationDashboard({ user, onLogout }) {
     });
     const [selectedFile, setSelectedFile] = useState(null);
     const scannerInputRef = useRef(null); 
+
+    // --- HELPER FUNCTION: RESET FORM ---
+    const resetForm = () => {
+        setFormData({ model: "", revision: "", baseUnitKittingNo: "", assemblyNo: "", deviceSerialNo: "", accessoryKittingNo: "", status: "In Progress", remarks: "" });
+        setScanInput(""); setStatusMessage(""); setProcessStatus('idle'); setScannedUnitId(null);
+    };
 
     // --- HOOKED FUNCTIONS ---
     const fetchUnits = useCallback(async (status) => { 
@@ -237,20 +284,18 @@ export default function StationDashboard({ user, onLogout }) {
         }
     }, [currentStation]);
 
-    // --- UPDATED HANDLE SCAN (THE KEY LOGIC CHANGE) ---
+   
+    // --- HANDLE SCAN LOGIC (FIXED FLICKERING) ---
     const handleScan = async (e) => { 
         e.preventDefault();
         setProcessStatus('loading'); 
         setStatusMessage("Validating process flow...");
+        setScannedUnitId(null); 
 
         const scannedData = scanInput.trim();
-        if (!scannedData) {
-            setProcessStatus('idle');
-            return;
-        }
+        if (!scannedData) { setProcessStatus('idle'); return; }
 
         const parts = scannedData.split('|');
-
         if (parts.length < 5) {
             setProcessStatus('error');
             setStatusMessage("⚠️ Invalid QR Format!");
@@ -259,82 +304,140 @@ export default function StationDashboard({ user, onLogout }) {
             return;
         }
 
+        // QR Format: MODEL|REV|BASE|ASSEMBLY|SERIAL|ACC
+        const scannedAssembly = parts[3].trim();
         const scannedSerial = parts[4].trim();
         
-        // Find index of current station (e.g., Station 2 is index 1)
         const myStationIndex = STATION_ORDER.indexOf(currentStation);
 
-        try {
-            // 1. Check DB for this serial
-            const response = await axios.get(UNITS_ENDPOINT, {
-                params: { search_serial: scannedSerial }
-            });
+        // [SECURITY CHECK] 
+        // Siguraduhin na nakuha ng maayos ang Station Name (may space dapat, e.g., "Station 2")
+        if (myStationIndex === -1 && currentStation !== "Station 1") {
+             setProcessStatus('error');
+             setStatusMessage(`⛔ ACCESS DENIED: You are logged in as "${currentStation}". Only authorized Stations (1-15) can scan.`);
+             setTimeout(() => setProcessStatus('idle'), 5000);
+             setScanInput("");
+             return;
+        }
 
-            // Get the last known status of this unit (if any)
+        try {
+            // SEARCH LOGIC
+            let response;
+            if (scannedSerial) {
+                response = await axios.get(UNITS_ENDPOINT, { params: { search_serial: scannedSerial } });
+            } else if (scannedAssembly) {
+                response = await axios.get(UNITS_ENDPOINT, { params: { search_assembly: scannedAssembly } });
+            } else {
+                throw new Error("Invalid QR: No Serial or Assembly Number found.");
+            }
+
             const dbUnit = response.data && response.data.length > 0 ? response.data[0] : null;
 
-            // 2. LOGIC GATES
+            // --- STRICT LOGIC IMPLEMENTATION ---
             
-            // GATE A: Station 1 (First Step)
+            const unitStationIndex = dbUnit ? STATION_ORDER.indexOf(dbUnit.station) : -1;
+            const dbStatus = dbUnit ? dbUnit.status.toLowerCase() : ""; 
+
+            // [LOGIC GATE 1] STATION 1 RULES
             if (currentStation === "Station 1") {
                 if (dbUnit) {
-                    throw new Error(`Unit already exists at ${dbUnit.station}. Station 1 creates NEW units only.`);
+                    if (dbStatus === "for scanning") {
+                        setScannedUnitId(dbUnit.id);
+                        setStatusMessage("✅ Unit Found (For Scanning). Activating...");
+                    } else if (dbUnit.station === "Station 1") {
+                        if (dbStatus === "completed") {
+                            throw new Error("Unit is already Completed at Station 1. Cannot rescan.");
+                        }
+                        setScannedUnitId(dbUnit.id);
+                        setStatusMessage("✅ Unit Found at Station 1. Resuming...");
+                    } else {
+                        throw new Error(`Unit has already moved to ${dbUnit.station}. Station 1 cannot modify.`);
+                    }
+                } else {
+                    setStatusMessage("✅ New Unit. Starting Process...");
                 }
             } 
-            // GATE B: Stations 2-15 (Subsequent Steps)
+            
+            // [LOGIC GATE 2] STATIONS 2 - 15 RULES
             else {
-                if (myStationIndex === -1) {
-                    // Safety check if station name isn't in list (e.g. Admin)
-                    console.warn("Station validation skipped: Name not in STATION_ORDER list");
-                } else {
-                    if (!dbUnit) {
-                        throw new Error("Unit not found. Process must start at Station 1.");
+                // RULE 1: Must Exist
+                if (!dbUnit) {
+                    throw new Error("Unit not found in database. Process MUST start at Station 1.");
+                }
+
+                // RULE 2: No 'For Scanning'
+                if (dbStatus === "for scanning") {
+                    throw new Error("Unit is NOT YET ACTIVATED. Please send to Station 1.");
+                }
+
+                // RULE 3: Forward Check (Prevent Backtracking)
+                if (unitStationIndex > myStationIndex) {
+                    throw new Error(`Unit is already processed at ${dbUnit.station}. Cannot backtrack.`);
+                }
+
+                // RULE 4: Current Station Check (Resume Work)
+                if (unitStationIndex === myStationIndex) {
+                    if (dbStatus === "completed") {
+                        throw new Error("Unit is already Completed at your station.");
+                    }
+                    setScannedUnitId(dbUnit.id);
+                    setStatusMessage(`✅ Resuming unit at ${currentStation}...`);
+                }
+
+                // RULE 5: Previous Station Handover (The Strict Sequence)
+                else if (unitStationIndex < myStationIndex) {
+                    
+                    // Sequence Check
+                    if (unitStationIndex !== myStationIndex - 1) {
+                         // Kunin ang pangalan ng dapat na previous station
+                         const requiredPrev = STATION_ORDER[myStationIndex - 1];
+                         throw new Error(`Sequence Violation: Unit is from ${dbUnit.station}. It must pass ${requiredPrev} first.`);
                     }
 
-                    const unitStationIndex = STATION_ORDER.indexOf(dbUnit.station);
-                    const prevStationIndex = myStationIndex - 1;
-                    const prevStationName = STATION_ORDER[prevStationIndex];
-
-                    // Rule: Cannot process backwards or same station
-                    if (unitStationIndex >= myStationIndex) {
-                        throw new Error(`Unit is already processed at ${dbUnit.station}. Cannot move backwards.`);
+                    // Status Check
+                    if (dbStatus !== 'completed') {
+                        throw new Error(`Handover Failed: Unit is '${dbUnit.status}' at ${dbUnit.station}. It must be 'Completed' first.`);
                     }
 
-                    // Rule: Cannot skip stations (must come from immediate previous station)
-                    if (unitStationIndex < prevStationIndex) {
-                        throw new Error(`Process Violation: Unit is at ${dbUnit.station}. It must pass through ${prevStationName} first.`);
-                    }
-
-                    // Rule: Status must be Completed
-                    if (dbUnit.status !== 'Completed') {
-                        throw new Error(`Unit at ${dbUnit.station} is '${dbUnit.status}'. Must be 'Completed' before moving here.`);
-                    }
+                    setScannedUnitId(dbUnit.id);
+                    setStatusMessage(`✅ Handover accepted from ${dbUnit.station}.`);
+                }
+                else {
+                    throw new Error(`Station Validation Error: Unit is at unknown station '${dbUnit.station}'.`);
                 }
             }
 
-            // 3. SUCCESS - Populate Form
+            // SUCCESS: Populate Form
             setFormData(prev => ({
                 ...prev,
                 model: parts[0].trim() || "",
                 revision: parts[1].trim() || "",
                 baseUnitKittingNo: parts[2].trim() || "",
                 assemblyNo: parts[3].trim() || "",
-                deviceSerialNo: scannedSerial,
+                deviceSerialNo: scannedSerial, 
                 accessoryKittingNo: parts[5]?.trim() || "",
-                status: "In Progress",
+                status: "In Progress", 
                 remarks: ""
             }));
             
-            setProcessStatus('idle');
-            setStatusMessage("✅ Validated. Ready to process.");
+            setProcessStatus('idle'); // Hide overlay immediately on success so user can edit
 
         } catch (err) {
             setProcessStatus('error');
             setStatusMessage(`⛔ ${err.message}`);
-            // Clear form to prevent saving invalid unit
-            resetForm(); 
-            // Keep error visible longer so user can read it
-            setTimeout(() => setProcessStatus('idle'), 5000); 
+            
+            // --- FIX HERE: DO NOT CALL resetForm() ---
+            // Just clear the form data explicitly if you want, but KEEP status message
+            setFormData({
+                model: "", revision: "", baseUnitKittingNo: "", assemblyNo: "",
+                deviceSerialNo: "", accessoryKittingNo: "", status: "In Progress", remarks: ""
+            });
+            
+            // Wait 5 seconds before hiding the error so the user can read it
+            setTimeout(() => {
+                setProcessStatus('idle');
+                setStatusMessage("");
+            }, 5000); 
         }
 
         setScanInput(""); 
@@ -343,39 +446,75 @@ export default function StationDashboard({ user, onLogout }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!formData.model) {
-            setProcessStatus('error'); setStatusMessage("Model is required."); setTimeout(() => setProcessStatus('idle'), 3000); return;
+            setProcessStatus('error'); 
+            setStatusMessage("Model is required."); 
+            setTimeout(() => setProcessStatus('idle'), 3000); 
+            return;
         }
+        
         setProcessStatus('loading');
         setStatusMessage("Saving unit...");
 
         try {
-            const dataToSend = {
+            const commonData = {
                 ...formData,
                 station: currentStation, 
                 full_name: user.full_name,
                 username: user.username,
             };
 
-            const res = await axios.post(UNITS_ENDPOINT, dataToSend);
-            if (res.data.status === 'success') {
+            let res;
+            let finalId = scannedUnitId;
+            let finalAction = 'create';
+
+            // SAFETY NET: If ID is missing, double-check DB by Assembly No to prevent duplicates
+            if (!finalId && currentStation === "Station 1") {
+                const checkRes = await axios.get(UNITS_ENDPOINT, { params: { search_assembly: formData.assemblyNo } });
+                if (checkRes.data && checkRes.data.length > 0) {
+                    finalId = checkRes.data[0].id;
+                }
+            }
+
+            if (finalId) {
+                // UPDATE / HANDOVER
+                res = await axios.post(UNITS_ENDPOINT, { 
+                    ...commonData, 
+                    id: finalId, 
+                    action: 'update' 
+                });
+            } else {
+                // CREATE NEW (Only allowed if logic passed handleScan for Station 1)
+                res = await axios.post(UNITS_ENDPOINT, { 
+                    ...commonData, 
+                    action: 'create' 
+                });
+            }
+
+            if (res.data.status === 'success' || res.data.success === true) {
                 setProcessStatus('success');
-                setStatusMessage(`Unit saved.`);
+                setStatusMessage(`Unit saved successfully!`);
                 setTimeout(() => {
-                    setProcessStatus('idle'); resetForm(); scannerInputRef.current?.focus(); 
+                    setProcessStatus('idle'); 
+                    resetForm(); 
+                    scannerInputRef.current?.focus(); 
                     if (activeTab === 'in_progress') fetchUnits('in_progress');
                 }, 2000);
             } else {
+                const errorMsg = res.data.error || res.data.message || JSON.stringify(res.data);
+                console.error("Backend Error:", res.data); 
                 setProcessStatus('error');
-                setStatusMessage(`Server Error: ${res.data.error}`);
-                setTimeout(() => setProcessStatus('idle'), 3000);
+                setStatusMessage(`Server Error: ${errorMsg}`);
+                setTimeout(() => setProcessStatus('idle'), 5000);
             }
         } catch (err) {
+            console.error("Network Error:", err);
             setProcessStatus('error');
-            setStatusMessage(`Submission Error: ${err.message}`);
+            const errMsg = err.response?.data?.message || err.message;
+            setStatusMessage(`Submission Error: ${errMsg}`);
             setTimeout(() => setProcessStatus('idle'), 4000);
         }
     };
-
+    
     const handleReportSubmit = async (e) => {
         e.preventDefault();
         const reportData = new FormData();
@@ -462,11 +601,6 @@ export default function StationDashboard({ user, onLogout }) {
     
     const currentUsername = user.username; 
     
-    const resetForm = () => {
-        setFormData({ model: "", revision: "", baseUnitKittingNo: "", assemblyNo: "", deviceSerialNo: "", accessoryKittingNo: "", status: "In Progress", remarks: "" });
-        setScanInput(""); setStatusMessage(""); setProcessStatus('idle');
-    };
-    
     const essentialFields = [formData.model, formData.revision, formData.assemblyNo];
     const progressPercent = Math.min((essentialFields.filter(val => val && val.trim() !== "").length / essentialFields.length) * 100, 100).toFixed(0);
 
@@ -477,7 +611,7 @@ export default function StationDashboard({ user, onLogout }) {
                 return (
                     <div className="card shadow-sm p-5 text-center">
                         <i className="bi bi-tools text-primary display-3 mb-4 mx-auto"></i>
-                        <h1 className="h3 fw-light text-dark">Welcome, **{currentUsername}**!</h1>
+                        <h1 className="h3 fw-light text-dark">Welcome, <strong>{currentUsername}</strong>!</h1>
                         <p className="lead text-muted mt-2">You are currently logged into <strong className="fw-semibold text-primary">{currentStation}</strong>.</p>
                         <button className="btn btn-primary btn-lg mt-4" onClick={() => setActiveTab('input_unit')}>
                             <i className="bi bi-qr-code-scan me-2"></i> Start Scanning
@@ -511,6 +645,7 @@ export default function StationDashboard({ user, onLogout }) {
                                     <div className="col-md-6"><label className="form-label small text-muted">Revision</label><input type="text" className="form-control form-control-sm bg-light font-monospace" value={formData.revision} readOnly /></div>
                                     <div className="col-12"><label className="form-label fw-bold">Assembly No. *</label><input type="text" className="form-control" value={formData.assemblyNo} onChange={(e) => setFormData({...formData, assemblyNo: e.target.value})} required disabled={processStatus !== 'idle'} /></div>
                                     <div className="col-12"><label className="form-label fw-bold">Device Serial No. (Opt)</label><input type="text" className="form-control" value={formData.deviceSerialNo} onChange={(e) => setFormData({...formData, deviceSerialNo: e.target.value})} disabled={processStatus !== 'idle'} /></div>
+                                    <div className="col-12"><label className="form-label fw-bold">Accessory Kitting No. (Opt)</label><input type="text" className="form-control" value={formData.accessoryKittingNo} onChange={(e) => setFormData({...formData, accessoryKittingNo: e.target.value})} disabled={processStatus !== 'idle'} /></div>
                                     <div className="col-md-6">
                                         <label className="form-label fw-bold">Status *</label>
                                         <select className="form-select" value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})} disabled={processStatus !== 'idle'}>
@@ -594,7 +729,7 @@ export default function StationDashboard({ user, onLogout }) {
                     <nav className="navbar navbar-expand-lg navbar-dark bg-dark sticky-top shadow-sm p-3">
                         <div className="container-fluid d-flex justify-content-between w-100">
                             <span className="navbar-brand h4 mb-0 text-white fw-bold">Edge Sensor Assembly - {currentStation}</span>
-                            <div className="text-white d-flex align-items-center small"><span className="me-3">{currentUsername}</span><button className="btn btn-sm btn-outline-light" onClick={onLogout}>Logout</button></div>
+                            <div className="text-white d-flex align-items-center small"><span className="me-3">{user.username}</span><button className="btn btn-sm btn-outline-light" onClick={onLogout}>Logout</button></div>
                         </div>
                     </nav>
                     <div className="container-fluid p-4 flex-grow-1">{renderContent()}</div>
