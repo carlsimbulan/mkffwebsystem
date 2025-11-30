@@ -424,50 +424,260 @@ export default function AdminPage({ user, onLogout }) {
         switch (activeTab) {
             case "dashboard":
                 return (
-                    <>
-                        <h3 className="mb-4 d-flex align-items-center"><i className="bi bi-speedometer2 me-2 text-danger"></i>Overall Manufacturing Dashboard</h3>
-                        <div className="row g-4 mb-4">
-                            <div className="col-md-3"><div className="card text-white bg-success shadow-sm h-100"><div className="card-body"><h6 className="card-title text-uppercase mb-2">Total Completed (Live)</h6><h2 className="display-6 fw-bold">{totalOutput}</h2><p className="card-text small">Units successfully completed</p></div></div></div>
-                            <div className="col-md-3"><div className="card text-white bg-primary shadow-sm h-100"><div className="card-body"><h6 className="card-title text-uppercase mb-2">Overall Yield</h6><h2 className="display-6 fw-bold">{overallMetrics.yieldRate}%</h2><p className="card-text small">Good Units / Total Units Checked</p></div></div></div>
-                            <div className="col-md-3"><div className="card bg-warning text-dark shadow-sm h-100"><div className="card-body"><h6 className="card-title text-uppercase mb-2">Pending Units (In Progress)</h6><h2 className="display-6 fw-bold">{overallMetrics.pendingUnits}</h2><p className="card-text small">Units currently in progress (Live)</p></div></div></div>
-                            <div className="col-md-3"><div className="card text-white bg-danger shadow-sm h-100"><div className="card-body"><h6 className="card-title text-uppercase mb-2">No Good (NG) (Live)</h6><h2 className="display-6 fw-bold">{systemAlerts}</h2><p className="card-text small">Defective units recorded</p></div></div></div>
+                    <div className="animate-in fade-in pb-4">
+                        {/* --- Header Section --- */}
+                        <div className="d-flex justify-content-between align-items-center mb-4">
+                            <div>
+                                <h3 className="fw-bold text-dark mb-1" style={{ letterSpacing: '-0.5px' }}>Production Overview</h3>
+                                <p className="text-muted small mb-0">Real-time data stream from all active stations.</p>
+                            </div>
+                            <div className="d-flex align-items-center gap-2">
+                                <div className="bg-white border px-3 py-2 rounded shadow-sm d-flex align-items-center">
+                                    <span className="position-relative d-flex h-2 w-2 me-2">
+                                      <span className="animate-ping position-absolute d-inline-flex h-100 w-100 rounded-circle bg-success opacity-75"></span>
+                                      <span className="position-relative d-inline-flex rounded-circle h-2 w-2 bg-success" style={{width:'10px', height:'10px'}}></span>
+                                    </span>
+                                    <span className="fw-bold text-dark small" style={{fontSize: '0.8rem'}}>System Live</span>
+                                </div>
+                                <div className="bg-white border px-3 py-2 rounded shadow-sm text-secondary fw-bold small">
+                                    {new Date().toLocaleDateString()}
+                                </div>
+                            </div>
                         </div>
-                        <div className="alert alert-danger d-flex align-items-center mb-4 border border-danger"><i className="bi bi-exclamation-triangle-fill me-3 fs-5"></i><span className="fw-bold me-2">{overallMetrics.pendingApprovalUnits}</span> units are awaiting QA approval. Please check the **Approvals** tab for review.</div>
+
+                        {/* --- Stats Cards (Modern Accent Style) --- */}
+                        <div className="row g-4 mb-5">
+                            {/* Completed Units */}
+                            <div className="col-md-3">
+                                <div className="card border-0 shadow-sm h-100 border-start border-4 border-success" style={{ borderRadius: '12px' }}>
+                                    <div className="card-body p-4">
+                                        <div className="d-flex align-items-center justify-content-between mb-3">
+                                            <div className="bg-success bg-opacity-10 text-success rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '50px', height: '50px'}}>
+                                                <i className="bi bi-box-seam-fill fs-4"></i>
+                                            </div>
+                                            <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-2 py-1 small fw-normal">
+                                                <i className="bi bi-arrow-up-short"></i>On Track
+                                            </span>
+                                        </div>
+                                        <h2 className="fw-bold text-dark mb-0 display-6">{totalOutput}</h2>
+                                        <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Completed Units</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Yield Rate */}
+                            <div className="col-md-3">
+                                <div className="card border-0 shadow-sm h-100 border-start border-4 border-primary" style={{ borderRadius: '12px' }}>
+                                    <div className="card-body p-4">
+                                        <div className="d-flex align-items-center justify-content-between mb-3">
+                                            <div className="bg-primary bg-opacity-10 text-primary rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '50px', height: '50px'}}>
+                                                <i className="bi bi-activity fs-4"></i>
+                                            </div>
+                                            <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-2 py-1 small fw-normal">
+                                                Target: 98%
+                                            </span>
+                                        </div>
+                                        <h2 className="fw-bold text-dark mb-0 display-6">{overallMetrics.yieldRate}%</h2>
+                                        <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Yield Rate</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* In Progress */}
+                            <div className="col-md-3">
+                                <div className="card border-0 shadow-sm h-100 border-start border-4 border-warning" style={{ borderRadius: '12px' }}>
+                                    <div className="card-body p-4">
+                                        <div className="d-flex align-items-center justify-content-between mb-3">
+                                            <div className="bg-warning bg-opacity-10 text-warning rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '50px', height: '50px'}}>
+                                                <i className="bi bi-hourglass-split fs-4"></i>
+                                            </div>
+                                            <span className="badge bg-warning bg-opacity-10 text-warning rounded-pill px-2 py-1 small fw-normal">
+                                                Active
+                                            </span>
+                                        </div>
+                                        <h2 className="fw-bold text-dark mb-0 display-6">{overallMetrics.pendingUnits}</h2>
+                                        <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>In Progress</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Defects (NG) */}
+                            <div className="col-md-3">
+                                <div className="card border-0 shadow-sm h-100 border-start border-4 border-danger" style={{ borderRadius: '12px' }}>
+                                    <div className="card-body p-4">
+                                        <div className="d-flex align-items-center justify-content-between mb-3">
+                                            <div className="bg-danger bg-opacity-10 text-danger rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '50px', height: '50px'}}>
+                                                <i className="bi bi-exclamation-octagon-fill fs-4"></i>
+                                            </div>
+                                            <span className="badge bg-danger bg-opacity-10 text-danger rounded-pill px-2 py-1 small fw-normal">
+                                                Alert
+                                            </span>
+                                        </div>
+                                        <h2 className="fw-bold text-danger mb-0 display-6">{systemAlerts}</h2>
+                                        <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Total Defects (NG)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* --- Approvals Alert (Modern Strip) --- */}
+                        {overallMetrics.pendingApprovalUnits > 0 && (
+                            <div className="card border-0 shadow-sm mb-4 border-start border-4 border-danger bg-white">
+                                <div className="card-body d-flex align-items-center justify-content-between p-3">
+                                    <div className="d-flex align-items-center">
+                                        <i className="bi bi-bell-fill text-danger fs-4 me-3 ms-2"></i>
+                                        <div>
+                                            <h6 className="fw-bold text-dark mb-0">Action Required</h6>
+                                            <small className="text-secondary">There are <span className="fw-bold text-danger">{overallMetrics.pendingApprovalUnits} units</span> waiting for QA validation.</small>
+                                        </div>
+                                    </div>
+                                    <button className="btn btn-sm btn-danger px-4 rounded-pill" onClick={() => setActiveTab('approval')}>
+                                        Review Queue
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* --- Charts Section --- */}
                         <div className="row g-4">
-                            <div className="col-lg-4"><UnitPieChart metrics={overallMetrics} title="Overall Live Unit Status Distribution" /></div>
-                            <div className="col-lg-8"><StationBarChart logs={logs} stations={stations} calculateMetrics={calculateStationMetrics} /></div>
+                            {/* Bar Chart Container */}
+                            <div className="col-lg-8">
+                                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
+                                    <div className="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 className="fw-bold text-dark mb-0">Station Output</h6>
+                                            <small className="text-muted" style={{fontSize: '0.75rem'}}>Live production count per station</small>
+                                        </div>
+                                        <button className="btn btn-light btn-sm border rounded-circle" onClick={fetchData}><i className="bi bi-arrow-clockwise"></i></button>
+                                    </div>
+                                    <div className="card-body">
+                                        <StationBarChart logs={logs} stations={stations} calculateMetrics={calculateStationMetrics} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Pie Chart Container */}
+                            <div className="col-lg-4">
+                                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
+                                    <div className="card-header bg-white py-3 border-0">
+                                        <h6 className="fw-bold text-dark mb-0">Status Distribution</h6>
+                                        <small className="text-muted" style={{fontSize: '0.75rem'}}>Overall yield ratio</small>
+                                    </div>
+                                    <div className="card-body d-flex align-items-center justify-content-center">
+                                        <div style={{width: '100%', maxWidth: '320px'}}>
+                                            <UnitPieChart metrics={overallMetrics} title="" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </>
+
+                        {/* Pulsing Animation for Live Indicator */}
+                        <style jsx>{`
+                            .animate-ping {
+                                animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+                            }
+                            @keyframes ping {
+                                75%, 100% { transform: scale(2); opacity: 0; }
+                            }
+                        `}</style>
+                    </div>
                 );
 
             case "stations":
                 return (
-                    <div className="row g-3">
-                        <div className="col-12 mb-3"><h4><i className="bi bi-grid-3x3-gap-fill me-2"></i>Stations Overview (1-15)</h4><p className="text-muted small">Shows live unit activity based on current metrics. Click **Monitor** for details or **History** for all recorded activity.</p></div>
-                        {stations.map((station) => {
-                            const metrics = calculateStationMetrics(station.id);
-                            const hasActivity = metrics.pendingUnits > 0 || metrics.completedUnits > 0 || metrics.ngUnits > 0;
-                            let statusText = "IDLE";
-                            let statusClass = "bg-secondary";
-                            if (metrics.pendingUnits > 0) { statusText = `${metrics.pendingUnits} IN PROGRESS`; statusClass = "bg-primary"; } 
-                            else if (metrics.yieldTotal > 0 && metrics.ngUnits > 0 && metrics.completedUnits === 0) { statusText = "NG ALERT"; statusClass = "bg-danger"; }
+                    <div className="animate-in fade-in">
+                        {/* Title Header */}
+                        <div className="d-flex justify-content-between align-items-end mb-4">
+                            <div>
+                                <h3 className="fw-bold text-dark mb-1">Station Management</h3>
+                                <p className="text-muted small mb-0">Overview of all {stations.length} production stations.</p>
+                            </div>
+                            {/* Legend */}
+                            <div className="d-none d-md-flex gap-3 small text-muted">
+                                <span className="d-flex align-items-center"><span className="rounded-circle bg-primary me-2" style={{width:8, height:8}}></span>Running</span>
+                                <span className="d-flex align-items-center"><span className="rounded-circle bg-danger me-2" style={{width:8, height:8}}></span>Attention</span>
+                                <span className="d-flex align-items-center"><span className="rounded-circle bg-secondary me-2" style={{width:8, height:8}}></span>Idle</span>
+                            </div>
+                        </div>
 
-                            return (
-                                <div key={station.id} className="col-md-4 col-lg-3 col-xl-2">
-                                    <div className={`card h-100 shadow-sm border-top-4 ${statusClass === 'bg-danger' ? 'border-danger' : statusClass === 'bg-primary' ? 'border-primary' : 'border-secondary'}`}>
-                                        <div className="card-body text-center p-2">
-                                            <h6 className="fw-bold mb-1">{station.name}</h6>
-                                            <span className={`badge mb-2 ${statusClass}`}>{statusText}</span>
-                                            <p className="small text-muted mb-0">{station.operator}</p>
-                                        </div>
-                                        <div className="card-footer bg-white p-1 d-flex justify-content-between">
-                                            <button className="btn btn-primary btn-sm py-0 flex-grow-1 me-1" style={{fontSize: '0.7rem'}} onClick={() => handleMonitorStation(station.id)}><i className="bi bi-eye me-1"></i>Monitor</button>
-                                            <button className="btn btn-secondary btn-sm py-0" style={{fontSize: '0.7rem'}} onClick={() => handleViewHistory(station.id)}><i className="bi bi-clock-history me-1"></i>History</button>
+                        <div className="row g-4">
+                            {stations.map((station) => {
+                                const metrics = calculateStationMetrics(station.id);
+                                const hasActivity = metrics.pendingUnits > 0;
+                                const hasError = metrics.ngUnits > 0 && metrics.completedUnits === 0;
+                                
+                                let statusColor = "secondary";
+                                let statusLabel = "Idle";
+                                let borderColor = "border-secondary";
+
+                                if (hasActivity) {
+                                    statusColor = "primary";
+                                    statusLabel = "Running";
+                                    borderColor = "border-primary";
+                                }
+                                if (hasError) {
+                                    statusColor = "danger";
+                                    statusLabel = "Attention";
+                                    borderColor = "border-danger";
+                                }
+
+                                return (
+                                    <div key={station.id} className="col-xl-3 col-lg-4 col-md-6">
+                                        <div className={`card h-100 border-0 shadow-sm station-card hover-up border-top border-4 ${borderColor}`} style={{borderRadius: '12px'}}>
+                                            <div className="card-body p-4 d-flex flex-column">
+                                                
+                                                {/* Card Header: Station Name & Status Badge ONLY */}
+                                                <div className="d-flex justify-content-between align-items-center mb-4">
+                                                    <h6 className="fw-bold text-dark mb-0 fs-5">{station.name}</h6>
+                                                    <span className={`badge bg-${statusColor} bg-opacity-10 text-${statusColor} px-2 py-1 rounded-pill small fw-bold`}>
+                                                        {hasActivity && <span className="spinner-grow spinner-grow-sm me-1" role="status" aria-hidden="true" style={{width: '0.5rem', height: '0.5rem'}}></span>}
+                                                        {statusLabel}
+                                                    </span>
+                                                </div>
+
+                                                {/* Mini Stats Summary */}
+                                                <div className="row g-2 mb-4 bg-light rounded p-2 mx-0">
+                                                    <div className="col-6 text-center border-end">
+                                                        <small className="text-muted text-uppercase" style={{fontSize: '0.65rem'}}>Output</small>
+                                                        <div className="fw-bold text-dark fs-5">{metrics.completedUnits}</div>
+                                                    </div>
+                                                    <div className="col-6 text-center">
+                                                        <small className="text-muted text-uppercase" style={{fontSize: '0.65rem'}}>Defects</small>
+                                                        <div className={`fw-bold fs-5 ${metrics.ngUnits > 0 ? 'text-danger' : 'text-dark'}`}>{metrics.ngUnits}</div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Actions */}
+                                                <div className="mt-auto d-flex gap-2">
+                                                    <button 
+                                                        className="btn btn-outline-primary btn-sm flex-grow-1 fw-bold" 
+                                                        style={{borderRadius: '8px'}}
+                                                        onClick={() => handleMonitorStation(station.id)}
+                                                    >
+                                                        Monitor
+                                                    </button>
+                                                    <button 
+                                                        className="btn btn-light text-secondary btn-sm border" 
+                                                        style={{borderRadius: '8px'}}
+                                                        onClick={() => handleViewHistory(station.id)}
+                                                        title="View Logs"
+                                                    >
+                                                        <i className="bi bi-clock-history"></i>
+                                                    </button>
+                                                </div>
+
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            );
-                        })}
+                                );
+                            })}
+                        </div>
+                        
+                        <style jsx>{`
+                            .hover-up { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+                            .hover-up:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important; }
+                        `}</style>
                     </div>
                 );
 
@@ -477,22 +687,96 @@ export default function AdminPage({ user, onLogout }) {
                 const monitorMetrics = calculateStationMetrics(stationMonitorId);
 
                 return (
-                    <div>
-                        <h3 className="mb-4 d-flex align-items-center"><i className="bi bi-activity me-2 text-danger"></i>Real-time Monitoring for <span className="text-primary ms-2">{station?.name || stationMonitorId}</span><button className="btn btn-sm btn-outline-secondary ms-auto" onClick={() => { setActiveTab('stations'); setHighlightedUnitId(null);}}><i className="bi bi-arrow-left me-1"></i> Back to Stations</button></h3>
-                        <hr />
+                    <div className="animate-in fade-in pb-5">
+                        {/* --- Header Section --- */}
+                        <div className="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3">
+                            <div>
+                                <h3 className="fw-bold text-dark mb-1">{station?.name || stationMonitorId}</h3>
+                                <p className="text-muted small mb-0">Real-time production feed</p>
+                            </div>
+                            <button 
+                                className="btn btn-light border btn-sm px-3 fw-bold text-muted hover-lift" 
+                                onClick={() => { setActiveTab('stations'); setHighlightedUnitId(null); }}
+                            >
+                                <i className="bi bi-arrow-left me-2"></i>Back to Overview
+                            </button>
+                        </div>
+
+                        {/* --- Stats Cards (Modern Style) --- */}
                         <div className="row g-4 mb-4">
-                            <div className="col-lg-6"> 
-                                <div className="row g-4">
-                                    <div className="col-md-6"><div className="card bg-success text-white shadow-sm h-100"><div className="card-body"><h6 className="card-title text-uppercase mb-2">Completed Units</h6><h2 className="display-6 fw-bold">{monitorMetrics.completedUnits}</h2><p className="card-text small">Total units successfully processed.</p></div></div></div>
-                                    <div className="col-md-6"><div className="card bg-info text-dark shadow-sm h-100"><div className="card-body"><h6 className="card-title text-uppercase mb-2">Overall Yield</h6><h2 className="display-6 fw-bold">{monitorMetrics.yieldRate}%</h2><p className="card-text small">Good Units / Total Units Checked ({monitorMetrics.yieldTotal})</p></div></div></div>
-                                    <div className="col-md-6"><div className="card bg-warning text-dark shadow-sm h-100"><div className="card-body"><h6 className="card-title text-uppercase mb-2">In Progress</h6><h2 className="display-6 fw-bold">{monitorMetrics.pendingUnits}</h2><p className="card-text small">Units currently being processed.</p></div></div></div>
-                                    <div className="col-md-6"><div className="card bg-danger text-white shadow-sm h-100"><div className="card-body"><h6 className="card-title text-uppercase mb-2">No Good (NG)</h6><h2 className="display-6 fw-bold">{monitorMetrics.ngUnits}</h2><p className="card-text small">Total defective units recorded.</p></div></div></div>
+                            {/* Completed */}
+                            <div className="col-md-6 col-xl-3">
+                                <div className="card border-0 shadow-sm h-100 border-start border-4 border-success" style={{borderRadius: '12px'}}>
+                                    <div className="card-body p-4">
+                                        <div className="d-flex align-items-center justify-content-between mb-3">
+                                            <div className="bg-success bg-opacity-10 text-success rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '45px', height: '45px'}}>
+                                                <i className="bi bi-check-circle-fill fs-4"></i>
+                                            </div>
+                                            <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-2 py-1 small fw-normal">Output</span>
+                                        </div>
+                                        <h2 className="fw-bold text-dark mb-0">{monitorMetrics.completedUnits}</h2>
+                                        <span className="text-muted text-uppercase small fw-bold" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Completed</span>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="col-lg-6"><UnitPieChart metrics={monitorMetrics} title={`${station?.name || 'Station'} Status (Live)`} /></div>
+
+                            {/* Yield Rate */}
+                            <div className="col-md-6 col-xl-3">
+                                <div className="card border-0 shadow-sm h-100 border-start border-4 border-primary" style={{borderRadius: '12px'}}>
+                                    <div className="card-body p-4">
+                                        <div className="d-flex align-items-center justify-content-between mb-3">
+                                            <div className="bg-primary bg-opacity-10 text-primary rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '45px', height: '45px'}}>
+                                                <i className="bi bi-graph-up-arrow fs-4"></i>
+                                            </div>
+                                            <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-2 py-1 small fw-normal">Efficiency</span>
+                                        </div>
+                                        <h2 className="fw-bold text-dark mb-0">{monitorMetrics.yieldRate}%</h2>
+                                        <span className="text-muted text-uppercase small fw-bold" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Yield Rate</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* In Progress */}
+                            <div className="col-md-6 col-xl-3">
+                                <div className="card border-0 shadow-sm h-100 border-start border-4 border-warning" style={{borderRadius: '12px'}}>
+                                    <div className="card-body p-4">
+                                        <div className="d-flex align-items-center justify-content-between mb-3">
+                                            <div className="bg-warning bg-opacity-10 text-warning rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '45px', height: '45px'}}>
+                                                <i className="bi bi-hourglass-split fs-4"></i>
+                                            </div>
+                                            <span className="badge bg-warning bg-opacity-10 text-warning rounded-pill px-2 py-1 small fw-normal">Active</span>
+                                        </div>
+                                        <h2 className="fw-bold text-dark mb-0">{monitorMetrics.pendingUnits}</h2>
+                                        <span className="text-muted text-uppercase small fw-bold" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>In Progress</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Defects (NG) */}
+                            <div className="col-md-6 col-xl-3">
+                                <div className="card border-0 shadow-sm h-100 border-start border-4 border-danger" style={{borderRadius: '12px'}}>
+                                    <div className="card-body p-4">
+                                        <div className="d-flex align-items-center justify-content-between mb-3">
+                                            <div className="bg-danger bg-opacity-10 text-danger rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '45px', height: '45px'}}>
+                                                <i className="bi bi-exclamation-triangle-fill fs-4"></i>
+                                            </div>
+                                            <span className="badge bg-danger bg-opacity-10 text-danger rounded-pill px-2 py-1 small fw-normal">Defects</span>
+                                        </div>
+                                        <h2 className="fw-bold text-dark mb-0">{monitorMetrics.ngUnits}</h2>
+                                        <span className="text-muted text-uppercase small fw-bold" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Total NG</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div className="card shadow-sm">
-                            <div className="card-header bg-white"><h5 className="mb-0">Live Logs (Excluding Pending Approval) for {station?.name || stationMonitorId}</h5></div>
+
+                        {/* --- Live Logs Table (Kept Original Structure) --- */}
+                        <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
+                            <div className="card-header bg-white py-3 px-4 border-0 d-flex justify-content-between align-items-center">
+                                <h6 className="fw-bold text-dark mb-0">Production Feed</h6>
+                                <button className="btn btn-sm btn-light text-primary fw-bold border rounded-pill px-3" onClick={fetchData}>
+                                    <i className="bi bi-arrow-clockwise me-1"></i>Refresh
+                                </button>
+                            </div>
                             <div className="table-responsive">
                                 <table className="table table-hover table-striped mb-0 small text-center align-middle">
                                     <thead className="table-dark">
@@ -533,110 +817,382 @@ export default function AdminPage({ user, onLogout }) {
                         </div>
                     </div>
                 );
-
             case "reports":
                 return (
-                    <div>
-                        <h3 className="mb-4 d-flex align-items-center"><i className="bi bi-clipboard-data me-2 text-danger"></i>Submitted Daily Reports</h3>
-                        <p className="text-muted">View production reports submitted by all stations, filtered by date and station.</p>
+                    <div className="animate-in fade-in pb-5">
+                        {/* Header */}
                         <div className="d-flex justify-content-between align-items-center mb-4">
-                            <div className="d-flex gap-3 align-items-center">
-                                <label className="form-label mb-0 fw-bold">Filter Date:</label>
-                                <input type="date" className="form-control w-auto" value={reportDate} onChange={(e) => setReportDate(e.target.value)} max={getTodayDate()} />
-                                <label className="form-label mb-0 fw-bold ms-3">Filter Station:</label>
-                                <select className="form-select w-auto" value={reportFilterStationId} onChange={(e) => setReportFilterStationId(e.target.value)}>
-                                    <option value="All">All Stations</option>
-                                    {stations.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
-                                </select>
+                            <div>
+                                <h3 className="fw-bold text-dark mb-1">Production Reports</h3>
+                                <p className="text-muted small mb-0">Daily performance records from all stations.</p>
                             </div>
-                            <button className="btn btn-sm btn-success" onClick={() => setShowReportModal(true)}><i className="bi bi-file-earmark-plus me-1"></i> Submit New Report</button>
+                            <button 
+                                className="btn btn-primary px-4 py-2 rounded-pill shadow-sm fw-bold hover-scale"
+                                onClick={() => setShowReportModal(true)}
+                            >
+                                <i className="bi bi-plus-lg me-2"></i>New Report
+                            </button>
                         </div>
-                        <div className="card shadow-sm">
-                            <div className="card-header bg-white fw-bold">Reports for {reportDate} ({filteredReports.length} found)</div>
+
+                        {/* Filter Bar */}
+                        <div className="card border-0 shadow-sm mb-4" style={{borderRadius: '12px'}}>
+                            <div className="card-body p-3 d-flex flex-wrap align-items-center gap-3">
+                                <div className="d-flex align-items-center">
+                                    <i className="bi bi-calendar-event text-secondary me-2 fs-5"></i>
+                                    <input 
+                                        type="date" 
+                                        className="form-control border-0 bg-light fw-bold text-secondary" 
+                                        style={{maxWidth: '160px'}}
+                                        value={reportDate} 
+                                        onChange={(e) => setReportDate(e.target.value)} 
+                                        max={getTodayDate()} 
+                                    />
+                                </div>
+                                <div className="vr text-secondary opacity-25 mx-2"></div>
+                                <div className="d-flex align-items-center flex-grow-1">
+                                    <i className="bi bi-funnel text-secondary me-2 fs-5"></i>
+                                    <select 
+                                        className="form-select border-0 bg-light fw-bold text-secondary" 
+                                        style={{maxWidth: '200px'}}
+                                        value={reportFilterStationId} 
+                                        onChange={(e) => setReportFilterStationId(e.target.value)}
+                                    >
+                                        <option value="All">All Stations</option>
+                                        {stations.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
+                                    </select>
+                                </div>
+                                <div className="text-muted small ms-auto">
+                                    Showing <strong className="text-dark">{filteredReports.length}</strong> records
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Reports Table */}
+                        <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
                             <div className="table-responsive">
-                                <table className="table table-hover table-striped mb-0 small">
-                                    <thead className="table-dark"><tr><th>ID</th><th>Station</th><th>Shift</th><th>Units Processed</th><th>NG/Downtime</th><th>Submitted By</th><th>Timestamp</th><th>Actions</th></tr></thead>
-                                    <tbody>
+                                <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.9rem' }}>
+                                    <thead className="bg-light text-secondary text-uppercase small" style={{ letterSpacing: '0.5px' }}>
+                                        <tr>
+                                            <th className="border-0 py-3 ps-4">Station & Shift</th>
+                                            <th className="border-0 py-3 text-center">Output</th>
+                                            <th className="border-0 py-3 text-center">Defects / Downtime</th>
+                                            <th className="border-0 py-3">Submitted By</th>
+                                            <th className="border-0 py-3 text-end pe-4">Timestamp</th>
+                                            <th className="border-0 py-3 text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="border-top-0">
                                         {filteredReports.length > 0 ? filteredReports.map(report => (
                                             <tr key={report.id}>
-                                                <td>{report.id}</td><td><span className="badge bg-primary">{report.station}</span></td><td>{report.shift}</td><td className="fw-bold text-success">{report.total_units_processed}</td><td><span className="text-danger">{report.total_ng} NG</span> / {report.downtime_minutes} min</td><td>{report.submitted_by}</td><td className="small">{new Date(report.created_at).toLocaleString()}</td>
-                                                <td><button className="btn btn-sm btn-outline-info py-0" onClick={() => handleViewReport(report)}><i className="bi bi-eye me-1"></i> View Details</button></td>
+                                                <td className="ps-4">
+                                                    <div className="d-flex align-items-center">
+                                                        <div className="bg-primary bg-opacity-10 text-primary rounded p-2 me-3">
+                                                            <i className="bi bi-layers-fill"></i>
+                                                        </div>
+                                                        <div>
+                                                            <div className="fw-bold text-dark">{report.station}</div>
+                                                            <div className="small text-muted">{report.shift}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="text-center">
+                                                    <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-2 fw-normal fs-6">
+                                                        {report.total_units_processed}
+                                                    </span>
+                                                </td>
+                                                <td className="text-center">
+                                                    <div className="d-flex flex-column justify-content-center align-items-center">
+                                                        <span className="text-danger fw-bold">{report.total_ng} NG</span>
+                                                        <small className="text-muted" style={{fontSize: '0.75rem'}}>{report.downtime_minutes} min down</small>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div className="d-flex align-items-center text-secondary">
+                                                        <i className="bi bi-person-circle me-2"></i>
+                                                        {report.submitted_by}
+                                                    </div>
+                                                </td>
+                                                <td className="text-end pe-4 text-muted font-monospace small">
+                                                    {new Date(report.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                                    <div style={{fontSize: '0.7rem'}}>{new Date(report.created_at).toLocaleDateString()}</div>
+                                                </td>
+                                                <td className="text-center">
+                                                    <button 
+                                                        className="btn btn-sm btn-light border text-primary hover-primary rounded-pill px-3" 
+                                                        onClick={() => handleViewReport(report)}
+                                                    >
+                                                        Details
+                                                    </button>
+                                                </td>
                                             </tr>
-                                        )) : ( <tr><td colSpan="8" className="text-center py-4">No reports found for the selected criteria.</td></tr> )}
+                                        )) : (
+                                            <tr>
+                                                <td colSpan="6" className="py-5 text-center text-muted">
+                                                    <div className="mb-3"><i className="bi bi-file-earmark-x fs-1 opacity-25"></i></div>
+                                                    <p className="mb-0">No reports found for the selected date or station.</p>
+                                                </td>
+                                            </tr>
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
+
+                        <style jsx>{`
+                            .hover-scale:hover { transform: scale(1.02); }
+                            .hover-primary:hover { background-color: #0d6efd; color: white !important; border-color: #0d6efd !important; }
+                        `}</style>
                     </div>
                 );
-
             case "approval":
                 const approvalQueueLogs = logs.filter(l => l.status === 'Pending Approval');
                 return (
-                    <div>
-                        <h3 className="mb-4 d-flex align-items-center"><i className="bi bi-check-circle-fill me-2 text-danger"></i>Units Awaiting QA Approval<span className="badge bg-danger ms-3">{approvalQueueLogs.length}</span></h3>
-                        <p className="text-muted">These units require review, typically because they were manually flagged for inspection or reopened from a final status (Completed/No Good).</p>
-                        <div className="card shadow-sm mt-4">
-                            <div className="card-header bg-warning text-dark fw-bold">Approval Queue</div>
+                    <div className="animate-in fade-in pb-5">
+                        {/* Header */}
+                        <div className="d-flex justify-content-between align-items-center mb-4">
+                            <div>
+                                <h3 className="fw-bold text-dark mb-1">Approval Queue</h3>
+                                <p className="text-muted small mb-0">Review flagged units requiring QA validation or status rollback.</p>
+                            </div>
+                            {approvalQueueLogs.length > 0 && (
+                                <span className="badge bg-danger rounded-pill px-3 py-2 shadow-sm d-flex align-items-center">
+                                    <span className="spinner-grow spinner-grow-sm me-2" role="status" aria-hidden="true"></span>
+                                    {approvalQueueLogs.length} Pending
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Main Card */}
+                        <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
                             <div className="table-responsive">
-                                <table className="table table-hover table-striped mb-0 small">
-                                    <thead className="table-dark"><tr><th>ID</th><th>Station</th><th>Serial No.</th><th>Model/Rev</th><th>Status</th><th>Remarks</th><th>Timestamp</th><th>Action</th></tr></thead>
-                                    <tbody>
+                                <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.9rem' }}>
+                                    <thead className="bg-light text-secondary text-uppercase small" style={{ letterSpacing: '0.5px' }}>
+                                        <tr>
+                                            <th className="border-0 py-3 ps-4">Unit Details</th>
+                                            <th className="border-0 py-3">Origin Station</th>
+                                            <th className="border-0 py-3 text-center">Status</th>
+                                            <th className="border-0 py-3" style={{width: '25%'}}>Remarks</th>
+                                            <th className="border-0 py-3 text-end">Timestamp</th>
+                                            <th className="border-0 py-3 text-center pe-4">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="border-top-0">
                                         {approvalQueueLogs.length > 0 ? approvalQueueLogs.map(log => (
                                             <tr key={log.id}>
-                                                <td>{log.id}</td><td><span className="badge bg-secondary">{log.station}</span></td><td className="fw-bold">{log.device_serial_no}</td><td>{log.model} (Rev: {log.revision})</td><td><span className="badge bg-info text-dark">{log.status}</span></td><td>{log.remarks || 'No remarks.'}</td><td className="small">{new Date(log.created_at).toLocaleString()}</td>
-                                                <td><button className="btn btn-sm btn-success py-0" onClick={() => handleApproveUnit(log.id, log)}><i className="bi bi-check"></i> Approve (In Progress)</button></td>
+                                                {/* Unit Details */}
+                                                <td className="ps-4">
+                                                    <div className="d-flex flex-column">
+                                                        <span className="fw-bold text-dark">{log.model} <span className="fw-normal text-muted">({log.revision})</span></span>
+                                                        <span className="small text-muted font-monospace">{log.device_serial_no}</span>
+                                                    </div>
+                                                </td>
+
+                                                {/* Station */}
+                                                <td>
+                                                    <div className="d-flex align-items-center">
+                                                        <div className="bg-light border rounded-circle p-1 me-2 d-flex align-items-center justify-content-center" style={{width: '28px', height: '28px'}}>
+                                                            <i className="bi bi-geo-alt-fill text-secondary" style={{fontSize: '0.7rem'}}></i>
+                                                        </div>
+                                                        <span className="fw-medium text-dark">{log.station}</span>
+                                                    </div>
+                                                </td>
+
+                                                {/* Status */}
+                                                <td className="text-center">
+                                                    <span className="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-2 fw-normal">
+                                                        Pending QA
+                                                    </span>
+                                                </td>
+
+                                                {/* Remarks */}
+                                                <td>
+                                                    <div className="d-flex align-items-start text-muted small fst-italic">
+                                                        <i className="bi bi-chat-quote-fill me-2 opacity-50"></i>
+                                                        "{log.remarks || 'No remarks provided'}"
+                                                    </div>
+                                                </td>
+
+                                                {/* Timestamp */}
+                                                <td className="text-end font-monospace small text-muted">
+                                                    <div>{new Date(log.created_at).toLocaleDateString()}</div>
+                                                    <div style={{fontSize: '0.75rem'}}>{new Date(log.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                                                </td>
+
+                                                {/* Action */}
+                                                <td className="text-center pe-4">
+                                                    <button 
+                                                        className="btn btn-sm btn-success text-white fw-bold px-4 rounded-pill shadow-sm hover-scale"
+                                                        onClick={() => handleApproveUnit(log.id, log)}
+                                                        style={{transition: 'transform 0.2s'}}
+                                                    >
+                                                        <i className="bi bi-check-circle me-1"></i> Approve
+                                                    </button>
+                                                </td>
                                             </tr>
-                                        )) : ( <tr><td colSpan="8" className="text-center py-4">No units currently require approval.</td></tr> )}
+                                        )) : (
+                                            <tr>
+                                                <td colSpan="6" className="py-5 text-center text-muted">
+                                                    <div className="mb-3">
+                                                        <i className="bi bi-clipboard-check fs-1 text-success opacity-25"></i>
+                                                    </div>
+                                                    <h6 className="fw-bold text-dark">All Clear!</h6>
+                                                    <p className="small mb-0">No units currently require approval.</p>
+                                                </td>
+                                            </tr>
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
+
+                        <style jsx>{`
+                            .hover-scale:hover { transform: scale(1.05); }
+                        `}</style>
                     </div>
                 );
-
-            case "manage_account": 
+           case "manage_account": 
                 return (
-                    <div>
-                        <h3 className="mb-4 d-flex align-items-center"><i className="bi bi-person-gear me-2 text-danger"></i>Manage Users</h3>
-                        <p className="text-muted">Create, edit, and view system users.</p>
-                        <div className="d-flex justify-content-end mb-3"><button className="btn btn-danger" onClick={handleAddUser}><i className="bi bi-person-plus me-2"></i> Add New User</button></div>
-                        <div className="card shadow-sm">
-                            <div className="card-header bg-white fw-bold">System User List ({userList.length} total)</div>
+                    <div className="animate-in fade-in pb-5">
+                        {/* Header */}
+                        <div className="d-flex justify-content-between align-items-center mb-4">
+                            <div>
+                                <h3 className="fw-bold text-dark mb-1">User Management</h3>
+                                <p className="text-muted small mb-0">Control access and manage system accounts.</p>
+                            </div>
+                            <button 
+                                className="btn btn-primary px-4 py-2 rounded-pill shadow-sm fw-bold hover-scale d-flex align-items-center" 
+                                onClick={handleAddUser}
+                            >
+                                <i className="bi bi-person-plus-fill me-2"></i> Add User
+                            </button>
+                        </div>
+
+                        {/* User List Card */}
+                        <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
+                            {/* Card Header / Toolbar */}
+                            <div className="bg-white px-4 py-3 border-bottom d-flex justify-content-between align-items-center">
+                                <span className="text-uppercase small fw-bold text-muted ls-1">All Users</span>
+                                <span className="badge bg-light text-dark border">Total: {userList.length}</span>
+                            </div>
+
                             <div className="table-responsive">
-                                <table className="table table-hover table-striped mb-0 small">
-                                    <thead className="table-dark"><tr><th>ID</th><th>User / Avatar</th><th>Full Name</th><th>Role</th><th>Station</th><th>Created At</th><th>Actions</th></tr></thead>
-                                    <tbody>
-                                        {userList.length > 0 ? userList.map(u => (
-                                            <tr key={u.id}>
-                                                <td>{u.id}</td>
-                                                <td className="d-flex align-items-center">
-                                                    <img src={u.avatar_url ? `${AVATAR_UPLOAD_PATH}${u.avatar_url}` : DEFAULT_AVATAR_PATH} alt={`${u.username} avatar`} className="rounded-circle me-2" style={{ width: '30px', height: '30px', objectFit: 'cover' }} onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }} />
-                                                    <strong>{u.username}</strong>
-                                                </td>
-                                                <td>{u.full_name}</td>
-                                                <td><span className={`badge ${u.role === 'Administrator' ? 'bg-danger' : u.role === 'Operator' ? 'bg-primary' : 'bg-warning text-dark'}`}>{u.role}</span></td>
-                                                <td>{u.station || 'N/A'}</td>
-                                                <td className="small">{new Date(u.created_at).toLocaleDateString()}</td>
-                                                <td>
-                                                    <button className="btn btn-sm btn-outline-primary py-0 me-1" onClick={() => handleViewUser(u)}><i className="bi bi-eye"></i> View</button>
-                                                    <button className="btn btn-sm btn-outline-secondary py-0" onClick={() => handleConfirmDeleteUser(u)} disabled={u.id === 1}><i className="bi bi-trash"></i> Delete</button>
+                                <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.9rem' }}>
+                                    <thead className="bg-light text-secondary text-uppercase small" style={{ letterSpacing: '0.5px' }}>
+                                        <tr>
+                                            <th className="border-0 py-3 ps-4">User Profile</th>
+                                            <th className="border-0 py-3">Role</th>
+                                            <th className="border-0 py-3">Assigned Station</th>
+                                            <th className="border-0 py-3 text-end pe-4">Date Added</th>
+                                            <th className="border-0 py-3 text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="border-top-0">
+                                        {userList.length > 0 ? userList.map(u => {
+                                            const isMe = u.id === user.id; // Assuming 'user' is the logged-in admin
+                                            const roleColor = u.role === 'Administrator' ? 'danger' : 'primary';
+                                            const roleIcon = u.role === 'Administrator' ? 'bi-shield-lock-fill' : 'bi-person-badge-fill';
+
+                                            return (
+                                                <tr key={u.id}>
+                                                    {/* Profile Column */}
+                                                    <td className="ps-4">
+                                                        <div className="d-flex align-items-center">
+                                                            <div className="position-relative me-3">
+                                                                <img 
+                                                                    src={u.avatar_url ? `${AVATAR_UPLOAD_PATH}${u.avatar_url}` : DEFAULT_AVATAR_PATH} 
+                                                                    alt="Avatar" 
+                                                                    className="rounded-circle border border-2 border-white shadow-sm" 
+                                                                    style={{ width: '40px', height: '40px', objectFit: 'cover' }} 
+                                                                    onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }} 
+                                                                />
+                                                                {isMe && <span className="position-absolute bottom-0 end-0 bg-success border border-white rounded-circle" style={{width: '10px', height: '10px'}}></span>}
+                                                            </div>
+                                                            <div>
+                                                                <div className="fw-bold text-dark">{u.full_name || 'No Name'}</div>
+                                                                <div className="small text-muted">@{u.username}</div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Role Column */}
+                                                    <td>
+                                                        <span className={`badge bg-${roleColor} bg-opacity-10 text-${roleColor} border border-${roleColor} border-opacity-10 rounded-pill px-3 py-2 fw-normal`}>
+                                                            <i className={`bi ${roleIcon} me-2`}></i>{u.role}
+                                                        </span>
+                                                    </td>
+
+                                                    {/* Station Column */}
+                                                    <td>
+                                                        {u.station ? (
+                                                            <div className="d-flex align-items-center text-dark">
+                                                                <i className="bi bi-geo-alt text-secondary me-2"></i>
+                                                                {u.station}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-muted small fst-italic">Not Assigned</span>
+                                                        )}
+                                                    </td>
+
+                                                    {/* Date Column */}
+                                                    <td className="text-end pe-4 text-muted font-monospace small">
+                                                        {new Date(u.created_at).toLocaleDateString()}
+                                                    </td>
+
+                                                    {/* Actions Column */}
+                                                    <td className="text-center">
+                                                        <div className="d-flex justify-content-center gap-2">
+                                                            <button 
+                                                                className="btn btn-sm btn-light border text-primary hover-primary rounded-circle" 
+                                                                style={{width: '32px', height: '32px', padding: 0}}
+                                                                onClick={() => handleViewUser(u)}
+                                                                title="View Details"
+                                                            >
+                                                                <i className="bi bi-eye-fill"></i>
+                                                            </button>
+                                                            
+                                                            <button 
+                                                                className="btn btn-sm btn-light border text-danger hover-danger rounded-circle" 
+                                                                style={{width: '32px', height: '32px', padding: 0}}
+                                                                onClick={() => handleConfirmDeleteUser(u)} 
+                                                                disabled={u.id === 1 || isMe}
+                                                                title="Delete User"
+                                                            >
+                                                                <i className="bi bi-trash-fill"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }) : (
+                                            <tr>
+                                                <td colSpan="5" className="py-5 text-center text-muted">
+                                                    <div className="mb-3"><i className="bi bi-people fs-1 opacity-25"></i></div>
+                                                    <p className="mb-0">No users found in the system.</p>
                                                 </td>
                                             </tr>
-                                        )) : ( <tr><td colSpan="7" className="text-center py-4">No users found.</td></tr> )}
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
+
+                        {/* Modals */}
                         {showViewModal && (
-                                <ViewUserModal 
-                                    viewUser={viewUser} 
-                                    onClose={() => setShowViewModal(false)} 
-                                    onEdit={handleEditUser}
-                                    AVATAR_UPLOAD_PATH={AVATAR_UPLOAD_PATH}
-                                    DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH}
-                                />
-                            )} 
+                            <ViewUserModal 
+                                viewUser={viewUser} 
+                                onClose={() => setShowViewModal(false)} 
+                                onEdit={handleEditUser}
+                                AVATAR_UPLOAD_PATH={AVATAR_UPLOAD_PATH}
+                                DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH}
+                            />
+                        )} 
+
+                        <style jsx>{`
+                            .hover-scale:hover { transform: scale(1.02); }
+                            .hover-primary:hover { background-color: #0d6efd; color: white !important; border-color: #0d6efd !important; }
+                            .hover-danger:hover { background-color: #dc3545; color: white !important; border-color: #dc3545 !important; }
+                            .ls-1 { letter-spacing: 1px; }
+                        `}</style>
                     </div>
                 );
 

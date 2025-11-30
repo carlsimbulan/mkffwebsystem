@@ -5,16 +5,24 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 export const UnitPieChart = ({ metrics, title }) => {
+    // Calculate Total
+    const total = metrics.completedUnits + metrics.ngUnits + metrics.pendingUnits;
+
     const chartData = {
         labels: ['Completed', 'No Good (NG)', 'In Progress'],
         datasets: [
             {
-                label: 'Unit Count',
                 data: [metrics.completedUnits, metrics.ngUnits, metrics.pendingUnits],
-                backgroundColor: ['#198754', '#dc3545', '#0d6efd'],
+                backgroundColor: [
+                    '#10b981', // Emerald Green
+                    '#ef4444', // Red
+                    '#f59e0b', // Amber
+                ],
                 borderWidth: 0,
-                hoverOffset: 10,       // Smooth hover effect
-                cutout: '65%',         // More modern donut size
+                hoverOffset: 20, // Mas malaking umbok pag hover
+                cutout: '85%',   // Ultra thin ring (Modern look)
+                borderRadius: 20, // Fully rounded ends
+                spacing: 5       // Konting gap between arcs
             },
         ],
     };
@@ -22,80 +30,93 @@ export const UnitPieChart = ({ metrics, title }) => {
     const options = {
         responsive: true,
         maintainAspectRatio: false,
+        animation: {
+            animateScale: true,
+            animateRotate: true
+        },
         plugins: {
-            legend: {
-                display: false,        // We create a custom legend below
-            },
+            legend: { display: false },
             tooltip: {
-                backgroundColor: '#1e293b',
-                titleColor: '#fff',
-                bodyColor: '#fff',
-                padding: 10,
-                borderWidth: 0,
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                titleColor: '#1e293b',
+                bodyColor: '#1e293b',
+                borderColor: '#e2e8f0',
+                borderWidth: 1,
+                padding: 12,
+                titleFont: { size: 14, weight: 'bold' },
+                bodyFont: { size: 13 },
+                cornerRadius: 12,
+                displayColors: true,
+                boxPadding: 6,
+                usePointStyle: true,
+                callbacks: {
+                    label: function(context) {
+                        let label = context.label || '';
+                        let value = context.raw || 0;
+                        let percentage = total > 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%';
+                        return ` ${label}: ${value} (${percentage})`;
+                    }
+                }
             },
         },
     };
 
-    const total = metrics.completedUnits + metrics.ngUnits + metrics.pendingUnits;
+    // Helper to render mini stat card
+    const StatItem = ({ label, value, color, icon }) => {
+        const percentage = total > 0 ? ((value / total) * 100).toFixed(0) : 0;
+        return (
+            <div className="d-flex align-items-center justify-content-between p-2 rounded mb-2" 
+                 style={{backgroundColor: `${color}15`, borderLeft: `4px solid ${color}`}}>
+                <div className="d-flex align-items-center">
+                    <div className="d-flex align-items-center justify-content-center rounded-circle me-2" 
+                         style={{width: '24px', height: '24px', backgroundColor: color}}>
+                        <i className={`bi ${icon} text-white`} style={{fontSize: '0.7rem'}}></i>
+                    </div>
+                    <span className="text-dark fw-bold small">{label}</span>
+                </div>
+                <div className="text-end lh-1">
+                    <div className="fw-bolder text-dark">{value}</div>
+                    <small className="text-muted" style={{fontSize: '0.65rem'}}>{percentage}%</small>
+                </div>
+            </div>
+        );
+    };
 
     return (
-        <div
-            className="p-3"
-            style={{
-                borderRadius: '16px',
-                background: '#ffffff',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.07)',
-                height: '100%'
-            }}
-        >
-            <h6
-                className="fw-bold text-uppercase small mb-3"
-                style={{ letterSpacing: '0.5px' }}
-            >
-                {title}
-            </h6>
-
-            <div className="d-flex flex-column align-items-center justify-content-center" style={{ height: '200px' }}>
-                {total === 0 ? (
-                    <p className="text-muted">No units recorded.</p>
-                ) : (
-                    <Doughnut data={chartData} options={options} />
-                )}
+        <div className="w-100 h-100 d-flex flex-column align-items-center justify-content-center position-relative">
+            
+            {/* Chart Section */}
+            <div className="position-relative mb-4" style={{ height: '200px', width: '200px' }}>
+                <Doughnut data={chartData} options={options} />
+                
+                {/* Modern Floating Center */}
+                <div className="position-absolute top-50 start-50 translate-middle text-center rounded-circle d-flex flex-column align-items-center justify-content-center shadow-sm bg-white" 
+                     style={{ width: '120px', height: '120px', pointerEvents: 'none' }}>
+                    <span className="text-muted text-uppercase fw-bold" style={{ fontSize: '0.65rem', letterSpacing: '1px' }}>Total Units</span>
+                    <h1 className="mb-0 fw-bolder text-dark display-6" style={{ lineHeight: '1', letterSpacing: '-1px' }}>{total}</h1>
+                </div>
             </div>
 
-            {/* Modern Minimal Legend */}
-            <div className="mt-3">
-                {chartData.labels.map((label, index) => {
-                    const value = chartData.datasets[0].data[index];
-                    const color = chartData.datasets[0].backgroundColor[index];
-                    const percentage = total === 0 ? 0 : ((value / total) * 100).toFixed(1);
-
-                    return (
-                        <div
-                            key={label}
-                            className="d-flex justify-content-between align-items-center py-1 small"
-                            style={{ borderBottom: '1px solid #f1f5f9' }}
-                        >
-                            <div className="d-flex align-items-center gap-2">
-                                <span
-                                    style={{
-                                        display: 'inline-block',
-                                        width: '10px',
-                                        height: '10px',
-                                        backgroundColor: color,
-                                        borderRadius: '50%',
-                                    }}
-                                ></span>
-
-                                <span className="fw-semibold">{label}</span>
-                            </div>
-
-                            <span className="text-muted fw-semibold">
-                                {value} ({percentage}%)
-                            </span>
-                        </div>
-                    );
-                })}
+            {/* Modern Card Legend */}
+            <div className="w-100 px-2">
+                <StatItem 
+                    label="Completed" 
+                    value={metrics.completedUnits} 
+                    color="#10b981" 
+                    icon="bi-check-lg" 
+                />
+                <StatItem 
+                    label="In Progress" 
+                    value={metrics.pendingUnits} 
+                    color="#f59e0b" 
+                    icon="bi-hourglass-split" 
+                />
+                <StatItem 
+                    label="Defects (NG)" 
+                    value={metrics.ngUnits} 
+                    color="#ef4444" 
+                    icon="bi-x-lg" 
+                />
             </div>
         </div>
     );
