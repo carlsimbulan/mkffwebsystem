@@ -1313,23 +1313,153 @@ const prevChart = () => {
 
     return (
         <div className="d-flex min-vh-100 bg-light overflow-hidden">
-            {/* --- SIDEBAR --- */}
-            <div className={`d-flex flex-column flex-shrink-0 p-3 text-white bg-dark transition-all`} style={{ width: isSidebarOpen ? "260px" : "80px", transition: "width 0.3s", backgroundColor: "#111827" }}>
-                <div className="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none overflow-hidden">
-                    <img src={logo} alt="MKFF Admin Logo" style={{ height: '3rem', marginRight: '1rem' }} className="logo-class" />
-                    {isSidebarOpen && <span className="fs-5 fw-bold text-nowrap">MKFF Admin</span>}
-                </div>
-                <hr />
-                <ul className="nav nav-pills flex-column mb-auto">
-                    <li><button className={`nav-link text-white w-100 text-start ${activeTab === 'dashboard' ? 'active bg-danger' : ''}`} onClick={() => { setActiveTab('dashboard'); setStationMonitorId(null); setReportFilterStationId('All'); setStationHistoryId(null); setHighlightedUnitId(null);}}><i className="bi bi-speedometer2 me-3"></i>{isSidebarOpen && "Dashboard"}</button></li>
-                    <li><button className={`nav-link text-white w-100 text-start ${activeTab === 'stations' || activeTab === 'station_monitor' ? 'active bg-danger' : ''}`} onClick={() => { setActiveTab('stations'); setStationMonitorId(null); setReportFilterStationId('All'); setStationHistoryId(null); setHighlightedUnitId(null);}}><i className="bi bi-grid-3x3-gap me-3"></i>{isSidebarOpen && "Stations"}</button></li>
-                    <li><button className={`nav-link text-white w-100 text-start ${activeTab === 'reports' ? 'active bg-danger' : ''}`} onClick={() => { setActiveTab('reports'); setStationMonitorId(null); setStationHistoryId(null); setHighlightedUnitId(null);}}><i className="bi bi-file-text me-3"></i>{isSidebarOpen && "Reports"}</button></li>
-                    <li><button className={`nav-link text-white w-100 text-start ${activeTab === 'approval' ? 'active bg-danger' : ''}`} onClick={() => { setActiveTab('approval'); setStationHistoryId(null); setHighlightedUnitId(null);}}><i className="bi bi-check-circle me-3"></i>{isSidebarOpen && "Approvals"}</button></li>
-                    <li><button className={`nav-link text-white w-100 text-start ${activeTab === 'manage_account' ? 'active bg-danger' : ''}`} onClick={() => { setActiveTab('manage_account'); setStationHistoryId(null); setHighlightedUnitId(null);}}><i className="bi bi-person-gear me-3"></i>{isSidebarOpen && "Manage Account"}</button></li>
-                    <li><button className={`nav-link text-white w-100 text-start ${activeTab === 'analytics' ? 'active bg-danger' : ''}`} onClick={() => { setActiveTab('analytics'); setStationHistoryId(null); setHighlightedUnitId(null);}}><i className="bi bi-graph-up me-3"></i>{isSidebarOpen && "Analytics"}</button></li>
-                </ul >
-                <button className="btn btn-outline-light mt-auto w-100" onClick={onLogout}><i className="bi bi-box-arrow-left me-2"></i>{isSidebarOpen && "Logout"}</button>
-            </div >
+
+            
+        {/* --- SIDEBAR --- */}
+        <div
+        className="d-flex flex-column flex-shrink-0 p-3 text-white transition-all"
+        style={{
+            width: isSidebarOpen ? "260px" : "80px",
+            transition: "width 0.3s",
+            backgroundColor: "#111827"
+        }}
+        >
+
+        {/* TOP LOGO */}
+        <div className="d-flex align-items-center mb-3 text-white overflow-hidden">
+            <img
+            src={logo}
+            alt="MKFF Admin Logo"
+            style={{ height: "3rem" }}
+            className={isSidebarOpen ? "me-3" : ""}
+            />
+            {isSidebarOpen && <span className="fs-5 fw-bold">MKFF Admin</span>}
+        </div>
+
+        <hr className="border-secondary" />
+
+        {/* MENU */}
+        <ul className="nav nav-pills flex-column mb-3">
+
+            <li>
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-4 
+                ${activeTab === "dashboard" ? "active bg-danger" : ""}`}
+                onClick={() => {
+                setActiveTab("dashboard");
+                setStationMonitorId(null);
+                setReportFilterStationId("All");
+                setStationHistoryId(null);
+                setHighlightedUnitId(null);
+                }}
+            >
+                <i className="bi bi-speedometer2"></i>
+                {isSidebarOpen && "Dashboard"}
+            </button>
+            </li>
+
+            <li>
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-4 
+                ${(activeTab === "stations" || activeTab === "station_monitor") ? "active bg-danger" : ""}`}
+                onClick={() => {
+                setActiveTab("stations");
+                setStationMonitorId(null);
+                setReportFilterStationId("All");
+                setStationHistoryId(null);
+                setHighlightedUnitId(null);
+                }}
+            >
+                <i className="bi bi-grid-3x3-gap"></i>
+                {isSidebarOpen && "Stations"}
+            </button>
+            </li>
+
+            <li>
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-4 
+                ${activeTab === "reports" ? "active bg-danger" : ""}`}
+                onClick={() => {
+                setActiveTab("reports");
+                setStationMonitorId(null);
+                setReportFilterStationId("All");
+                setStationHistoryId(null);
+                setHighlightedUnitId(null);
+                }}
+            >
+                <i className="bi bi-file-text"></i>
+                {isSidebarOpen && "Reports"}
+            </button>
+            </li>
+
+            <li>
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-4 
+                ${activeTab === "approval" ? "active bg-danger" : ""}`}
+                onClick={() => {
+                setActiveTab("approval");
+                setStationHistoryId(null);
+                setHighlightedUnitId(null);
+                }}
+            >
+                <i className="bi bi-check-circle"></i>
+                {isSidebarOpen && "Approvals"}
+            </button>
+            </li>
+
+            <li>
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-4 
+                ${activeTab === "manage_account" ? "active bg-danger" : ""}`}
+                onClick={() => {
+                setActiveTab("manage_account");
+                setStationHistoryId(null);
+                setHighlightedUnitId(null);
+                }}
+            >
+                <i className="bi bi-person-gear"></i>
+                {isSidebarOpen && "Manage Account"}
+            </button>
+            </li>
+
+            <li>
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-4 
+                ${activeTab === "analytics" ? "active bg-danger" : ""}`}
+                onClick={() => {
+                setActiveTab("analytics");
+                setStationHistoryId(null);
+                setHighlightedUnitId(null);
+                }}
+            >
+                <i className="bi bi-graph-up"></i>
+                {isSidebarOpen && "Analytics"}
+            </button>
+            </li>
+
+        </ul>
+
+        {/* PUSH COPYRIGHT + LOGOUT TO BOTTOM */}
+        <div className="mt-auto">
+
+            {/* LOGOUT BUTTON */}
+            <button
+            className="btn btn-outline-light w-100"
+            onClick={onLogout}
+            >
+            <i className="bi bi-box-arrow-left me-2"></i>
+            {isSidebarOpen && "Logout"}
+            </button>
+            
+            {/* COPYRIGHT TEXT (Now Below Logout with Separator) */}
+            <div className="text-center text-white-50 small pt-2 mt-2 border-top border-secondary">
+            {isSidebarOpen && <small>©2025 MKFF Laser Technique</small>}
+            </div>
+
+        </div>
+        </div>
+
+
 
             {/* --- MAIN --- */}
             <div className="flex-grow-1 d-flex flex-column" style={{maxHeight: '100vh', overflowY: 'auto'}}>

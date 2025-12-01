@@ -1,11 +1,25 @@
 import React, { useState } from 'react';
+// Ang import ng LogOut, LayoutGrid, Factory ay hindi na kailangan dito
+
+// --- Sub-Component for consistent styling of read-only fields ---
+// INILAGAY ITO SA UNAHAN AT IISANG BESES LANG
+const DetailField = ({ label, value, icon, monospace }) => (
+    <div className="d-flex align-items-center py-2 border-bottom border-light">
+        <i className={`bi ${icon} me-3 text-primary opacity-75`}></i>
+        <div>
+            <div className="small text-muted mb-0 lh-1" style={{fontSize: '0.7rem'}}>{label}</div>
+            <div className={`fw-bold text-dark ${monospace ? 'font-monospace small' : 'fs-6'}`}>
+                {value}
+            </div>
+        </div>
+    </div>
+);
+
 
 // --- Edit Unit Modal Component (Enhanced UI) ---
 export const EditUnitModal = ({ unit, onClose, onSave }) => {
-    // Determine if the unit status is locked (completed/NG status often requires QA/Admin action)
-    const isCompletedOrNG = unit.status.includes('Completed') || unit.status.includes('No Good');
 
-    const [formData, setFormData] = useState(unit ? {
+    const [formData, setFormData] = useState(unit ? { 
         status: unit.status,
         remarks: unit.remarks,
         model: unit.model,
@@ -22,13 +36,18 @@ export const EditUnitModal = ({ unit, onClose, onSave }) => {
     };
 
     const handleSave = () => {
+        // Ipadala ang buong updated form data
         onSave(unit.id, formData);
     };
 
     if (!unit) return null;
 
-    // Available statuses (Pending Approval is often added when re-opening a Completed/NG unit)
+    // Available statuses 
     const statusOptions = ["In Progress", "Completed", "No Good (NG)", "Pending Approval"];
+
+    // Check ulit kung Completed/NG para lang sa WARNING MESSAGE
+    const isCompletedOrNGForWarning = unit.status.includes('Completed') || unit.status.includes('No Good');
+
 
     return (
         <div className="modal show d-block fade-in" style={{ backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 1050, backdropFilter: 'blur(3px)' }}>
@@ -83,7 +102,7 @@ export const EditUnitModal = ({ unit, onClose, onSave }) => {
                                             name="status" 
                                             value={formData.status} 
                                             onChange={handleChange}
-                                            disabled={isCompletedOrNG} // Disable status change unless admin/QA override (which they can do via remarks)
+                                            // Status is now fully editable (as requested)
                                         >
                                             {statusOptions.map(opt => (
                                                 <option 
@@ -95,9 +114,9 @@ export const EditUnitModal = ({ unit, onClose, onSave }) => {
                                                 </option>
                                             ))}
                                         </select>
-                                        {isCompletedOrNG && 
-                                            <small className="text-danger fw-bold mt-2 d-block">
-                                                Status locked. Please update Remarks and contact QA/Admin for reopening.
+                                        {isCompletedOrNGForWarning && 
+                                            <small className="text-warning fw-bold mt-2 d-block">
+                                                <i className="bi bi-info-circle me-1"></i> Warning: Changing status from Completed/NG requires careful review.
                                             </small>
                                         }
                                     </div>
@@ -139,16 +158,3 @@ export const EditUnitModal = ({ unit, onClose, onSave }) => {
         </div>
     );
 };
-
-// --- Sub-Component for consistent styling of read-only fields ---
-const DetailField = ({ label, value, icon, monospace }) => (
-    <div className="d-flex align-items-center py-2 border-bottom border-light">
-        <i className={`bi ${icon} me-3 text-primary opacity-75`}></i>
-        <div>
-            <div className="small text-muted mb-0 lh-1" style={{fontSize: '0.7rem'}}>{label}</div>
-            <div className={`fw-bold text-dark ${monospace ? 'font-monospace small' : 'fs-6'}`}>
-                {value}
-            </div>
-        </div>
-    </div>
-);

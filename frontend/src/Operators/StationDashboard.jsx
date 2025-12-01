@@ -816,28 +816,116 @@ export default function StationDashboard({ user, onLogout }) {
                     </div>
                 );
             case "daily_reports":
-                return (
-                    <div className="row justify-content-center">
-                        <div className="col-lg-8">
-                            <form onSubmit={handleReportSubmit} className="card shadow-sm p-4">
-                                <h4 className="border-bottom pb-3 mb-4">Daily Production Report - {currentStation}</h4>
-                                <div className="row g-3 mb-4">
-                                    <div className="col-md-6"><label className="form-label fw-bold">Date</label><input type="date" className="form-control" value={dailyReportData.date} onChange={(e) => setDailyReportData({...dailyReportData, date: e.target.value})} required /></div>
-                                    <div className="col-md-6"><label className="form-label fw-bold">Shift</label><select className="form-select" value={dailyReportData.shift} onChange={(e) => setDailyReportData({...dailyReportData, shift: e.target.value})}><option value="Day Shift">Day Shift</option><option value="Night Shift">Night Shift</option></select></div>
-                                </div>
-                                <h6 className="mt-4 border-bottom pb-2 text-primary">Metrics</h6>
-                                <div className="row g-3 mb-4">
-                                    <div className="col-md-4"><label className="form-label">Total Units</label><input type="number" className="form-control" value={dailyReportData.totalUnitsProcessed} onChange={(e) => setDailyReportData({...dailyReportData, totalUnitsProcessed: parseInt(e.target.value) || 0})} required /></div>
-                                    <div className="col-md-4"><label className="form-label">Total NG</label><input type="number" className="form-control" value={dailyReportData.totalNG} onChange={(e) => setDailyReportData({...dailyReportData, totalNG: parseInt(e.target.value) || 0})} /></div>
-                                    <div className="col-md-4"><label className="form-label">Downtime (min)</label><input type="number" className="form-control" value={dailyReportData.downtimeMinutes} onChange={(e) => setDailyReportData({...dailyReportData, downtimeMinutes: parseInt(e.target.value) || 0})} /></div>
-                                </div>
-                                <div className="mb-4"><label className="form-label fw-bold">Summary</label><textarea className="form-control" rows="4" value={dailyReportData.summary} onChange={(e) => setDailyReportData({...dailyReportData, summary: e.target.value})} required></textarea></div>
-                                <div className="mb-4"><label className="form-label fw-bold">Attach File</label><input type="file" className="form-control" onChange={(e) => setSelectedFile(e.target.files[0])} /></div>
-                                <div className="mt-4 pt-3 border-top d-flex justify-content-end"><button type="submit" className="btn btn-primary btn-lg">Submit Report</button></div>
-                            </form>
-                        </div>
+    return (
+        <div className="row justify-content-center mt-4">
+            <div className="col-lg-10 col-xl-8">
+                <div className="card shadow-lg border-0">
+                    {/* Card Header para sa Title */}
+                    <div className="card-header bg-primary text-white p-4">
+                        <h3 className="mb-0">
+                            <i className="bi bi-file-earmark-bar-graph me-2"></i>
+                            Daily Production Report - {currentStation}
+                        </h3>
                     </div>
-                );
+
+                    <form onSubmit={handleReportSubmit} className="card-body p-5">
+                        
+                        {/* --- General Details (Date and Shift) --- */}
+                        <h5 className="border-bottom pb-3 mb-4 text-primary fw-bold">General Details</h5>
+                        <div className="row g-4 mb-5">
+                            <div className="col-md-6">
+                                <label className="form-label fw-bold">Date <span className="text-danger">*</span></label>
+                                <input
+                                    type="date"
+                                    className="form-control form-control-lg"
+                                    value={dailyReportData.date}
+                                    onChange={(e) => setDailyReportData({...dailyReportData, date: e.target.value})}
+                                    required
+                                />
+                            </div>
+                            <div className="col-md-6">
+                                <label className="form-label fw-bold">Shift</label>
+                                <select
+                                    className="form-select form-select-lg"
+                                    value={dailyReportData.shift}
+                                    onChange={(e) => setDailyReportData({...dailyReportData, shift: e.target.value})}
+                                >
+                                    <option value="Day Shift">Day Shift</option>
+                                    <option value="Night Shift">Night Shift</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* --- Metrics (Units, NG, Downtime) --- */}
+                        <h5 className="border-bottom pb-3 mb-4 text-primary fw-bold">Production Metrics</h5>
+                        <div className="row g-4 mb-5">
+                            <div className="col-md-4">
+                                <label className="form-label">Total Units Processed <span className="text-danger">*</span></label>
+                                <input
+                                    type="number"
+                                    className="form-control"
+                                    min="0"
+                                    value={dailyReportData.totalUnitsProcessed}
+                                    onChange={(e) => setDailyReportData({...dailyReportData, totalUnitsProcessed: parseInt(e.target.value) || 0})}
+                                    required
+                                />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label">Total NG (No Good)</label>
+                                <input
+                                    type="number"
+                                    className="form-control"
+                                    min="0"
+                                    value={dailyReportData.totalNG}
+                                    onChange={(e) => setDailyReportData({...dailyReportData, totalNG: parseInt(e.target.value) || 0})}
+                                />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label">Downtime (in Minutes)</label>
+                                <input
+                                    type="number"
+                                    className="form-control"
+                                    min="0"
+                                    value={dailyReportData.downtimeMinutes}
+                                    onChange={(e) => setDailyReportData({...dailyReportData, downtimeMinutes: parseInt(e.target.value) || 0})}
+                                />
+                            </div>
+                        </div>
+
+                        {/* --- Summary and Attachments --- */}
+                        <h5 className="border-bottom pb-3 mb-4 text-primary fw-bold">Summary & Attachments</h5>
+                        <div className="mb-4">
+                            <label className="form-label fw-bold">Shift Summary/Notes <span className="text-danger">*</span></label>
+                            <textarea
+                                className="form-control"
+                                rows="5"
+                                value={dailyReportData.summary}
+                                onChange={(e) => setDailyReportData({...dailyReportData, summary: e.target.value})}
+                                required
+                                placeholder="Enter a comprehensive summary of the shift's activities, issues, and resolutions."
+                            ></textarea>
+                        </div>
+                        <div className="mb-5">
+                            <label className="form-label fw-bold">Attach Supporting File (Optional)</label>
+                            <input
+                                type="file"
+                                className="form-control"
+                                onChange={(e) => setSelectedFile(e.target.files[0])}
+                            />
+                        </div>
+
+                        {/* --- Submit Button --- */}
+                        <div className="d-grid">
+                            <button type="submit" className="btn btn-primary btn-lg">
+                                <i className="bi bi-check-circle me-2"></i>
+                                Submit Daily Report
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
             case "in_progress":
             case "completed":
             case "no_good":
