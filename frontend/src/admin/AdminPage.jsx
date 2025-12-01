@@ -410,7 +410,43 @@ export default function AdminPage({ user, onLogout }) {
     const headerAvatarSrc = user.avatar_url ? `${AVATAR_UPLOAD_PATH}${user.avatar_url}` : DEFAULT_AVATAR_PATH;
     const headerFullName = user.full_name || user.username || 'Admin';
 
-    
+    // --- Add these at the top of your component function ---
+    const [showApproveModal, setShowApproveModal] = useState(false);
+const [selectedLogToApprove, setSelectedLogToApprove] = useState(null);
+
+// Wrapper function to execute approval
+const executeApproval = () => {
+    if (selectedLogToApprove) {
+        // Calls the function to approve and set status to 'In Progress'
+        handleApproveUnit(selectedLogToApprove.id, selectedLogToApprove); 
+        
+        setShowApproveModal(false);
+        setSelectedLogToApprove(null);
+    }
+};
+
+// --- ADD THESE TO AdminPage COMPONENT FUNCTION BODY ---
+const [dashboardView, setDashboardView] = useState('bar'); // 'bar' or 'pie'
+
+const chartViews = ['bar', 'pie'];
+
+const nextChart = () => {
+    setDashboardView(prev => {
+        const currentIndex = chartViews.indexOf(prev);
+        const nextIndex = (currentIndex + 1) % chartViews.length;
+        return chartViews[nextIndex];
+    });
+};
+
+const prevChart = () => {
+    setDashboardView(prev => {
+        const currentIndex = chartViews.indexOf(prev);
+        // Uses modulus arithmetic to handle wrap-around from 0 to last index
+        const prevIndex = (currentIndex - 1 + chartViews.length) % chartViews.length;
+        return chartViews[prevIndex];
+    });
+};
+// --- END OF ADMINPAGE COMPONENT FUNCTION BODY ADDITIONS ---
 
     // --- RENDER CONTENT ---
     const renderContent = () => {
@@ -421,266 +457,292 @@ export default function AdminPage({ user, onLogout }) {
             return ( <div className="alert alert-danger text-center py-5"><i className="bi bi-x-octagon-fill me-2"></i> {error}</div> );
         }
 
+
+
         switch (activeTab) {
-            case "dashboard":
-                return (
-                    <div className="animate-in fade-in pb-4">
-                        {/* --- Header Section --- */}
-                        <div className="d-flex justify-content-between align-items-center mb-4">
-                            <div>
-                                <h3 className="fw-bold text-dark mb-1" style={{ letterSpacing: '-0.5px' }}>Production Overview</h3>
-                                <p className="text-muted small mb-0">Real-time data stream from all active stations.</p>
-                            </div>
-                            <div className="d-flex align-items-center gap-2">
-                                <div className="bg-white border px-3 py-2 rounded shadow-sm d-flex align-items-center">
-                                    <span className="position-relative d-flex h-2 w-2 me-2">
-                                      <span className="animate-ping position-absolute d-inline-flex h-100 w-100 rounded-circle bg-success opacity-75"></span>
-                                      <span className="position-relative d-inline-flex rounded-circle h-2 w-2 bg-success" style={{width:'10px', height:'10px'}}></span>
-                                    </span>
-                                    <span className="fw-bold text-dark small" style={{fontSize: '0.8rem'}}>System Live</span>
-                                </div>
-                                <div className="bg-white border px-3 py-2 rounded shadow-sm text-secondary fw-bold small">
-                                    {new Date().toLocaleDateString()}
-                                </div>
-                            </div>
-                        </div>
+         case "dashboard":
+    // Note: 'dashboardView', 'nextChart', and 'prevChart' must be defined outside this switch.
+    
+    // Determine current chart title
+    const currentChartTitle = dashboardView === 'bar' ? 'Station Output' : 'Status Distribution';
+    const currentChartSubtitle = dashboardView === 'bar' ? 'Live production count per station' : 'Overall yield ratio';
 
-                        {/* --- Stats Cards (Modern Accent Style) --- */}
-                        <div className="row g-4 mb-5">
-                            {/* Completed Units */}
-                            <div className="col-md-3">
-                                <div className="card border-0 shadow-sm h-100 border-start border-4 border-success" style={{ borderRadius: '12px' }}>
-                                    <div className="card-body p-4">
-                                        <div className="d-flex align-items-center justify-content-between mb-3">
-                                            <div className="bg-success bg-opacity-10 text-success rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '50px', height: '50px'}}>
-                                                <i className="bi bi-box-seam-fill fs-4"></i>
-                                            </div>
-                                            <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-2 py-1 small fw-normal">
-                                                <i className="bi bi-arrow-up-short"></i>On Track
-                                            </span>
-                                        </div>
-                                        <h2 className="fw-bold text-dark mb-0 display-6">{totalOutput}</h2>
-                                        <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Completed Units</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Yield Rate */}
-                            <div className="col-md-3">
-                                <div className="card border-0 shadow-sm h-100 border-start border-4 border-primary" style={{ borderRadius: '12px' }}>
-                                    <div className="card-body p-4">
-                                        <div className="d-flex align-items-center justify-content-between mb-3">
-                                            <div className="bg-primary bg-opacity-10 text-primary rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '50px', height: '50px'}}>
-                                                <i className="bi bi-activity fs-4"></i>
-                                            </div>
-                                            <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-2 py-1 small fw-normal">
-                                                Target: 98%
-                                            </span>
-                                        </div>
-                                        <h2 className="fw-bold text-dark mb-0 display-6">{overallMetrics.yieldRate}%</h2>
-                                        <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Yield Rate</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* In Progress */}
-                            <div className="col-md-3">
-                                <div className="card border-0 shadow-sm h-100 border-start border-4 border-warning" style={{ borderRadius: '12px' }}>
-                                    <div className="card-body p-4">
-                                        <div className="d-flex align-items-center justify-content-between mb-3">
-                                            <div className="bg-warning bg-opacity-10 text-warning rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '50px', height: '50px'}}>
-                                                <i className="bi bi-hourglass-split fs-4"></i>
-                                            </div>
-                                            <span className="badge bg-warning bg-opacity-10 text-warning rounded-pill px-2 py-1 small fw-normal">
-                                                Active
-                                            </span>
-                                        </div>
-                                        <h2 className="fw-bold text-dark mb-0 display-6">{overallMetrics.pendingUnits}</h2>
-                                        <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>In Progress</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Defects (NG) */}
-                            <div className="col-md-3">
-                                <div className="card border-0 shadow-sm h-100 border-start border-4 border-danger" style={{ borderRadius: '12px' }}>
-                                    <div className="card-body p-4">
-                                        <div className="d-flex align-items-center justify-content-between mb-3">
-                                            <div className="bg-danger bg-opacity-10 text-danger rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '50px', height: '50px'}}>
-                                                <i className="bi bi-exclamation-octagon-fill fs-4"></i>
-                                            </div>
-                                            <span className="badge bg-danger bg-opacity-10 text-danger rounded-pill px-2 py-1 small fw-normal">
-                                                Alert
-                                            </span>
-                                        </div>
-                                        <h2 className="fw-bold text-danger mb-0 display-6">{systemAlerts}</h2>
-                                        <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Total Defects (NG)</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* --- Approvals Alert (Modern Strip) --- */}
-                        {overallMetrics.pendingApprovalUnits > 0 && (
-                            <div className="card border-0 shadow-sm mb-4 border-start border-4 border-danger bg-white">
-                                <div className="card-body d-flex align-items-center justify-content-between p-3">
-                                    <div className="d-flex align-items-center">
-                                        <i className="bi bi-bell-fill text-danger fs-4 me-3 ms-2"></i>
-                                        <div>
-                                            <h6 className="fw-bold text-dark mb-0">Action Required</h6>
-                                            <small className="text-secondary">There are <span className="fw-bold text-danger">{overallMetrics.pendingApprovalUnits} units</span> waiting for QA validation.</small>
-                                        </div>
-                                    </div>
-                                    <button className="btn btn-sm btn-danger px-4 rounded-pill" onClick={() => setActiveTab('approval')}>
-                                        Review Queue
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* --- Charts Section --- */}
-                        <div className="row g-4">
-                            {/* Bar Chart Container */}
-                            <div className="col-lg-8">
-                                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
-                                    <div className="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <h6 className="fw-bold text-dark mb-0">Station Output</h6>
-                                            <small className="text-muted" style={{fontSize: '0.75rem'}}>Live production count per station</small>
-                                        </div>
-                                        <button className="btn btn-light btn-sm border rounded-circle" onClick={fetchData}><i className="bi bi-arrow-clockwise"></i></button>
-                                    </div>
-                                    <div className="card-body">
-                                        <StationBarChart logs={logs} stations={stations} calculateMetrics={calculateStationMetrics} />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Pie Chart Container */}
-                            <div className="col-lg-4">
-                                <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
-                                    <div className="card-header bg-white py-3 border-0">
-                                        <h6 className="fw-bold text-dark mb-0">Status Distribution</h6>
-                                        <small className="text-muted" style={{fontSize: '0.75rem'}}>Overall yield ratio</small>
-                                    </div>
-                                    <div className="card-body d-flex align-items-center justify-content-center">
-                                        <div style={{width: '100%', maxWidth: '320px'}}>
-                                            <UnitPieChart metrics={overallMetrics} title="" />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Pulsing Animation for Live Indicator */}
-                        <style jsx>{`
-                            .animate-ping {
-                                animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
-                            }
-                            @keyframes ping {
-                                75%, 100% { transform: scale(2); opacity: 0; }
-                            }
-                        `}</style>
+    return (
+        <div className="animate-in fade-in pb-4">
+            {/* --- Header Section --- */}
+            <div className="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h3 className="fw-bold text-dark mb-1" style={{ letterSpacing: '-0.5px' }}>Production Overview</h3>
+                    <p className="text-muted small mb-0">Real-time data stream from all active stations.</p>
+                </div>
+                <div className="d-flex align-items-center gap-2">
+                    <div className="bg-white border px-3 py-2 rounded shadow-sm d-flex align-items-center">
+                        <span className="position-relative d-flex h-2 w-2 me-2">
+                            <span className="animate-ping position-absolute d-inline-flex h-100 w-100 rounded-circle bg-success opacity-75"></span>
+                            <span className="position-relative d-inline-flex rounded-circle h-2 w-2 bg-success" style={{width:'10px', height:'10px'}}></span>
+                        </span>
+                        <span className="fw-bold text-dark small" style={{fontSize: '0.8rem'}}>System Live</span>
                     </div>
-                );
+                    <div className="bg-white border px-3 py-2 rounded shadow-sm text-secondary fw-bold small">
+                        {new Date().toLocaleDateString()}
+                    </div>
+                </div>
+            </div>
+
+            {/* --- Stats Cards (Modern Accent Style) --- */}
+            <div className="row g-4 mb-5">
+                {/* Completed Units */}
+                <div className="col-md-3">
+                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-success" style={{ borderRadius: '12px' }}>
+                        <div className="card-body p-4">
+                            <div className="d-flex align-items-center justify-content-between mb-3">
+                                <div className="bg-success bg-opacity-10 text-success rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '50px', height: '50px'}}>
+                                    <i className="bi bi-box-seam-fill fs-4"></i>
+                                </div>
+                                <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-2 py-1 small fw-normal">
+                                    <i className="bi bi-arrow-up-short"></i>On Track
+                                </span>
+                            </div>
+                            <h2 className="fw-bold text-dark mb-0 display-6">{overallMetrics.completedUnits}</h2>
+                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Completed Units</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Yield Rate */}
+                <div className="col-md-3">
+                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-primary" style={{ borderRadius: '12px' }}>
+                        <div className="card-body p-4">
+                            <div className="d-flex align-items-center justify-content-between mb-3">
+                                <div className="bg-primary bg-opacity-10 text-primary rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '50px', height: '50px'}}>
+                                    <i className="bi bi-activity fs-4"></i>
+                                </div>
+                                <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-2 py-1 small fw-normal">
+                                    Target: 98%
+                                </span>
+                            </div>
+                            <h2 className="fw-bold text-dark mb-0 display-6">{overallMetrics.yieldRate}%</h2>
+                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Yield Rate</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* In Progress */}
+                <div className="col-md-3">
+                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-warning" style={{ borderRadius: '12px' }}>
+                        <div className="card-body p-4">
+                            <div className="d-flex align-items-center justify-content-between mb-3">
+                                <div className="bg-warning bg-opacity-10 text-warning rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '50px', height: '50px'}}>
+                                    <i className="bi bi-hourglass-split fs-4"></i>
+                                </div>
+                                <span className="badge bg-warning bg-opacity-10 text-warning rounded-pill px-2 py-1 small fw-normal">
+                                    Active
+                                </span>
+                            </div>
+                            <h2 className="fw-bold text-dark mb-0 display-6">{overallMetrics.pendingUnits}</h2>
+                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>In Progress</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Defects (NG) */}
+                <div className="col-md-3">
+                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-danger" style={{ borderRadius: '12px' }}>
+                        <div className="card-body p-4">
+                            <div className="d-flex align-items-center justify-content-between mb-3">
+                                <div className="bg-danger bg-opacity-10 text-danger rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '50px', height: '50px'}}>
+                                    <i className="bi bi-exclamation-octagon-fill fs-4"></i>
+                                </div>
+                                <span className="badge bg-danger bg-opacity-10 text-danger rounded-pill px-2 py-1 small fw-normal">
+                                    Alert
+                                </span>
+                            </div>
+                            <h2 className="fw-bold text-danger mb-0 display-6">{overallMetrics.ngUnits}</h2>
+                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Total Defects (NG)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* --- Approvals Alert (Modern Strip) --- */}
+            {overallMetrics.pendingApprovalUnits > 0 && (
+                <div className="card border-0 shadow-sm mb-4 border-start border-4 border-danger bg-white">
+                    <div className="card-body d-flex align-items-center justify-content-between p-3">
+                        <div className="d-flex align-items-center">
+                            <i className="bi bi-bell-fill text-danger fs-4 me-3 ms-2"></i>
+                            <div>
+                                <h6 className="fw-bold text-dark mb-0">Action Required</h6>
+                                <small className="text-secondary">There are <span className="fw-bold text-danger">{overallMetrics.pendingApprovalUnits} units</span> waiting for QA validation.</small>
+                            </div>
+                        </div>
+                        <button className="btn btn-sm btn-danger px-4 rounded-pill" onClick={() => setActiveTab('approval')}>
+                            Review Queue
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* --- PAGING CHART CONTAINER (New Section) --- */}
+            <div className="row g-4">
+                <div className="col-12">
+                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px', minHeight: '480px' }}>
+                        
+                        {/* CHART HEADER - BUTTONS ARE VISIBLE AND IN THE TOP CENTER/RIGHT */}
+                        <div className="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+                            
+                            {/* Left: Title and Subtitle */}
+                            <div>
+                                <h5 className="fw-bold text-dark mb-0">{currentChartTitle}</h5>
+                                <small className="text-muted" style={{fontSize: '0.75rem'}}>{currentChartSubtitle}</small>
+                            </div>
+
+                            {/* Right: Navigation Buttons (Highly Visible) */}
+                            <div className="d-flex gap-2 ms-auto">
+                                <button className="btn btn-dark btn-sm rounded-pill fw-bold" onClick={prevChart} title="Previous Chart">
+                                    <i className="bi bi-arrow-left me-1"></i> Prev
+                                </button>
+                                <button className="btn btn-dark btn-sm rounded-pill fw-bold" onClick={nextChart} title="Next Chart">
+                                    Next <i className="bi bi-arrow-right ms-1"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Chart Body (Clear of buttons) */}
+                        <div className="card-body d-flex align-items-center justify-content-center p-4">
+                            <div className="w-100 h-100 fade-in" style={{ height: '400px' }}>
+                                {/* Conditional Rendering based on dashboardView state */}
+                                {dashboardView === 'bar' && (
+                                    <StationBarChart logs={logs} stations={stations} calculateMetrics={calculateStationMetrics} />
+                                )}
+                                {/* REMOVED RESTRICTIVE MAX-WIDTH DIV HERE */}
+                                {dashboardView === 'pie' && (
+                                    <UnitPieChart metrics={overallMetrics} title="" />
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Pulsing Animation for Live Indicator */}
+            <style jsx>{`
+                .animate-ping {
+                    animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+                }
+                @keyframes ping {
+                    75%, 100% { transform: scale(2); opacity: 0; }
+                }
+                .fade-in {
+                    animation: fadeIn 0.4s ease-in-out;
+                }
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+            `}</style>
+        </div>
+    );
 
             case "stations":
-                return (
-                    <div className="animate-in fade-in">
-                        {/* Title Header */}
-                        <div className="d-flex justify-content-between align-items-end mb-4">
-                            <div>
-                                <h3 className="fw-bold text-dark mb-1">Station Management</h3>
-                                <p className="text-muted small mb-0">Overview of all {stations.length} production stations.</p>
-                            </div>
-                            {/* Legend */}
-                            <div className="d-none d-md-flex gap-3 small text-muted">
-                                <span className="d-flex align-items-center"><span className="rounded-circle bg-primary me-2" style={{width:8, height:8}}></span>Running</span>
-                                <span className="d-flex align-items-center"><span className="rounded-circle bg-danger me-2" style={{width:8, height:8}}></span>Attention</span>
-                                <span className="d-flex align-items-center"><span className="rounded-circle bg-secondary me-2" style={{width:8, height:8}}></span>Idle</span>
-                            </div>
-                        </div>
+    return (
+        <div className="animate-in fade-in">
+            {/* Title Header */}
+            <div className="d-flex justify-content-between align-items-end mb-4">
+                <div>
+                    <h3 className="fw-bold text-dark mb-1">Station Management</h3>
+                    <p className="text-muted small mb-0">Overview of all {stations.length} production stations.</p>
+                </div>
+                {/* Legend */}
+                <div className="d-none d-md-flex gap-3 small text-muted">
+                    <span className="d-flex align-items-center"><span className="rounded-circle bg-primary me-2" style={{width:8, height:8}}></span>Running</span>
+                    <span className="d-flex align-items-center"><span className="rounded-circle bg-danger me-2" style={{width:8, height:8}}></span>Attention</span>
+                    <span className="d-flex align-items-center"><span className="rounded-circle bg-secondary me-2" style={{width:8, height:8}}></span>Idle</span>
+                </div>
+            </div>
 
-                        <div className="row g-4">
-                            {stations.map((station) => {
-                                const metrics = calculateStationMetrics(station.id);
-                                const hasActivity = metrics.pendingUnits > 0;
-                                const hasError = metrics.ngUnits > 0 && metrics.completedUnits === 0;
-                                
-                                let statusColor = "secondary";
-                                let statusLabel = "Idle";
-                                let borderColor = "border-secondary";
+            <div className="row g-4">
+                {stations.map((station) => {
+                    const metrics = calculateStationMetrics(station.id);
+                    const hasActivity = metrics.pendingUnits > 0;
+                    const hasError = metrics.ngUnits > 0 && metrics.completedUnits === 0;
+                    
+                    let statusColor = "secondary";
+                    let statusLabel = "Idle";
+                    let borderColor = "border-secondary";
 
-                                if (hasActivity) {
-                                    statusColor = "primary";
-                                    statusLabel = "Running";
-                                    borderColor = "border-primary";
-                                }
-                                if (hasError) {
-                                    statusColor = "danger";
-                                    statusLabel = "Attention";
-                                    borderColor = "border-danger";
-                                }
+                    if (hasActivity) {
+                        statusColor = "primary";
+                        statusLabel = "Running";
+                        borderColor = "border-primary";
+                    }
+                    if (hasError) {
+                        statusColor = "danger";
+                        statusLabel = "Attention";
+                        borderColor = "border-danger";
+                    }
 
-                                return (
-                                    <div key={station.id} className="col-xl-3 col-lg-4 col-md-6">
-                                        <div className={`card h-100 border-0 shadow-sm station-card hover-up border-top border-4 ${borderColor}`} style={{borderRadius: '12px'}}>
-                                            <div className="card-body p-4 d-flex flex-column">
-                                                
-                                                {/* Card Header: Station Name & Status Badge ONLY */}
-                                                <div className="d-flex justify-content-between align-items-center mb-4">
-                                                    <h6 className="fw-bold text-dark mb-0 fs-5">{station.name}</h6>
-                                                    <span className={`badge bg-${statusColor} bg-opacity-10 text-${statusColor} px-2 py-1 rounded-pill small fw-bold`}>
-                                                        {hasActivity && <span className="spinner-grow spinner-grow-sm me-1" role="status" aria-hidden="true" style={{width: '0.5rem', height: '0.5rem'}}></span>}
-                                                        {statusLabel}
-                                                    </span>
-                                                </div>
+                    return (
+                        <div key={station.id} className="col-xl-3 col-lg-4 col-md-6">
+                            <div className={`card h-100 border-0 shadow-sm station-card hover-up border-top border-4 ${borderColor}`} style={{borderRadius: '12px'}}>
+                                <div className="card-body p-4 d-flex flex-column">
+                                    
+                                    {/* Card Header: Station Name & Status Badge */}
+                                    <div className="d-flex justify-content-between align-items-center mb-4">
+                                        <h6 className="fw-bold text-dark mb-0 fs-5">{station.name}</h6>
+                                        <span className={`badge bg-${statusColor} bg-opacity-10 text-${statusColor} px-2 py-1 rounded-pill small fw-bold`}>
+                                            {hasActivity && <span className="spinner-grow spinner-grow-sm me-1" role="status" aria-hidden="true" style={{width: '0.5rem', height: '0.5rem'}}></span>}
+                                            {statusLabel}
+                                        </span>
+                                    </div>
 
-                                                {/* Mini Stats Summary */}
-                                                <div className="row g-2 mb-4 bg-light rounded p-2 mx-0">
-                                                    <div className="col-6 text-center border-end">
-                                                        <small className="text-muted text-uppercase" style={{fontSize: '0.65rem'}}>Output</small>
-                                                        <div className="fw-bold text-dark fs-5">{metrics.completedUnits}</div>
-                                                    </div>
-                                                    <div className="col-6 text-center">
-                                                        <small className="text-muted text-uppercase" style={{fontSize: '0.65rem'}}>Defects</small>
-                                                        <div className={`fw-bold fs-5 ${metrics.ngUnits > 0 ? 'text-danger' : 'text-dark'}`}>{metrics.ngUnits}</div>
-                                                    </div>
-                                                </div>
-
-                                                {/* Actions */}
-                                                <div className="mt-auto d-flex gap-2">
-                                                    <button 
-                                                        className="btn btn-outline-primary btn-sm flex-grow-1 fw-bold" 
-                                                        style={{borderRadius: '8px'}}
-                                                        onClick={() => handleMonitorStation(station.id)}
-                                                    >
-                                                        Monitor
-                                                    </button>
-                                                    <button 
-                                                        className="btn btn-light text-secondary btn-sm border" 
-                                                        style={{borderRadius: '8px'}}
-                                                        onClick={() => handleViewHistory(station.id)}
-                                                        title="View Logs"
-                                                    >
-                                                        <i className="bi bi-clock-history"></i>
-                                                    </button>
-                                                </div>
-
-                                            </div>
+                                    {/* Mini Stats Summary */}
+                                    <div className="row g-2 mb-4 bg-light rounded p-2 mx-0">
+                                        <div className="col-6 text-center border-end">
+                                            <small className="text-muted text-uppercase" style={{fontSize: '0.65rem'}}>Output</small>
+                                            <div className="fw-bold text-dark fs-5">{metrics.completedUnits}</div>
+                                        </div>
+                                        <div className="col-6 text-center">
+                                            <small className="text-muted text-uppercase" style={{fontSize: '0.65rem'}}>Defects</small>
+                                            <div className={`fw-bold fs-5 ${metrics.ngUnits > 0 ? 'text-danger' : 'text-dark'}`}>{metrics.ngUnits}</div>
                                         </div>
                                     </div>
-                                );
-                            })}
-                        </div>
-                        
-                        <style jsx>{`
-                            .hover-up { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-                            .hover-up:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important; }
-                        `}</style>
-                    </div>
-                );
 
+                                    {/* Actions - UPDATED FOR BETTER VISIBILITY */}
+                                    <div className="mt-auto">
+                                        <div className="d-flex gap-2">
+                                            {/* Monitor Button */}
+                                            <button 
+                                                className="btn btn-primary btn-sm flex-grow-1 fw-bold shadow-sm" 
+                                                style={{borderRadius: '8px'}}
+                                                onClick={() => handleMonitorStation(station.id)}
+                                            >
+                                                <i className="bi bi-speedometer2 me-1"></i> Monitor
+                                            </button>
+                                            
+                                            {/* History Button - Now clearly visible with text */}
+                                            <button 
+                                                className="btn btn-outline-secondary btn-sm flex-grow-1 fw-bold" 
+                                                style={{borderRadius: '8px'}}
+                                                onClick={() => handleViewHistory(station.id)}
+                                            >
+                                                <i className="bi bi-clock-history me-1"></i> History
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+            
+            <style jsx>{`
+                .hover-up { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+                .hover-up:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important; }
+            `}</style>
+        </div>
+    );
             case "station_monitor":
                 if (!stationMonitorId) { setActiveTab('stations'); return null; }
                 const station = stations.find(s => s.id === stationMonitorId);
@@ -818,238 +880,271 @@ export default function AdminPage({ user, onLogout }) {
                     </div>
                 );
             case "reports":
-                return (
-                    <div className="animate-in fade-in pb-5">
-                        {/* Header */}
-                        <div className="d-flex justify-content-between align-items-center mb-4">
-                            <div>
-                                <h3 className="fw-bold text-dark mb-1">Production Reports</h3>
-                                <p className="text-muted small mb-0">Daily performance records from all stations.</p>
-                            </div>
-                            <button 
-                                className="btn btn-primary px-4 py-2 rounded-pill shadow-sm fw-bold hover-scale"
-                                onClick={() => setShowReportModal(true)}
-                            >
-                                <i className="bi bi-plus-lg me-2"></i>New Report
-                            </button>
-                        </div>
+    return (
+        <div className="animate-in fade-in pb-5">
+            {/* Header */}
+            <div className="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h3 className="fw-bold text-dark mb-1">Production Reports</h3>
+                    <p className="text-muted small mb-0">Daily performance records from all stations.</p>
+                </div>
+                <button 
+                    className="btn btn-primary px-4 py-2 rounded-pill shadow-sm fw-bold hover-scale"
+                    onClick={() => setShowReportModal(true)}
+                >
+                    <i className="bi bi-plus-lg me-2"></i>New Report
+                </button>
+            </div>
 
-                        {/* Filter Bar */}
-                        <div className="card border-0 shadow-sm mb-4" style={{borderRadius: '12px'}}>
-                            <div className="card-body p-3 d-flex flex-wrap align-items-center gap-3">
-                                <div className="d-flex align-items-center">
-                                    <i className="bi bi-calendar-event text-secondary me-2 fs-5"></i>
-                                    <input 
-                                        type="date" 
-                                        className="form-control border-0 bg-light fw-bold text-secondary" 
-                                        style={{maxWidth: '160px'}}
-                                        value={reportDate} 
-                                        onChange={(e) => setReportDate(e.target.value)} 
-                                        max={getTodayDate()} 
-                                    />
-                                </div>
-                                <div className="vr text-secondary opacity-25 mx-2"></div>
-                                <div className="d-flex align-items-center flex-grow-1">
-                                    <i className="bi bi-funnel text-secondary me-2 fs-5"></i>
-                                    <select 
-                                        className="form-select border-0 bg-light fw-bold text-secondary" 
-                                        style={{maxWidth: '200px'}}
-                                        value={reportFilterStationId} 
-                                        onChange={(e) => setReportFilterStationId(e.target.value)}
-                                    >
-                                        <option value="All">All Stations</option>
-                                        {stations.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
-                                    </select>
-                                </div>
-                                <div className="text-muted small ms-auto">
-                                    Showing <strong className="text-dark">{filteredReports.length}</strong> records
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Reports Table */}
-                        <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
-                            <div className="table-responsive">
-                                <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.9rem' }}>
-                                    <thead className="bg-light text-secondary text-uppercase small" style={{ letterSpacing: '0.5px' }}>
-                                        <tr>
-                                            <th className="border-0 py-3 ps-4">Station & Shift</th>
-                                            <th className="border-0 py-3 text-center">Output</th>
-                                            <th className="border-0 py-3 text-center">Defects / Downtime</th>
-                                            <th className="border-0 py-3">Submitted By</th>
-                                            <th className="border-0 py-3 text-end pe-4">Timestamp</th>
-                                            <th className="border-0 py-3 text-center">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="border-top-0">
-                                        {filteredReports.length > 0 ? filteredReports.map(report => (
-                                            <tr key={report.id}>
-                                                <td className="ps-4">
-                                                    <div className="d-flex align-items-center">
-                                                        <div className="bg-primary bg-opacity-10 text-primary rounded p-2 me-3">
-                                                            <i className="bi bi-layers-fill"></i>
-                                                        </div>
-                                                        <div>
-                                                            <div className="fw-bold text-dark">{report.station}</div>
-                                                            <div className="small text-muted">{report.shift}</div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="text-center">
-                                                    <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-2 fw-normal fs-6">
-                                                        {report.total_units_processed}
-                                                    </span>
-                                                </td>
-                                                <td className="text-center">
-                                                    <div className="d-flex flex-column justify-content-center align-items-center">
-                                                        <span className="text-danger fw-bold">{report.total_ng} NG</span>
-                                                        <small className="text-muted" style={{fontSize: '0.75rem'}}>{report.downtime_minutes} min down</small>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <div className="d-flex align-items-center text-secondary">
-                                                        <i className="bi bi-person-circle me-2"></i>
-                                                        {report.submitted_by}
-                                                    </div>
-                                                </td>
-                                                <td className="text-end pe-4 text-muted font-monospace small">
-                                                    {new Date(report.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                                    <div style={{fontSize: '0.7rem'}}>{new Date(report.created_at).toLocaleDateString()}</div>
-                                                </td>
-                                                <td className="text-center">
-                                                    <button 
-                                                        className="btn btn-sm btn-light border text-primary hover-primary rounded-pill px-3" 
-                                                        onClick={() => handleViewReport(report)}
-                                                    >
-                                                        Details
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        )) : (
-                                            <tr>
-                                                <td colSpan="6" className="py-5 text-center text-muted">
-                                                    <div className="mb-3"><i className="bi bi-file-earmark-x fs-1 opacity-25"></i></div>
-                                                    <p className="mb-0">No reports found for the selected date or station.</p>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <style jsx>{`
-                            .hover-scale:hover { transform: scale(1.02); }
-                            .hover-primary:hover { background-color: #0d6efd; color: white !important; border-color: #0d6efd !important; }
-                        `}</style>
+            {/* Filter Bar */}
+            <div className="card border-0 shadow-sm mb-4" style={{borderRadius: '12px'}}>
+                <div className="card-body p-3 d-flex flex-wrap align-items-center gap-3">
+                    <div className="d-flex align-items-center">
+                        <i className="bi bi-calendar-event text-secondary me-2 fs-5"></i>
+                        <input 
+                            type="date" 
+                            className="form-control border-0 bg-light fw-bold text-secondary" 
+                            style={{maxWidth: '160px'}}
+                            value={reportDate} 
+                            onChange={(e) => setReportDate(e.target.value)} 
+                            max={getTodayDate()} 
+                        />
                     </div>
-                );
-            case "approval":
-                const approvalQueueLogs = logs.filter(l => l.status === 'Pending Approval');
-                return (
-                    <div className="animate-in fade-in pb-5">
-                        {/* Header */}
-                        <div className="d-flex justify-content-between align-items-center mb-4">
-                            <div>
-                                <h3 className="fw-bold text-dark mb-1">Approval Queue</h3>
-                                <p className="text-muted small mb-0">Review flagged units requiring QA validation or status rollback.</p>
-                            </div>
-                            {approvalQueueLogs.length > 0 && (
-                                <span className="badge bg-danger rounded-pill px-3 py-2 shadow-sm d-flex align-items-center">
-                                    <span className="spinner-grow spinner-grow-sm me-2" role="status" aria-hidden="true"></span>
-                                    {approvalQueueLogs.length} Pending
-                                </span>
+                    <div className="vr text-secondary opacity-25 mx-2"></div>
+                    <div className="d-flex align-items-center flex-grow-1">
+                        <i className="bi bi-funnel text-secondary me-2 fs-5"></i>
+                        <select 
+                            className="form-select border-0 bg-light fw-bold text-secondary" 
+                            style={{maxWidth: '200px'}}
+                            value={reportFilterStationId} 
+                            onChange={(e) => setReportFilterStationId(e.target.value)}
+                        >
+                            <option value="All">All Stations</option>
+                            {stations.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
+                        </select>
+                    </div>
+                    <div className="text-muted small ms-auto">
+                        Showing <strong className="text-dark">{filteredReports.length}</strong> records
+                    </div>
+                </div>
+            </div>
+
+            {/* Reports Table */}
+            <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
+                <div className="table-responsive">
+                    <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.9rem' }}>
+                        <thead className="bg-light text-secondary text-uppercase small" style={{ letterSpacing: '0.5px' }}>
+                            <tr>
+                                <th className="border-0 py-3 ps-4">Station & Shift</th>
+                                <th className="border-0 py-3 text-center">Output</th>
+                                <th className="border-0 py-3 text-center">Defects / Downtime</th>
+                                {/* REMOVED: Submitted By Column */}
+                                <th className="border-0 py-3 text-end pe-4">Timestamp</th>
+                                <th className="border-0 py-3 text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="border-top-0">
+                            {filteredReports.length > 0 ? filteredReports.map(report => (
+                                <tr key={report.id}>
+                                    <td className="ps-4">
+                                        <div className="d-flex align-items-center">
+                                            <div className="bg-primary bg-opacity-10 text-primary rounded p-2 me-3">
+                                                <i className="bi bi-layers-fill"></i>
+                                            </div>
+                                            <div>
+                                                <div className="fw-bold text-dark">{report.station}</div>
+                                                <div className="small text-muted">{report.shift}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="text-center">
+                                        <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-2 fw-normal fs-6">
+                                            {report.total_units_processed}
+                                        </span>
+                                    </td>
+                                    <td className="text-center">
+                                        <div className="d-flex flex-column justify-content-center align-items-center">
+                                            <span className="text-danger fw-bold">{report.total_ng} NG</span>
+                                            <small className="text-muted" style={{fontSize: '0.75rem'}}>{report.downtime_minutes} min down</small>
+                                        </div>
+                                    </td>
+                                    
+                                    {/* REMOVED: Submitted By Cell */}
+
+                                    <td className="text-end pe-4 text-muted font-monospace small">
+                                        {new Date(report.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                        <div style={{fontSize: '0.7rem'}}>{new Date(report.created_at).toLocaleDateString()}</div>
+                                    </td>
+                                    <td className="text-center">
+                                        <button 
+                                            className="btn btn-sm btn-light border text-primary hover-primary rounded-pill px-3" 
+                                            onClick={() => handleViewReport(report)}
+                                        >
+                                            Details
+                                        </button>
+                                    </td>
+                                </tr>
+                            )) : (
+                                <tr>
+                                    {/* Updated colSpan from 6 to 5 because we removed 1 column */}
+                                    <td colSpan="5" className="py-5 text-center text-muted">
+                                        <div className="mb-3"><i className="bi bi-file-earmark-x fs-1 opacity-25"></i></div>
+                                        <p className="mb-0">No reports found for the selected date or station.</p>
+                                    </td>
+                                </tr>
                             )}
-                        </div>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
-                        {/* Main Card */}
-                        <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
-                            <div className="table-responsive">
-                                <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.9rem' }}>
-                                    <thead className="bg-light text-secondary text-uppercase small" style={{ letterSpacing: '0.5px' }}>
-                                        <tr>
-                                            <th className="border-0 py-3 ps-4">Unit Details</th>
-                                            <th className="border-0 py-3">Origin Station</th>
-                                            <th className="border-0 py-3 text-center">Status</th>
-                                            <th className="border-0 py-3" style={{width: '25%'}}>Remarks</th>
-                                            <th className="border-0 py-3 text-end">Timestamp</th>
-                                            <th className="border-0 py-3 text-center pe-4">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="border-top-0">
-                                        {approvalQueueLogs.length > 0 ? approvalQueueLogs.map(log => (
-                                            <tr key={log.id}>
-                                                {/* Unit Details */}
-                                                <td className="ps-4">
-                                                    <div className="d-flex flex-column">
-                                                        <span className="fw-bold text-dark">{log.model} <span className="fw-normal text-muted">({log.revision})</span></span>
-                                                        <span className="small text-muted font-monospace">{log.device_serial_no}</span>
-                                                    </div>
-                                                </td>
+            <style jsx>{`
+                .hover-scale:hover { transform: scale(1.02); }
+                .hover-primary:hover { background-color: #0d6efd; color: white !important; border-color: #0d6efd !important; }
+            `}</style>
+        </div>
+    );
+            case "approval":
+    const approvalQueueLogs = logs.filter(l => l.status === 'Pending Approval');
+    
+    return (
+        <div className="animate-in fade-in pb-5">
+            {/* Header */}
+            <div className="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h3 className="fw-bold text-dark mb-1">Approval Queue</h3>
+                    <p className="text-muted small mb-0">Review flagged units requiring QA validation.</p>
+                </div>
+                {approvalQueueLogs.length > 0 && (
+                    <span className="badge bg-danger rounded-pill px-3 py-2 shadow-sm d-flex align-items-center">
+                        <span className="spinner-grow spinner-grow-sm me-2" role="status" aria-hidden="true"></span>
+                        {approvalQueueLogs.length} Pending
+                    </span>
+                )}
+            </div>
 
-                                                {/* Station */}
-                                                <td>
-                                                    <div className="d-flex align-items-center">
-                                                        <div className="bg-light border rounded-circle p-1 me-2 d-flex align-items-center justify-content-center" style={{width: '28px', height: '28px'}}>
-                                                            <i className="bi bi-geo-alt-fill text-secondary" style={{fontSize: '0.7rem'}}></i>
-                                                        </div>
-                                                        <span className="fw-medium text-dark">{log.station}</span>
-                                                    </div>
-                                                </td>
+            {/* Main Card */}
+            <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
+                <div className="table-responsive">
+                    <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.9rem' }}>
+                        <thead className="bg-light text-secondary text-uppercase small" style={{ letterSpacing: '0.5px' }}>
+                            <tr>
+                                <th className="border-0 py-3 ps-4">Unit Details</th>
+                                <th className="border-0 py-3">Origin Station</th>
+                                <th className="border-0 py-3 text-center">Status</th>
+                                <th className="border-0 py-3" style={{width: '25%'}}>Remarks</th>
+                                <th className="border-0 py-3 text-end">Timestamp</th>
+                                <th className="border-0 py-3 text-center pe-4">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="border-top-0">
+                            {approvalQueueLogs.length > 0 ? approvalQueueLogs.map(log => (
+                                <tr key={log.id}>
+                                    <td className="ps-4">
+                                        <div className="d-flex flex-column">
+                                            <span className="fw-bold text-dark">{log.model} <span className="fw-normal text-muted">({log.revision})</span></span>
+                                            <span className="small text-muted font-monospace">{log.device_serial_no}</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div className="d-flex align-items-center">
+                                            <div className="bg-light border rounded-circle p-1 me-2 d-flex align-items-center justify-content-center" style={{width: '28px', height: '28px'}}>
+                                                <i className="bi bi-geo-alt-fill text-secondary" style={{fontSize: '0.7rem'}}></i>
+                                            </div>
+                                            <span className="fw-medium text-dark">{log.station}</span>
+                                        </div>
+                                    </td>
+                                    <td className="text-center">
+                                        <span className="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-2 fw-normal">
+                                            Pending QA
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div className="d-flex align-items-start text-muted small fst-italic">
+                                            <i className="bi bi-chat-quote-fill me-2 opacity-50"></i>
+                                            "{log.remarks || 'No remarks provided'}"
+                                        </div>
+                                    </td>
+                                    <td className="text-end font-monospace small text-muted">
+                                        <div>{new Date(log.created_at).toLocaleDateString()}</div>
+                                        <div style={{fontSize: '0.75rem'}}>{new Date(log.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                                    </td>
+                                    <td className="text-center pe-4">
+                                        <button 
+                                            className="btn btn-sm btn-success text-white fw-bold px-4 rounded-pill shadow-sm hover-scale"
+                                            onClick={() => {
+                                                setSelectedLogToApprove(log);
+                                                setShowApproveModal(true);
+                                            }}
+                                            style={{transition: 'transform 0.2s'}}
+                                        >
+                                            <i className="bi bi-check-circle me-1"></i> Approve
+                                        </button>
+                                    </td>
+                                </tr>
+                            )) : (
+                                <tr>
+                                    <td colSpan="6" className="py-5 text-center text-muted">
+                                        <div className="mb-3">
+                                            <i className="bi bi-clipboard-check fs-1 text-success opacity-25"></i>
+                                        </div>
+                                        <h6 className="fw-bold text-dark">All Clear!</h6>
+                                        <p className="small mb-0">No units currently require approval.</p>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
-                                                {/* Status */}
-                                                <td className="text-center">
-                                                    <span className="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-2 fw-normal">
-                                                        Pending QA
-                                                    </span>
-                                                </td>
-
-                                                {/* Remarks */}
-                                                <td>
-                                                    <div className="d-flex align-items-start text-muted small fst-italic">
-                                                        <i className="bi bi-chat-quote-fill me-2 opacity-50"></i>
-                                                        "{log.remarks || 'No remarks provided'}"
-                                                    </div>
-                                                </td>
-
-                                                {/* Timestamp */}
-                                                <td className="text-end font-monospace small text-muted">
-                                                    <div>{new Date(log.created_at).toLocaleDateString()}</div>
-                                                    <div style={{fontSize: '0.75rem'}}>{new Date(log.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                                                </td>
-
-                                                {/* Action */}
-                                                <td className="text-center pe-4">
-                                                    <button 
-                                                        className="btn btn-sm btn-success text-white fw-bold px-4 rounded-pill shadow-sm hover-scale"
-                                                        onClick={() => handleApproveUnit(log.id, log)}
-                                                        style={{transition: 'transform 0.2s'}}
-                                                    >
-                                                        <i className="bi bi-check-circle me-1"></i> Approve
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        )) : (
-                                            <tr>
-                                                <td colSpan="6" className="py-5 text-center text-muted">
-                                                    <div className="mb-3">
-                                                        <i className="bi bi-clipboard-check fs-1 text-success opacity-25"></i>
-                                                    </div>
-                                                    <h6 className="fw-bold text-dark">All Clear!</h6>
-                                                    <p className="small mb-0">No units currently require approval.</p>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
+            {/* --- CONFIRMATION MODAL --- */}
+            {showApproveModal && selectedLogToApprove && (
+                <div className="modal show d-block fade-in" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1070 }}>
+                    <div className="modal-dialog modal-dialog-centered">
+                        <div className="modal-content border-0 shadow-lg rounded-4">
+                            <div className="modal-body p-4 text-center">
+                                <div className="mb-3">
+                                    <div className="bg-success bg-opacity-10 text-success rounded-circle d-inline-flex align-items-center justify-content-center" style={{width: 80, height: 80}}>
+                                        <i className="bi bi-arrow-repeat display-4"></i> {/* Changed icon to represent 'In Progress' */}
+                                    </div>
+                                </div>
+                                <h4 className="fw-bold text-dark">Approve & Resume?</h4>
+                                <p className="text-muted">
+                                    Are you sure you want to approve <br/>
+                                    <span className="fw-bold text-dark">{selectedLogToApprove.model}</span> - <span className="font-monospace text-dark bg-light px-2 rounded">{selectedLogToApprove.device_serial_no}</span>?
+                                </p>
+                                {/* UPDATED TEXT: Now says "In Progress" */}
+                                <p className="small text-muted mb-4">
+                                    This action will release the unit from QA Hold and return its status to <strong>"In Progress"</strong>.
+                                </p>
+                                <div className="d-flex gap-2 justify-content-center">
+                                    <button 
+                                        className="btn btn-light border px-4 rounded-pill fw-bold" 
+                                        onClick={() => setShowApproveModal(false)}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        className="btn btn-success px-4 rounded-pill fw-bold shadow-sm"
+                                        onClick={executeApproval}
+                                    >
+                                        Yes, Set to In Progress
+                                    </button>
+                                </div>
                             </div>
                         </div>
-
-                        <style jsx>{`
-                            .hover-scale:hover { transform: scale(1.05); }
-                        `}</style>
                     </div>
-                );
+                </div>
+            )}
+
+            <style jsx>{`
+                .hover-scale:hover { transform: scale(1.05); }
+                .fade-in { animation: fadeIn 0.2s ease-in-out; }
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+            `}</style>
+        </div>
+    );
            case "manage_account": 
                 return (
                     <div className="animate-in fade-in pb-5">

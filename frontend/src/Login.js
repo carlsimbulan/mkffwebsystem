@@ -279,11 +279,7 @@ export default function Login({ onLogin }) {
               </button>
             </form>
 
-            <div className="text-center mt-4">
-              <a href="#help" className="text-decoration-none text-muted small">
-                Forgot Password? / Contact Support
-              </a>
-            </div>
+      
           </div>
         </div>
       </div>

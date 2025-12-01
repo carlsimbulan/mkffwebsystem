@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 
-// --- Edit Unit Modal Component ---
-// This component assumes you've passed necessary props and constants (API_BASE_URL is not needed here)
+// --- Edit Unit Modal Component (Enhanced UI) ---
 export const EditUnitModal = ({ unit, onClose, onSave }) => {
+    // Determine if the unit status is locked (completed/NG status often requires QA/Admin action)
+    const isCompletedOrNG = unit.status.includes('Completed') || unit.status.includes('No Good');
+
     const [formData, setFormData] = useState(unit ? {
         status: unit.status,
         remarks: unit.remarks,
@@ -25,43 +27,128 @@ export const EditUnitModal = ({ unit, onClose, onSave }) => {
 
     if (!unit) return null;
 
+    // Available statuses (Pending Approval is often added when re-opening a Completed/NG unit)
     const statusOptions = ["In Progress", "Completed", "No Good (NG)", "Pending Approval"];
 
     return (
-        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1050 }}>
-            <div className="modal-dialog modal-dialog-centered">
-                <div className="modal-content">
-                    <div className="modal-header bg-danger text-white">
-                        <h5 className="modal-title">Edit Unit: {unit.device_serial_no}</h5>
+        <div className="modal show d-block fade-in" style={{ backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 1050, backdropFilter: 'blur(3px)' }}>
+            <div className="modal-dialog modal-dialog-centered modal-lg">
+                <div className="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+                    
+                    {/* Header: Professional Primary Color */}
+                    <div className="modal-header text-white border-0 py-3" style={{ background: 'linear-gradient(90deg, #0d6efd 0%, #0a58ca 100%)' }}>
+                        <h5 className="modal-title fw-bold d-flex align-items-center">
+                            <i className="bi bi-pencil-square me-2"></i> Unit Edit: {unit.model}
+                        </h5>
                         <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
                     </div>
-                    <div className="modal-body">
-                        <p className="text-muted small">ID: {unit.id} | Station: {unit.station}</p>
-                        <form>
-                            <div className="mb-3">
-                                <label className="form-label">Model</label>
-                                <input type="text" className="form-control" name="model" value={formData.model || ''} onChange={handleChange} readOnly />
+
+                    <div className="modal-body p-4 bg-light">
+                        
+                        {/* Unit Identifier */}
+                        <div className="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+                            <h6 className="fw-bold text-dark mb-0">
+                                <span className="text-secondary me-2">Serial:</span> 
+                                <span className="font-monospace bg-light p-1 rounded border">{unit.device_serial_no || 'N/A'}</span>
+                            </h6>
+                            <div className="small text-muted">
+                                <i className="bi bi-geo-alt-fill me-1"></i> Current Station: <span className="fw-bold text-primary">{unit.station}</span>
                             </div>
-                            <div className="mb-3">
-                                <label className="form-label">Status</label>
-                                <select className="form-select" name="status" value={formData.status} onChange={handleChange}>
-                                    {statusOptions.map(opt => (
-                                        <option key={opt} value={opt}>{opt}</option>
-                                    ))}
-                                </select>
+                        </div>
+
+                        <div className="row g-4">
+                            
+                            {/* LEFT COLUMN: Core Read-Only Details (Technical Specs) */}
+                            <div className="col-lg-5">
+                                <h6 className="fw-bold text-uppercase small text-muted mb-3" style={{letterSpacing: '1px'}}>Technical Details</h6>
+                                <div className="card shadow-sm border-0 rounded-3 bg-white p-3">
+                                    <DetailField label="Model / Revision" value={`${unit.model} (${unit.revision})`} icon="bi-tag-fill" />
+                                    <DetailField label="Assembly No." value={unit.assembly_no} icon="bi-puzzle-fill" monospace />
+                                    <DetailField label="Base Unit Kitting" value={unit.base_unit_kitting_no || 'N/A'} icon="bi-box-seam" monospace />
+                                    <DetailField label="Accessory Kitting" value={unit.accessory_kitting_no || 'N/A'} icon="bi-plus-square" monospace />
+                                </div>
                             </div>
-                            <div className="mb-3">
-                                <label className="form-label">Remarks</label>
-                                <textarea className="form-control" name="remarks" value={formData.remarks || ''} onChange={handleChange}></textarea>
+
+                            {/* RIGHT COLUMN: Editable Status & Remarks */}
+                            <div className="col-lg-7">
+                                <h6 className="fw-bold text-uppercase small text-muted mb-3" style={{letterSpacing: '1px'}}>Action & Status Update</h6>
+                                <form>
+                                    {/* Status Selector */}
+                                    <div className="mb-4">
+                                        <label className="form-label fw-bold d-flex align-items-center text-dark">
+                                            <i className="bi bi-toggles me-2 text-primary"></i> Current Status
+                                        </label>
+                                        <select 
+                                            className="form-select form-select-lg" 
+                                            name="status" 
+                                            value={formData.status} 
+                                            onChange={handleChange}
+                                            disabled={isCompletedOrNG} // Disable status change unless admin/QA override (which they can do via remarks)
+                                        >
+                                            {statusOptions.map(opt => (
+                                                <option 
+                                                    key={opt} 
+                                                    value={opt}
+                                                    className={opt.includes('Completed') ? 'text-success' : opt.includes('NG') ? 'text-danger' : opt.includes('Progress') ? 'text-warning' : 'text-info'}
+                                                >
+                                                    {opt}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {isCompletedOrNG && 
+                                            <small className="text-danger fw-bold mt-2 d-block">
+                                                Status locked. Please update Remarks and contact QA/Admin for reopening.
+                                            </small>
+                                        }
+                                    </div>
+
+                                    {/* Remarks Textarea */}
+                                    <div className="mb-3">
+                                        <label className="form-label fw-bold d-flex align-items-center text-dark">
+                                            <i className="bi bi-chat-left-text me-2 text-primary"></i> Remarks / Notes
+                                        </label>
+                                        <textarea 
+                                            className="form-control" 
+                                            name="remarks" 
+                                            rows="4" 
+                                            value={formData.remarks || ''} 
+                                            onChange={handleChange}
+                                        ></textarea>
+                                    </div>
+                                </form>
                             </div>
-                        </form>
+                        </div>
+
                     </div>
-                    <div className="modal-footer">
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
-                        <button type="button" className="btn btn-danger" onClick={handleSave}>Save changes</button>
+                    
+                    {/* Footer */}
+                    <div className="modal-footer bg-white border-top-0 justify-content-end p-4">
+                        <button type="button" className="btn btn-secondary px-4 rounded-pill fw-bold" onClick={onClose}>
+                            Close
+                        </button>
+                        <button 
+                            type="button" 
+                            className="btn btn-primary px-4 rounded-pill fw-bold shadow-sm" 
+                            onClick={handleSave}
+                        >
+                            <i className="bi bi-save me-2"></i> Save Changes
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
     );
 };
+
+// --- Sub-Component for consistent styling of read-only fields ---
+const DetailField = ({ label, value, icon, monospace }) => (
+    <div className="d-flex align-items-center py-2 border-bottom border-light">
+        <i className={`bi ${icon} me-3 text-primary opacity-75`}></i>
+        <div>
+            <div className="small text-muted mb-0 lh-1" style={{fontSize: '0.7rem'}}>{label}</div>
+            <div className={`fw-bold text-dark ${monospace ? 'font-monospace small' : 'fs-6'}`}>
+                {value}
+            </div>
+        </div>
+    </div>
+);

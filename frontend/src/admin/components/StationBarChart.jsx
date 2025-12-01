@@ -13,36 +13,38 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
 
     // Prepare dataset per station
     const summaries = stations.map(station => {
+        // Calculate metrics for both display and tooltip use
         const metrics = calculateMetrics(station.id, liveLogs) || { completedUnits: 0, ngUnits: 0 };
         return {
             name: station.name,
             completed: metrics.completedUnits || 0,
             ng: metrics.ngUnits || 0,
+            total: (metrics.completedUnits || 0) + (metrics.ngUnits || 0)
         };
     });
 
     const totalOutput = summaries.reduce((sum, s) => sum + s.completed + s.ng, 0);
 
-    // Create Gradients on Mount
+    // Create Gradients on Mount/Update (More robust check)
     useEffect(() => {
         const chart = chartRef.current;
         if (!chart) return;
 
         const ctx = chart.ctx;
         
-        // Success Gradient (Emerald)
-        const gradSuccess = ctx.createLinearGradient(0, 0, 400, 0);
-        gradSuccess.addColorStop(0, '#10b981'); // Start
-        gradSuccess.addColorStop(1, '#34d399'); // End
+        // Success Gradient (Emerald/Bootstrap Success)
+        const gradSuccess = ctx.createLinearGradient(0, 0, chart.width, 0);
+        gradSuccess.addColorStop(0, '#10b981'); // Dark Green Start
+        gradSuccess.addColorStop(1, '#34d399'); // Light Green End
         setGradientSuccess(gradSuccess);
 
-        // Danger Gradient (Red)
-        const gradDanger = ctx.createLinearGradient(0, 0, 400, 0);
-        gradDanger.addColorStop(0, '#ef4444'); // Start
-        gradDanger.addColorStop(1, '#f87171'); // End
+        // Danger Gradient (Red/Bootstrap Danger)
+        const gradDanger = ctx.createLinearGradient(0, 0, chart.width, 0);
+        gradDanger.addColorStop(0, '#ef4444'); // Dark Red Start
+        gradDanger.addColorStop(1, '#f87171'); // Light Red End
         setGradientDanger(gradDanger);
 
-    }, []);
+    }, [totalOutput]); // Re-run if total output changes
 
     // Chart data
     const chartData = {
@@ -52,19 +54,19 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
                 label: 'Completed',
                 data: summaries.map(s => s.completed),
                 backgroundColor: gradientSuccess || '#10b981',
-                borderRadius: 20, // Fully rounded
-                borderSkipped: false, // Round all corners
-                barPercentage: 0.6,
-                categoryPercentage: 0.7,
+                hoverBackgroundColor: gradientSuccess || '#10b981', // Use the same color for hover
+                borderRadius: 10, // Slightly reduced rounding for cleaner look
+                borderSkipped: false,
+                barThickness: 10, // Thinner bars for better separation
             },
             {
                 label: 'No Good (NG)',
                 data: summaries.map(s => s.ng),
                 backgroundColor: gradientDanger || '#ef4444',
-                borderRadius: 20, // Fully rounded
-                borderSkipped: false, // Round all corners
-                barPercentage: 0.6,
-                categoryPercentage: 0.7,
+                hoverBackgroundColor: gradientDanger || '#ef4444', // Use the same color for hover
+                borderRadius: 10,
+                borderSkipped: false,
+                barThickness: 10,
             },
         ],
     };
@@ -78,21 +80,22 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
                 stacked: true,
                 beginAtZero: true,
                 grid: {
-                    color: '#f1f5f9', // Very light gray grid
+                    color: '#f1f5f9',
                     borderDash: [4, 4],
+                    drawBorder: false, // Remove border line
                 },
                 ticks: {
                     color: '#94a3b8',
                     font: { size: 11, family: "'Inter', sans-serif" },
                 },
-                border: { display: false }, 
             },
             y: {
                 stacked: true,
                 grid: { display: false },
                 ticks: {
                     color: '#475569',
-                    font: { size: 12, weight: '600', family: "'Inter', sans-serif" },
+                    // UPDATED FONT: Bolder and slightly larger for readability
+                    font: { size: 13, weight: '700', family: "'Inter', sans-serif" }, 
                     autoSkip: false,
                 },
                 border: { display: false },
@@ -111,15 +114,34 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
                 }
             },
             tooltip: {
-                backgroundColor: 'rgba(30, 41, 59, 0.95)', // Dark blue-gray
+                backgroundColor: 'rgba(30, 41, 59, 0.95)',
                 titleColor: '#fff',
                 bodyColor: '#e2e8f0',
-                padding: 14,
-                cornerRadius: 12,
-                displayColors: true,
-                boxPadding: 6,
+                padding: 12,
+                cornerRadius: 8,
                 titleFont: { size: 13 },
                 bodyFont: { size: 13 },
+                // ADDED: Custom callback to show total output
+                callbacks: {
+                    title: (tooltipItem) => {
+                        const stationName = tooltipItem[0].label;
+                        const stationData = summaries.find(s => s.name === stationName);
+                        return stationName;
+                    },
+                    afterBody: (tooltipItem) => {
+                         const stationName = tooltipItem[0].label;
+                         const stationData = summaries.find(s => s.name === stationName);
+                         if (stationData && stationData.total > 0) {
+                            const yieldRate = ((stationData.completed / stationData.total) * 100).toFixed(1);
+                            return [
+                                `---`,
+                                `Total Output: ${stationData.total}`,
+                                `Yield Rate: ${yieldRate}%`
+                            ];
+                         }
+                         return null;
+                    }
+                }
             },
         },
     };
