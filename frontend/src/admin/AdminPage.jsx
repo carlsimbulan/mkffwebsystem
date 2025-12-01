@@ -17,6 +17,7 @@ import { StationBarChart } from './components/StationBarChart';
 import { NotificationBell } from './components/NotificationBell';
 import { NotificationContent } from './components/NotificationContent';
 import { ViewUserModal } from './components/ViewUserModal';
+import { AnnouncementModal } from './components/AnnouncementModal';
 
 // REGISTER CHART COMPONENTS GLOBALLY
 ChartJS.register(
@@ -55,6 +56,8 @@ const REPORTS_ENDPOINT = `${API_BASE_URL}/daily_reports.php`;
 const USER_MANAGEMENT_ENDPOINT = `${API_BASE_URL}/user_management.php`;
 const HISTORY_ENDPOINT = `${API_BASE_URL}/unit_history.php`; 
 
+const ANNOUNCEMENTS_ENDPOINT = `${API_BASE_URL}/announcements.php`;
+
 // --- LOCAL PATHS ---
 const AVATAR_UPLOAD_PATH = `${API_BASE_URL}/uploads/avatars/`;
 const DEFAULT_AVATAR_PATH = `${API_BASE_URL}/uploads/avatars/default_avatar.png`;
@@ -89,6 +92,9 @@ export default function AdminPage({ user, onLogout }) {
     const [lastSeenReportIds, setLastSeenReportIds] = useState(new Set());
     const [highlightedUnitId, setHighlightedUnitId] = useState(null);
     
+    const [announcements, setAnnouncements] = useState([]); // Announcements/Forum data
+    const [showPostModal, setShowPostModal] = useState(false); // For Admin to post
+
     const [loading, setLoading] = useState(true); 
     const [error, setError] = useState(null);
 
@@ -219,6 +225,13 @@ export default function AdminPage({ user, onLogout }) {
                 user.full_name = loggedInUserData.full_name;
                 user.avatar_url = loggedInUserData.avatar_url;
             }
+
+            // --- NEW: Fetch Announcements ---
+            const announcementsRes = await axios.get(ANNOUNCEMENTS_ENDPOINT);
+            const fetchedAnnouncements = Array.isArray(announcementsRes.data) ? announcementsRes.data : [];
+            if (JSON.stringify(fetchedAnnouncements) !== JSON.stringify(announcements)) {
+                setAnnouncements(fetchedAnnouncements);
+            }
 
             // 4. Mock Station Data - FIXED: ID matches DB (No space), Name has space (UI)
             const mockStations = Array.from({ length: 15 }, (_, i) => ({
@@ -446,7 +459,29 @@ const prevChart = () => {
         return chartViews[prevIndex];
     });
 };
+
+
+
 // --- END OF ADMINPAGE COMPONENT FUNCTION BODY ADDITIONS ---
+
+// --- ANNOUNCEMENT HANDLERS ---
+    const handlePostAnnouncement = async (content) => {
+    if (user.role !== 'Administrator') {
+        throw new Error("Only Administrators can post announcements.");
+    }
+    const payload = {
+        user_id: user.id, // Siguraduhin na may laman ito (galing sa login user state)
+        content: content,
+    };
+    try {
+        // Dapat maghintay ng successful response mula sa PHP
+        await axios.post(ANNOUNCEMENTS_ENDPOINT, payload, { headers: { 'Content-Type': 'application/json' } });
+        fetchData(); // ✅ Dapat ito ang nagre-refresh ng announcement list
+    } catch (error) {
+        console.error("Error posting announcement:", error);
+        throw new Error(error.response?.data?.message || "Failed to post announcement. Check console for API error.");
+    }
+};
 
     // --- RENDER CONTENT ---
     const renderContent = () => {
@@ -625,7 +660,8 @@ const prevChart = () => {
             </div>
 
             {/* Pulsing Animation for Live Indicator */}
-            <style jsx>{`
+            
+            <style>{`
                 .animate-ping {
                     animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
                 }
@@ -643,7 +679,9 @@ const prevChart = () => {
         </div>
     );
 
-            case "stations":
+// ...
+
+     case "stations":
     return (
         <div className="animate-in fade-in">
             {/* Title Header */}
@@ -1004,6 +1042,65 @@ const prevChart = () => {
             `}</style>
         </div>
     );
+    {/* --- NEW CASE: ANNOUNCEMENT BOARD --- */}
+            case "announcements": // ✅ ANNOUNCEMENTS CONTENT
+                return (
+                    <div className="animate-in fade-in pb-5">
+                        <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+                            <div>
+                                <h3 className="fw-bold text-dark mb-1">📢 Announcement Board</h3>
+                                <p className="text-muted small mb-0">Post critical updates and important notices for all users.</p>
+                            </div>
+                            {/* Check if user is Admin to show post button */}
+                            {user.role === 'Administrator' && (
+                                <button
+                                    className="btn btn-danger px-4 py-2 rounded-pill shadow-sm fw-bold hover-scale d-flex align-items-center"
+                                    onClick={() => setShowPostModal(true)}
+                                >
+                                    <i className="bi bi-send-fill me-2"></i> Post New Announcement
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Announcement List (Chat/Forum Style) */}
+                        <div className="card border-0 shadow-sm p-4" style={{ borderRadius: '12px' }}>
+                            <div className="announcement-feed" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                                {announcements.length > 0 ? (
+                                    announcements.map(announcement => (
+                                        <div key={announcement.id} className="d-flex align-items-start border-bottom pb-3 mb-3 announcement-item">
+                                            {/* Avatar */}
+                                            <img
+                                                src={announcement.poster_avatar ? `${AVATAR_UPLOAD_PATH}${announcement.poster_avatar}` : DEFAULT_AVATAR_PATH}
+                                                alt="Avatar"
+                                                className="rounded-circle me-3 border border-3 border-danger shadow-sm"
+                                                style={{ width: '50px', height: '50px', objectFit: 'cover' }}
+                                                onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
+                                            />
+
+                                            {/* Content */}
+                                            <div className="flex-grow-1">
+                                                <div className="d-flex align-items-center mb-1">
+                                                    <h6 className="fw-bold text-dark mb-0 me-2">{announcement.poster_name || announcement.poster_role}</h6>
+                                                    <span className={`badge ${announcement.poster_role === 'Administrator' ? 'bg-danger' : 'bg-secondary'} rounded-pill small fw-normal`}>{announcement.poster_role}</span>
+                                                    <span className="ms-auto text-muted small" style={{ fontSize: '0.75rem' }}>
+                                                        {new Date(announcement.created_at).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })}
+                                                    </span>
+                                                </div>
+                                                <p className="mb-0 text-dark announcement-content p-3 bg-light rounded" style={{ whiteSpace: 'pre-wrap', borderLeft: '3px solid #dc3545' }}>{announcement.content}</p>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-5">
+                                        <i className="bi bi-pin-angle-fill display-3 text-secondary opacity-50 mb-3"></i>
+                                        <h5 className="fw-bold text-dark">No Recent Announcements</h5>
+                                        <p className="text-muted mb-0">Use the "Post New Announcement" button to inform your team.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
             case "approval":
     const approvalQueueLogs = logs.filter(l => l.status === 'Pending Approval');
     
@@ -1301,6 +1398,7 @@ const prevChart = () => {
                         onNotificationClick={(n) => { handleNotificationClick(n); }}
                     />
                 );
+                
 
             case "analytics":
             case "guide":
@@ -1315,170 +1413,219 @@ const prevChart = () => {
         <div className="d-flex min-vh-100 bg-light overflow-hidden">
 
             
-        {/* --- SIDEBAR --- */}
-        <div
-        className="d-flex flex-column flex-shrink-0 p-3 text-white transition-all"
-        style={{
-            width: isSidebarOpen ? "260px" : "80px",
-            transition: "width 0.3s",
-            backgroundColor: "#111827"
+        // {/* --- SIDEBAR --- */}
+<div
+  className="d-flex flex-column flex-shrink-0 p-3 text-white transition-all position-fixed"
+  style={{
+    width: isSidebarOpen ? "260px" : "80px",
+    transition: "width 0.3s",
+    backgroundColor: "#111827",
+    height: "100vh",
+    zIndex: 1000,
+    top: 0,
+    left: 0
+  }}
+>
+  {/* TOP LOGO */}
+  <div className="d-flex align-items-center mb-3 text-white overflow-hidden">
+    <img
+      src={logo}
+      alt="MKFF Admin Logo"
+      style={{ height: "3rem" }}
+      className={isSidebarOpen ? "me-3" : ""}
+    />
+    {isSidebarOpen && <span className="fs-5 fw-bold">MKFF Admin</span>}
+  </div>
+
+  <hr className="border-secondary" />
+
+  {/* MENU */}
+  <ul className="nav nav-pills flex-column mb-3">
+    <li>
+      <button
+        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
+          activeTab === "dashboard" ? "active bg-danger" : ""
+        }`}
+        onClick={() => {
+          setActiveTab("dashboard");
+          setStationMonitorId(null);
+          setReportFilterStationId("All");
+          setStationHistoryId(null);
+          setHighlightedUnitId(null);
         }}
-        >
+      >
+        <i className="bi bi-speedometer2"></i>
+        {isSidebarOpen && "Dashboard"}
+      </button>
+    </li>
 
-        {/* TOP LOGO */}
-        <div className="d-flex align-items-center mb-3 text-white overflow-hidden">
-            <img
-            src={logo}
-            alt="MKFF Admin Logo"
-            style={{ height: "3rem" }}
-            className={isSidebarOpen ? "me-3" : ""}
-            />
-            {isSidebarOpen && <span className="fs-5 fw-bold">MKFF Admin</span>}
-        </div>
+    <li>
+      <button
+        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
+          (activeTab === "stations" || activeTab === "station_monitor") ? "active bg-danger" : ""
+        }`}
+        onClick={() => {
+          setActiveTab("stations");
+          setStationMonitorId(null);
+          setReportFilterStationId("All");
+          setStationHistoryId(null);
+          setHighlightedUnitId(null);
+        }}
+      >
+        <i className="bi bi-grid-3x3-gap"></i>
+        {isSidebarOpen && "Stations"}
+      </button>
+    </li>
 
-        <hr className="border-secondary" />
+    <li>
+      <button
+        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
+          activeTab === "reports" ? "active bg-danger" : ""
+        }`}
+        onClick={() => {
+          setActiveTab("reports");
+          setStationMonitorId(null);
+          setReportFilterStationId("All");
+          setStationHistoryId(null);
+          setHighlightedUnitId(null);
+        }}
+      >
+        <i className="bi bi-file-text"></i>
+        {isSidebarOpen && "Reports"}
+      </button>
+    </li>
 
-        {/* MENU */}
-        <ul className="nav nav-pills flex-column mb-3">
+    {/* --- NEW MODULE: ANNOUNCEMENT BOARD (FORUM) --- */}
+    <li>
+      <button
+        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
+          activeTab === "announcements" ? "active bg-danger" : ""
+        }`}
+        onClick={() => {
+          setActiveTab("announcements");
+          setStationMonitorId(null);
+          setReportFilterStationId("All");
+          setStationHistoryId(null);
+          setHighlightedUnitId(null);
+        }}
+      >
+        <i className="bi bi-megaphone-fill"></i>
+        {isSidebarOpen && "Announcement Board"}
+      </button>
+    </li>
+    {/* ------------------------------------- */}
 
-            <li>
-            <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-4 
-                ${activeTab === "dashboard" ? "active bg-danger" : ""}`}
-                onClick={() => {
-                setActiveTab("dashboard");
-                setStationMonitorId(null);
-                setReportFilterStationId("All");
-                setStationHistoryId(null);
-                setHighlightedUnitId(null);
-                }}
-            >
-                <i className="bi bi-speedometer2"></i>
-                {isSidebarOpen && "Dashboard"}
-            </button>
-            </li>
+    <li>
+      <button
+        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
+          activeTab === "approval" ? "active bg-danger" : ""
+        }`}
+        onClick={() => {
+          setActiveTab("approval");
+          setStationHistoryId(null);
+          setHighlightedUnitId(null);
+        }}
+      >
+        <i className="bi bi-check-circle"></i>
+        {isSidebarOpen && "Approvals"}
+      </button>
+    </li>
 
-            <li>
-            <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-4 
-                ${(activeTab === "stations" || activeTab === "station_monitor") ? "active bg-danger" : ""}`}
-                onClick={() => {
-                setActiveTab("stations");
-                setStationMonitorId(null);
-                setReportFilterStationId("All");
-                setStationHistoryId(null);
-                setHighlightedUnitId(null);
-                }}
-            >
-                <i className="bi bi-grid-3x3-gap"></i>
-                {isSidebarOpen && "Stations"}
-            </button>
-            </li>
+    <li>
+      <button
+        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
+          activeTab === "manage_account" ? "active bg-danger" : ""
+        }`}
+        onClick={() => {
+          setActiveTab("manage_account");
+          setStationHistoryId(null);
+          setHighlightedUnitId(null);
+        }}
+      >
+        <i className="bi bi-person-gear"></i>
+        {isSidebarOpen && "Manage Account"}
+      </button>
+    </li>
 
-            <li>
-            <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-4 
-                ${activeTab === "reports" ? "active bg-danger" : ""}`}
-                onClick={() => {
-                setActiveTab("reports");
-                setStationMonitorId(null);
-                setReportFilterStationId("All");
-                setStationHistoryId(null);
-                setHighlightedUnitId(null);
-                }}
-            >
-                <i className="bi bi-file-text"></i>
-                {isSidebarOpen && "Reports"}
-            </button>
-            </li>
-
-            <li>
-            <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-4 
-                ${activeTab === "approval" ? "active bg-danger" : ""}`}
-                onClick={() => {
-                setActiveTab("approval");
-                setStationHistoryId(null);
-                setHighlightedUnitId(null);
-                }}
-            >
-                <i className="bi bi-check-circle"></i>
-                {isSidebarOpen && "Approvals"}
-            </button>
-            </li>
-
-            <li>
-            <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-4 
-                ${activeTab === "manage_account" ? "active bg-danger" : ""}`}
-                onClick={() => {
-                setActiveTab("manage_account");
-                setStationHistoryId(null);
-                setHighlightedUnitId(null);
-                }}
-            >
-                <i className="bi bi-person-gear"></i>
-                {isSidebarOpen && "Manage Account"}
-            </button>
-            </li>
-
-            <li>
-            <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-4 
-                ${activeTab === "analytics" ? "active bg-danger" : ""}`}
-                onClick={() => {
-                setActiveTab("analytics");
-                setStationHistoryId(null);
-                setHighlightedUnitId(null);
-                }}
-            >
-                <i className="bi bi-graph-up"></i>
-                {isSidebarOpen && "Analytics"}
-            </button>
-            </li>
-
-        </ul>
-
-        {/* PUSH COPYRIGHT + LOGOUT TO BOTTOM */}
-        <div className="mt-auto">
-
-            {/* LOGOUT BUTTON */}
-            <button
-            className="btn btn-outline-light w-100"
-            onClick={onLogout}
-            >
-            <i className="bi bi-box-arrow-left me-2"></i>
-            {isSidebarOpen && "Logout"}
-            </button>
-            
-            {/* COPYRIGHT TEXT (Now Below Logout with Separator) */}
-            <div className="text-center text-white-50 small pt-2 mt-2 border-top border-secondary">
-            {isSidebarOpen && <small>©2025 MKFF Laser Technique</small>}
-            </div>
-
-        </div>
-        </div>
+    <li>
+      <button
+        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
+          activeTab === "analytics" ? "active bg-danger" : ""
+        }`}
+        onClick={() => {
+          setActiveTab("analytics");
+          setStationHistoryId(null);
+          setHighlightedUnitId(null);
+        }}
+      >
+        <i className="bi bi-graph-up"></i>
+        {isSidebarOpen && "Analytics"}
+      </button>
+    </li>
 
 
+    {/* ------------------------------------- */}
+  </ul>
 
-            {/* --- MAIN --- */}
-            <div className="flex-grow-1 d-flex flex-column" style={{maxHeight: '100vh', overflowY: 'auto'}}>
-                <header className="bg-white shadow-sm p-3 mb-4 d-flex justify-content-between align-items-center sticky-top">
-                    <div className="d-flex align-items-center">
-                        <button className="btn btn-light border me-3" onClick={() => setIsSidebarOpen(!isSidebarOpen)}><i className="bi bi-list"></i></button>
-                        <h5 className="mb-0 fw-bold text-secondary text-uppercase">{activeTab === 'station_monitor' ? `${stations.find(s => s.id === stationMonitorId)?.name || 'Monitor'} Details` : activeTab.replace('_', ' ')}</h5>
-                    </div>
-                    <div className="d-flex align-items-center gap-3">
-                        <NotificationBell notifications={notifications} onClick={handleBellClick} />
-                        <div className="text-end me-2 d-none d-md-block"><div className="fw-bold small">{headerFullName}</div><div className="text-muted small" style={{fontSize: '0.75rem'}}>Administrator</div></div>
-                        <img src={headerAvatarSrc} alt="User Avatar" className="rounded-circle border border-danger" style={{width: '35px', height: '35px', objectFit: 'cover'}} onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }} />
-                    </div>
-                </header>
+  {/* PUSH COPYRIGHT + LOGOUT TO BOTTOM */}
+  <div className="mt-auto">
+    {/* LOGOUT BUTTON */}
+    <button
+      className="btn btn-outline-light w-100"
+      onClick={onLogout}
+    >
+      <i className="bi bi-box-arrow-left me-2"></i>
+      {isSidebarOpen && "Logout"}
+    </button>
 
-                <div className="container-fluid px-4 pb-5">
-                    {renderContent()}
-                </div>
-            </div>
+    {/* COPYRIGHT TEXT (Now Below Logout with Separator) */}
+    <div className="text-center text-white-50 small pt-2 mt-2 border-top border-secondary">
+      {isSidebarOpen && <small>©2025 MKFF Laser Technique</small>}
+    </div>
+  </div>
+</div>
+
+{/* --- MAIN --- */}
+<div
+  className="flex-grow-1 d-flex flex-column"
+  style={{
+    marginLeft: isSidebarOpen ? "260px" : "80px",
+    transition: "margin-left 0.3s",
+    maxHeight: '100vh',
+    overflowY: 'auto',
+    overflowX: 'hidden'  // Added to prevent horizontal overflow
+  }}
+>
+  <header className="bg-white shadow-sm p-3 mb-4 d-flex justify-content-between align-items-center sticky-top">
+    <div className="d-flex align-items-center">
+      <button className="btn btn-light border me-3" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+        <i className="bi bi-list"></i>
+      </button>
+      <h5 className="mb-0 fw-bold text-secondary text-uppercase">
+        {activeTab === 'station_monitor' ? `${stations.find(s => s.id === stationMonitorId)?.name || 'Monitor'} Details` : activeTab.replace('_', ' ')}
+      </h5>
+    </div>
+    <div className="d-flex align-items-center gap-3">
+      <NotificationBell notifications={notifications} onClick={handleBellClick} />
+      <div className="text-end me-2 d-none d-md-block">
+        <div className="fw-bold small">{headerFullName}</div>
+        <div className="text-muted small" style={{fontSize: '0.75rem'}}>Administrator</div>
+      </div>
+      <img
+        src={headerAvatarSrc}
+        alt="User Avatar"
+        className="rounded-circle border border-danger"
+        style={{width: '35px', height: '35px', objectFit: 'cover'}}
+        onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
+      />
+    </div>
+  </header>
+
+  <div className="container-fluid px-4 pb-5">
+    {renderContent()}
+  </div>
+</div>
+
 
             {/* --- MODAL RENDERING --- */}
             {selectedUnitToEdit && ( <EditUnitModal unit={selectedUnitToEdit} onClose={() => setSelectedUnitToEdit(null)} onSave={handleSaveEdit} /> )}
@@ -1487,6 +1634,16 @@ const prevChart = () => {
             {stationHistoryId && ( <StationHistoryModal stationId={stationHistoryId} onClose={() => setStationHistoryId(null)} HISTORY_ENDPOINT={HISTORY_ENDPOINT} /> )}
             {selectedUserToManage && ( <ManageUserModal userToEdit={selectedUserToManage.id ? selectedUserToManage : initialNewUserData} stations={stations} onClose={() => setSelectedUserToManage(null)} onSave={handleSaveUser} AVATAR_UPLOAD_PATH={AVATAR_UPLOAD_PATH} DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH} /> )}
             {selectedUserToDelete && ( <DeleteUserModal user={selectedUserToDelete} onClose={() => setSelectedUserToDelete(null)} onDelete={handleDeleteUser} /> )}
+                {/* --- NEW ANNOUNCEMENT MODAL --- */}
+            {showPostModal && ( 
+                <AnnouncementModal 
+                    user={user} 
+                    onClose={() => setShowPostModal(false)} 
+                    onPost={handlePostAnnouncement} 
+                    API_BASE_URL={API_BASE_URL}
+                    DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH}
+                /> 
+            )}
         </div>
     );
 }

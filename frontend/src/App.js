@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import Login from "./Login";
 import AdminPage from "./admin/AdminPage";
 import StationDashboard from "./Operators/StationDashboard"; // Assuming path is correct
-import ITAssistantPage from "./pages/ITAssistantPage";
+import ITAssistantPage from "./qrgenpage/ITAssistantPage";
 
 function App() {
   const [user, setUser] = useState(null);
