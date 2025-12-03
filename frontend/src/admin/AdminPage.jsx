@@ -1413,7 +1413,9 @@ const prevChart = () => {
         <div className="d-flex min-vh-100 bg-light overflow-hidden">
 
             
-        // {/* --- SIDEBAR --- */}
+// Assuming the root wrapper of this entire component is positioned relatively (e.g., position: 'relative')
+
+// {/* --- SIDEBAR --- */}
 <div
   className="d-flex flex-column flex-shrink-0 p-3 text-white transition-all position-fixed"
   style={{
@@ -1589,14 +1591,20 @@ const prevChart = () => {
 <div
   className="flex-grow-1 d-flex flex-column"
   style={{
-    marginLeft: isSidebarOpen ? "260px" : "80px",
-    transition: "margin-left 0.3s",
-    maxHeight: '100vh',
+    position: 'fixed',
+    top: 0, 
+    bottom: 0,
+    right: 0,
+    left: isSidebarOpen ? "260px" : "80px", 
+    transition: "left 0.3s", 
     overflowY: 'auto',
-    overflowX: 'hidden'  // Added to prevent horizontal overflow
+    overflowX: 'hidden',
+    backgroundColor: '#f8f9fa', 
+    zIndex: 999,
   }}
 >
-  <header className="bg-white shadow-sm p-3 mb-4 d-flex justify-content-between align-items-center sticky-top">
+  <header className="bg-white shadow-sm p-3 d-flex justify-content-between align-items-center">
+    {/* Removed 'mb-4' and 'sticky-top' from the header className */}
     <div className="d-flex align-items-center">
       <button className="btn btn-light border me-3" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
         <i className="bi bi-list"></i>
@@ -1621,10 +1629,13 @@ const prevChart = () => {
     </div>
   </header>
 
-  <div className="container-fluid px-4 pb-5">
+  {/* Added pt-4 and pb-5 to ensure content has space above and below it */}
+  <div className="container-fluid px-4 pt-4 pb-5">
     {renderContent()}
   </div>
 </div>
+
+// ... (rest of the modal rendering code)
 
 
             {/* --- MODAL RENDERING --- */}
