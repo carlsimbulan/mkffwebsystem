@@ -1046,7 +1046,7 @@ export default function StationDashboard({ user, onLogout }) {
                 </div>
 
                 {/* --- MAIN CONTENT AREA --- */}
-                <div className="d-flex flex-column flex-grow-1 bg-light"> 
+                <div className="d-flex flex-column flex-grow-1" style={{ backgroundColor: '#eeeeeeff' }}> 
                     
                     {/* --- HEADER: WHITE BACKGROUND --- */}
                     <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm px-4 py-3 sticky-top z-2">

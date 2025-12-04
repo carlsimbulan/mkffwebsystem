@@ -777,105 +777,125 @@ const executeDelete = async () => {
 
 // ...
 
-     case "stations":
+    case "stations":
+    // Define the fixed list of station names based on the process flow
+    const processStations = [
+        "PCB Pairing",
+        "Integrated Board Test",
+        "Main Board Conformal Coating",
+        "RTV Application",
+        "Casing/Harnessing",
+        "Complete Unit Test/Calibration",
+        "Pre BI Hi-Pot Test",
+        "Burn-in Testing",
+        "Sealing",
+        "Post BI Hi-Pot Test",
+        "Final Functional/Connectivity Test",
+        "Label Sticker Attachment",
+        "FVI",
+        "Packing",
+        "QC Stamping"
+    ];
+
+    // Assuming the 'stations' array initially passed to the component has length 15 
+    // and we need to map the new names to them while preserving their IDs and metrics.
+    const namedStations = stations.slice(0, processStations.length).map((station, index) => ({
+        ...station, // Keep existing data like ID
+        name: processStations[index], // Overwrite the name with the process name
+    }));
+
     return (
         <div className="animate-in fade-in">
-            {/* Title Header */}
-            <div className="d-flex justify-content-between align-items-end mb-4">
-                <div>
-                    <h3 className="fw-bold text-dark mb-1">Station Management</h3>
-                    <p className="text-muted small mb-0">Overview of all {stations.length} production stations.</p>
-                </div>
-                {/* Legend */}
-                <div className="d-none d-md-flex gap-3 small text-muted">
-                    <span className="d-flex align-items-center"><span className="rounded-circle bg-primary me-2" style={{width:8, height:8}}></span>Running</span>
-                    <span className="d-flex align-items-center"><span className="rounded-circle bg-danger me-2" style={{width:8, height:8}}></span>Attention</span>
-                    <span className="d-flex align-items-center"><span className="rounded-circle bg-secondary me-2" style={{width:8, height:8}}></span>Idle</span>
-                </div>
-            </div>
+    {/* Title Header */}
+    <div className="d-flex justify-content-between align-items-end mb-4">
+        <div>
+            <h3 className="fw-bold text-dark mb-1">Station Management</h3>
+            <p className="text-muted small mb-0">Overview of all {namedStations.length} production stations.</p>
+        </div>
+    </div>
 
-            <div className="row g-4">
-                {stations.map((station) => {
-                    const metrics = calculateStationMetrics(station.id);
-                    const hasActivity = metrics.pendingUnits > 0;
-                    const hasError = metrics.ngUnits > 0 && metrics.completedUnits === 0;
-                    
-                    let statusColor = "secondary";
-                    let statusLabel = "Idle";
-                    let borderColor = "border-secondary";
+    {/* Grid Container */}
+    <div className="row g-3">
+        {namedStations.map((station) => {
+            const metrics = calculateStationMetrics(station.id);
+            const hasActivity = metrics.pendingUnits > 0;
+            const hasError = metrics.ngUnits > 0 && metrics.completedUnits === 0;
 
-                    if (hasActivity) {
-                        statusColor = "primary";
-                        statusLabel = "Running";
-                        borderColor = "border-primary";
-                    }
-                    if (hasError) {
-                        statusColor = "danger";
-                        statusLabel = "Attention";
-                        borderColor = "border-danger";
-                    }
+            let statusColor = "secondary";
+            let statusLabel = "Idle";
 
-                    return (
-                        <div key={station.id} className="col-xl-3 col-lg-4 col-md-6">
-                            <div className={`card h-100 border-0 shadow-sm station-card hover-up border-top border-4 ${borderColor}`} style={{borderRadius: '12px'}}>
-                                <div className="card-body p-4 d-flex flex-column">
-                                    
-                                    {/* Card Header: Station Name & Status Badge */}
-                                    <div className="d-flex justify-content-between align-items-center mb-4">
-                                        <h6 className="fw-bold text-dark mb-0 fs-5">{station.name}</h6>
-                                        <span className={`badge bg-${statusColor} bg-opacity-10 text-${statusColor} px-2 py-1 rounded-pill small fw-bold`}>
-                                            {hasActivity && <span className="spinner-grow spinner-grow-sm me-1" role="status" aria-hidden="true" style={{width: '0.5rem', height: '0.5rem'}}></span>}
-                                            {statusLabel}
+            if (hasActivity) {
+                statusColor = "primary";
+                statusLabel = "Running";
+            }
+            if (hasError) {
+                statusColor = "danger";
+                statusLabel = "Attention";
+            }
+
+            return (
+                <div key={station.id} className="col-12 col-sm-6 col-lg-4 col-xl-3">
+                    <div className="card shadow-sm h-100 border-0">
+                        <div className="card-body d-flex flex-column">
+
+                            {/* Station Name + ID */}
+                            <h6 className="fw-bold text-dark mb-1">{station.name}</h6>
+                            <small className="text-muted mb-2">ID: {station.id}</small>
+
+                            {/* Status */}
+                            <div className="mb-3">
+                                <span className={`badge bg-${statusColor} bg-opacity-10 text-${statusColor} px-3 py-2 rounded-pill fw-bold`}>
+                                    {hasActivity && (
+                                        <span className="spinner-grow spinner-grow-sm me-1"
+                                            role="status"
+                                            aria-hidden="true"
+                                            style={{ width: "0.5rem", height: "0.5rem" }}>
                                         </span>
-                                    </div>
+                                    )}
+                                    {statusLabel}
+                                </span>
+                            </div>
 
-                                    {/* Mini Stats Summary */}
-                                    <div className="row g-2 mb-4 bg-light rounded p-2 mx-0">
-                                        <div className="col-6 text-center border-end">
-                                            <small className="text-muted text-uppercase" style={{fontSize: '0.65rem'}}>Output</small>
-                                            <div className="fw-bold text-dark fs-5">{metrics.completedUnits}</div>
-                                        </div>
-                                        <div className="col-6 text-center">
-                                            <small className="text-muted text-uppercase" style={{fontSize: '0.65rem'}}>Defects</small>
-                                            <div className={`fw-bold fs-5 ${metrics.ngUnits > 0 ? 'text-danger' : 'text-dark'}`}>{metrics.ngUnits}</div>
-                                        </div>
-                                    </div>
+                            {/* Metrics */}
+                            <div className="mb-3">
+                                <div className="d-flex justify-content-between">
+                                    <small className="text-muted">Completed</small>
+                                    <span className="fw-bold text-dark">{metrics.completedUnits}</span>
+                                </div>
 
-                                    {/* Actions - UPDATED FOR BETTER VISIBILITY */}
-                                    <div className="mt-auto">
-                                        <div className="d-flex gap-2">
-                                            {/* Monitor Button */}
-                                            <button 
-                                                className="btn btn-primary btn-sm flex-grow-1 fw-bold shadow-sm" 
-                                                style={{borderRadius: '8px'}}
-                                                onClick={() => handleMonitorStation(station.id)}
-                                            >
-                                                <i className="bi bi-speedometer2 me-1"></i> Monitor
-                                            </button>
-                                            
-                                            {/* History Button - Now clearly visible with text */}
-                                            <button 
-                                                className="btn btn-outline-secondary btn-sm flex-grow-1 fw-bold" 
-                                                style={{borderRadius: '8px'}}
-                                                onClick={() => handleViewHistory(station.id)}
-                                            >
-                                                <i className="bi bi-clock-history me-1"></i> History
-                                            </button>
-                                        </div>
-                                    </div>
-
+                                <div className="d-flex justify-content-between">
+                                    <small className="text-muted">Defects (NG)</small>
+                                    <span className={`fw-bold ${metrics.ngUnits > 0 ? "text-danger" : "text-dark"}`}>
+                                        {metrics.ngUnits}
+                                    </span>
                                 </div>
                             </div>
+
+                            {/* Actions */}
+                            <div className="mt-auto d-flex gap-2">
+                                <button
+                                    className="btn btn-sm btn-outline-primary fw-bold flex-grow-1"
+                                    onClick={() => handleMonitorStation(station.id)}
+                                >
+                                    <i className="bi bi-speedometer2 me-1"></i> Monitor
+                                </button>
+
+                                <button
+                                    className="btn btn-sm btn-outline-secondary fw-bold flex-grow-1"
+                                    onClick={() => handleViewHistory(station.id)}
+                                >
+                                    <i className="bi bi-clock-history me-1"></i> History
+                                </button>
+                            </div>
+
                         </div>
-                    );
-                })}
-            </div>
-            
-            <style jsx>{`
-                .hover-up { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-                .hover-up:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important; }
-            `}</style>
-        </div>
+                    </div>
+                </div>
+            );
+        })}
+    </div>
+</div>
+
     );
             case "station_monitor":
                 if (!stationMonitorId) { setActiveTab('stations'); return null; }
@@ -1139,14 +1159,6 @@ const executeDelete = async () => {
         </div>
     );
     {/* --- NEW CASE: ANNOUNCEMENT BOARD --- */}
-           // AdminPage.jsx (Inside renderContent function)
-
-// ... (existing cases)
-
-// AdminPage.jsx (Inside renderContent function)
-
-// ... (existing cases)
-
 case "announcements": 
     
     // 1. FILTERING LOGIC (No changes needed here)
@@ -1174,7 +1186,8 @@ case "announcements":
             <div className="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
                 <div>
                     <h3 className="fw-bold text-dark mb-1 fs-3" style={{ letterSpacing: '-0.5px' }}>
-                        📢 Factory Announcements
+                        {/* Tinanggal ang icon dito */}
+                        Announcements
                     </h3>
                     <p className="text-muted small mb-0">
                         {announcementsToDisplay.length} notices shown. Filtered by date range.
@@ -1182,7 +1195,7 @@ case "announcements":
                 </div>
                 {user.role === 'Administrator' && (
                     <button
-                        className="btn btn-danger px-4 py-2 rounded-pill shadow fw-bold hover-scale d-flex align-items-center"
+                        className="btn btn-primary px-4 py-2 rounded-pill shadow fw-bold hover-scale d-flex align-items-center"
                         onClick={() => setShowPostModal(true)}
                     >
                         <i className="bi bi-send-fill me-2"></i> Create New Post
@@ -1193,7 +1206,7 @@ case "announcements":
             {/* --- FILTER BAR (Compact Card) --- */}
             <div className="card border-0 shadow-sm mb-4 p-3" style={{ borderRadius: '12px' }}>
                 <div className="d-flex flex-wrap align-items-center gap-3">
-                    <i className="bi bi-calendar-range text-secondary fs-5 me-2"></i>
+                    <i className="bi bi-calendar-range text-primary fs-5 me-2"></i>
                     
                     {/* Start Date Filter */}
                     <div className="d-flex align-items-center gap-2">
@@ -1234,12 +1247,12 @@ case "announcements":
             {/* --- Announcement Feed Container (Central Focus) --- */}
             <div className="card border-0 shadow-lg" style={{ borderRadius: '16px' }}>
                 <div className="card-body p-4"> 
-                    <div className="announcement-feed mx-auto" style={{ maxWidth: '800px', maxHeight: '70vh', overflowY: 'auto' }}>
+                    <div className="announcement-feed" style={{ maxWidth: '800px', maxHeight: '70vh', overflowY: 'auto' }}>
                         
                         {announcementsToDisplay.length > 0 ? (
                             announcementsToDisplay.map((announcement, index) => {
-                                const isLatest = index === 0;
-                                // FIX: Use new Date().toLocaleString() directly if getTimeDifference is not defined
+                                const isLatest = index === 0; 
+                                
                                 const postTime = new Date(announcement.created_at).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' }); 
                                 const posterAvatar = announcement.poster_avatar ? `${AVATAR_UPLOAD_PATH}${announcement.poster_avatar}` : DEFAULT_AVATAR_PATH;
                                 
@@ -1248,14 +1261,14 @@ case "announcements":
                                 return (
                                     <div 
                                         key={announcement.id} 
-                                        className={`d-flex align-items-start ${!isLatest ? 'border-bottom' : ''} pb-3 mb-3 announcement-item ${isLatest && announcements.length === announcementsToDisplay.length ? 'bg-light p-3 rounded-3 border border-danger border-opacity-25' : ''}`}
+                                        className={`d-flex align-items-start ${index < announcementsToDisplay.length - 1 ? 'border-bottom' : ''} pb-3 mb-3 announcement-item ${isLatest ? 'bg-light p-3 rounded-3 border border-primary border-opacity-25' : ''}`}
                                     >
                                         {/* Avatar Column */}
                                         <div className="flex-shrink-0">
                                             <img
                                                 src={posterAvatar}
                                                 alt="Avatar"
-                                                className="rounded-circle me-3 border border-3 border-danger shadow-sm"
+                                                className="rounded-circle me-3 border border-1 border-light shadow-sm"
                                                 style={{ width: '48px', height: '48px', objectFit: 'cover' }} 
                                                 onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
                                             />
@@ -1266,9 +1279,10 @@ case "announcements":
                                             <div className="d-flex justify-content-between align-items-start mb-2">
                                                 <div className="d-flex align-items-center">
                                                     <h6 className="fw-bold text-dark mb-0 me-3">{announcement.poster_name || announcement.poster_role}</h6>
-                                                    <span className="badge bg-danger rounded-pill fw-bold py-1 px-2" style={{fontSize: '0.7rem'}}>
+                                                    <span className="badge bg-primary rounded-pill fw-bold py-1 px-2" style={{fontSize: '0.7rem'}}>
                                                         {announcement.poster_role}
                                                     </span>
+                                                    {isLatest && <span className="badge bg-warning ms-2 rounded-pill fw-bold py-1 px-2 animate-pulse" style={{fontSize: '0.7rem'}}>NEW!</span>} 
                                                 </div>
                                                 
                                                 {/* TIME AND DELETE BUTTON */}
@@ -1281,7 +1295,6 @@ case "announcements":
                                                         <button
                                                             className="btn btn-sm btn-light text-danger border-0 p-1 rounded-circle hover-scale"
                                                             title="Delete Announcement"
-                                                            // *** FIX: CALLS handleConfirmDelete WITH BOTH IDs ***
                                                             onClick={() => handleConfirmDelete(announcement.id, announcement.user_id)} 
                                                             style={{ width: '26px', height: '26px', padding: 0 }}
                                                         >
@@ -1293,8 +1306,8 @@ case "announcements":
                                                 
                                             </div>
 
-                                            {/* Announcement Content Box */}
-                                            <div className="bg-light p-3 rounded" style={{ borderLeft: '4px solid #dc3545', backgroundColor: '#fdf3f3 !important' }}>
+                                            {/* Announcement Content Box (light blue background) */}
+                                            <div className="p-3 rounded" style={{ borderLeft: '4px solid #0d6efd', backgroundColor: isLatest ? '#e3f2fd !important' : '#f8f9fa !important' }}>
                                                 <p className="mb-0 text-dark fw-medium" style={{ whiteSpace: 'pre-wrap', fontSize: '0.95rem', lineHeight: '1.4' }}>
                                                     {announcement.content}
                                                 </p>
@@ -1315,52 +1328,56 @@ case "announcements":
                 </div>
             </div>
 
+            {/* --- DELETE CONFIRMATION MODAL (Theme updated) --- */}
+            {showDeleteModal && (
+                <div className="modal fade show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                    <div className="modal-dialog modal-dialog-centered">
+                        <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '16px' }}>
+                            <div className="modal-header border-0 pb-0">
+                                <h5 className="modal-title fw-bold text-danger d-flex align-items-center">
+                                    <i className="bi bi-exclamation-triangle-fill me-2 fs-4"></i> Confirm Deletion
+                                </h5>
+                                <button type="button" className="btn-close" 
+                                    onClick={() => setShowDeleteModal(false)} aria-label="Close"></button>
+                            </div>
+                            <div className="modal-body pt-2 pb-4">
+                                <p className="text-dark fw-medium">
+                                    Are you absolutely sure you want to delete announcement ID <span className="fw-bold text-primary">{announcementToDelete}</span>? 
+                                </p>
+                                <p className="text-muted small mb-0">
+                                    This action is permanent and cannot be reversed. Please ensure this is the correct item before proceeding.
+                                </p>
+                            </div>
+                            <div className="modal-footer border-0 pt-0">
+                                <button type="button" className="btn btn-secondary rounded-pill px-4" 
+                                    onClick={() => setShowDeleteModal(false)}>
+                                    Cancel
+                                </button>
+                                <button type="button" className="btn btn-danger rounded-pill px-4 fw-bold" 
+                                    onClick={executeDelete}> 
+                                    <i className="bi bi-trash-fill me-2"></i> Delete Permanently
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* --- END DELETE CONFIRMATION MODAL --- */}
             
-{/* --- DELETE CONFIRMATION MODAL (Must be here and calls executeDelete) --- */}
-{showDeleteModal && (
-    <div className="modal fade show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-        <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '16px' }}>
-                <div className="modal-header border-0 pb-0">
-                    <h5 className="modal-title fw-bold text-danger d-flex align-items-center">
-                        <i className="bi bi-exclamation-triangle-fill me-2 fs-4"></i> Confirm Deletion
-                    </h5>
-                    <button type="button" className="btn-close" 
-                        onClick={() => setShowDeleteModal(false)} aria-label="Close"></button>
-                </div>
-                <div className="modal-body pt-2 pb-4">
-                    <p className="text-dark fw-medium">
-                        Are you absolutely sure you want to delete announcement ID <span className="fw-bold text-primary">{announcementToDelete}</span>? 
-                    </p>
-                    <p className="text-muted small mb-0">
-                        This action is permanent and cannot be reversed. Please ensure this is the correct item before proceeding.
-                    </p>
-                </div>
-                <div className="modal-footer border-0 pt-0">
-                    <button type="button" className="btn btn-secondary rounded-pill px-4" 
-                        onClick={() => setShowDeleteModal(false)}>
-                        Cancel
-                    </button>
-                    <button type="button" className="btn btn-danger rounded-pill px-4 fw-bold" 
-                        onClick={executeDelete}> {/* <-- This calls the execution function */}
-                        <i className="bi bi-trash-fill me-2"></i> Delete Permanently
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-)}
-{/* --- END DELETE CONFIRMATION MODAL --- */}
-            
-            {/* Custom Styles for better hover effect */}
             <style jsx>{`
                 .hover-scale:hover { transform: scale(1.02); }
-                .announcement-item:hover .shadow-sm { box-shadow: 0 0.5rem 1rem rgba(0,0,0,.15)!important; }
+                .announcement-item { transition: background-color 0.2s ease; }
+                /* Custom animation for NEW! badge */
+                .animate-pulse {
+                    animation: pulse 1.5s infinite;
+                }
+                @keyframes pulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.5; }
+                }
             `}</style>
         </div>
     );
-
-// ... (remaining cases)
             case "approval":
     const approvalQueueLogs = logs.filter(l => l.status === 'Pending Approval');
     
@@ -1859,7 +1876,7 @@ case "announcements":
     transition: "left 0.3s", 
     overflowY: 'auto',
     overflowX: 'hidden',
-    backgroundColor: '#f8f9fa', 
+    backgroundColor: '#eeeeeeff', 
     zIndex: 999,
   }}
 >

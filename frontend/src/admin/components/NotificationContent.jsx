@@ -10,6 +10,7 @@ export const NotificationContent = ({ notifications, onDismissAll, onClearReport
     // Helper to render individual notification item
     const notificationItem = (n) => {
         const isUrgent = n.type === 'DelayedUnit';
+        // Consistent colors: Danger for urgent, Primary for general info
         const color = isUrgent ? 'danger' : 'primary';
         const icon = isUrgent ? 'bi-clock-history' : 'bi-file-earmark-bar-graph';
         const titleColor = isUrgent ? 'text-danger' : 'text-dark';
@@ -17,7 +18,8 @@ export const NotificationContent = ({ notifications, onDismissAll, onClearReport
         return (
             <li 
                 key={n.id} 
-                className={`list-group-item list-group-item-action d-flex align-items-center py-3 px-4 border-0 border-bottom hover-shadow-sm`}
+                // Removed extra hover styles for cleaner look
+                className={`list-group-item list-group-item-action d-flex align-items-center py-3 px-4 border-bottom`}
                 style={{cursor: 'pointer', transition: 'background-color 0.2s ease'}}
                 onClick={() => onNotificationClick(n)}
             >
@@ -27,7 +29,7 @@ export const NotificationContent = ({ notifications, onDismissAll, onClearReport
                 </div>
                 
                 {/* Content */}
-                <div className="flex-grow-1">
+                <div className="flex-grow-1 text-start">
                     <h6 className={`mb-1 fw-bold ${titleColor}`}>{n.title}</h6>
                     <p className="mb-0 text-muted small text-truncate" style={{maxWidth: '90%'}}>{n.message}</p>
                 </div>
@@ -50,17 +52,23 @@ export const NotificationContent = ({ notifications, onDismissAll, onClearReport
             {/* --- TOP HEADER --- */}
             <div className="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
                 <h3 className="fw-bold text-dark d-flex align-items-center mb-0">
-                    <i className="bi bi-bell-fill me-2 text-danger"></i>
+                    {/* Primary color for general notification icon */}
+                    <i className="bi bi-bell-fill me-2 text-primary"></i>
                     System Alerts & Notifications
                 </h3>
-                <button className="btn btn-outline-danger px-4 rounded-pill fw-bold" onClick={onDismissAll} disabled={totalCount === 0}>
+                {/* Clear All button is less aggressive (secondary) but functional */}
+                <button 
+                    className="btn btn-outline-secondary px-4 rounded-pill fw-bold" 
+                    onClick={onDismissAll} 
+                    disabled={totalCount === 0}
+                >
                     <i className="bi bi-trash-fill me-1"></i> Clear All ({totalCount})
                 </button>
             </div>
 
             {/* --- EMPTY STATE --- */}
             {totalCount === 0 && (
-                <div className="card shadow-sm border-success bg-white" style={{borderRadius: '12px'}}>
+                <div className="card shadow-lg border-success bg-white rounded-4">
                     <div className="text-center py-5">
                         <i className="bi bi-check-circle display-4 text-success opacity-50"></i>
                         <h4 className="mt-3 fw-bold text-dark">All Clear!</h4>
@@ -73,13 +81,18 @@ export const NotificationContent = ({ notifications, onDismissAll, onClearReport
             {totalCount > 0 && (
                 <div className="row g-4">
                     
-                    {/* LEFT COLUMN: DELAYED UNITS (URGENT) */}
+                    {/* LEFT COLUMN: DELAYED UNITS (URGENT - RED) */}
                     <div className="col-lg-6">
-                        <div className="card shadow-sm border-0 rounded-4 overflow-hidden h-100">
+                        <div className="card shadow-lg border-0 rounded-4 overflow-hidden h-100">
+                            {/* Header: Danger/Red */}
                             <div className="card-header bg-danger text-white d-flex justify-content-between align-items-center py-3">
                                 <h5 className="mb-0 fw-bold"><i className="bi bi-clock-fill me-2"></i> Delayed Units ({delayedUnits.length})</h5>
                                 {delayedUnits.length > 0 && (
-                                    <button className="btn btn-sm btn-outline-light py-1 px-3 rounded-pill" onClick={onClearDelayed}>
+                                    <button 
+                                        className="btn btn-sm btn-outline-light py-1 px-3 rounded-pill fw-bold" 
+                                        // Action color changed to Danger to mark resolution
+                                        onClick={onClearDelayed}
+                                    >
                                         Mark Checked
                                     </button>
                                 )}
@@ -96,13 +109,18 @@ export const NotificationContent = ({ notifications, onDismissAll, onClearReport
                         </div>
                     </div>
                     
-                    {/* RIGHT COLUMN: NEW REPORTS (INFO) */}
+                    {/* RIGHT COLUMN: NEW REPORTS (INFO - PRIMARY) */}
                     <div className="col-lg-6">
-                        <div className="card shadow-sm border-0 rounded-4 overflow-hidden h-100">
+                        <div className="card shadow-lg border-0 rounded-4 overflow-hidden h-100">
+                            {/* Header: Primary/Blue */}
                             <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center py-3">
                                 <h5 className="mb-0 fw-bold"><i className="bi bi-file-earmark-text-fill me-2"></i> New Daily Reports ({newReports.length})</h5>
                                 {newReports.length > 0 && (
-                                    <button className="btn btn-sm btn-outline-light py-1 px-3 rounded-pill" onClick={onClearReports}>
+                                    <button 
+                                        className="btn btn-sm btn-outline-light py-1 px-3 rounded-pill fw-bold" 
+                                        // Action color changed to Success to mark reading/processing
+                                        onClick={onClearReports}
+                                    >
                                         Mark Read
                                     </button>
                                 )}
@@ -121,6 +139,12 @@ export const NotificationContent = ({ notifications, onDismissAll, onClearReport
 
                 </div>
             )}
+            
+            <style jsx>{`
+                .hover-shadow-sm:hover {
+                    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+                }
+            `}</style>
         </div>
     );
 };
