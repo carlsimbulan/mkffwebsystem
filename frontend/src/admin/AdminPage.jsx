@@ -71,11 +71,17 @@ const getTodayDate = () => {
 export default function AdminPage({ user, onLogout }) {
     const [activeTab, setActiveTab] = useState("dashboard");
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [filterStartDate, setFilterStartDate] = useState(''); 
+    const [filterEndDate, setFilterEndDate] = useState(getTodayDate());
     const [logs, setLogs] = useState([]); // Unit logs
     const [dailyReportsList, setDailyReportsList] = useState([]); // Reports
     const [userList, setUserList] = useState([]); // User list
     const [stations, setStations] = useState([]); // State for station list
     const [stationMonitorId, setStationMonitorId] = useState(null);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [announcementToDelete, setAnnouncementToDelete] = useState(null);
+    const [posterIdOfAnnouncement, setPosterIdOfAnnouncement] = useState(null);
+    const [successMessage, setSuccessMessage] = useState(null);
 
     // STATES for Reports and Editing
     const [reportDate, setReportDate] = useState(getTodayDate());
@@ -483,6 +489,68 @@ const prevChart = () => {
     }
 };
 
+// AdminPage.jsx (Add this function alongside your other ANNOUNCEMENT HANDLERS)
+
+// UPDATED handleDeleteAnnouncement FUNCTION
+
+// //////////////////////////////////////////////////////
+// 1. FUNCTION NA TATAWAGIN NG TRASH BUTTON SA LISTAHAN
+// (Ito ang magpapakita ng modal)
+// //////////////////////////////////////////////////////
+const handleConfirmDelete = (announcementId, posterUserId) => {
+    // Client-side security check (user must be Admin OR the original poster)
+    if (user.role !== 'Administrator' && user.id !== posterUserId) { 
+        alert("You do not have permission to delete this announcement.");
+        return;
+    }
+    
+    // Itatago ang ID sa state at ilalabas ang modal
+    setAnnouncementToDelete(announcementId);
+    setPosterIdOfAnnouncement(posterUserId); 
+    setShowDeleteModal(true); // <--- ITO ANG NAGPAPALABAS NG MODAL
+};
+
+// //////////////////////////////////////////////////////
+// 2. FUNCTION NA TATAWAGIN NG DELETE BUTTON SA LOOB NG MODAL
+// (Ito ang gagawa ng API call)
+// //////////////////////////////////////////////////////
+const executeDelete = async () => {
+    // Siguraduhin na may ID na nakaset bago mag-execute
+    if (!announcementToDelete) return; 
+
+    // Isara ang modal
+    setShowDeleteModal(false);
+
+    try {
+        // --- Execute DELETE API Call gamit ang ID sa state ---
+        const response = await axios.delete(`${ANNOUNCEMENTS_ENDPOINT}`, {
+            data: {
+                id: announcementToDelete, // Announcement ID galing sa state
+                user_id: user.id          // Ang ID ng kasalukuyang user
+            },
+            headers: { 
+                'Content-Type': 'application/json' 
+            }
+        });
+        
+        // Success: Show message and refresh the announcement list
+        alert(response.data.message || "Announcement deleted successfully.");
+        fetchData();
+        
+    } catch (error) {
+        console.error("Error deleting announcement:", error);
+        alert(`Failed to delete announcement: ${error.response?.data?.message || error.message}`);
+    } finally {
+        // I-reset ang state
+        setAnnouncementToDelete(null);
+        setPosterIdOfAnnouncement(null);
+    }
+};
+
+// --- ANNOUNCEMENT HANDLERS ---
+// ... (The place where you put handlePostAnnouncement) ...
+// ... (Insert handleDeleteAnnouncement here) ...
+
     // --- RENDER CONTENT ---
     const renderContent = () => {
         if (loading && logs.length === 0) {
@@ -495,7 +563,7 @@ const prevChart = () => {
 
 
         switch (activeTab) {
-         case "dashboard":
+       case "dashboard":
     // Note: 'dashboardView', 'nextChart', and 'prevChart' must be defined outside this switch.
     
     // Determine current chart title
@@ -504,7 +572,7 @@ const prevChart = () => {
 
     return (
         <div className="animate-in fade-in pb-4">
-            {/* --- Header Section --- */}
+            {/* --- 1. Header Section --- */}
             <div className="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <h3 className="fw-bold text-dark mb-1" style={{ letterSpacing: '-0.5px' }}>Production Overview</h3>
@@ -524,7 +592,7 @@ const prevChart = () => {
                 </div>
             </div>
 
-            {/* --- Stats Cards (Modern Accent Style) --- */}
+            {/* --- 2. Stats Cards (Summary) --- */}
             <div className="row g-4 mb-5">
                 {/* Completed Units */}
                 <div className="col-md-3">
@@ -599,7 +667,7 @@ const prevChart = () => {
                 </div>
             </div>
 
-            {/* --- Approvals Alert (Modern Strip) --- */}
+            {/* --- 3. Approvals Alert (Action Bar) --- */}
             {overallMetrics.pendingApprovalUnits > 0 && (
                 <div className="card border-0 shadow-sm mb-4 border-start border-4 border-danger bg-white">
                     <div className="card-body d-flex align-items-center justify-content-between p-3">
@@ -616,9 +684,54 @@ const prevChart = () => {
                     </div>
                 </div>
             )}
+            
+            {/* ----------------------------------------------------- */}
+            {/* --- 4. LIVE UNITS OVERVIEW (PRIORITIZED TABLE) --- */}
+            {/* ----------------------------------------------------- */}
+            <div className="row g-4 mb-4">
+                <div className="col-12">
+                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
+                        <div className="card-header bg-white py-3 border-0">
+                            <h5 className="fw-bold text-dark mb-0">Live Units Overview</h5>
+                            <small className="text-muted" style={{fontSize: '0.75rem'}}>Detailed breakdown of active and recent logs.</small>
+                        </div>
+                        <div className="card-body p-4">
+                            <div className="table-responsive" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                                <table className="table table-sm table-striped align-middle mb-0 small">
+                                    <thead className="table-light">
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Station</th>
+                                            <th>Device Serial No</th>
+                                            <th>Status</th>
+                                            <th>Remarks</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {logs.slice(0, 10).map(log => ( // Show only the last 10 logs for a quick overview
+                                            <tr key={log.id}>
+                                                <td className="text-muted" style={{fontSize: '00.7rem'}}>{new Date(log.created_at).toLocaleTimeString()}</td>
+                                                <td className="fw-medium">{log.station}</td>
+                                                <td className="font-monospace">{log.device_serial_no}</td>
+                                                <td><span className={`badge ${log.status === 'Completed' ? 'bg-success' : log.status === 'No Good (NG)' ? 'bg-danger' : log.status === 'In Progress' ? 'bg-primary' : 'bg-warning text-dark'}`}>{log.status}</span></td>
+                                                <td className="small text-truncate" style={{ maxWidth: '200px' }}>{log.remarks || 'N/A'}</td>
+                                            </tr>
+                                        ))}
+                                        {logs.length === 0 && (
+                                            <tr><td colSpan="5" className="text-center py-3 text-muted">No recent activity to display.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-            {/* --- PAGING CHART CONTAINER (New Section) --- */}
-            <div className="row g-4">
+            {/* ----------------------------------------------------- */}
+            {/* --- 5. PAGING CHART CONTAINER (Secondary Visual) --- */}
+            {/* ----------------------------------------------------- */}
+            <div className="row g-4"> 
                 <div className="col-12">
                     <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px', minHeight: '480px' }}>
                         
@@ -642,14 +755,13 @@ const prevChart = () => {
                             </div>
                         </div>
 
-                        {/* Chart Body (Clear of buttons) */}
+                        {/* Chart Body */}
                         <div className="card-body d-flex align-items-center justify-content-center p-4">
                             <div className="w-100 h-100 fade-in" style={{ height: '400px' }}>
                                 {/* Conditional Rendering based on dashboardView state */}
                                 {dashboardView === 'bar' && (
                                     <StationBarChart logs={logs} stations={stations} calculateMetrics={calculateStationMetrics} />
                                 )}
-                                {/* REMOVED RESTRICTIVE MAX-WIDTH DIV HERE */}
                                 {dashboardView === 'pie' && (
                                     <UnitPieChart metrics={overallMetrics} title="" />
                                 )}
@@ -659,23 +771,7 @@ const prevChart = () => {
                 </div>
             </div>
 
-            {/* Pulsing Animation for Live Indicator */}
-            
-            <style>{`
-                .animate-ping {
-                    animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
-                }
-                @keyframes ping {
-                    75%, 100% { transform: scale(2); opacity: 0; }
-                }
-                .fade-in {
-                    animation: fadeIn 0.4s ease-in-out;
-                }
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-            `}</style>
+            {/* Removed the style block here to keep components cleaner, assuming global CSS handles animations */}
         </div>
     );
 
@@ -1043,64 +1139,228 @@ const prevChart = () => {
         </div>
     );
     {/* --- NEW CASE: ANNOUNCEMENT BOARD --- */}
-            case "announcements": // ✅ ANNOUNCEMENTS CONTENT
-                return (
-                    <div className="animate-in fade-in pb-5">
-                        <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
-                            <div>
-                                <h3 className="fw-bold text-dark mb-1">📢 Announcement Board</h3>
-                                <p className="text-muted small mb-0">Post critical updates and important notices for all users.</p>
-                            </div>
-                            {/* Check if user is Admin to show post button */}
-                            {user.role === 'Administrator' && (
-                                <button
-                                    className="btn btn-danger px-4 py-2 rounded-pill shadow-sm fw-bold hover-scale d-flex align-items-center"
-                                    onClick={() => setShowPostModal(true)}
-                                >
-                                    <i className="bi bi-send-fill me-2"></i> Post New Announcement
-                                </button>
-                            )}
-                        </div>
+           // AdminPage.jsx (Inside renderContent function)
 
-                        {/* Announcement List (Chat/Forum Style) */}
-                        <div className="card border-0 shadow-sm p-4" style={{ borderRadius: '12px' }}>
-                            <div className="announcement-feed" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-                                {announcements.length > 0 ? (
-                                    announcements.map(announcement => (
-                                        <div key={announcement.id} className="d-flex align-items-start border-bottom pb-3 mb-3 announcement-item">
-                                            {/* Avatar */}
-                                            <img
-                                                src={announcement.poster_avatar ? `${AVATAR_UPLOAD_PATH}${announcement.poster_avatar}` : DEFAULT_AVATAR_PATH}
-                                                alt="Avatar"
-                                                className="rounded-circle me-3 border border-3 border-danger shadow-sm"
-                                                style={{ width: '50px', height: '50px', objectFit: 'cover' }}
-                                                onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
-                                            />
+// ... (existing cases)
 
-                                            {/* Content */}
-                                            <div className="flex-grow-1">
-                                                <div className="d-flex align-items-center mb-1">
-                                                    <h6 className="fw-bold text-dark mb-0 me-2">{announcement.poster_name || announcement.poster_role}</h6>
-                                                    <span className={`badge ${announcement.poster_role === 'Administrator' ? 'bg-danger' : 'bg-secondary'} rounded-pill small fw-normal`}>{announcement.poster_role}</span>
-                                                    <span className="ms-auto text-muted small" style={{ fontSize: '0.75rem' }}>
-                                                        {new Date(announcement.created_at).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' })}
-                                                    </span>
-                                                </div>
-                                                <p className="mb-0 text-dark announcement-content p-3 bg-light rounded" style={{ whiteSpace: 'pre-wrap', borderLeft: '3px solid #dc3545' }}>{announcement.content}</p>
-                                            </div>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="text-center py-5">
-                                        <i className="bi bi-pin-angle-fill display-3 text-secondary opacity-50 mb-3"></i>
-                                        <h5 className="fw-bold text-dark">No Recent Announcements</h5>
-                                        <p className="text-muted mb-0">Use the "Post New Announcement" button to inform your team.</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                );
+// AdminPage.jsx (Inside renderContent function)
+
+// ... (existing cases)
+
+case "announcements": 
+    
+    // 1. FILTERING LOGIC (No changes needed here)
+    const announcementsToDisplay = announcements.filter(announcement => {
+        const postDate = new Date(announcement.created_at.split(' ')[0]);
+        
+        let start = filterStartDate ? new Date(filterStartDate) : new Date('2000-01-01');
+        let end = filterEndDate ? new Date(filterEndDate) : new Date();
+
+        if (filterEndDate) {
+            end.setHours(23, 59, 59, 999);
+        }
+
+        const normalizedPostDate = new Date(postDate.getFullYear(), postDate.getMonth(), postDate.getDate());
+
+        return (
+            normalizedPostDate.getTime() >= start.getTime() && 
+            normalizedPostDate.getTime() <= end.getTime()
+        );
+    });
+
+    return (
+        <div className="animate-in fade-in pb-5">
+            {/* --- Header Section (Medyo compact) --- */}
+            <div className="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+                <div>
+                    <h3 className="fw-bold text-dark mb-1 fs-3" style={{ letterSpacing: '-0.5px' }}>
+                        📢 Factory Announcements
+                    </h3>
+                    <p className="text-muted small mb-0">
+                        {announcementsToDisplay.length} notices shown. Filtered by date range.
+                    </p>
+                </div>
+                {user.role === 'Administrator' && (
+                    <button
+                        className="btn btn-danger px-4 py-2 rounded-pill shadow fw-bold hover-scale d-flex align-items-center"
+                        onClick={() => setShowPostModal(true)}
+                    >
+                        <i className="bi bi-send-fill me-2"></i> Create New Post
+                    </button>
+                )}
+            </div>
+
+            {/* --- FILTER BAR (Compact Card) --- */}
+            <div className="card border-0 shadow-sm mb-4 p-3" style={{ borderRadius: '12px' }}>
+                <div className="d-flex flex-wrap align-items-center gap-3">
+                    <i className="bi bi-calendar-range text-secondary fs-5 me-2"></i>
+                    
+                    {/* Start Date Filter */}
+                    <div className="d-flex align-items-center gap-2">
+                        <label className="text-muted small fw-bold mb-0">From:</label>
+                        <input
+                            type="date"
+                            className="form-control form-control-sm border-0 bg-light fw-bold"
+                            style={{ maxWidth: '140px' }}
+                            value={filterStartDate}
+                            onChange={(e) => setFilterStartDate(e.target.value)}
+                        />
+                    </div>
+
+                    {/* End Date Filter */}
+                    <div className="d-flex align-items-center gap-2">
+                        <label className="text-muted small fw-bold mb-0">To:</label>
+                        <input
+                            type="date"
+                            className="form-control form-control-sm border-0 bg-light fw-bold"
+                            style={{ maxWidth: '140px' }}
+                            value={filterEndDate}
+                            onChange={(e) => setFilterEndDate(e.target.value)}
+                            max={getTodayDate()} 
+                        />
+                    </div>
+
+                    <button 
+                        className="btn btn-sm btn-outline-secondary ms-auto"
+                        onClick={() => { setFilterStartDate(''); setFilterEndDate(getTodayDate()); }}
+                    >
+                        Clear Filter
+                    </button>
+                </div>
+            </div>
+            {/* --- END FILTER BAR --- */}
+
+
+            {/* --- Announcement Feed Container (Central Focus) --- */}
+            <div className="card border-0 shadow-lg" style={{ borderRadius: '16px' }}>
+                <div className="card-body p-4"> 
+                    <div className="announcement-feed mx-auto" style={{ maxWidth: '800px', maxHeight: '70vh', overflowY: 'auto' }}>
+                        
+                        {announcementsToDisplay.length > 0 ? (
+                            announcementsToDisplay.map((announcement, index) => {
+                                const isLatest = index === 0;
+                                // FIX: Use new Date().toLocaleString() directly if getTimeDifference is not defined
+                                const postTime = new Date(announcement.created_at).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' }); 
+                                const posterAvatar = announcement.poster_avatar ? `${AVATAR_UPLOAD_PATH}${announcement.poster_avatar}` : DEFAULT_AVATAR_PATH;
+                                
+                                const canDelete = user.role === 'Administrator' || (user.id === announcement.user_id);
+
+                                return (
+                                    <div 
+                                        key={announcement.id} 
+                                        className={`d-flex align-items-start ${!isLatest ? 'border-bottom' : ''} pb-3 mb-3 announcement-item ${isLatest && announcements.length === announcementsToDisplay.length ? 'bg-light p-3 rounded-3 border border-danger border-opacity-25' : ''}`}
+                                    >
+                                        {/* Avatar Column */}
+                                        <div className="flex-shrink-0">
+                                            <img
+                                                src={posterAvatar}
+                                                alt="Avatar"
+                                                className="rounded-circle me-3 border border-3 border-danger shadow-sm"
+                                                style={{ width: '48px', height: '48px', objectFit: 'cover' }} 
+                                                onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
+                                            />
+                                        </div>
+
+                                        {/* Content Column */}
+                                        <div className="flex-grow-1">
+                                            <div className="d-flex justify-content-between align-items-start mb-2">
+                                                <div className="d-flex align-items-center">
+                                                    <h6 className="fw-bold text-dark mb-0 me-3">{announcement.poster_name || announcement.poster_role}</h6>
+                                                    <span className="badge bg-danger rounded-pill fw-bold py-1 px-2" style={{fontSize: '0.7rem'}}>
+                                                        {announcement.poster_role}
+                                                    </span>
+                                                </div>
+                                                
+                                                {/* TIME AND DELETE BUTTON */}
+                                                <div className="d-flex align-items-center gap-3">
+                                                    <span className="text-muted small fw-medium text-end" style={{ fontSize: '0.75rem' }}>
+                                                        <i className="bi bi-clock me-1"></i> {postTime}
+                                                    </span>
+                                                    
+                                                    {canDelete && (
+                                                        <button
+                                                            className="btn btn-sm btn-light text-danger border-0 p-1 rounded-circle hover-scale"
+                                                            title="Delete Announcement"
+                                                            // *** FIX: CALLS handleConfirmDelete WITH BOTH IDs ***
+                                                            onClick={() => handleConfirmDelete(announcement.id, announcement.user_id)} 
+                                                            style={{ width: '26px', height: '26px', padding: 0 }}
+                                                        >
+                                                            <i className="bi bi-trash-fill small"></i>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                {/* END TIME AND DELETE BUTTON */}
+                                                
+                                            </div>
+
+                                            {/* Announcement Content Box */}
+                                            <div className="bg-light p-3 rounded" style={{ borderLeft: '4px solid #dc3545', backgroundColor: '#fdf3f3 !important' }}>
+                                                <p className="mb-0 text-dark fw-medium" style={{ whiteSpace: 'pre-wrap', fontSize: '0.95rem', lineHeight: '1.4' }}>
+                                                    {announcement.content}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            /* --- Empty State --- */
+                            <div className="text-center py-5 my-5">
+                                <i className="bi bi-calendar-x display-2 text-secondary opacity-25 mb-4"></i>
+                                <h5 className="fw-bold text-dark">No Announcements Found</h5>
+                                <p className="text-muted mb-0">No posts match the selected date range.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            
+{/* --- DELETE CONFIRMATION MODAL (Must be here and calls executeDelete) --- */}
+{showDeleteModal && (
+    <div className="modal fade show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '16px' }}>
+                <div className="modal-header border-0 pb-0">
+                    <h5 className="modal-title fw-bold text-danger d-flex align-items-center">
+                        <i className="bi bi-exclamation-triangle-fill me-2 fs-4"></i> Confirm Deletion
+                    </h5>
+                    <button type="button" className="btn-close" 
+                        onClick={() => setShowDeleteModal(false)} aria-label="Close"></button>
+                </div>
+                <div className="modal-body pt-2 pb-4">
+                    <p className="text-dark fw-medium">
+                        Are you absolutely sure you want to delete announcement ID <span className="fw-bold text-primary">{announcementToDelete}</span>? 
+                    </p>
+                    <p className="text-muted small mb-0">
+                        This action is permanent and cannot be reversed. Please ensure this is the correct item before proceeding.
+                    </p>
+                </div>
+                <div className="modal-footer border-0 pt-0">
+                    <button type="button" className="btn btn-secondary rounded-pill px-4" 
+                        onClick={() => setShowDeleteModal(false)}>
+                        Cancel
+                    </button>
+                    <button type="button" className="btn btn-danger rounded-pill px-4 fw-bold" 
+                        onClick={executeDelete}> {/* <-- This calls the execution function */}
+                        <i className="bi bi-trash-fill me-2"></i> Delete Permanently
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+)}
+{/* --- END DELETE CONFIRMATION MODAL --- */}
+            
+            {/* Custom Styles for better hover effect */}
+            <style jsx>{`
+                .hover-scale:hover { transform: scale(1.02); }
+                .announcement-item:hover .shadow-sm { box-shadow: 0 0.5rem 1rem rgba(0,0,0,.15)!important; }
+            `}</style>
+        </div>
+    );
+
+// ... (remaining cases)
             case "approval":
     const approvalQueueLogs = logs.filter(l => l.status === 'Pending Approval');
     
