@@ -1,132 +1,69 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios'; 
+import 'bootstrap-icons/font/bootstrap-icons.css';
 
 // --- CONFIGURATION ---
 const API_BASE_URL = "http://localhost/mkffwebsystem/backend/api";
 const UNITS_ENDPOINT = `${API_BASE_URL}/units.php`;
 const HISTORY_ENDPOINT = `${API_BASE_URL}/unit_history.php`; 
-const CURRENT_ROLE = "IT_Assistant"; 
-const MAX_QR_COUNT = 100000; 
+const MAX_QR_COUNT = 100;
+const USER_ENDPOINT = `${API_BASE_URL}/user_management.php`; 
 
-// Helper to format a number into a sequential serial string (e.g., 1 -> 00001)
+// Helper Functions
 const formatSerial = (num) => String(num).padStart(5, '0');
-
-// Helper function to safely parse a SN/ASSY string to a number
 const safeParseSerial = (serialStr, prefix) => {
     const numStr = serialStr?.replace(prefix, '') || '0';
     return parseInt(numStr, 10) || 0;
-}
+};
+const getTodayDate = () => {
+    const d = new Date();
+    return d.toISOString().split('T')[0];
+};
 
-// --- QR LIST PRINT COMPONENT ---
-const GeneratedQRList = ({ list, onSave, onDiscard, isSaving }) => {
-    if (list.length === 0) return null;
+// --- UTILITY COMPONENTS (MODALS & OVERLAYS) ---
 
-    const handlePrint = () => {
-        const printContent = document.getElementById('qr-print-area-wrapper').innerHTML;
-        const printWindow = window.open('', '', 'height=600,width=800');
-        printWindow.document.write('<html><head><title>Print QR Batch</title>');
-        
-        printWindow.document.write(`
-            <style>
-                @page { size: auto; margin: 3mm; } 
-                body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
-                .qr-item {
-                    display: inline-block;
-                    width: 95mm; 
-                    height: 50mm; 
-                    border: 1px dotted #ccc; 
-                    margin: 2mm;
-                    padding: 3mm;
-                    box-sizing: border-box;
-                    text-align: center;
-                    page-break-inside: avoid;
-                }
-                .qr-img {
-                    max-width: 35mm; 
-                    height: auto;
-                    margin-bottom: 2mm;
-                }
-                .qr-text {
-                    font-size: 9pt; 
-                    line-height: 1.3;
-                }
-                .qr-text strong {
-                    font-size: 11pt; 
-                    display: block;
-                    margin-bottom: 2px;
-                }
-                .tag-label {
-                    font-size: 7pt; 
-                    color: #555; 
-                    text-transform: uppercase;
-                }
-            </style>
-        `);
-        printWindow.document.write('</head><body>');
-        printWindow.document.write(printContent); 
-        printWindow.document.write('</body></html>');
-        printWindow.document.close();
-        
-        setTimeout(() => {
-            printWindow.focus();
-            printWindow.print();
-        }, 300); 
-    };
-    
+const LoadingOverlay = ({ status, message }) => {
+    if (status === 'idle') return null;
+    let iconClass, spinnerVisible = false, bgColor, statusText;
+    if (status === 'loading') {
+        spinnerVisible = true; bgColor = "bg-dark opacity-75"; statusText = "PROCESSING DATA...";
+    } else if (status === 'success') {
+        iconClass = "bi bi-check-circle-fill text-success"; bgColor = "bg-success opacity-75"; statusText = "SUCCESS";
+    } else if (status === 'error') {
+        iconClass = "bi bi-x-octagon-fill text-danger"; bgColor = "bg-danger opacity-75"; statusText = "FAILED";
+    }
     return (
-        <div className="mt-4 border-top pt-3">
-            <h5 className="fw-bold mb-3 text-primary">Generated Batch Preview & Actions ({list.length} units)</h5>
-
-            <div className="d-flex mb-3 gap-2">
-                <button className="btn btn-primary fw-bold flex-grow-1" onClick={handlePrint}>
-                    <i className="bi bi-printer me-2"></i> Print All Labels
-                </button>
-                <button className="btn btn-success fw-bold flex-grow-1" onClick={onSave} disabled={isSaving}>
-                    {isSaving ? <span><span className="spinner-border spinner-border-sm me-2"></span>Saving...</span> : <span><i className="bi bi-database-add me-2"></i> Save Batch to DB</span>}
-                </button>
-                <button className="btn btn-outline-secondary" onClick={onDiscard} disabled={isSaving}>
-                    <i className="bi bi-trash"></i> Discard
-                </button>
-            </div>
-
-            {/* Print Area Container */}
-            <div className="bg-light p-3 border rounded" style={{ maxHeight: '500px', overflowY: 'auto' }}>
-                <p className="small text-danger fw-bold mb-2">
-                    Start Assembly No: {list[0]?.assembly_no} | Serial Numbers are BLANK (Pending Scan)
-                </p>
-                
-                <div id="qr-print-area-wrapper">
-                    {list.map((unit, index) => (
-                        <div key={unit.id || index} className="qr-item bg-white shadow-sm" style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: '5px', width: '150px', height: '120px', border: '1px solid #ddd' }}>
-                            <img src={unit.qr_url} alt="QR" className="qr-img" style={{ maxWidth: '60px' }} />
-                            <div className="qr-text">
-                                {/* Display Assembly No as the main identifier since Serial is blank */}
-                                <strong>{unit.assembly_no}</strong>
-                                <div><span className="tag-label">Model:</span> {unit.model || 'N/A'}</div>
-                                <div><span className="tag-label">Rev:</span> {unit.revision || '-'}</div>
-                            </div>
-                        </div>
-                    ))}
+        <div className={`position-fixed w-100 h-100 top-0 start-0 ${bgColor} d-flex justify-content-center align-items-center z-3`} style={{ zIndex: 1060 }}>
+            <div className="bg-white p-5 rounded shadow text-center" style={{ minWidth: '300px' }}>
+                <div className="mb-3">
+                    {spinnerVisible ? <div className="spinner-border text-primary" role="status"></div> : <i className={`${iconClass} fs-1`}></i>}
                 </div>
+                <h4 className="fw-bold text-dark mb-1">{statusText}</h4>
+                <p className="text-muted small">{message}</p>
             </div>
         </div>
     );
 };
 
-// --- MODAL COMPONENTS ---
 const CustomMessageModal = ({ title, message, type, onClose }) => {
     const bgColor = type === 'success' ? 'bg-success' : type === 'error' ? 'bg-danger' : type === 'warning' ? 'bg-warning' : 'bg-info'; 
+    const icon = type === 'success' ? 'bi-check-circle-fill' : type === 'error' ? 'bi-x-octagon-fill' : 'bi-info-circle-fill';
+
     return (
-        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000 }}>
+        <div className="modal d-block animate-in fade-in" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000 }}>
             <div className="modal-dialog modal-dialog-centered modal-sm">
-                <div className="modal-content">
-                    <div className={`modal-header ${bgColor} text-white`}>
-                        <h5 className="modal-title">{title}</h5>
+                <div className="modal-content border-0 shadow" style={{ borderRadius: '12px' }}>
+                    <div className={`modal-header ${bgColor} text-white border-0 rounded-top-2`} style={{ borderBottom: 'none' }}>
+                        <h5 className="modal-title fw-bold d-flex align-items-center">
+                            <i className={`${icon} me-2`}></i> {title}
+                        </h5>
                         <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
                     </div>
-                    <div className="modal-body"><p>{message}</p></div>
-                    <div className="modal-footer">
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
+                    <div className="modal-body p-4">
+                        <p className="mb-0 text-dark fw-medium">{message}</p>
+                    </div>
+                    <div className="modal-footer border-0">
+                        <button type="button" className="btn btn-secondary rounded-pill px-4" onClick={onClose}>Close</button>
                     </div>
                 </div>
             </div>
@@ -134,85 +71,100 @@ const CustomMessageModal = ({ title, message, type, onClose }) => {
     );
 };
 
-// --- SUB-COMPONENTS (Monitoring Table - Unscanned) ---
-const UnscannedUnitsTable = ({ unscannedUnits }) => (
-    <div className="card shadow-sm">
-        <div className="card-header bg-primary text-white">
-            <h5 className="mb-0"><i className="bi bi-box me-2"></i>Units For Scanning (**{unscannedUnits.length}** Units)</h5>
-            <p className="small mb-0">These units have been created and are ready for the production floor.</p>
-        </div>
-        <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-            <table className="table table-striped table-sm mb-0 small">
-                <thead className="table-light sticky-top">
-                    <tr>
-                        <th>Assembly No.</th>
-                        <th>Model</th>
-                        <th>Revision</th>
-                        <th>Kitting No.</th>
-                        <th>Status</th>
-                        <th>Station</th>
-                        <th>Created At</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {unscannedUnits.length > 0 ? unscannedUnits.map(unit => (
-                        <tr key={unit.id} className="table-info">
-                            <td className="fw-bold text-primary">{unit.assembly_no}</td>
-                            <td>{unit.model}</td>
-                            <td>{unit.revision}</td>
-                            <td>{unit.base_unit_kitting_no}</td>
-                            <td><span className="badge bg-primary">For Scanning</span></td>
-                            <td>{unit.station}</td>
-                            <td>{new Date(unit.created_at).toLocaleString()}</td>
-                        </tr>
-                    )) : (
-                        <tr><td colSpan="7" className="text-center py-4">No units currently require initial scanning.</td></tr>
-                    )}
-                </tbody>
-            </table>
-        </div>
-    </div>
-);
+// --- MONITORING VIEW COMPONENTS ---
 
-// --- MONITORING VIEW UTILITIES (Station History Modal) ---
-const StationHistoryModal = ({ stationId, onClose }) => {
+const StationHistoryModal = ({ stationId, onClose, user }) => {
     const [historyLogs, setHistoryLogs] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(true);
     const [historyError, setHistoryError] = useState(null);
+    
+    const [filterAssemblyNo, setFilterAssemblyNo] = useState('');
+    const [filterStartDate, setFilterStartDate] = useState('');
+    const [filterEndDate, setFilterEndDate] = useState(getTodayDate());
+
+    const fetchHistory = useCallback(async () => {
+        setHistoryLoading(true);
+        setHistoryError(null);
+        try {
+            const params = { 
+                station: stationId, 
+                search_assembly: filterAssemblyNo || undefined,
+                start_date: filterStartDate || undefined,
+                end_date: filterEndDate || undefined
+            };
+
+            const response = await axios.get(HISTORY_ENDPOINT, { params });
+            const logs = Array.isArray(response.data) ? response.data.reverse() : [];
+            setHistoryLogs(logs);
+        } catch (err) {
+            setHistoryError(`Failed to fetch history: ${err.message}.`);
+        } finally {
+            setHistoryLoading(false);
+        }
+    }, [stationId, filterAssemblyNo, filterStartDate, filterEndDate]);
 
     useEffect(() => {
-        const fetchHistory = async () => {
-            setHistoryLoading(true);
-            setHistoryError(null);
-            try {
-                const response = await axios.get(HISTORY_ENDPOINT, { params: { station: stationId } });
-                if (Array.isArray(response.data)) {
-                    setHistoryLogs(response.data);
-                } else {
-                    setHistoryLogs([]);
-                }
-            } catch (err) {
-                setHistoryError(`Failed to fetch history for ${stationId}.`);
-            } finally {
-                setHistoryLoading(false);
-            }
-        };
         fetchHistory();
-    }, [stationId]);
-    
+    }, [fetchHistory]);
+
     return (
-        <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1080 }}>
+        <div className="modal d-block animate-in fade-in" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1080 }}>
             <div className="modal-dialog modal-dialog-centered modal-xl">
-                <div className="modal-content">
-                    <div className="modal-header bg-dark text-white">
-                        <h5 className="modal-title"><i className="bi bi-clock-history me-2"></i> Unit History for: {stationId}</h5>
+                <div className="modal-content border-0 shadow" style={{ borderRadius: '12px' }}>
+                    <div className="modal-header bg-dark text-white border-0">
+                        <h5 className="modal-title fw-bold"><i className="bi bi-clock-history me-2"></i> History Logs for: {stationId}</h5>
                         <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
                     </div>
-                    <div className="modal-body p-0">
+                    <div className="modal-body p-4">
+                        
+                        {/* --- FILTER BAR (Shadow removed) --- */}
+                        <div className="card mb-4 p-3 border-0 bg-light">
+                            <div className="row g-3 align-items-center small">
+                                <div className="col-md-4">
+                                    <label className="form-label mb-0 fw-bold">Assembly No. Search:</label>
+                                    <input 
+                                        type="text" 
+                                        className="form-control form-control-sm" 
+                                        placeholder="ASSY-00001"
+                                        value={filterAssemblyNo}
+                                        onChange={(e) => setFilterAssemblyNo(e.target.value)}
+                                    />
+                                </div>
+                                <div className="col-md-3">
+                                    <label className="form-label mb-0 fw-bold">Date From:</label>
+                                    <input 
+                                        type="date" 
+                                        className="form-control form-control-sm" 
+                                        value={filterStartDate}
+                                        onChange={(e) => setFilterStartDate(e.target.value)}
+                                    />
+                                </div>
+                                <div className="col-md-3">
+                                    <label className="form-label mb-0 fw-bold">Date To:</label>
+                                    <input 
+                                        type="date" 
+                                        className="form-control form-control-sm" 
+                                        value={filterEndDate}
+                                        onChange={(e) => setFilterEndDate(e.target.value)}
+                                        max={getTodayDate()}
+                                    />
+                                </div>
+                                <div className="col-md-2 d-flex justify-content-end">
+                                    <button 
+                                        className="btn btn-sm btn-outline-secondary w-100 mt-3" 
+                                        onClick={() => { setFilterAssemblyNo(''); setFilterStartDate(''); setFilterEndDate(getTodayDate()); }}
+                                    >
+                                        Clear Filters
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* --- HISTORY TABLE --- */}
                         {historyLoading && <div className="text-center py-5">Loading history...</div>}
                         {historyError && <div className="alert alert-danger m-3">{historyError}</div>}
                         {!historyLoading && !historyError && (
-                            <div className="table-responsive" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                            <div className="table-responsive border rounded" style={{ maxHeight: '50vh', overflowY: 'auto' }}>
                                 <table className="table table-sm table-hover table-striped mb-0 small">
                                     <thead className="table-dark sticky-top">
                                         <tr>
@@ -228,26 +180,26 @@ const StationHistoryModal = ({ stationId, onClose }) => {
                                     </thead>
                                     <tbody>
                                         {historyLogs.length > 0 ? historyLogs.map(log => (
-                                            <tr key={log.history_id}> 
+                                            <tr key={log.history_id} className={log.action_type.includes('CREATE') ? 'table-primary' : log.action_type.includes('UPDATE') ? 'table-warning' : ''}>
                                                 <td>{log.unit_id}</td>
                                                 <td>{log.model}</td>
-                                                <td>{log.assembly_no}</td>
+                                                <td className="fw-bold">{log.assembly_no}</td>
                                                 <td>{log.action_type}</td>
                                                 <td>{log.station_name}</td>
-                                                <td>{log.status_after}</td>
+                                                <td><span className={`badge ${log.status_after.includes('Progress') ? 'bg-primary' : log.status_after.includes('Completed') ? 'bg-success' : 'bg-danger'}`}>{log.status_after}</span></td>
                                                 <td>{log.action_by || 'System'}</td>
                                                 <td className="text-muted">{new Date(log.timestamp).toLocaleString()}</td>
                                             </tr>
                                         )) : (
-                                            <tr><td colSpan="8" className="text-center py-4">No historical records found for **{stationId}**.</td></tr>
+                                            <tr><td colSpan="8" className="text-center py-4 text-muted">No historical records match your search criteria.</td></tr>
                                         )}
                                     </tbody>
                                 </table>
                             </div>
                         )}
                     </div>
-                    <div className="modal-footer">
-                        <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
+                    <div className="modal-footer border-0">
+                        <button type="button" className="btn btn-secondary rounded-pill px-4" onClick={onClose}>Close</button>
                     </div>
                 </div>
             </div>
@@ -255,48 +207,79 @@ const StationHistoryModal = ({ stationId, onClose }) => {
     );
 };
 
-// --- MONITORING VIEW UTILITIES (Live Monitoring Table) ---
-const LiveMonitoringTable = ({ stationId, units, onBack, handleMonitorHistory }) => {
-    // Filter units that are currently at this station (not just history)
-    const stationUnits = units.filter(u => u.station === stationId && u.status !== 'For Scanning');
+const UnscannedUnitsTable = ({ unscannedUnits }) => (
+    <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
+        <div className="card-header bg-light border-0">
+            <h5 className="mb-0 fw-bold text-dark"><i className="bi bi-box me-2 text-primary"></i>Units For Initial Scanning (**{unscannedUnits.length}** Units)</h5>
+            <p className="small text-muted mb-0">These units have been created and are ready for the production floor (Station 1).</p>
+        </div>
+        <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+            <table className="table table-striped table-sm mb-0 small align-middle">
+                <thead className="table-light sticky-top">
+                    <tr>
+                        <th className="fw-bold">Assembly No.</th>
+                        <th>Model</th>
+                        <th>Revision</th>
+                        <th>Kitting No.</th>
+                        <th>Status</th>
+                        <th>Created At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {unscannedUnits.length > 0 ? unscannedUnits.map(unit => (
+                        <tr key={unit.id}>
+                            <td className="fw-bold text-primary">{unit.assembly_no}</td>
+                            <td>{unit.model}</td>
+                            <td>{unit.revision}</td>
+                            <td>{unit.base_unit_kitting_no}</td>
+                            <td><span className="badge bg-info text-dark fw-bold">For Scanning</span></td>
+                            <td>{new Date(unit.created_at).toLocaleString()}</td>
+                        </tr>
+                    )) : (
+                        <tr><td colSpan="6" className="text-center py-4 text-muted">No units currently require initial scanning.</td></tr>
+                    )}
+                </tbody>
+            </table>
+        </div>
+    </div>
+);
 
+const LiveMonitoringTable = ({ stationId, units, onBack }) => {
+    const stationUnits = units.filter(u => u.station === stationId && u.status !== 'For Scanning');
+    
     return (
-        <div>
-            <div className="d-flex justify-content-between align-items-center mb-3">
-                <h4 className="mb-0"><i className="bi bi-activity me-2"></i>Live Units at {stationId}</h4>
-                <button className="btn btn-sm btn-outline-danger" onClick={onBack}>
+        <div className="animate-in fade-in">
+            <div className="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+                <h4 className="mb-0 fw-bold text-primary"><i className="bi bi-activity me-2"></i>Live Units at {stationId}</h4>
+                <button className="btn btn-sm btn-outline-secondary rounded-pill px-3" onClick={onBack}>
                     <i className="bi bi-arrow-left me-2"></i>Back to Grid View
                 </button>
             </div>
-            <div className="card shadow-sm">
-                <div className="table-responsive" style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                    <table className="table table-striped table-sm mb-0 small">
+            <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
+                <div className="table-responsive" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                    <table className="table table-striped table-sm mb-0 small align-middle">
                         <thead className="table-dark sticky-top">
                             <tr>
-                                <th>Assembly No.</th>
+                                <th className="fw-bold">Assembly No.</th>
                                 <th>Serial No.</th>
                                 <th>Model</th>
                                 <th>Status</th>
                                 <th>Remarks</th>
-                                <th>Actions</th>
+                                <th>Time Logged</th>
                             </tr>
                         </thead>
                         <tbody>
                             {stationUnits.length > 0 ? stationUnits.map(unit => (
                                 <tr key={unit.id}>
-                                    <td className="fw-bold">{unit.assembly_no}</td>
+                                    <td className="fw-bold text-primary">{unit.assembly_no}</td>
                                     <td>{unit.device_serial_no || <span className="text-muted fst-italic">Pending</span>}</td>
                                     <td>{unit.model}</td>
                                     <td><span className={`badge ${unit.status === 'In Progress' ? 'bg-primary' : unit.status === 'Completed' ? 'bg-success' : 'bg-danger'}`}>{unit.status}</span></td>
-                                    <td>{unit.remarks}</td>
-                                    <td>
-                                        <button className="btn btn-sm btn-outline-secondary py-0" onClick={() => handleMonitorHistory(unit.station)}>
-                                            <i className="bi bi-clock-history me-1"></i>History
-                                        </button>
-                                    </td>
+                                    <td><small className="text-muted">{unit.remarks}</small></td>
+                                    <td>{new Date(unit.created_at).toLocaleTimeString()}</td>
                                 </tr>
                             )) : (
-                                <tr><td colSpan="6" className="text-center py-4">No live units currently logged at this station.</td></tr>
+                                <tr><td colSpan="6" className="text-center py-4 text-muted">No live units currently logged at this station.</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -305,6 +288,98 @@ const LiveMonitoringTable = ({ stationId, units, onBack, handleMonitorHistory })
         </div>
     );
 };
+
+const GeneratedQRList = ({ list, onSave, onDiscard, isSaving }) => {
+    if (list.length === 0) return null;
+    
+    const handlePrint = () => {
+        const printContent = document.getElementById('qr-print-area-wrapper').innerHTML;
+        const printWindow = window.open('', '', 'height=600,width=800');
+        printWindow.document.write('<html><head><title>Print QR Batch</title>');
+        printWindow.document.write(`
+            <style>
+                @page { size: A4; margin: 5mm; } 
+                body { margin: 0; padding: 0; font-family: Arial, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                .qr-item-label {
+                    display: inline-block;
+                    width: 95mm; 
+                    height: 50mm; 
+                    border: 1px solid #000; 
+                    margin: 2mm;
+                    padding: 3mm;
+                    box-sizing: border-box;
+                    page-break-inside: avoid;
+                    float: left; 
+                    overflow: hidden;
+                    font-size: 8pt;
+                    line-height: 1.2;
+                }
+                .qr-img-print { max-width: 40mm; height: auto; float: left; margin-right: 5mm; }
+                .qr-text-print { text-align: left; float: left; width: 50mm; }
+                .qr-text-print strong { font-size: 14pt; display: block; margin-bottom: 2px; color: #000; }
+                .tag-label { font-size: 8pt; color: #555; text-transform: uppercase; display: inline-block; width: 15mm; }
+            </style>
+        `);
+        printWindow.document.write('</head><body>');
+        printWindow.document.write(printContent); 
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        
+        setTimeout(() => {
+            printWindow.focus();
+            printWindow.print();
+        }, 300); 
+    };
+    
+    return (
+        <div className="mt-4 border-top pt-4 animate-in fade-in">
+            <h5 className="fw-bold mb-3 text-dark"><i className="bi bi-file-earmark-check me-2 text-success"></i>Generated Batch Preview & Actions ({list.length} units)</h5>
+
+            <div className="d-flex mb-3 gap-3">
+                <button className="btn btn-primary fw-bold flex-grow-1 rounded-pill px-4" onClick={handlePrint}>
+                    <i className="bi bi-printer me-2"></i> Print All Labels
+                </button>
+                <button className="btn btn-success fw-bold flex-grow-1 rounded-pill px-4" onClick={onSave} disabled={isSaving}>
+                    {isSaving ? <span><span className="spinner-border spinner-border-sm me-2"></span>Saving...</span> : <span><i className="bi bi-database-add me-2"></i> Save Batch to DB</span>}
+                </button>
+                <button className="btn btn-outline-secondary rounded-pill px-4" onClick={onDiscard} disabled={isSaving}>
+                    <i className="bi bi-trash"></i> Discard
+                </button>
+            </div>
+
+            <div className="bg-light p-3 border rounded shadow-sm" style={{ maxHeight: '500px', overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                <p className="small text-danger fw-bold w-100 mb-2">
+                    Start Assembly No: **{list[0]?.assembly_no}** | **{list.length}** QRs generated (Serial No. is BLANK)
+                </p>
+                
+                <div id="qr-print-area-wrapper" style={{ display: 'none' }}>
+                     {list.map((unit, index) => (
+                        <div key={unit.id || index} className="qr-item-label bg-white shadow-sm">
+                            <img src={unit.qr_url} alt="QR" className="qr-img-print" />
+                            <div className="qr-text-print">
+                                <strong>{unit.assembly_no}</strong>
+                                <div><span className="tag-label">Model:</span> {unit.model || 'N/A'}</div>
+                                <div><span className="tag-label">Rev:</span> {unit.revision || '-'}</div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                
+                {list.map((unit, index) => (
+                    <div key={unit.id || index} className="bg-white border rounded p-2" style={{ flex: '0 0 calc(25% - 5px)', minWidth: '150px', maxWidth: '250px', textAlign: 'center' }}>
+                        <img src={unit.qr_url} alt="QR" style={{ maxWidth: '80px', marginBottom: '5px' }} />
+                        <div className="small">
+                            <strong className="d-block text-dark" style={{ fontSize: '0.9rem' }}>{unit.assembly_no}</strong>
+                            <span className="text-muted" style={{ fontSize: '0.7rem' }}>Model: {unit.model || 'N/A'}</span>
+                        </div>
+                    </div>
+                ))}
+
+            </div>
+        </div>
+    );
+};
+
 
 // --- MAIN COMPONENT ---
 export default function ITAssistantPage({ user, onLogout }) {
@@ -361,12 +436,22 @@ export default function ITAssistantPage({ user, onLogout }) {
             const fetchedUnits = Array.isArray(unitsRes.data) ? unitsRes.data : [];
             setUnitLogs(fetchedUnits);
 
+            // Fetch user list (to ensure we have the latest full_name and email)
+            const userRes = await axios.get(USER_ENDPOINT);
+            const fetchedUsers = Array.isArray(userRes.data) ? userRes.data : [];
+            const currentUser = fetchedUsers.find(u => u.username === user.username);
+            
+            // Update user object with fetched data
+            if (currentUser) {
+                user.full_name = currentUser.full_name;
+                user.email = currentUser.email;
+            }
+
             if (fetchedUnits.length > 0) {
                 let maxSerial = 0;
                 let maxAssembly = 0;
 
                 fetchedUnits.forEach(unit => {
-                    // Only parse serials if they exist
                     if (unit.device_serial_no) {
                         const currentSerial = safeParseSerial(unit.device_serial_no, 'SN-');
                         if (currentSerial > maxSerial) maxSerial = currentSerial;
@@ -384,17 +469,18 @@ export default function ITAssistantPage({ user, onLogout }) {
                 setNextAssemblyNo(1);
             }
         } catch (err) {
-            console.error("Error fetching unit data:", err);
+            console.error("Error fetching data:", err);
+            setError("Failed to fetch production data.");
         } finally {
             if (isInitial) {
                 setLoading(false);
                 setIsInitialLoadComplete(true); 
             }
         }
-    }, []);
+    }, [user]); // Depend on user to ensure profile data is fetched
 
     useEffect(() => {
-        // Define Stations 1-15
+        // Define Stations 1-15 (Kept for monitoring view)
         const mockStations = Array.from({ length: 15 }, (_, i) => ({
             id: `Station ${i + 1}`, // Matches DB station names
             name: `Station ${i + 1}`,
@@ -407,20 +493,19 @@ export default function ITAssistantPage({ user, onLogout }) {
 
     useEffect(() => {
         if (isInitialLoadComplete) {
+            // Poll every 10 seconds for real-time updates
             const interval = setInterval(() => fetchUnitData(false), 10000); 
             return () => clearInterval(interval);
         }
     }, [isInitialLoadComplete, fetchUnitData]);
     
-    // --- QR HANDLERS ---
+    // --- HANDLERS (Logic Retained) ---
     const handleGenerateQR = (e) => {
         e.preventDefault();
-
-        // 1. Validation: Only Quantity is strictly required now
-        const quantity = parseInt(qrFormData.quantity, 10);
+        const quantity = parseInt(qrFormData.quantity, 10) || 0;
         
-        if (isNaN(quantity) || quantity < 1 || quantity > 100) { 
-            setModalConfig({ title: "Error", message: "Batch quantity must be between 1 and 100.", type: "error" });
+        if (isNaN(quantity) || quantity < 1 || quantity > MAX_QR_COUNT) { 
+            setModalConfig({ title: "Error", message: `Batch quantity must be between 1 and ${MAX_QR_COUNT}.`, type: "error" });
             setShowModal(true);
             return;
         }
@@ -431,25 +516,19 @@ export default function ITAssistantPage({ user, onLogout }) {
         for (let i = 0; i < quantity; i++) {
             if (currentAssembly > 999999) break;
 
-            // 2. Generate Unique Assembly No
             const newAssemblyNum = `ASSY-${formatSerial(currentAssembly)}`; 
-            
-            // 3. Serial No is BLANK
-            const newSerialNum = ""; 
-
-            // 4. Get Optional Values (Default to empty string if undefined)
+            const newSerialNum = ""; // BLANK
             const model = qrFormData.model?.trim() || "";
             const rev = qrFormData.revision?.trim() || "";
             const base = qrFormData.baseKit?.trim() || "";
             const acc = qrFormData.accKit?.trim() || "";
 
-            // 5. Construct QR String
             const qrString = `${model}|${rev}|${base}|${newAssemblyNum}|${newSerialNum}|${acc}`;
             
             newQRList.push({
-                id: Date.now() + i, // Temp Key
-                device_serial_no: newSerialNum, // BLANK
-                assembly_no: newAssemblyNum,    // UNIQUE
+                id: Date.now() + i, 
+                device_serial_no: newSerialNum, 
+                assembly_no: newAssemblyNum, 
                 model: model,
                 revision: rev,
                 base_unit_kitting_no: base,
@@ -457,7 +536,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                 qr_url: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrString)}`,
                 qr_string: qrString,
                 status: 'For Scanning', 
-                station: 'N/A', // [FIX] This ensures it is NOT in Station 1 yet
+                station: 'N/A', 
                 remarks: 'Batch generated.',
             });
 
@@ -476,9 +555,9 @@ export default function ITAssistantPage({ user, onLogout }) {
             const promises = generatedQRList.map(unit => {
                 return axios.post(UNITS_ENDPOINT, {
                     ...unit,
-                    action: 'create', // Use the 'create' action we defined in units.php
+                    action: 'create', 
                     username: user.username,
-                    station: 'N/A', // [FIX] Ensure it is saved as N/A
+                    station: 'N/A', 
                     status: 'For Scanning'
                 });
             });
@@ -498,7 +577,7 @@ export default function ITAssistantPage({ user, onLogout }) {
             console.error("Batch Unit Save Failed:", error);
             setModalConfig({ 
                 title: "Save Failed", 
-                message: `Failed to save units. check console for details.`, 
+                message: `Failed to save units. Check console for details.`, 
                 type: "error" 
             });
             setShowModal(true);
@@ -512,7 +591,7 @@ export default function ITAssistantPage({ user, onLogout }) {
         if (name === 'quantity') {
             let parsed = parseInt(value, 10);
             if (isNaN(parsed) || parsed < 1) parsed = 1;
-            if (parsed > 100) parsed = 100;
+            if (parsed > MAX_QR_COUNT) parsed = MAX_QR_COUNT; // Enforce max limit
             value = parsed;
         }
         setQrFormData(prev => ({...prev, [name]: value}));
@@ -525,13 +604,14 @@ export default function ITAssistantPage({ user, onLogout }) {
                 id: unit.id,
                 status: 'In Progress', 
                 remarks: `Approved by ${user.full_name || user.username}. Re-entry permitted.`,
-                // Pass existing model/assy to preserve them in history
                 model: unit.model,
                 assemblyNo: unit.assembly_no
             };
-            await axios.put(UNITS_ENDPOINT, dataToSend, {
+            
+             await axios.post(`${UNITS_ENDPOINT}?method=PUT`, dataToSend, {
                 headers: { 'Content-Type': 'application/json' }
             });
+
             setModalConfig({ title: "Success", message: `Unit approved!`, type: "success" });
             setShowModal(true);
             fetchUnitData(false);
@@ -543,7 +623,6 @@ export default function ITAssistantPage({ user, onLogout }) {
         }
     };
     
-    // --- HANDLERS FOR MONITORING ---
     const handleMonitorHistory = (stationId) => { setActiveHistoryStation(stationId); }
     const handleMonitorStationDetails = (stationId) => { setActiveMonitorStationId(stationId); setActiveTab('station_details'); }
     
@@ -551,8 +630,6 @@ export default function ITAssistantPage({ user, onLogout }) {
     const renderContent = () => {
         const metrics = calculateMetrics(unitLogs);
         const unitsForScanning = unitLogs.filter(u => u.status === 'For Scanning');
-        
-        // [FIX] Renamed to match the variable used in 'case "approvals"'
         const pendingApprovalLogs = unitLogs.filter(u => u.status === 'Pending Approval');
         
         if (loading && !isInitialLoadComplete) return <div className="text-center py-5">Loading production data...</div>;
@@ -560,57 +637,69 @@ export default function ITAssistantPage({ user, onLogout }) {
 
         switch (activeTab) {
             case "overview":
+                const cardData = [
+                    { title: "For Scanning", value: metrics.forScanning, color: "info", icon: "bi-qr-code-scan", subtitle: "Waiting for initial scan", textColor: "text-dark" },
+                    { title: "In Progress", value: metrics.inProgress, color: "primary", icon: "bi-hourglass-split", subtitle: "Currently in production" },
+                    { title: "Completed", value: metrics.completed, color: "success", icon: "bi-check-circle-fill", subtitle: "Finished assembly/QA" },
+                    { title: "No Good (NG)", value: metrics.noGood, color: "danger", icon: "bi-exclamation-octagon-fill", subtitle: "Defective units" }
+                ];
+
                 return (
-                    <div className="row g-4">
-                        <div className="col-md-3">
-                            <div className="card text-white bg-primary shadow-sm h-100">
-                                <div className="card-body">
-                                    <h6 className="card-title text-uppercase mb-2">For Scanning</h6>
-                                    <h2 className="display-6 fw-bold">{metrics.forScanning}</h2>
-                                    <p className="card-text small">Waiting for initial scan</p>
+                    <div className="row g-4 animate-in fade-in">
+                        {/* --- 1. Stats Cards (Shadows Reduced) --- */}
+                        {cardData.map((card, index) => (
+                            <div className="col-md-3" key={index}>
+                                <div 
+                                    className={`card border-0 shadow-sm h-100 border-start border-4 border-${card.color}`}
+                                    style={{ borderRadius: '12px' }}
+                                >
+                                    <div className="card-body p-4">
+                                        <div className="d-flex align-items-center justify-content-between mb-3">
+                                            <div 
+                                                className={`bg-${card.color} bg-opacity-10 text-${card.color} rounded-3 p-3 d-flex align-items-center justify-content-center`} 
+                                                style={{ width: '50px', height: '50px' }}
+                                            >
+                                                <i className={`${card.icon} fs-4`}></i>
+                                            </div>
+                                            <span className={`badge bg-${card.color} bg-opacity-10 text-${card.color} rounded-pill px-2 py-1 small fw-normal`}>
+                                                {card.title.toUpperCase()}
+                                            </span>
+                                        </div>
+                                        <h2 className={`fw-bold mb-0 display-6 ${card.textColor || 'text-dark'}`}>{card.value}</h2>
+                                        <span 
+                                            className="text-muted text-uppercase small fw-bold" 
+                                            style={{ fontSize: '0.7rem', letterSpacing: '1px' }}
+                                        >
+                                            {card.subtitle}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div className="col-md-3">
-                            <div className="card text-white bg-info shadow-sm h-100">
-                                <div className="card-body">
-                                    <h6 className="card-title text-uppercase mb-2">In Progress</h6>
-                                    <h2 className="display-6 fw-bold">{metrics.inProgress}</h2>
-                                    <p className="card-text small">Currently in production</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="col-md-3">
-                            <div className="card text-white bg-success shadow-sm h-100">
-                                <div className="card-body">
-                                    <h6 className="card-title text-uppercase mb-2">Completed</h6>
-                                    <h2 className="display-6 fw-bold">{metrics.completed}</h2>
-                                    <p className="card-text small">Finished assembly/QA</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="col-md-3">
-                            <div className="card text-white bg-danger shadow-sm h-100">
-                                <div className="card-body">
-                                    <h6 className="card-title text-uppercase mb-2">No Good (NG)</h6>
-                                    <h2 className="display-6 fw-bold">{metrics.noGood}</h2>
-                                    <p className="card-text small">Defective units</p>
-                                </div>
-                            </div>
-                        </div>
-                        
+                        ))}
+
+                        {/* --- 2. Pending Approval Alert (Shadow Reduced) --- */}
                         {metrics.pendingApproval > 0 && (
                             <div className="col-12">
-                                <div className="alert alert-warning d-flex justify-content-between align-items-center shadow-sm">
+                                <div 
+                                    className="alert alert-warning d-flex justify-content-between align-items-center shadow-sm border-start border-4 border-danger" 
+                                    role="alert"
+                                    style={{ borderRadius: '12px' }}
+                                >
                                     <h5 className="mb-0 text-dark fw-bold">
-                                        <i className="bi bi-exclamation-triangle-fill me-2"></i> 
+                                        <i className="bi bi-exclamation-triangle-fill me-2 text-danger"></i> 
                                         {metrics.pendingApproval} UNITS AWAITING APPROVAL!
                                     </h5>
-                                    <button className="btn btn-sm btn-dark" onClick={() => setActiveTab('approvals')}>Review Approvals</button>
+                                    <button 
+                                        className="btn btn-sm btn-danger px-3 rounded-pill fw-bold" 
+                                        onClick={() => setActiveTab('approvals')}
+                                    >
+                                        <i className="bi bi-eye me-2"></i> Review Approvals
+                                    </button>
                                 </div>
                             </div>
                         )}
 
+                        {/* --- 3. Unscanned Units Table (Shadow Reduced) --- */}
                         <div className="col-12 mt-4">
                             <UnscannedUnitsTable unscannedUnits={unitsForScanning} />
                         </div>
@@ -619,36 +708,43 @@ export default function ITAssistantPage({ user, onLogout }) {
 
             case "qr_generator":
                 const currentQuantity = parseInt(qrFormData.quantity, 10) || 0;
-                const isMaxLimitReached = currentQuantity > MAX_QR_COUNT; 
-                const isFormInvalid = currentQuantity < 1 || isMaxLimitReached; 
+                const isFormInvalid = currentQuantity < 1 || currentQuantity > MAX_QR_COUNT; 
 
                 return (
-                    <div className="row">
+                    <div className="row g-4 animate-in fade-in">
                         <div className="col-md-12">
-                            <div className="card shadow-sm">
-                                <div className="card-header bg-dark text-white">
-                                    <h5 className="mb-0"><i className="bi bi-qr-code me-2"></i>Generate Unique Assembly QR Batch</h5>
+                            <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
+                                <div className="card-header bg-dark text-white border-0 rounded-top-2">
+                                    <h5 className="mb-0 fw-bold"><i className="bi bi-qr-code me-2"></i>Generate Unique Assembly QR Batch</h5>
                                 </div>
-                                <div className="card-body">
-                                    <div className="alert alert-primary small p-2 mb-3">
-                                        <i className="bi bi-info-circle-fill me-2"></i>
-                                        <strong>Auto-Generation Info:</strong><br/>
-                                        Only <strong>Assembly No.</strong> will be auto-generated.<br/>
-                                        Next Assembly No: <strong className="fs-6 text-dark">ASSY-{formatSerial(nextAssemblyNo)}</strong>
-                                        {isMaxLimitReached && (
-                                            <p className="text-danger fw-bold mt-2 mb-0">
-                                                ⚠️ WARNING: Quantity exceeds limit.
-                                            </p>
-                                        )}
+                                <div className="card-body p-4">
+                                    <div className="alert alert-primary small p-3 mb-4 border-primary bg-opacity-10 border-start border-4">
+                                        <h6 className="fw-bold mb-1 text-primary"><i className="bi bi-info-circle-fill me-2"></i>Auto-Generation Info</h6>
+                                        <p className="mb-1">
+                                            Only **Assembly No.** will be auto-generated sequentially.
+                                        </p>
+                                        <p className="mb-0">
+                                            Next Assembly No: <strong className="fs-6 text-dark bg-light px-2 py-1 rounded">ASSY-{formatSerial(nextAssemblyNo)}</strong>
+                                        </p>
                                     </div>
                                     <form onSubmit={handleGenerateQR}>
                                         <div className="row g-3">
-                                            <div className="col-md-12">
-                                                <label className="form-label fw-bold text-primary">How many QRs to generate? (Required)</label>
-                                                <input type="number" className="form-control form-control-lg fw-bold border-primary" name="quantity" required min="1" max="100" value={qrFormData.quantity} onChange={handleSaveInput} placeholder="Enter quantity (e.g. 50)"/>
+                                            <div className="col-md-12 mb-3">
+                                                <label className="form-label fw-bold text-dark">How many QRs to generate? (Max: {MAX_QR_COUNT})</label>
+                                                <input 
+                                                    type="number" 
+                                                    className="form-control form-control-lg fw-bold border-primary" 
+                                                    name="quantity" 
+                                                    required 
+                                                    min="1" 
+                                                    max={MAX_QR_COUNT} 
+                                                    value={qrFormData.quantity} 
+                                                    onChange={handleSaveInput} 
+                                                    placeholder="Enter quantity (e.g. 50)"
+                                                />
                                             </div>
                                             <hr className="my-4 text-muted" />
-                                            <p className="small text-muted mb-2 fst-italic">OPTIONAL FIELDS</p>
+                                            <p className="small text-muted mb-2 fst-italic fw-bold text-uppercase">Optional Fields (Will be embedded in the QR data string)</p>
                                             <div className="col-md-6">
                                                 <label className="form-label small fw-bold">Model</label>
                                                 <input type="text" className="form-control" name="model" value={qrFormData.model} onChange={handleSaveInput} placeholder="Optional"/>
@@ -666,8 +762,8 @@ export default function ITAssistantPage({ user, onLogout }) {
                                                 <input type="text" className="form-control" name="accKit" value={qrFormData.accKit} onChange={handleSaveInput} placeholder="Optional"/>
                                             </div>
                                         </div>
-                                        <div className="mt-4 text-end">
-                                            <button type="submit" className="btn btn-primary px-4 btn-lg" disabled={isFormInvalid}>
+                                        <div className="mt-4 pt-3 border-top text-end">
+                                            <button type="submit" className="btn btn-primary px-4 btn-lg rounded-pill fw-bold" disabled={isFormInvalid}>
                                                 <i className="bi bi-printer me-2"></i> Generate {qrFormData.quantity || 0} QRs
                                             </button>
                                         </div>
@@ -682,36 +778,47 @@ export default function ITAssistantPage({ user, onLogout }) {
                 );
             
             case "station_details":
-                return <LiveMonitoringTable stationId={activeMonitorStationId} units={unitLogs} onBack={() => { setActiveTab('station_monitor'); setActiveMonitorStationId(null); }} handleMonitorHistory={handleMonitorHistory} />;
+                return <LiveMonitoringTable stationId={activeMonitorStationId} units={unitLogs} onBack={() => { setActiveTab('station_monitor'); setActiveMonitorStationId(null); }} />;
 
             case "station_monitor":
                 const productionUnits = unitLogs.filter(u => u.status !== 'For Scanning' && u.station !== 'N/A');
                 return (
-                    <div className="row g-4">
+                    <div className="row g-4 animate-in fade-in">
                         <div className="col-12">
-                            <h4 className="mb-3"><i className="bi bi-grid-3x3-gap-fill me-2"></i>Production Stations Overview</h4>
+                            <h4 className="mb-4 fw-bold text-dark"><i className="bi bi-grid-3x3-gap-fill me-2 text-primary"></i>Production Stations Monitor</h4>
                             <div className="row g-3">
                                 {stations.map((station) => {
                                     const stationUnits = productionUnits.filter(u => u.station === station.id);
+                                    const inProgressCount = stationUnits.filter(u => u.status === 'In Progress').length;
+                                    const completedCount = stationUnits.filter(u => u.status === 'Completed').length;
+                                    const ngCount = stationUnits.filter(u => u.status === 'No Good (NG)').length;
+                                    
                                     let statusText = "IDLE";
                                     let statusClass = "bg-secondary";
-                                    if (stationUnits.length > 0) {
-                                        statusText = `${stationUnits.length} UNITS IN PRODUCTION`;
+                                    if (inProgressCount > 0) {
+                                        statusText = `${inProgressCount} UNITS ACTIVE`;
                                         statusClass = "bg-primary"; 
+                                    } else if (completedCount > 0) {
+                                        statusText = `${completedCount} UNITS COMPLETED`;
+                                        statusClass = "bg-success";
+                                    } else if (ngCount > 0) {
+                                        statusText = `${ngCount} DEFECTS`;
+                                        statusClass = "bg-danger";
                                     }
+                                    
                                     return (
                                         <div key={station.id} className="col-xl-2 col-lg-3 col-md-4 col-sm-6">
-                                            <div className={`card h-100 shadow-sm border-top-4 ${statusClass === 'bg-primary' ? 'border-primary' : 'border-secondary'}`}>
-                                                <div className="card-body text-center p-2">
-                                                    <h6 className="fw-bold mb-1">{station.name}</h6>
-                                                    <span className={`badge mb-2 ${statusClass}`}>{statusText}</span>
-                                                    <p className="small text-muted mb-0">{station.operator}</p>
+                                            <div className={`card h-100 border-0 shadow-sm border-start border-4 ${statusClass === 'bg-secondary' ? 'border-secondary' : statusClass === 'bg-primary' ? 'border-primary' : statusClass === 'bg-success' ? 'border-success' : 'border-danger'}`} style={{ borderRadius: '12px' }}>
+                                                <div className="card-body p-3">
+                                                    <h6 className="fw-bold mb-1 text-dark">{station.name}</h6>
+                                                    <span className={`badge mb-2 ${statusClass} text-white fw-bold`}>{statusText}</span>
+                                                    <p className="small text-muted mb-2 lh-sm">{station.operator || 'Unassigned'}</p>
                                                 </div>
-                                                <div className="card-footer bg-white p-1 d-flex justify-content-between">
-                                                    <button className="btn btn-primary btn-sm py-0 flex-grow-1 me-1" style={{fontSize: '0.7rem'}} onClick={() => handleMonitorStationDetails(station.id)}>
+                                                <div className="card-footer bg-light p-2 d-flex justify-content-between border-top">
+                                                    <button className="btn btn-primary btn-sm py-1 flex-grow-1 me-1 rounded-pill" style={{fontSize: '0.75rem'}} onClick={() => handleMonitorStationDetails(station.id)}>
                                                         <i className="bi bi-eye me-1"></i>Monitor
                                                     </button>
-                                                    <button className="btn btn-secondary btn-sm py-0" style={{fontSize: '0.7rem'}} onClick={() => handleMonitorHistory(station.id)}>
+                                                    <button className="btn btn-secondary btn-sm py-1 rounded-pill" style={{fontSize: '0.75rem'}} onClick={() => handleMonitorHistory(station.id)}>
                                                         <i className="bi bi-clock-history me-1"></i>History
                                                     </button>
                                                 </div>
@@ -726,31 +833,32 @@ export default function ITAssistantPage({ user, onLogout }) {
             
             case "approvals":
                 return (
-                    <div className="card shadow-sm">
-                        <div className="card-header bg-warning text-dark">
-                            <h5 className="mb-0"><i className="bi bi-shield-check me-2"></i>Pending Rework Approvals (**{pendingApprovalLogs.length}** Units)</h5>
+                    <div className="card border-0 shadow-sm animate-in fade-in" style={{ borderRadius: '12px' }}>
+                        <div className="card-header bg-danger text-white border-0 rounded-top-2">
+                            <h5 className="mb-0 fw-bold"><i className="bi bi-shield-check me-2"></i>Pending Rework Approvals (**{pendingApprovalLogs.length}** Units)</h5>
+                            <p className="small mb-0 text-white-50">Review and approve units set for rework or re-entry.</p>
                         </div>
-                        <div className="table-responsive">
-                            <table className="table table-striped table-sm mb-0">
-                                <thead className="table-light">
-                                    <tr><th>Serial No.</th><th>Model</th><th>Assembly No.</th><th>Station</th><th>Remarks</th><th>Action</th></tr>
+                        <div className="table-responsive" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                            <table className="table table-striped table-sm mb-0 align-middle">
+                                <thead className="table-light sticky-top">
+                                    <tr><th>Serial No.</th><th>Model</th><th>Assembly No.</th><th>Station</th><th>Remarks</th><th className="text-center">Action</th></tr>
                                 </thead>
                                 <tbody>
                                     {pendingApprovalLogs.length > 0 ? pendingApprovalLogs.map(unit => (
-                                        <tr key={unit.id}>
+                                        <tr key={unit.id} className="table-warning">
                                             <td className="fw-bold">{unit.device_serial_no || '(No Serial)'}</td>
                                             <td>{unit.model}</td>
                                             <td>{unit.assembly_no}</td>
                                             <td><span className="badge bg-secondary">{unit.station}</span></td>
                                             <td>{unit.remarks}</td>
-                                            <td>
-                                                <button className="btn btn-sm btn-success py-0" onClick={() => handleApproveUnit(unit)}>
+                                            <td className="text-center">
+                                                <button className="btn btn-sm btn-success py-1 px-3 rounded-pill fw-bold" onClick={() => handleApproveUnit(unit)}>
                                                     <i className="bi bi-check-circle me-1"></i> Approve
                                                 </button>
                                             </td>
                                         </tr>
                                     )) : (
-                                        <tr><td colSpan="6" className="text-center py-4">No units currently require approval.</td></tr>
+                                        <tr><td colSpan="6" className="text-center py-5 text-muted">No units currently require approval.</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -765,49 +873,82 @@ export default function ITAssistantPage({ user, onLogout }) {
 
     return (
         <div className="d-flex min-vh-100 bg-light">
-            <div className="d-flex flex-column flex-shrink-0 p-3 text-white bg-dark" style={{ width: "260px" }}>
+            {/* --- 1. SIDEBAR (Fixed, Dark Blue, Scrollable) --- */}
+            <div className="d-flex flex-column flex-shrink-0 p-3 text-white" style={{ 
+                width: "260px", 
+                backgroundColor: "#111827", 
+                height: '100vh', 
+                position: 'fixed', 
+                top: 0, 
+                bottom: 0, 
+                zIndex: 1000, 
+                overflowY: 'auto'
+            }}>
                 <a href="/" className="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
-                    <i className="bi bi-hdd-rack fs-4 me-2"></i>
+                    <i className="bi bi-hdd-rack fs-4 me-2 text-danger"></i>
                     <span className="fs-5 fw-bold">IT Support</span>
                 </a>
-                <hr />
-                <ul className="nav nav-pills flex-column mb-auto">
-                    <li className="nav-item mb-1">
-                        <button className={`nav-link text-white text-start w-100 ${activeTab === 'overview' ? 'active bg-danger' : ''}`} onClick={() => setActiveTab('overview')}>
-                            <i className="bi bi-speedometer2 me-2"></i> Overview
-                        </button>
-                    </li>
-                    <li className="nav-item mb-1">
-                        <button className={`nav-link text-white text-start w-100 ${activeTab === 'qr_generator' ? 'active bg-danger' : ''}`} onClick={() => setActiveTab('qr_generator')}>
-                            <i className="bi bi-qr-code me-2"></i> QR Generator
-                        </button>
-                    </li>
-                    <li className="nav-item mb-1">
-                        <button className={`nav-link text-white text-start w-100 ${activeTab === 'station_monitor' || activeTab === 'station_details' ? 'active bg-danger' : ''}`} onClick={() => setActiveTab('station_monitor')}>
-                            <i className="bi bi-display me-2"></i> Station Monitor
-                        </button>
-                    </li>
-                    <li className="nav-item mb-1">
-                        <button className={`nav-link text-white text-start w-100 ${activeTab === 'approvals' ? 'active bg-danger' : ''}`} onClick={() => setActiveTab('approvals')}>
-                            <i className="bi bi-shield-check me-2"></i> Approvals
-                        </button>
-                    </li>
-                </ul>
-                <hr />
-                <div className="dropdown">
-                    <div className="d-flex align-items-center text-white text-decoration-none">
-                        <i className="bi bi-person-circle fs-4 me-2"></i>
-                        <strong>{user.full_name || user.username}</strong>
+                <hr className="text-white-50"/>
+                
+                {/* NAVIGATION */}
+                <ul className="nav nav-pills flex-column mb-auto gap-2 flex-grow-1">
+                    <li className="nav-item"><button className={`nav-link text-white text-start w-100 fw-bold ${activeTab === 'overview' ? 'active bg-danger' : 'hover-danger-bg'}`} onClick={() => setActiveTab('overview')}><i className="bi bi-speedometer2 me-2"></i> Overview</button></li>
+                    <li className="nav-item"><button className={`nav-link text-white text-start w-100 fw-bold ${activeTab === 'qr_generator' ? 'active bg-danger' : 'hover-danger-bg'}`} onClick={() => setActiveTab('qr_generator')}><i className="bi bi-qr-code me-2"></i> QR Generator</button></li>
+                    <li className="nav-item"><button className={`nav-link text-white text-start w-100 fw-bold ${activeTab === 'station_monitor' || activeTab === 'station_details' ? 'active bg-danger' : 'hover-danger-bg'}`} onClick={() => setActiveTab('station_monitor')}><i className="bi bi-display me-2"></i> Station Monitor</button></li>
+                    <li className="nav-item"><button className={`nav-link text-white text-start w-100 fw-bold ${activeTab === 'approvals' ? 'active bg-danger' : 'hover-danger-bg'}`} onClick={() => setActiveTab('approvals')}><i className="bi bi-shield-check me-2"></i> Approvals</button></li>
+              </ul> 
+    
+   
+    
+    {/* LOGOUT + COPYRIGHT SECTION (SIMPLIFIED & SPLIT) */}
+    <div className="mt-auto pt-2">
+        
+        {/* LOGOUT BUTTON (FIRST SECTION) */}
+        <button onClick={onLogout} className="btn btn-outline-danger w-100 btn-sm fw-bold">
+            <i className="bi bi-box-arrow-left me-2"></i> Logout
+        </button>
+
+        {/* SEPARATOR LINE */}
+        <hr className="text-white-50 my-2" /> 
+
+        {/* COPYRIGHT TEXT (SECOND SECTION) */}
+        <div className="text-center text-white-50 small" style={{fontSize: '0.7rem'}}>
+            ©2025 MKFF Laserteqhnique
+        </div>
+    </div>
+</div>
+
+            {/* --- 2. MAIN CONTENT AREA (Fixed Header, Scrollable Content) --- */}
+            <div className="flex-grow-1 d-flex flex-column" style={{ 
+                marginLeft: "260px", 
+                backgroundColor: '#eeeeeeff', 
+                height: '100vh', 
+                overflow: 'hidden' 
+            }}>
+                
+                {/* HEADER (Sticky/Fixed Visual - No strong shadow) */}
+                <header className="bg-white shadow-sm p-3 d-flex justify-content-between align-items-center border-bottom" style={{ flexShrink: 0, position: 'sticky', top: 0, zIndex: 10 }}>
+                    <div className="d-flex align-items-center">
+                        <h2 className="mb-0 text-capitalize fw-bold text-dark">{activeTab.replace(/_/g, ' ')}</h2>
                     </div>
-                    <button onClick={onLogout} className="btn btn-outline-danger w-100 btn-sm mt-2">Logout</button>
+                    <div className="d-flex align-items-center gap-3">
+                        <span className="text-muted small">Logged in as:</span>
+                        <div className="d-flex align-items-center">
+                            <i className="bi bi-person-circle fs-4 me-2 text-primary"></i>
+                            {/* FIXED: Display full_name */}
+                            <div className="fw-bold small text-dark me-2">{user.full_name || user.username}</div>
+                            <span className="badge bg-danger">{user.role || 'IT Assistant'}</span>
+                        </div>
+                    </div>
+                </header>
+
+                {/* SCROLLABLE CONTENT */}
+                <div className="p-4 flex-grow-1" style={{ overflowY: 'auto' }}>
+                    {renderContent()}
                 </div>
             </div>
-
-            <div className="flex-grow-1 p-4 overflow-auto">
-                <h2 className="mb-4 text-capitalize border-bottom pb-2">{activeTab.replace(/_/g, ' ')}</h2>
-                {renderContent()}
-            </div>
             
+            {/* Global Modals */}
             {showModal && (
                 <CustomMessageModal
                     title={modalConfig.title}
@@ -820,8 +961,22 @@ export default function ITAssistantPage({ user, onLogout }) {
                 <StationHistoryModal 
                     stationId={activeHistoryStation}
                     onClose={() => setActiveHistoryStation(null)}
+                    user={user} 
                 />
             )}
+            
+            {/* Global Styles for UI Enhancements */}
+            <style jsx>{`
+                .animate-in { animation: fadeInUp 0.5s ease-out; }
+                @keyframes fadeInUp {
+                    from { opacity: 0; transform: translateY(20px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                .hover-danger-bg:hover {
+                    background-color: #dc3545 !important;
+                    color: white !important;
+                }
+            `}</style>
         </div>
     );
 }

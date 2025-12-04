@@ -1,37 +1,42 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
-// 1. CHART IMPORTS & REGISTRATION
+// 1. CHART IMPORTS & REGISTRATION (Keep for global chart setup)
 import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
-import logo from '../logo.png'; 
+import logo from '../logo.png';
 
-// IMPORT SEPARATED COMPONENTS
+// 2. IMPORT SEPARATED COMPONENTS (Updated List)
+// Existing Modals and Utilities
 import { EditUnitModal } from './components/EditUnitModal';
 import { ReportDetailModal } from './components/ReportDetailModal';
 import { ManageUserModal } from './components/ManageUserModal';
 import { DeleteUserModal } from './components/DeleteUserModal';
 import { SubmitReportModal } from './components/SubmitReportModal';
 import { StationHistoryModal } from './components/StationHistoryModal';
-import { UnitPieChart } from './components/UnitPieChart';
-import { StationBarChart } from './components/StationBarChart';
 import { NotificationBell } from './components/NotificationBell';
 import { NotificationContent } from './components/NotificationContent';
 import { ViewUserModal } from './components/ViewUserModal';
 import { AnnouncementModal } from './components/AnnouncementModal';
+// NEW VIEW COMPONENTS
+import { Dashboard } from './components/Dashboard';
+import { StationsOverview } from './components/StationsOverview';
+import { ReportsView } from './components/ReportsView';
+import { AnnouncementsView } from './components/AnnouncementsView'; // Assuming this is the old 'case "announcements"'
+import { ApprovalQueue } from './components/ApprovalQueue';
+import { UserManagement } from './components/UserManagement';
+// NEW EMBEDDED MODALS
+import { ApproveUnitModal } from './components/ApproveUnitModal';
+import { DeleteAnnouncementModal } from './components/DeleteAnnouncementModal';
+
 
 // REGISTER CHART COMPONENTS GLOBALLY
 ChartJS.register(
-    ArcElement, // For Doughnut/Pie charts
-    CategoryScale, // For Bar charts (X-axis)
-    LinearScale, // For Bar charts (Y-axis)
-    BarElement, // For Bar charts
-    Tooltip,
-    Legend
+    ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend
 );
 
 // --- CONFIGURATION CONSTANT: DELAY THRESHOLDS ---
-// Support both formats just in case
 const DELAY_THRESHOLDS_MINUTES = {
+    // ... (keep original DELAY_THRESHOLDS_MINUTES object) ...
     'Station1': 6, 'Station 1': 6,
     'Station2': 8, 'Station 2': 8,
     'Station3': 3, 'Station 3': 3,
@@ -54,7 +59,7 @@ const API_BASE_URL = "http://localhost/mkffwebsystem/backend/api";
 const UNITS_ENDPOINT = `${API_BASE_URL}/units.php`;
 const REPORTS_ENDPOINT = `${API_BASE_URL}/daily_reports.php`;
 const USER_MANAGEMENT_ENDPOINT = `${API_BASE_URL}/user_management.php`;
-const HISTORY_ENDPOINT = `${API_BASE_URL}/unit_history.php`; 
+const HISTORY_ENDPOINT = `${API_BASE_URL}/unit_history.php`;
 
 const ANNOUNCEMENTS_ENDPOINT = `${API_BASE_URL}/announcements.php`;
 
@@ -71,14 +76,14 @@ const getTodayDate = () => {
 export default function AdminPage({ user, onLogout }) {
     const [activeTab, setActiveTab] = useState("dashboard");
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-    const [filterStartDate, setFilterStartDate] = useState(''); 
+    const [filterStartDate, setFilterStartDate] = useState('');
     const [filterEndDate, setFilterEndDate] = useState(getTodayDate());
     const [logs, setLogs] = useState([]); // Unit logs
     const [dailyReportsList, setDailyReportsList] = useState([]); // Reports
     const [userList, setUserList] = useState([]); // User list
     const [stations, setStations] = useState([]); // State for station list
     const [stationMonitorId, setStationMonitorId] = useState(null);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false); // FOR ANNOUNCEMENT DELETE
     const [announcementToDelete, setAnnouncementToDelete] = useState(null);
     const [posterIdOfAnnouncement, setPosterIdOfAnnouncement] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
@@ -87,26 +92,34 @@ export default function AdminPage({ user, onLogout }) {
     const [reportDate, setReportDate] = useState(getTodayDate());
     const [reportFilterStationId, setReportFilterStationId] = useState('All');
     const [selectedUnitToEdit, setSelectedUnitToEdit] = useState(null);
-    const [selectedReportToView, setSelectedReportToView] = useState(null); 
+    const [selectedReportToView, setSelectedReportToView] = useState(null);
     const [selectedUserToManage, setSelectedUserToManage] = useState(null);
     const [selectedUserToDelete, setSelectedUserToDelete] = useState(null);
     const [showReportModal, setShowReportModal] = useState(false);
     const [stationHistoryId, setStationHistoryId] = useState(null);
-    
-    // --- NEW NOTIFICATION STATES ---
+
+    // --- NOTIFICATION STATES ---
     const [notifications, setNotifications] = useState([]);
     const [lastSeenReportIds, setLastSeenReportIds] = useState(new Set());
     const [highlightedUnitId, setHighlightedUnitId] = useState(null);
-    
+
     const [announcements, setAnnouncements] = useState([]); // Announcements/Forum data
     const [showPostModal, setShowPostModal] = useState(false); // For Admin to post
 
-    const [loading, setLoading] = useState(true); 
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const [showViewModal, setShowViewModal] = useState(false);
     const [viewUser, setViewUser] = useState(null);
-    const [showPasswordInModal, setShowPasswordInModal] = useState(false);
+    const [showPasswordInModal, setShowPasswordInModal] = useState(false); // (Unused but kept in original)
+
+    // --- NEW APPROVAL MODAL STATES ---
+    const [showApproveModal, setShowApproveModal] = useState(false);
+    const [selectedLogToApprove, setSelectedLogToApprove] = useState(null);
+    // --- DASHBOARD CHART STATES ---
+    const [dashboardView, setDashboardView] = useState('bar');
+    const chartViews = ['bar', 'pie'];
+
 
     // Define the initial structure for a new user object
     const initialNewUserData = {
@@ -116,23 +129,23 @@ export default function AdminPage({ user, onLogout }) {
         role: 'Operator',
         full_name: '',
         station: '',
-        avatar_url: '', 
-        avatar_file: null, 
+        avatar_url: '',
+        avatar_file: null,
     };
 
-    // --- CHECK DELAYED UNITS AND REPORTS ---
+    // --- CHECK DELAYED UNITS AND REPORTS (KEPT AS IS) ---
     const checkDelayedUnitsAndReports = useCallback((allUnits, allReports) => {
         const now = new Date();
         const newDelayedNotifications = [];
-        const currentDelayedUnitIds = new Set(); 
+        const currentDelayedUnitIds = new Set();
 
-        // 1. Delayed Units Check 
+        // 1. Delayed Units Check
         const inProgressUnits = allUnits.filter(l => l.status === 'In Progress');
-        
+
         inProgressUnits.forEach(unit => {
             const stationId = unit.station;
             // Flexible check for threshold
-            const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationId] || DELAY_THRESHOLDS_MINUTES[stationId.replace(' ', '')] || 0; 
+            const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationId] || DELAY_THRESHOLDS_MINUTES[stationId.replace(' ', '')] || 0;
 
             if (thresholdMinutes > 0) {
                 const createdAt = new Date(unit.created_at);
@@ -142,7 +155,7 @@ export default function AdminPage({ user, onLogout }) {
                 if (elapsedMinutes > thresholdMinutes) {
                     currentDelayedUnitIds.add(unit.id);
                     newDelayedNotifications.push({
-                        id: `delayed-${unit.id}`, 
+                        id: `delayed-${unit.id}`,
                         type: 'DelayedUnit',
                         title: `⚠️ Unit Delay Alert at ${stationId}`,
                         message: `Unit ${unit.device_serial_no} has been In Progress for ${elapsedMinutes} mins (Limit: ${thresholdMinutes} mins).`,
@@ -153,11 +166,11 @@ export default function AdminPage({ user, onLogout }) {
                 }
             }
         });
-        
+
         // 2. New Reports Check
         const allFetchedReportIds = new Set(allReports.map(r => r.id));
         const newReportNotifications = [];
-        
+
         allReports.forEach(report => {
             if (!lastSeenReportIds.has(report.id)) {
                 newReportNotifications.push({
@@ -176,17 +189,17 @@ export default function AdminPage({ user, onLogout }) {
             if (n.type === 'DelayedUnit') {
                 return currentDelayedUnitIds.has(n.unitId);
             }
-            return n.type === 'NewReport'; 
+            return n.type === 'NewReport';
         });
 
-        const updatedDelayedNotifications = newDelayedNotifications.filter(newN => 
+        const updatedDelayedNotifications = newDelayedNotifications.filter(newN =>
             !existingNotifications.some(existingN => existingN.id === newN.id)
         );
 
         setNotifications([
             ...existingNotifications.filter(n => n.type === 'DelayedUnit'),
             ...updatedDelayedNotifications,
-            ...existingNotifications.filter(n => n.type === 'NewReport'), 
+            ...existingNotifications.filter(n => n.type === 'NewReport'),
             ...newReportNotifications,
         ]);
 
@@ -195,14 +208,14 @@ export default function AdminPage({ user, onLogout }) {
     }, [notifications, lastSeenReportIds]);
 
 
-    // --- FETCH DATA ---
+    // --- FETCH DATA (KEPT AS IS) ---
     const fetchData = async () => {
         const isBackgroundUpdate = logs.length > 0;
-        
+
         if (!isBackgroundUpdate) {
             setLoading(true);
         }
-        
+
         setError(null);
         try {
             // 1. Fetch Units/Logs
@@ -232,12 +245,12 @@ export default function AdminPage({ user, onLogout }) {
                 user.avatar_url = loggedInUserData.avatar_url;
             }
 
-            // --- NEW: Fetch Announcements ---
-            const announcementsRes = await axios.get(ANNOUNCEMENTS_ENDPOINT);
-            const fetchedAnnouncements = Array.isArray(announcementsRes.data) ? announcementsRes.data : [];
-            if (JSON.stringify(fetchedAnnouncements) !== JSON.stringify(announcements)) {
-                setAnnouncements(fetchedAnnouncements);
-            }
+            // --- Fetch Announcements ---
+            const announcementsRes = await axios.get(ANNOUNCEMENTS_ENDPOINT);
+            const fetchedAnnouncements = Array.isArray(announcementsRes.data) ? announcementsRes.data : [];
+            if (JSON.stringify(fetchedAnnouncements) !== JSON.stringify(announcements)) {
+                setAnnouncements(fetchedAnnouncements);
+            }
 
             // 4. Mock Station Data - FIXED: ID matches DB (No space), Name has space (UI)
             const mockStations = Array.from({ length: 15 }, (_, i) => ({
@@ -246,14 +259,14 @@ export default function AdminPage({ user, onLogout }) {
                 operator: `Operator-${100 + i}`
             }));
             setStations(mockStations);
-            
+
             // 5. Run Notification Logic
             checkDelayedUnitsAndReports(fetchedUnits, fetchedReports);
 
         } catch (err) {
             console.error("Error fetching data:", err);
             if (!isBackgroundUpdate) {
-                // setError(`Failed to fetch data. ${err.message}`); 
+                // setError(`Failed to fetch data. ${err.message}`);
             }
         } finally {
             setLoading(false);
@@ -261,7 +274,7 @@ export default function AdminPage({ user, onLogout }) {
     };
 
     const refreshAndCloseReport = () => {
-        setLastSeenReportIds(new Set()); 
+        setLastSeenReportIds(new Set());
         fetchData();
         setShowReportModal(false);
     };
@@ -269,19 +282,36 @@ export default function AdminPage({ user, onLogout }) {
     // UseEffect for Polling
     useEffect(() => {
         fetchData();
-        const interval = setInterval(fetchData, 1000); 
-        return () => clearInterval(interval); 
-    }, []); 
+        const interval = setInterval(fetchData, 1000);
+        return () => clearInterval(interval);
+    }, []);
 
-    // --- NOTIFICATION HANDLERS ---
+    // --- DASHBOARD CHART HANDLERS (KEPT AS IS) ---
+    const nextChart = () => {
+        setDashboardView(prev => {
+            const currentIndex = chartViews.indexOf(prev);
+            const nextIndex = (currentIndex + 1) % chartViews.length;
+            return chartViews[nextIndex];
+        });
+    };
+
+    const prevChart = () => {
+        setDashboardView(prev => {
+            const currentIndex = chartViews.indexOf(prev);
+            const prevIndex = (currentIndex - 1 + chartViews.length) % chartViews.length;
+            return chartViews[prevIndex];
+        });
+    };
+
+    // --- NOTIFICATION HANDLERS (KEPT AS IS) ---
     const handleBellClick = () => { setActiveTab('notifications'); };
     const handleDismissAllNotifications = () => { setNotifications([]); setActiveTab('dashboard'); };
     const handleClearNewReports = () => { setNotifications(prev => prev.filter(n => n.type !== 'NewReport')); };
     const handleClearDelayedUnits = () => { setNotifications(prev => prev.filter(n => n.type !== 'DelayedUnit')); };
-    
+
     const handleNotificationClick = (notification) => {
         if (notification.type === 'NewReport') {
-            setHighlightedUnitId(null); 
+            setHighlightedUnitId(null);
             setActiveTab('reports');
             const report = dailyReportsList.find(r => r.id === notification.reportId);
             if (report) {
@@ -293,7 +323,7 @@ export default function AdminPage({ user, onLogout }) {
             setActiveTab('station_monitor');
             // Normalize station ID match for notification click
             const targetStation = stations.find(s => s.id.replace(/\s/g, '') === notification.stationId.replace(/\s/g, ''));
-            if(targetStation) {
+            if (targetStation) {
                 setStationMonitorId(targetStation.id);
             }
             setHighlightedUnitId(notification.unitId);
@@ -303,18 +333,16 @@ export default function AdminPage({ user, onLogout }) {
         }
     };
 
-    // --- UNIT HANDLERS ---
+    // --- UNIT HANDLERS (KEPT AS IS) ---
     const handleMonitorStation = (stationId) => {
         setStationMonitorId(stationId);
         setActiveTab('station_monitor');
-        setHighlightedUnitId(null); 
+        setHighlightedUnitId(null);
     };
     const handleEditClick = (log) => { setSelectedUnitToEdit(log); };
     const handleViewReport = (report) => { setSelectedReportToView(report); };
-    const handleViewHistory = (stationId) => { 
-        // stationId here is "Station1" (from mockStations)
-        // This should match what the backend expects.
-        setStationHistoryId(stationId); 
+    const handleViewHistory = (stationId) => {
+        setStationHistoryId(stationId);
     };
 
     // --- ACTION HANDLERS ---
@@ -327,6 +355,16 @@ export default function AdminPage({ user, onLogout }) {
             console.error(`Error approving unit ${unitId}:`, error);
         }
     };
+
+    // Wrapper function to execute approval for the modal
+    const executeApproval = () => {
+        if (selectedLogToApprove) {
+            handleApproveUnit(selectedLogToApprove.id, selectedLogToApprove);
+            setShowApproveModal(false);
+            setSelectedLogToApprove(null);
+        }
+    };
+
 
     const handleSaveEdit = async (id, updatedData) => {
         setSelectedUnitToEdit(null);
@@ -351,14 +389,14 @@ export default function AdminPage({ user, onLogout }) {
         }
     };
 
-    // --- USER MANAGEMENT HANDLERS ---
+    // --- USER MANAGEMENT HANDLERS (KEPT AS IS) ---
     const handleAddUser = () => { setSelectedUserToManage(initialNewUserData); };
     const handleEditUser = (user) => { setSelectedUserToManage(user); };
     const handleConfirmDeleteUser = (user) => { setSelectedUserToDelete(user); };
 
     const handleViewUser = (user) => {
         setViewUser(user);
-        setShowPasswordInModal(false); 
+        setShowPasswordInModal(false);
         setShowViewModal(true);
     };
 
@@ -377,27 +415,86 @@ export default function AdminPage({ user, onLogout }) {
         setSelectedUserToDelete(null);
         try {
             await axios.post(`${USER_MANAGEMENT_ENDPOINT}?method=DELETE`, { id: userId }, { headers: { 'Content-Type': 'application/json' } });
-            fetchData(); 
+            fetchData();
         } catch (error) {
             console.error(`Error deleting user ${userId}:`, error);
         }
     };
 
-    // --- CALCULATE METRICS ---
+    // --- ANNOUNCEMENT HANDLERS (KEPT AS IS) ---
+    const handlePostAnnouncement = async (content) => {
+        if (user.role !== 'Administrator') {
+            throw new Error("Only Administrators can post announcements.");
+        }
+        const payload = {
+            user_id: user.id,
+            content: content,
+        };
+        try {
+            await axios.post(ANNOUNCEMENTS_ENDPOINT, payload, { headers: { 'Content-Type': 'application/json' } });
+            fetchData();
+        } catch (error) {
+            console.error("Error posting announcement:", error);
+            throw new Error(error.response?.data?.message || "Failed to post announcement. Check console for API error.");
+        }
+    };
+
+    // 1. FUNCTION NA TATAWAGIN NG TRASH BUTTON SA LISTAHAN
+    const handleConfirmDelete = (announcementId, posterUserId) => {
+        if (user.role !== 'Administrator' && user.id !== posterUserId) {
+            alert("You do not have permission to delete this announcement.");
+            return;
+        }
+
+        setAnnouncementToDelete(announcementId);
+        setPosterIdOfAnnouncement(posterUserId);
+        setShowDeleteModal(true); // <--- ITO ANG NAGPAPALABAS NG MODAL
+    };
+
+    // 2. FUNCTION NA TATAWAGIN NG DELETE BUTTON SA LOOB NG MODAL
+    const executeDeleteAnnouncement = async () => {
+        if (!announcementToDelete) return;
+
+        setShowDeleteModal(false);
+
+        try {
+            const response = await axios.delete(`${ANNOUNCEMENTS_ENDPOINT}`, {
+                data: {
+                    id: announcementToDelete,
+                    user_id: user.id
+                },
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            alert(response.data.message || "Announcement deleted successfully.");
+            fetchData();
+
+        } catch (error) {
+            console.error("Error deleting announcement:", error);
+            alert(`Failed to delete announcement: ${error.response?.data?.message || error.message}`);
+        } finally {
+            setAnnouncementToDelete(null);
+            setPosterIdOfAnnouncement(null);
+        }
+    };
+
+    // --- CALCULATE METRICS (KEPT AS IS) ---
     const calculateStationMetrics = (stationId, currentLogs = logs) => {
         const liveLogs = currentLogs.filter(l => l.status !== 'Pending Approval');
-        
+
         // Flexible matching (Handles "Station 1" vs "Station1")
-        const stationLogs = stationId 
-            ? liveLogs.filter(l => l.station.replace(/\s+/g, '').toLowerCase() === stationId.replace(/\s+/g, '').toLowerCase()) 
-            : liveLogs; 
+        const stationLogs = stationId
+            ? liveLogs.filter(l => l.station.replace(/\s+/g, '').toLowerCase() === stationId.replace(/\s+/g, '').toLowerCase())
+            : liveLogs;
 
         const pendingApprovalUnits = currentLogs.filter(l => l.status === 'Pending Approval').length;
         const completedUnits = stationLogs.filter(l => l.status === 'Completed').length;
         const ngUnits = stationLogs.filter(l => l.status === 'No Good (NG)').length;
         const totalUnitsForYield = completedUnits + ngUnits;
         const pendingUnits = stationLogs.filter(l => l.status === 'In Progress').length;
-        
+
         const yieldRate = totalUnitsForYield > 0 ? (completedUnits / totalUnitsForYield) * 100 : 0;
 
         return {
@@ -406,16 +503,14 @@ export default function AdminPage({ user, onLogout }) {
             ngUnits,
             totalUnits: stationLogs.length,
             yieldTotal: totalUnitsForYield,
-            pendingUnits, 
+            pendingUnits,
             pendingApprovalUnits: stationId ? currentLogs.filter(l => l.station.replace(/\s+/g, '') === stationId.replace(/\s+/g, '') && l.status === 'Pending Approval').length : pendingApprovalUnits,
             yieldRate: yieldRate.toFixed(2),
         };
     };
 
     const overallMetrics = calculateStationMetrics(null, logs);
-    const totalOutput = overallMetrics.completedUnits;
-    const systemAlerts = overallMetrics.ngUnits;
-    
+
     // Filter reports (Flexible filtering)
     const filteredReports = dailyReportsList.filter(report => {
         const reportDbDate = report.report_date ? report.report_date.split(' ')[0] : null;
@@ -429,1509 +524,381 @@ export default function AdminPage({ user, onLogout }) {
     const headerAvatarSrc = user.avatar_url ? `${AVATAR_UPLOAD_PATH}${user.avatar_url}` : DEFAULT_AVATAR_PATH;
     const headerFullName = user.full_name || user.username || 'Admin';
 
-    // --- Add these at the top of your component function ---
-    const [showApproveModal, setShowApproveModal] = useState(false);
-const [selectedLogToApprove, setSelectedLogToApprove] = useState(null);
-
-// Wrapper function to execute approval
-const executeApproval = () => {
-    if (selectedLogToApprove) {
-        // Calls the function to approve and set status to 'In Progress'
-        handleApproveUnit(selectedLogToApprove.id, selectedLogToApprove); 
-        
-        setShowApproveModal(false);
-        setSelectedLogToApprove(null);
-    }
-};
-
-// --- ADD THESE TO AdminPage COMPONENT FUNCTION BODY ---
-const [dashboardView, setDashboardView] = useState('bar'); // 'bar' or 'pie'
-
-const chartViews = ['bar', 'pie'];
-
-const nextChart = () => {
-    setDashboardView(prev => {
-        const currentIndex = chartViews.indexOf(prev);
-        const nextIndex = (currentIndex + 1) % chartViews.length;
-        return chartViews[nextIndex];
-    });
-};
-
-const prevChart = () => {
-    setDashboardView(prev => {
-        const currentIndex = chartViews.indexOf(prev);
-        // Uses modulus arithmetic to handle wrap-around from 0 to last index
-        const prevIndex = (currentIndex - 1 + chartViews.length) % chartViews.length;
-        return chartViews[prevIndex];
-    });
-};
-
-
-
-// --- END OF ADMINPAGE COMPONENT FUNCTION BODY ADDITIONS ---
-
-// --- ANNOUNCEMENT HANDLERS ---
-    const handlePostAnnouncement = async (content) => {
-    if (user.role !== 'Administrator') {
-        throw new Error("Only Administrators can post announcements.");
-    }
-    const payload = {
-        user_id: user.id, // Siguraduhin na may laman ito (galing sa login user state)
-        content: content,
-    };
-    try {
-        // Dapat maghintay ng successful response mula sa PHP
-        await axios.post(ANNOUNCEMENTS_ENDPOINT, payload, { headers: { 'Content-Type': 'application/json' } });
-        fetchData(); // ✅ Dapat ito ang nagre-refresh ng announcement list
-    } catch (error) {
-        console.error("Error posting announcement:", error);
-        throw new Error(error.response?.data?.message || "Failed to post announcement. Check console for API error.");
-    }
-};
-
-// AdminPage.jsx (Add this function alongside your other ANNOUNCEMENT HANDLERS)
-
-// UPDATED handleDeleteAnnouncement FUNCTION
-
-// //////////////////////////////////////////////////////
-// 1. FUNCTION NA TATAWAGIN NG TRASH BUTTON SA LISTAHAN
-// (Ito ang magpapakita ng modal)
-// //////////////////////////////////////////////////////
-const handleConfirmDelete = (announcementId, posterUserId) => {
-    // Client-side security check (user must be Admin OR the original poster)
-    if (user.role !== 'Administrator' && user.id !== posterUserId) { 
-        alert("You do not have permission to delete this announcement.");
-        return;
-    }
-    
-    // Itatago ang ID sa state at ilalabas ang modal
-    setAnnouncementToDelete(announcementId);
-    setPosterIdOfAnnouncement(posterUserId); 
-    setShowDeleteModal(true); // <--- ITO ANG NAGPAPALABAS NG MODAL
-};
-
-// //////////////////////////////////////////////////////
-// 2. FUNCTION NA TATAWAGIN NG DELETE BUTTON SA LOOB NG MODAL
-// (Ito ang gagawa ng API call)
-// //////////////////////////////////////////////////////
-const executeDelete = async () => {
-    // Siguraduhin na may ID na nakaset bago mag-execute
-    if (!announcementToDelete) return; 
-
-    // Isara ang modal
-    setShowDeleteModal(false);
-
-    try {
-        // --- Execute DELETE API Call gamit ang ID sa state ---
-        const response = await axios.delete(`${ANNOUNCEMENTS_ENDPOINT}`, {
-            data: {
-                id: announcementToDelete, // Announcement ID galing sa state
-                user_id: user.id          // Ang ID ng kasalukuyang user
-            },
-            headers: { 
-                'Content-Type': 'application/json' 
-            }
-        });
-        
-        // Success: Show message and refresh the announcement list
-        alert(response.data.message || "Announcement deleted successfully.");
-        fetchData();
-        
-    } catch (error) {
-        console.error("Error deleting announcement:", error);
-        alert(`Failed to delete announcement: ${error.response?.data?.message || error.message}`);
-    } finally {
-        // I-reset ang state
-        setAnnouncementToDelete(null);
-        setPosterIdOfAnnouncement(null);
-    }
-};
-
-// --- ANNOUNCEMENT HANDLERS ---
-// ... (The place where you put handlePostAnnouncement) ...
-// ... (Insert handleDeleteAnnouncement here) ...
-
-    // --- RENDER CONTENT ---
+    // --- RENDER CONTENT (Simplified Switch) ---
     const renderContent = () => {
         if (loading && logs.length === 0) {
-            return ( <div className="text-center py-5"><div className="spinner-border text-danger" role="status"></div><p className="mt-3 text-muted">Loading real-time production data...</p></div> );
+            return (<div className="text-center py-5"><div className="spinner-border text-danger" role="status"></div><p className="mt-3 text-muted">Loading real-time production data...</p></div>);
         }
         if (error) {
-            return ( <div className="alert alert-danger text-center py-5"><i className="bi bi-x-octagon-fill me-2"></i> {error}</div> );
+            return (<div className="alert alert-danger text-center py-5"><i className="bi bi-x-octagon-fill me-2"></i> {error}</div>);
         }
-
-
 
         switch (activeTab) {
-       case "dashboard":
-    // Note: 'dashboardView', 'nextChart', and 'prevChart' must be defined outside this switch.
-    
-    // Determine current chart title
-    const currentChartTitle = dashboardView === 'bar' ? 'Station Output' : 'Status Distribution';
-    const currentChartSubtitle = dashboardView === 'bar' ? 'Live production count per station' : 'Overall yield ratio';
+            case "dashboard":
+                return (
+                    <Dashboard
+                        logs={logs}
+                        stations={stations}
+                        calculateMetrics={calculateStationMetrics}
+                        overallMetrics={overallMetrics}
+                        setActiveTab={setActiveTab}
+                        dashboardView={dashboardView}
+                        nextChart={nextChart}
+                        prevChart={prevChart}
+                        handleMonitorStation={handleMonitorStation}
+                    />
+                );
 
-    return (
-        <div className="animate-in fade-in pb-4">
-            {/* --- 1. Header Section --- */}
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h3 className="fw-bold text-dark mb-1" style={{ letterSpacing: '-0.5px' }}>Production Overview</h3>
-                    <p className="text-muted small mb-0">Real-time data stream from all active stations.</p>
-                </div>
-                <div className="d-flex align-items-center gap-2">
-                    <div className="bg-white border px-3 py-2 rounded shadow-sm d-flex align-items-center">
-                        <span className="position-relative d-flex h-2 w-2 me-2">
-                            <span className="animate-ping position-absolute d-inline-flex h-100 w-100 rounded-circle bg-success opacity-75"></span>
-                            <span className="position-relative d-inline-flex rounded-circle h-2 w-2 bg-success" style={{width:'10px', height:'10px'}}></span>
-                        </span>
-                        <span className="fw-bold text-dark small" style={{fontSize: '0.8rem'}}>System Live</span>
-                    </div>
-                    <div className="bg-white border px-3 py-2 rounded shadow-sm text-secondary fw-bold small">
-                        {new Date().toLocaleDateString()}
-                    </div>
-                </div>
-            </div>
-
-            {/* --- 2. Stats Cards (Summary) --- */}
-            <div className="row g-4 mb-5">
-                {/* Completed Units */}
-                <div className="col-md-3">
-                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-success" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <div className="bg-success bg-opacity-10 text-success rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '50px', height: '50px'}}>
-                                    <i className="bi bi-box-seam-fill fs-4"></i>
-                                </div>
-                                <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-2 py-1 small fw-normal">
-                                    <i className="bi bi-arrow-up-short"></i>On Track
-                                </span>
-                            </div>
-                            <h2 className="fw-bold text-dark mb-0 display-6">{overallMetrics.completedUnits}</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Completed Units</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Yield Rate */}
-                <div className="col-md-3">
-                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-primary" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <div className="bg-primary bg-opacity-10 text-primary rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '50px', height: '50px'}}>
-                                    <i className="bi bi-activity fs-4"></i>
-                                </div>
-                                <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-2 py-1 small fw-normal">
-                                    Target: 98%
-                                </span>
-                            </div>
-                            <h2 className="fw-bold text-dark mb-0 display-6">{overallMetrics.yieldRate}%</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Yield Rate</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* In Progress */}
-                <div className="col-md-3">
-                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-warning" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <div className="bg-warning bg-opacity-10 text-warning rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '50px', height: '50px'}}>
-                                    <i className="bi bi-hourglass-split fs-4"></i>
-                                </div>
-                                <span className="badge bg-warning bg-opacity-10 text-warning rounded-pill px-2 py-1 small fw-normal">
-                                    Active
-                                </span>
-                            </div>
-                            <h2 className="fw-bold text-dark mb-0 display-6">{overallMetrics.pendingUnits}</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>In Progress</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Defects (NG) */}
-                <div className="col-md-3">
-                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-danger" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <div className="bg-danger bg-opacity-10 text-danger rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '50px', height: '50px'}}>
-                                    <i className="bi bi-exclamation-octagon-fill fs-4"></i>
-                                </div>
-                                <span className="badge bg-danger bg-opacity-10 text-danger rounded-pill px-2 py-1 small fw-normal">
-                                    Alert
-                                </span>
-                            </div>
-                            <h2 className="fw-bold text-danger mb-0 display-6">{overallMetrics.ngUnits}</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Total Defects (NG)</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* --- 3. Approvals Alert (Action Bar) --- */}
-            {overallMetrics.pendingApprovalUnits > 0 && (
-                <div className="card border-0 shadow-sm mb-4 border-start border-4 border-danger bg-white">
-                    <div className="card-body d-flex align-items-center justify-content-between p-3">
-                        <div className="d-flex align-items-center">
-                            <i className="bi bi-bell-fill text-danger fs-4 me-3 ms-2"></i>
-                            <div>
-                                <h6 className="fw-bold text-dark mb-0">Action Required</h6>
-                                <small className="text-secondary">There are <span className="fw-bold text-danger">{overallMetrics.pendingApprovalUnits} units</span> waiting for QA validation.</small>
-                            </div>
-                        </div>
-                        <button className="btn btn-sm btn-danger px-4 rounded-pill" onClick={() => setActiveTab('approval')}>
-                            Review Queue
-                        </button>
-                    </div>
-                </div>
-            )}
-            
-            {/* ----------------------------------------------------- */}
-            {/* --- 4. LIVE UNITS OVERVIEW (PRIORITIZED TABLE) --- */}
-            {/* ----------------------------------------------------- */}
-            <div className="row g-4 mb-4">
-                <div className="col-12">
-                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
-                        <div className="card-header bg-white py-3 border-0">
-                            <h5 className="fw-bold text-dark mb-0">Live Units Overview</h5>
-                            <small className="text-muted" style={{fontSize: '0.75rem'}}>Detailed breakdown of active and recent logs.</small>
-                        </div>
-                        <div className="card-body p-4">
-                            <div className="table-responsive" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                                <table className="table table-sm table-striped align-middle mb-0 small">
-                                    <thead className="table-light">
-                                        <tr>
-                                            <th>Time</th>
-                                            <th>Station</th>
-                                            <th>Device Serial No</th>
-                                            <th>Status</th>
-                                            <th>Remarks</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {logs.slice(0, 10).map(log => ( // Show only the last 10 logs for a quick overview
-                                            <tr key={log.id}>
-                                                <td className="text-muted" style={{fontSize: '00.7rem'}}>{new Date(log.created_at).toLocaleTimeString()}</td>
-                                                <td className="fw-medium">{log.station}</td>
-                                                <td className="font-monospace">{log.device_serial_no}</td>
-                                                <td><span className={`badge ${log.status === 'Completed' ? 'bg-success' : log.status === 'No Good (NG)' ? 'bg-danger' : log.status === 'In Progress' ? 'bg-primary' : 'bg-warning text-dark'}`}>{log.status}</span></td>
-                                                <td className="small text-truncate" style={{ maxWidth: '200px' }}>{log.remarks || 'N/A'}</td>
-                                            </tr>
-                                        ))}
-                                        {logs.length === 0 && (
-                                            <tr><td colSpan="5" className="text-center py-3 text-muted">No recent activity to display.</td></tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* ----------------------------------------------------- */}
-            {/* --- 5. PAGING CHART CONTAINER (Secondary Visual) --- */}
-            {/* ----------------------------------------------------- */}
-            <div className="row g-4"> 
-                <div className="col-12">
-                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px', minHeight: '480px' }}>
-                        
-                        {/* CHART HEADER - BUTTONS ARE VISIBLE AND IN THE TOP CENTER/RIGHT */}
-                        <div className="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
-                            
-                            {/* Left: Title and Subtitle */}
-                            <div>
-                                <h5 className="fw-bold text-dark mb-0">{currentChartTitle}</h5>
-                                <small className="text-muted" style={{fontSize: '0.75rem'}}>{currentChartSubtitle}</small>
-                            </div>
-
-                            {/* Right: Navigation Buttons (Highly Visible) */}
-                            <div className="d-flex gap-2 ms-auto">
-                                <button className="btn btn-dark btn-sm rounded-pill fw-bold" onClick={prevChart} title="Previous Chart">
-                                    <i className="bi bi-arrow-left me-1"></i> Prev
-                                </button>
-                                <button className="btn btn-dark btn-sm rounded-pill fw-bold" onClick={nextChart} title="Next Chart">
-                                    Next <i className="bi bi-arrow-right ms-1"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Chart Body */}
-                        <div className="card-body d-flex align-items-center justify-content-center p-4">
-                            <div className="w-100 h-100 fade-in" style={{ height: '400px' }}>
-                                {/* Conditional Rendering based on dashboardView state */}
-                                {dashboardView === 'bar' && (
-                                    <StationBarChart logs={logs} stations={stations} calculateMetrics={calculateStationMetrics} />
-                                )}
-                                {dashboardView === 'pie' && (
-                                    <UnitPieChart metrics={overallMetrics} title="" />
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Removed the style block here to keep components cleaner, assuming global CSS handles animations */}
-        </div>
-    );
-
-// ...
-
-    case "stations":
-    // Define the fixed list of station names based on the process flow
-    const processStations = [
-        "PCB Pairing",
-        "Integrated Board Test",
-        "Main Board Conformal Coating",
-        "RTV Application",
-        "Casing/Harnessing",
-        "Complete Unit Test/Calibration",
-        "Pre BI Hi-Pot Test",
-        "Burn-in Testing",
-        "Sealing",
-        "Post BI Hi-Pot Test",
-        "Final Functional/Connectivity Test",
-        "Label Sticker Attachment",
-        "FVI",
-        "Packing",
-        "QC Stamping"
-    ];
-
-    // Assuming the 'stations' array initially passed to the component has length 15 
-    // and we need to map the new names to them while preserving their IDs and metrics.
-    const namedStations = stations.slice(0, processStations.length).map((station, index) => ({
-        ...station, // Keep existing data like ID
-        name: processStations[index], // Overwrite the name with the process name
-    }));
-
-    return (
-        <div className="animate-in fade-in">
-    {/* Title Header */}
-    <div className="d-flex justify-content-between align-items-end mb-4">
-        <div>
-            <h3 className="fw-bold text-dark mb-1">Station Management</h3>
-            <p className="text-muted small mb-0">Overview of all {namedStations.length} production stations.</p>
-        </div>
-    </div>
-
-    {/* Grid Container */}
-    <div className="row g-3">
-        {namedStations.map((station) => {
-            const metrics = calculateStationMetrics(station.id);
-            const hasActivity = metrics.pendingUnits > 0;
-            const hasError = metrics.ngUnits > 0 && metrics.completedUnits === 0;
-
-            let statusColor = "secondary";
-            let statusLabel = "Idle";
-
-            if (hasActivity) {
-                statusColor = "primary";
-                statusLabel = "Running";
-            }
-            if (hasError) {
-                statusColor = "danger";
-                statusLabel = "Attention";
-            }
-
-            return (
-                <div key={station.id} className="col-12 col-sm-6 col-lg-4 col-xl-3">
-                    <div className="card shadow-sm h-100 border-0">
-                        <div className="card-body d-flex flex-column">
-
-                            {/* Station Name + ID */}
-                            <h6 className="fw-bold text-dark mb-1">{station.name}</h6>
-                            <small className="text-muted mb-2">ID: {station.id}</small>
-
-                            {/* Status */}
-                            <div className="mb-3">
-                                <span className={`badge bg-${statusColor} bg-opacity-10 text-${statusColor} px-3 py-2 rounded-pill fw-bold`}>
-                                    {hasActivity && (
-                                        <span className="spinner-grow spinner-grow-sm me-1"
-                                            role="status"
-                                            aria-hidden="true"
-                                            style={{ width: "0.5rem", height: "0.5rem" }}>
-                                        </span>
-                                    )}
-                                    {statusLabel}
-                                </span>
-                            </div>
-
-                            {/* Metrics */}
-                            <div className="mb-3">
-                                <div className="d-flex justify-content-between">
-                                    <small className="text-muted">Completed</small>
-                                    <span className="fw-bold text-dark">{metrics.completedUnits}</span>
-                                </div>
-
-                                <div className="d-flex justify-content-between">
-                                    <small className="text-muted">Defects (NG)</small>
-                                    <span className={`fw-bold ${metrics.ngUnits > 0 ? "text-danger" : "text-dark"}`}>
-                                        {metrics.ngUnits}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Actions */}
-                            <div className="mt-auto d-flex gap-2">
-                                <button
-                                    className="btn btn-sm btn-outline-primary fw-bold flex-grow-1"
-                                    onClick={() => handleMonitorStation(station.id)}
-                                >
-                                    <i className="bi bi-speedometer2 me-1"></i> Monitor
-                                </button>
-
-                                <button
-                                    className="btn btn-sm btn-outline-secondary fw-bold flex-grow-1"
-                                    onClick={() => handleViewHistory(station.id)}
-                                >
-                                    <i className="bi bi-clock-history me-1"></i> History
-                                </button>
-                            </div>
-
-                        </div>
-                    </div>
-                </div>
-            );
-        })}
-    </div>
-</div>
-
-    );
+            case "stations":
             case "station_monitor":
-                if (!stationMonitorId) { setActiveTab('stations'); return null; }
-                const station = stations.find(s => s.id === stationMonitorId);
-                const monitorMetrics = calculateStationMetrics(stationMonitorId);
-
                 return (
-                    <div className="animate-in fade-in pb-5">
-                        {/* --- Header Section --- */}
-                        <div className="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3">
-                            <div>
-                                <h3 className="fw-bold text-dark mb-1">{station?.name || stationMonitorId}</h3>
-                                <p className="text-muted small mb-0">Real-time production feed</p>
-                            </div>
-                            <button 
-                                className="btn btn-light border btn-sm px-3 fw-bold text-muted hover-lift" 
-                                onClick={() => { setActiveTab('stations'); setHighlightedUnitId(null); }}
-                            >
-                                <i className="bi bi-arrow-left me-2"></i>Back to Overview
-                            </button>
-                        </div>
-
-                        {/* --- Stats Cards (Modern Style) --- */}
-                        <div className="row g-4 mb-4">
-                            {/* Completed */}
-                            <div className="col-md-6 col-xl-3">
-                                <div className="card border-0 shadow-sm h-100 border-start border-4 border-success" style={{borderRadius: '12px'}}>
-                                    <div className="card-body p-4">
-                                        <div className="d-flex align-items-center justify-content-between mb-3">
-                                            <div className="bg-success bg-opacity-10 text-success rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '45px', height: '45px'}}>
-                                                <i className="bi bi-check-circle-fill fs-4"></i>
-                                            </div>
-                                            <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-2 py-1 small fw-normal">Output</span>
-                                        </div>
-                                        <h2 className="fw-bold text-dark mb-0">{monitorMetrics.completedUnits}</h2>
-                                        <span className="text-muted text-uppercase small fw-bold" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Completed</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Yield Rate */}
-                            <div className="col-md-6 col-xl-3">
-                                <div className="card border-0 shadow-sm h-100 border-start border-4 border-primary" style={{borderRadius: '12px'}}>
-                                    <div className="card-body p-4">
-                                        <div className="d-flex align-items-center justify-content-between mb-3">
-                                            <div className="bg-primary bg-opacity-10 text-primary rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '45px', height: '45px'}}>
-                                                <i className="bi bi-graph-up-arrow fs-4"></i>
-                                            </div>
-                                            <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-2 py-1 small fw-normal">Efficiency</span>
-                                        </div>
-                                        <h2 className="fw-bold text-dark mb-0">{monitorMetrics.yieldRate}%</h2>
-                                        <span className="text-muted text-uppercase small fw-bold" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Yield Rate</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* In Progress */}
-                            <div className="col-md-6 col-xl-3">
-                                <div className="card border-0 shadow-sm h-100 border-start border-4 border-warning" style={{borderRadius: '12px'}}>
-                                    <div className="card-body p-4">
-                                        <div className="d-flex align-items-center justify-content-between mb-3">
-                                            <div className="bg-warning bg-opacity-10 text-warning rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '45px', height: '45px'}}>
-                                                <i className="bi bi-hourglass-split fs-4"></i>
-                                            </div>
-                                            <span className="badge bg-warning bg-opacity-10 text-warning rounded-pill px-2 py-1 small fw-normal">Active</span>
-                                        </div>
-                                        <h2 className="fw-bold text-dark mb-0">{monitorMetrics.pendingUnits}</h2>
-                                        <span className="text-muted text-uppercase small fw-bold" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>In Progress</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Defects (NG) */}
-                            <div className="col-md-6 col-xl-3">
-                                <div className="card border-0 shadow-sm h-100 border-start border-4 border-danger" style={{borderRadius: '12px'}}>
-                                    <div className="card-body p-4">
-                                        <div className="d-flex align-items-center justify-content-between mb-3">
-                                            <div className="bg-danger bg-opacity-10 text-danger rounded-3 p-3 d-flex align-items-center justify-content-center" style={{width: '45px', height: '45px'}}>
-                                                <i className="bi bi-exclamation-triangle-fill fs-4"></i>
-                                            </div>
-                                            <span className="badge bg-danger bg-opacity-10 text-danger rounded-pill px-2 py-1 small fw-normal">Defects</span>
-                                        </div>
-                                        <h2 className="fw-bold text-dark mb-0">{monitorMetrics.ngUnits}</h2>
-                                        <span className="text-muted text-uppercase small fw-bold" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Total NG</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* --- Live Logs Table (Kept Original Structure) --- */}
-                        <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
-                            <div className="card-header bg-white py-3 px-4 border-0 d-flex justify-content-between align-items-center">
-                                <h6 className="fw-bold text-dark mb-0">Production Feed</h6>
-                                <button className="btn btn-sm btn-light text-primary fw-bold border rounded-pill px-3" onClick={fetchData}>
-                                    <i className="bi bi-arrow-clockwise me-1"></i>Refresh
-                                </button>
-                            </div>
-                            <div className="table-responsive">
-                                <table className="table table-hover table-striped mb-0 small text-center align-middle">
-                                    <thead className="table-dark">
-                                        <tr>
-                                            <th>MODEL</th>
-                                            <th>REVISION</th>
-                                            <th>BASE UNIT</th>
-                                            <th>ASSEMBLY</th>
-                                            <th>DEVICE SERIAL</th>
-                                            <th>ACCESSORY</th>
-                                            <th>STATUS</th>
-                                            <th>REMARKS</th>
-                                            <th>TIME DATE</th>
-                                            <th>ACTIONS</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {monitorMetrics.stationLogs.length > 0 ? monitorMetrics.stationLogs.map(log => {
-                                            const isHighlighted = highlightedUnitId === log.id;
-                                            return (
-                                                <tr key={log.id} className={isHighlighted ? 'table-danger fw-bold' : ''}>
-                                                    <td>{log.model}</td>
-                                                    <td>{log.revision}</td>
-                                                    <td className="font-monospace">{log.base_unit_kitting_no}</td>
-                                                    <td className="font-monospace text-primary fw-bold">{log.assembly_no}</td>
-                                                    <td className="fw-bold">{log.device_serial_no}</td>
-                                                    <td>{log.accessory_kitting_no}</td>
-                                                    <td><span className={`badge ${log.status === 'Completed' ? 'bg-success' : log.status === 'No Good (NG)' ? 'bg-danger' : log.status === 'In Progress' ? 'bg-primary' : 'bg-warning text-dark'}`}>{log.status}</span></td>
-                                                    <td>{log.remarks}</td>
-                                                    <td className="small">{new Date(log.created_at).toLocaleString()}</td>
-                                                    <td><button className="btn btn-sm btn-outline-danger py-0" onClick={() => handleEditClick(log)}><i className="bi bi-pencil"></i> Edit</button></td>
-                                                </tr>
-                                            );
-                                        }) : ( <tr><td colSpan="10" className="text-center py-4">No live logs found for this station.</td></tr> )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
+                    <StationsOverview
+                        activeTab={activeTab}
+                        stations={stations}
+                        calculateMetrics={calculateStationMetrics}
+                        stationMonitorId={stationMonitorId}
+                        highlightedUnitId={highlightedUnitId}
+                        setActiveTab={setActiveTab}
+                        handleMonitorStation={handleMonitorStation}
+                        handleViewHistory={handleViewHistory}
+                        handleEditClick={handleEditClick}
+                        fetchData={fetchData}
+                    />
                 );
+
             case "reports":
-    return (
-        <div className="animate-in fade-in pb-5">
-            {/* Header */}
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h3 className="fw-bold text-dark mb-1">Production Reports</h3>
-                    <p className="text-muted small mb-0">Daily performance records from all stations.</p>
-                </div>
-                <button 
-                    className="btn btn-primary px-4 py-2 rounded-pill shadow-sm fw-bold hover-scale"
-                    onClick={() => setShowReportModal(true)}
-                >
-                    <i className="bi bi-plus-lg me-2"></i>New Report
-                </button>
-            </div>
-
-            {/* Filter Bar */}
-            <div className="card border-0 shadow-sm mb-4" style={{borderRadius: '12px'}}>
-                <div className="card-body p-3 d-flex flex-wrap align-items-center gap-3">
-                    <div className="d-flex align-items-center">
-                        <i className="bi bi-calendar-event text-secondary me-2 fs-5"></i>
-                        <input 
-                            type="date" 
-                            className="form-control border-0 bg-light fw-bold text-secondary" 
-                            style={{maxWidth: '160px'}}
-                            value={reportDate} 
-                            onChange={(e) => setReportDate(e.target.value)} 
-                            max={getTodayDate()} 
-                        />
-                    </div>
-                    <div className="vr text-secondary opacity-25 mx-2"></div>
-                    <div className="d-flex align-items-center flex-grow-1">
-                        <i className="bi bi-funnel text-secondary me-2 fs-5"></i>
-                        <select 
-                            className="form-select border-0 bg-light fw-bold text-secondary" 
-                            style={{maxWidth: '200px'}}
-                            value={reportFilterStationId} 
-                            onChange={(e) => setReportFilterStationId(e.target.value)}
-                        >
-                            <option value="All">All Stations</option>
-                            {stations.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
-                        </select>
-                    </div>
-                    <div className="text-muted small ms-auto">
-                        Showing <strong className="text-dark">{filteredReports.length}</strong> records
-                    </div>
-                </div>
-            </div>
-
-            {/* Reports Table */}
-            <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
-                <div className="table-responsive">
-                    <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.9rem' }}>
-                        <thead className="bg-light text-secondary text-uppercase small" style={{ letterSpacing: '0.5px' }}>
-                            <tr>
-                                <th className="border-0 py-3 ps-4">Station & Shift</th>
-                                <th className="border-0 py-3 text-center">Output</th>
-                                <th className="border-0 py-3 text-center">Defects / Downtime</th>
-                                {/* REMOVED: Submitted By Column */}
-                                <th className="border-0 py-3 text-end pe-4">Timestamp</th>
-                                <th className="border-0 py-3 text-center">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="border-top-0">
-                            {filteredReports.length > 0 ? filteredReports.map(report => (
-                                <tr key={report.id}>
-                                    <td className="ps-4">
-                                        <div className="d-flex align-items-center">
-                                            <div className="bg-primary bg-opacity-10 text-primary rounded p-2 me-3">
-                                                <i className="bi bi-layers-fill"></i>
-                                            </div>
-                                            <div>
-                                                <div className="fw-bold text-dark">{report.station}</div>
-                                                <div className="small text-muted">{report.shift}</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="text-center">
-                                        <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-2 fw-normal fs-6">
-                                            {report.total_units_processed}
-                                        </span>
-                                    </td>
-                                    <td className="text-center">
-                                        <div className="d-flex flex-column justify-content-center align-items-center">
-                                            <span className="text-danger fw-bold">{report.total_ng} NG</span>
-                                            <small className="text-muted" style={{fontSize: '0.75rem'}}>{report.downtime_minutes} min down</small>
-                                        </div>
-                                    </td>
-                                    
-                                    {/* REMOVED: Submitted By Cell */}
-
-                                    <td className="text-end pe-4 text-muted font-monospace small">
-                                        {new Date(report.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                        <div style={{fontSize: '0.7rem'}}>{new Date(report.created_at).toLocaleDateString()}</div>
-                                    </td>
-                                    <td className="text-center">
-                                        <button 
-                                            className="btn btn-sm btn-light border text-primary hover-primary rounded-pill px-3" 
-                                            onClick={() => handleViewReport(report)}
-                                        >
-                                            Details
-                                        </button>
-                                    </td>
-                                </tr>
-                            )) : (
-                                <tr>
-                                    {/* Updated colSpan from 6 to 5 because we removed 1 column */}
-                                    <td colSpan="5" className="py-5 text-center text-muted">
-                                        <div className="mb-3"><i className="bi bi-file-earmark-x fs-1 opacity-25"></i></div>
-                                        <p className="mb-0">No reports found for the selected date or station.</p>
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <style jsx>{`
-                .hover-scale:hover { transform: scale(1.02); }
-                .hover-primary:hover { background-color: #0d6efd; color: white !important; border-color: #0d6efd !important; }
-            `}</style>
-        </div>
-    );
-    {/* --- NEW CASE: ANNOUNCEMENT BOARD --- */}
-case "announcements": 
-    
-    // 1. FILTERING LOGIC (No changes needed here)
-    const announcementsToDisplay = announcements.filter(announcement => {
-        const postDate = new Date(announcement.created_at.split(' ')[0]);
-        
-        let start = filterStartDate ? new Date(filterStartDate) : new Date('2000-01-01');
-        let end = filterEndDate ? new Date(filterEndDate) : new Date();
-
-        if (filterEndDate) {
-            end.setHours(23, 59, 59, 999);
-        }
-
-        const normalizedPostDate = new Date(postDate.getFullYear(), postDate.getMonth(), postDate.getDate());
-
-        return (
-            normalizedPostDate.getTime() >= start.getTime() && 
-            normalizedPostDate.getTime() <= end.getTime()
-        );
-    });
-
-    return (
-        <div className="animate-in fade-in pb-5">
-            {/* --- Header Section (Medyo compact) --- */}
-            <div className="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
-                <div>
-                    <h3 className="fw-bold text-dark mb-1 fs-3" style={{ letterSpacing: '-0.5px' }}>
-                        {/* Tinanggal ang icon dito */}
-                        Announcements
-                    </h3>
-                    <p className="text-muted small mb-0">
-                        {announcementsToDisplay.length} notices shown. Filtered by date range.
-                    </p>
-                </div>
-                {user.role === 'Administrator' && (
-                    <button
-                        className="btn btn-primary px-4 py-2 rounded-pill shadow fw-bold hover-scale d-flex align-items-center"
-                        onClick={() => setShowPostModal(true)}
-                    >
-                        <i className="bi bi-send-fill me-2"></i> Create New Post
-                    </button>
-                )}
-            </div>
-
-            {/* --- FILTER BAR (Compact Card) --- */}
-            <div className="card border-0 shadow-sm mb-4 p-3" style={{ borderRadius: '12px' }}>
-                <div className="d-flex flex-wrap align-items-center gap-3">
-                    <i className="bi bi-calendar-range text-primary fs-5 me-2"></i>
-                    
-                    {/* Start Date Filter */}
-                    <div className="d-flex align-items-center gap-2">
-                        <label className="text-muted small fw-bold mb-0">From:</label>
-                        <input
-                            type="date"
-                            className="form-control form-control-sm border-0 bg-light fw-bold"
-                            style={{ maxWidth: '140px' }}
-                            value={filterStartDate}
-                            onChange={(e) => setFilterStartDate(e.target.value)}
-                        />
-                    </div>
-
-                    {/* End Date Filter */}
-                    <div className="d-flex align-items-center gap-2">
-                        <label className="text-muted small fw-bold mb-0">To:</label>
-                        <input
-                            type="date"
-                            className="form-control form-control-sm border-0 bg-light fw-bold"
-                            style={{ maxWidth: '140px' }}
-                            value={filterEndDate}
-                            onChange={(e) => setFilterEndDate(e.target.value)}
-                            max={getTodayDate()} 
-                        />
-                    </div>
-
-                    <button 
-                        className="btn btn-sm btn-outline-secondary ms-auto"
-                        onClick={() => { setFilterStartDate(''); setFilterEndDate(getTodayDate()); }}
-                    >
-                        Clear Filter
-                    </button>
-                </div>
-            </div>
-            {/* --- END FILTER BAR --- */}
-
-
-            {/* --- Announcement Feed Container (Central Focus) --- */}
-            <div className="card border-0 shadow-lg" style={{ borderRadius: '16px' }}>
-                <div className="card-body p-4"> 
-                    <div className="announcement-feed" style={{ maxWidth: '800px', maxHeight: '70vh', overflowY: 'auto' }}>
-                        
-                        {announcementsToDisplay.length > 0 ? (
-                            announcementsToDisplay.map((announcement, index) => {
-                                const isLatest = index === 0; 
-                                
-                                const postTime = new Date(announcement.created_at).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' }); 
-                                const posterAvatar = announcement.poster_avatar ? `${AVATAR_UPLOAD_PATH}${announcement.poster_avatar}` : DEFAULT_AVATAR_PATH;
-                                
-                                const canDelete = user.role === 'Administrator' || (user.id === announcement.user_id);
-
-                                return (
-                                    <div 
-                                        key={announcement.id} 
-                                        className={`d-flex align-items-start ${index < announcementsToDisplay.length - 1 ? 'border-bottom' : ''} pb-3 mb-3 announcement-item ${isLatest ? 'bg-light p-3 rounded-3 border border-primary border-opacity-25' : ''}`}
-                                    >
-                                        {/* Avatar Column */}
-                                        <div className="flex-shrink-0">
-                                            <img
-                                                src={posterAvatar}
-                                                alt="Avatar"
-                                                className="rounded-circle me-3 border border-1 border-light shadow-sm"
-                                                style={{ width: '48px', height: '48px', objectFit: 'cover' }} 
-                                                onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
-                                            />
-                                        </div>
-
-                                        {/* Content Column */}
-                                        <div className="flex-grow-1">
-                                            <div className="d-flex justify-content-between align-items-start mb-2">
-                                                <div className="d-flex align-items-center">
-                                                    <h6 className="fw-bold text-dark mb-0 me-3">{announcement.poster_name || announcement.poster_role}</h6>
-                                                    <span className="badge bg-primary rounded-pill fw-bold py-1 px-2" style={{fontSize: '0.7rem'}}>
-                                                        {announcement.poster_role}
-                                                    </span>
-                                                    {isLatest && <span className="badge bg-warning ms-2 rounded-pill fw-bold py-1 px-2 animate-pulse" style={{fontSize: '0.7rem'}}>NEW!</span>} 
-                                                </div>
-                                                
-                                                {/* TIME AND DELETE BUTTON */}
-                                                <div className="d-flex align-items-center gap-3">
-                                                    <span className="text-muted small fw-medium text-end" style={{ fontSize: '0.75rem' }}>
-                                                        <i className="bi bi-clock me-1"></i> {postTime}
-                                                    </span>
-                                                    
-                                                    {canDelete && (
-                                                        <button
-                                                            className="btn btn-sm btn-light text-danger border-0 p-1 rounded-circle hover-scale"
-                                                            title="Delete Announcement"
-                                                            onClick={() => handleConfirmDelete(announcement.id, announcement.user_id)} 
-                                                            style={{ width: '26px', height: '26px', padding: 0 }}
-                                                        >
-                                                            <i className="bi bi-trash-fill small"></i>
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                {/* END TIME AND DELETE BUTTON */}
-                                                
-                                            </div>
-
-                                            {/* Announcement Content Box (light blue background) */}
-                                            <div className="p-3 rounded" style={{ borderLeft: '4px solid #0d6efd', backgroundColor: isLatest ? '#e3f2fd !important' : '#f8f9fa !important' }}>
-                                                <p className="mb-0 text-dark fw-medium" style={{ whiteSpace: 'pre-wrap', fontSize: '0.95rem', lineHeight: '1.4' }}>
-                                                    {announcement.content}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        ) : (
-                            /* --- Empty State --- */
-                            <div className="text-center py-5 my-5">
-                                <i className="bi bi-calendar-x display-2 text-secondary opacity-25 mb-4"></i>
-                                <h5 className="fw-bold text-dark">No Announcements Found</h5>
-                                <p className="text-muted mb-0">No posts match the selected date range.</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* --- DELETE CONFIRMATION MODAL (Theme updated) --- */}
-            {showDeleteModal && (
-                <div className="modal fade show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                    <div className="modal-dialog modal-dialog-centered">
-                        <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '16px' }}>
-                            <div className="modal-header border-0 pb-0">
-                                <h5 className="modal-title fw-bold text-danger d-flex align-items-center">
-                                    <i className="bi bi-exclamation-triangle-fill me-2 fs-4"></i> Confirm Deletion
-                                </h5>
-                                <button type="button" className="btn-close" 
-                                    onClick={() => setShowDeleteModal(false)} aria-label="Close"></button>
-                            </div>
-                            <div className="modal-body pt-2 pb-4">
-                                <p className="text-dark fw-medium">
-                                    Are you absolutely sure you want to delete announcement ID <span className="fw-bold text-primary">{announcementToDelete}</span>? 
-                                </p>
-                                <p className="text-muted small mb-0">
-                                    This action is permanent and cannot be reversed. Please ensure this is the correct item before proceeding.
-                                </p>
-                            </div>
-                            <div className="modal-footer border-0 pt-0">
-                                <button type="button" className="btn btn-secondary rounded-pill px-4" 
-                                    onClick={() => setShowDeleteModal(false)}>
-                                    Cancel
-                                </button>
-                                <button type="button" className="btn btn-danger rounded-pill px-4 fw-bold" 
-                                    onClick={executeDelete}> 
-                                    <i className="bi bi-trash-fill me-2"></i> Delete Permanently
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {/* --- END DELETE CONFIRMATION MODAL --- */}
-            
-            <style jsx>{`
-                .hover-scale:hover { transform: scale(1.02); }
-                .announcement-item { transition: background-color 0.2s ease; }
-                /* Custom animation for NEW! badge */
-                .animate-pulse {
-                    animation: pulse 1.5s infinite;
-                }
-                @keyframes pulse {
-                    0%, 100% { opacity: 1; }
-                    50% { opacity: 0.5; }
-                }
-            `}</style>
-        </div>
-    );
-            case "approval":
-    const approvalQueueLogs = logs.filter(l => l.status === 'Pending Approval');
-    
-    return (
-        <div className="animate-in fade-in pb-5">
-            {/* Header */}
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h3 className="fw-bold text-dark mb-1">Approval Queue</h3>
-                    <p className="text-muted small mb-0">Review flagged units requiring QA validation.</p>
-                </div>
-                {approvalQueueLogs.length > 0 && (
-                    <span className="badge bg-danger rounded-pill px-3 py-2 shadow-sm d-flex align-items-center">
-                        <span className="spinner-grow spinner-grow-sm me-2" role="status" aria-hidden="true"></span>
-                        {approvalQueueLogs.length} Pending
-                    </span>
-                )}
-            </div>
-
-            {/* Main Card */}
-            <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
-                <div className="table-responsive">
-                    <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.9rem' }}>
-                        <thead className="bg-light text-secondary text-uppercase small" style={{ letterSpacing: '0.5px' }}>
-                            <tr>
-                                <th className="border-0 py-3 ps-4">Unit Details</th>
-                                <th className="border-0 py-3">Origin Station</th>
-                                <th className="border-0 py-3 text-center">Status</th>
-                                <th className="border-0 py-3" style={{width: '25%'}}>Remarks</th>
-                                <th className="border-0 py-3 text-end">Timestamp</th>
-                                <th className="border-0 py-3 text-center pe-4">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody className="border-top-0">
-                            {approvalQueueLogs.length > 0 ? approvalQueueLogs.map(log => (
-                                <tr key={log.id}>
-                                    <td className="ps-4">
-                                        <div className="d-flex flex-column">
-                                            <span className="fw-bold text-dark">{log.model} <span className="fw-normal text-muted">({log.revision})</span></span>
-                                            <span className="small text-muted font-monospace">{log.device_serial_no}</span>
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div className="d-flex align-items-center">
-                                            <div className="bg-light border rounded-circle p-1 me-2 d-flex align-items-center justify-content-center" style={{width: '28px', height: '28px'}}>
-                                                <i className="bi bi-geo-alt-fill text-secondary" style={{fontSize: '0.7rem'}}></i>
-                                            </div>
-                                            <span className="fw-medium text-dark">{log.station}</span>
-                                        </div>
-                                    </td>
-                                    <td className="text-center">
-                                        <span className="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-2 fw-normal">
-                                            Pending QA
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div className="d-flex align-items-start text-muted small fst-italic">
-                                            <i className="bi bi-chat-quote-fill me-2 opacity-50"></i>
-                                            "{log.remarks || 'No remarks provided'}"
-                                        </div>
-                                    </td>
-                                    <td className="text-end font-monospace small text-muted">
-                                        <div>{new Date(log.created_at).toLocaleDateString()}</div>
-                                        <div style={{fontSize: '0.75rem'}}>{new Date(log.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                                    </td>
-                                    <td className="text-center pe-4">
-                                        <button 
-                                            className="btn btn-sm btn-success text-white fw-bold px-4 rounded-pill shadow-sm hover-scale"
-                                            onClick={() => {
-                                                setSelectedLogToApprove(log);
-                                                setShowApproveModal(true);
-                                            }}
-                                            style={{transition: 'transform 0.2s'}}
-                                        >
-                                            <i className="bi bi-check-circle me-1"></i> Approve
-                                        </button>
-                                    </td>
-                                </tr>
-                            )) : (
-                                <tr>
-                                    <td colSpan="6" className="py-5 text-center text-muted">
-                                        <div className="mb-3">
-                                            <i className="bi bi-clipboard-check fs-1 text-success opacity-25"></i>
-                                        </div>
-                                        <h6 className="fw-bold text-dark">All Clear!</h6>
-                                        <p className="small mb-0">No units currently require approval.</p>
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {/* --- CONFIRMATION MODAL --- */}
-            {showApproveModal && selectedLogToApprove && (
-                <div className="modal show d-block fade-in" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1070 }}>
-                    <div className="modal-dialog modal-dialog-centered">
-                        <div className="modal-content border-0 shadow-lg rounded-4">
-                            <div className="modal-body p-4 text-center">
-                                <div className="mb-3">
-                                    <div className="bg-success bg-opacity-10 text-success rounded-circle d-inline-flex align-items-center justify-content-center" style={{width: 80, height: 80}}>
-                                        <i className="bi bi-arrow-repeat display-4"></i> {/* Changed icon to represent 'In Progress' */}
-                                    </div>
-                                </div>
-                                <h4 className="fw-bold text-dark">Approve & Resume?</h4>
-                                <p className="text-muted">
-                                    Are you sure you want to approve <br/>
-                                    <span className="fw-bold text-dark">{selectedLogToApprove.model}</span> - <span className="font-monospace text-dark bg-light px-2 rounded">{selectedLogToApprove.device_serial_no}</span>?
-                                </p>
-                                {/* UPDATED TEXT: Now says "In Progress" */}
-                                <p className="small text-muted mb-4">
-                                    This action will release the unit from QA Hold and return its status to <strong>"In Progress"</strong>.
-                                </p>
-                                <div className="d-flex gap-2 justify-content-center">
-                                    <button 
-                                        className="btn btn-light border px-4 rounded-pill fw-bold" 
-                                        onClick={() => setShowApproveModal(false)}
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button 
-                                        className="btn btn-success px-4 rounded-pill fw-bold shadow-sm"
-                                        onClick={executeApproval}
-                                    >
-                                        Yes, Set to In Progress
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <style jsx>{`
-                .hover-scale:hover { transform: scale(1.05); }
-                .fade-in { animation: fadeIn 0.2s ease-in-out; }
-                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-            `}</style>
-        </div>
-    );
-           case "manage_account": 
                 return (
-                    <div className="animate-in fade-in pb-5">
-                        {/* Header */}
-                        <div className="d-flex justify-content-between align-items-center mb-4">
-                            <div>
-                                <h3 className="fw-bold text-dark mb-1">User Management</h3>
-                                <p className="text-muted small mb-0">Control access and manage system accounts.</p>
-                            </div>
-                            <button 
-                                className="btn btn-primary px-4 py-2 rounded-pill shadow-sm fw-bold hover-scale d-flex align-items-center" 
-                                onClick={handleAddUser}
-                            >
-                                <i className="bi bi-person-plus-fill me-2"></i> Add User
-                            </button>
-                        </div>
-
-                        {/* User List Card */}
-                        <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
-                            {/* Card Header / Toolbar */}
-                            <div className="bg-white px-4 py-3 border-bottom d-flex justify-content-between align-items-center">
-                                <span className="text-uppercase small fw-bold text-muted ls-1">All Users</span>
-                                <span className="badge bg-light text-dark border">Total: {userList.length}</span>
-                            </div>
-
-                            <div className="table-responsive">
-                                <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.9rem' }}>
-                                    <thead className="bg-light text-secondary text-uppercase small" style={{ letterSpacing: '0.5px' }}>
-                                        <tr>
-                                            <th className="border-0 py-3 ps-4">User Profile</th>
-                                            <th className="border-0 py-3">Role</th>
-                                            <th className="border-0 py-3">Assigned Station</th>
-                                            <th className="border-0 py-3 text-end pe-4">Date Added</th>
-                                            <th className="border-0 py-3 text-center">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="border-top-0">
-                                        {userList.length > 0 ? userList.map(u => {
-                                            const isMe = u.id === user.id; // Assuming 'user' is the logged-in admin
-                                            const roleColor = u.role === 'Administrator' ? 'danger' : 'primary';
-                                            const roleIcon = u.role === 'Administrator' ? 'bi-shield-lock-fill' : 'bi-person-badge-fill';
-
-                                            return (
-                                                <tr key={u.id}>
-                                                    {/* Profile Column */}
-                                                    <td className="ps-4">
-                                                        <div className="d-flex align-items-center">
-                                                            <div className="position-relative me-3">
-                                                                <img 
-                                                                    src={u.avatar_url ? `${AVATAR_UPLOAD_PATH}${u.avatar_url}` : DEFAULT_AVATAR_PATH} 
-                                                                    alt="Avatar" 
-                                                                    className="rounded-circle border border-2 border-white shadow-sm" 
-                                                                    style={{ width: '40px', height: '40px', objectFit: 'cover' }} 
-                                                                    onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }} 
-                                                                />
-                                                                {isMe && <span className="position-absolute bottom-0 end-0 bg-success border border-white rounded-circle" style={{width: '10px', height: '10px'}}></span>}
-                                                            </div>
-                                                            <div>
-                                                                <div className="fw-bold text-dark">{u.full_name || 'No Name'}</div>
-                                                                <div className="small text-muted">@{u.username}</div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-
-                                                    {/* Role Column */}
-                                                    <td>
-                                                        <span className={`badge bg-${roleColor} bg-opacity-10 text-${roleColor} border border-${roleColor} border-opacity-10 rounded-pill px-3 py-2 fw-normal`}>
-                                                            <i className={`bi ${roleIcon} me-2`}></i>{u.role}
-                                                        </span>
-                                                    </td>
-
-                                                    {/* Station Column */}
-                                                    <td>
-                                                        {u.station ? (
-                                                            <div className="d-flex align-items-center text-dark">
-                                                                <i className="bi bi-geo-alt text-secondary me-2"></i>
-                                                                {u.station}
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-muted small fst-italic">Not Assigned</span>
-                                                        )}
-                                                    </td>
-
-                                                    {/* Date Column */}
-                                                    <td className="text-end pe-4 text-muted font-monospace small">
-                                                        {new Date(u.created_at).toLocaleDateString()}
-                                                    </td>
-
-                                                    {/* Actions Column */}
-                                                    <td className="text-center">
-                                                        <div className="d-flex justify-content-center gap-2">
-                                                            <button 
-                                                                className="btn btn-sm btn-light border text-primary hover-primary rounded-circle" 
-                                                                style={{width: '32px', height: '32px', padding: 0}}
-                                                                onClick={() => handleViewUser(u)}
-                                                                title="View Details"
-                                                            >
-                                                                <i className="bi bi-eye-fill"></i>
-                                                            </button>
-                                                            
-                                                            <button 
-                                                                className="btn btn-sm btn-light border text-danger hover-danger rounded-circle" 
-                                                                style={{width: '32px', height: '32px', padding: 0}}
-                                                                onClick={() => handleConfirmDeleteUser(u)} 
-                                                                disabled={u.id === 1 || isMe}
-                                                                title="Delete User"
-                                                            >
-                                                                <i className="bi bi-trash-fill"></i>
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        }) : (
-                                            <tr>
-                                                <td colSpan="5" className="py-5 text-center text-muted">
-                                                    <div className="mb-3"><i className="bi bi-people fs-1 opacity-25"></i></div>
-                                                    <p className="mb-0">No users found in the system.</p>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        {/* Modals */}
-                        {showViewModal && (
-                            <ViewUserModal 
-                                viewUser={viewUser} 
-                                onClose={() => setShowViewModal(false)} 
-                                onEdit={handleEditUser}
-                                AVATAR_UPLOAD_PATH={AVATAR_UPLOAD_PATH}
-                                DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH}
-                            />
-                        )} 
-
-                        <style jsx>{`
-                            .hover-scale:hover { transform: scale(1.02); }
-                            .hover-primary:hover { background-color: #0d6efd; color: white !important; border-color: #0d6efd !important; }
-                            .hover-danger:hover { background-color: #dc3545; color: white !important; border-color: #dc3545 !important; }
-                            .ls-1 { letter-spacing: 1px; }
-                        `}</style>
-                    </div>
+                    <ReportsView
+                        filteredReports={filteredReports}
+                        stations={stations}
+                        reportDate={reportDate}
+                        setReportDate={setReportDate}
+                        reportFilterStationId={reportFilterStationId}
+                        setReportFilterStationId={setReportFilterStationId}
+                        setShowReportModal={setShowReportModal}
+                        handleViewReport={handleViewReport}
+                        getTodayDate={getTodayDate}
+                    />
                 );
 
-            case "notifications": 
+            case "announcements":
                 return (
-                    <NotificationContent 
+                    <AnnouncementsView
+                        user={user}
+                        announcements={announcements}
+                        filterStartDate={filterStartDate}
+                        setFilterStartDate={setFilterStartDate}
+                        filterEndDate={filterEndDate}
+                        setFilterEndDate={setFilterEndDate}
+                        getTodayDate={getTodayDate}
+                        setShowPostModal={setShowPostModal}
+                        handleConfirmDelete={handleConfirmDelete}
+                        AVATAR_UPLOAD_PATH={AVATAR_UPLOAD_PATH}
+                        DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH}
+                    />
+                );
+
+            case "approval":
+                return (
+                    <ApprovalQueue
+                        logs={logs}
+                        setSelectedLogToApprove={setSelectedLogToApprove}
+                        setShowApproveModal={setShowApproveModal}
+                        showApproveModal={showApproveModal}
+                        selectedLogToApprove={selectedLogToApprove}
+                        executeApproval={executeApproval}
+                    />
+                );
+
+            case "manage_account":
+                return (
+                    <UserManagement
+                        user={user}
+                        userList={userList}
+                        AVATAR_UPLOAD_PATH={AVATAR_UPLOAD_PATH}
+                        DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH}
+                        handleAddUser={handleAddUser}
+                        handleViewUser={handleViewUser}
+                        handleConfirmDeleteUser={handleConfirmDeleteUser}
+                        showViewModal={showViewModal}
+                        viewUser={viewUser}
+                        setShowViewModal={setShowViewModal}
+                        handleEditUser={handleEditUser}
+                    />
+                );
+
+            case "notifications":
+                return (
+                    <NotificationContent
                         notifications={notifications}
-                        onDismissAll={() => { handleDismissAllNotifications(); setActiveTab('dashboard'); }} 
+                        onDismissAll={() => { handleDismissAllNotifications(); setActiveTab('dashboard'); }}
                         onClearReports={handleClearNewReports}
                         onClearDelayed={handleClearDelayedUnits}
                         onNotificationClick={(n) => { handleNotificationClick(n); }}
                     />
                 );
-                
+
 
             case "analytics":
             case "guide":
-                return ( <div className="text-center py-5 text-muted"><i className="bi bi-cone-striped display-1"></i><h3 className="mt-3">Under Construction</h3><p>The module **{activeTab}** is currently being developed.</p></div> );
+                return (<div className="text-center py-5 text-muted"><i className="bi bi-cone-striped display-1"></i><h3 className="mt-3">Under Construction</h3><p>The module **{activeTab}** is currently being developed.</p></div>);
 
             default:
-                return ( <div className="alert alert-info text-center"><i className="bi bi-info-circle-fill me-2"></i>The module **{activeTab}** is under development.</div> );
+                return (<div className="alert alert-info text-center"><i className="bi bi-info-circle-fill me-2"></i>The module **{activeTab}** is under development.</div>);
         }
     };
 
     return (
         <div className="d-flex min-vh-100 bg-light overflow-hidden">
 
+            {/* --- SIDEBAR (KEPT AS IS) --- */}
+            <div
+                className="d-flex flex-column flex-shrink-0 p-3 text-white transition-all position-fixed"
+                style={{
+                    width: isSidebarOpen ? "260px" : "80px",
+                    transition: "width 0.3s",
+                    backgroundColor: "#111827",
+                    height: "100vh",
+                    zIndex: 1000,
+                    top: 0,
+                    left: 0
+                }}
+            >
+                {/* TOP LOGO */}
+                <div className="d-flex align-items-center mb-3 text-white overflow-hidden">
+                    <img
+                        src={logo}
+                        alt="MKFF Admin Logo"
+                        style={{ height: "3rem" }}
+                        className={isSidebarOpen ? "me-3" : ""}
+                    />
+                    {isSidebarOpen && <span className="fs-5 fw-bold">MKFF Admin</span>}
+                </div>
+
+                <hr className="border-secondary" />
+
+                {/* MENU */}
+                <ul className="nav nav-pills flex-column mb-3">
+                    <li>
+                        <button
+                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "dashboard" ? "active bg-danger" : ""
+                                }`}
+                            onClick={() => {
+                                setActiveTab("dashboard");
+                                setStationMonitorId(null);
+                                setReportFilterStationId("All");
+                                setStationHistoryId(null);
+                                setHighlightedUnitId(null);
+                            }}
+                        >
+                            <i className="bi bi-speedometer2"></i>
+                            {isSidebarOpen && "Dashboard"}
+                        </button>
+                    </li>
+
+                    <li>
+                        <button
+                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
+                                (activeTab === "stations" || activeTab === "station_monitor") ? "active bg-danger" : ""
+                                }`}
+                            onClick={() => {
+                                setActiveTab("stations");
+                                setStationMonitorId(null);
+                                setReportFilterStationId("All");
+                                setStationHistoryId(null);
+                                setHighlightedUnitId(null);
+                            }}
+                        >
+                            <i className="bi bi-grid-3x3-gap"></i>
+                            {isSidebarOpen && "Stations"}
+                        </button>
+                    </li>
+
+                    <li>
+                        <button
+                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "reports" ? "active bg-danger" : ""
+                                }`}
+                            onClick={() => {
+                                setActiveTab("reports");
+                                setStationMonitorId(null);
+                                setReportFilterStationId("All");
+                                setStationHistoryId(null);
+                                setHighlightedUnitId(null);
+                            }}
+                        >
+                            <i className="bi bi-file-text"></i>
+                            {isSidebarOpen && "Reports"}
+                        </button>
+                    </li>
+
+                    {/* --- ANNOUNCEMENT BOARD --- */}
+                    <li>
+                        <button
+                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "announcements" ? "active bg-danger" : ""
+                                }`}
+                            onClick={() => {
+                                setActiveTab("announcements");
+                                setStationMonitorId(null);
+                                setReportFilterStationId("All");
+                                setStationHistoryId(null);
+                                setHighlightedUnitId(null);
+                            }}
+                        >
+                            <i className="bi bi-megaphone-fill"></i>
+                            {isSidebarOpen && "Announcement Board"}
+                        </button>
+                    </li>
+                    {/* ------------------------------------- */}
+
+                    <li>
+                        <button
+                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "approval" ? "active bg-danger" : ""
+                                }`}
+                            onClick={() => {
+                                setActiveTab("approval");
+                                setStationHistoryId(null);
+                                setHighlightedUnitId(null);
+                            }}
+                        >
+                            <i className="bi bi-check-circle"></i>
+                            {isSidebarOpen && "Approvals"}
+                        </button>
+                    </li>
+
+                    <li>
+                        <button
+                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "manage_account" ? "active bg-danger" : ""
+                                }`}
+                            onClick={() => {
+                                setActiveTab("manage_account");
+                                setStationHistoryId(null);
+                                setHighlightedUnitId(null);
+                            }}
+                        >
+                            <i className="bi bi-person-gear"></i>
+                            {isSidebarOpen && "Manage Account"}
+                        </button>
+                    </li>
+
+                    <li>
+                        <button
+                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "analytics" ? "active bg-danger" : ""
+                                }`}
+                            onClick={() => {
+                                setActiveTab("analytics");
+                                setStationHistoryId(null);
+                                setHighlightedUnitId(null);
+                            }}
+                        >
+                            <i className="bi bi-graph-up"></i>
+                            {isSidebarOpen && "Analytics"}
+                        </button>
+                    </li>
+
+
+                    {/* ------------------------------------- */}
+                </ul>
+
+                {/* PUSH COPYRIGHT + LOGOUT TO BOTTOM */}
+                <div className="mt-auto">
+                    {/* LOGOUT BUTTON */}
+                    <button
+                        className="btn btn-outline-light w-100"
+                        onClick={onLogout}
+                    >
+                        <i className="bi bi-box-arrow-left me-2"></i>
+                        {isSidebarOpen && "Logout"}
+                    </button>
+
+                    {/* COPYRIGHT TEXT (Now Below Logout with Separator) */}
+                    <div className="text-center text-white-50 small pt-2 mt-2 border-top border-secondary">
+                        {isSidebarOpen && <small>©2025 MKFF Laser Technique</small>}
+                    </div>
+                </div>
+            </div>
+
+                        {/* --- MAIN CONTENT CONTAINER (UPDATED FOR FIXED HEADER) --- */}
+            <div
+                className="flex-grow-1 d-flex flex-column"
+                style={{
+                    position: 'fixed',
+                    top: 0,
+                    bottom: 0,
+                    right: 0,
+                    left: isSidebarOpen ? "260px" : "80px",
+                    transition: "left 0.3s",
+                    // TINANGGAL: overflowY: 'auto' sa buong container
+                    overflowX: 'hidden',
+                    backgroundColor: '#eeeeeeff',
+                    zIndex: 999,
+                }}
+            >
+                {/* 1. HEADER (Fixed/Sticky at the Top) */}
+                <header 
+                    className="bg-white shadow-sm p-3 d-flex justify-content-between align-items-center"
+                    style={{ flexShrink: 0, position: 'sticky', top: 0, zIndex: 10 }} // Ensure it stays on top visually
+                >
+                    <div className="d-flex align-items-center">
+                        <button className="btn btn-light border me-3" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+                            <i className="bi bi-list"></i>
+                        </button>
+                        <h5 className="mb-0 fw-bold text-secondary text-uppercase">
+                            {activeTab === 'station_monitor' ? `${stations.find(s => s.id === stationMonitorId)?.name || 'Monitor'} Details` : activeTab.replace('_', ' ')}
+                        </h5>
+                    </div>
+                    <div className="d-flex align-items-center gap-3">
+                        <NotificationBell notifications={notifications} onClick={handleBellClick} />
+                        <div className="text-end me-2 d-none d-md-block">
+                            <div className="fw-bold small">{headerFullName}</div>
+                            <div className="text-muted small" style={{ fontSize: '0.75rem' }}>Administrator</div>
+                        </div>
+                        <img
+                            src={headerAvatarSrc}
+                            alt="User Avatar"
+                            className="rounded-circle border border-danger"
+                            style={{ width: '35px', height: '35px', objectFit: 'cover' }}
+                            onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
+                        />
+                    </div>
+                </header>
+
+                {/* 2. CONTENT AREA (Scrollable Part) */}
+                {/* Dito natin ilalagay ang scroll bar para HINDI kasama ang header */}
+                <div 
+                    className="container-fluid px-4 pt-4 pb-5 flex-grow-1"
+                    style={{ overflowY: 'auto' }} // Ibinaba ang overflowY: 'auto' dito
+                >
+                    {renderContent()}
+                </div>
+            </div>
+            {/* --- GLOBAL MODAL RENDERING (Maaaring mas madali na lang sa huli ng component) --- */}
+            {selectedUnitToEdit && (<EditUnitModal unit={selectedUnitToEdit} onClose={() => setSelectedUnitToEdit(null)} onSave={handleSaveEdit} />)}
+            {selectedReportToView && (<ReportDetailModal report={selectedReportToView} onClose={() => setSelectedReportToView(null)} API_BASE_URL={API_BASE_URL} />)}
+            {showReportModal && (<SubmitReportModal user={user} stations={stations} onClose={() => setShowReportModal(false)} onSave={refreshAndCloseReport} REPORTS_ENDPOINT={REPORTS_ENDPOINT} />)}
+            {stationHistoryId && (<StationHistoryModal stationId={stationHistoryId} onClose={() => setStationHistoryId(null)} HISTORY_ENDPOINT={HISTORY_ENDPOINT} />)}
+            {selectedUserToManage && (<ManageUserModal userToEdit={selectedUserToManage.id ? selectedUserToManage : initialNewUserData} stations={stations} onClose={() => setSelectedUserToManage(null)} onSave={handleSaveUser} AVATAR_UPLOAD_PATH={AVATAR_UPLOAD_PATH} DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH} />)}
+            {selectedUserToDelete && (<DeleteUserModal user={selectedUserToDelete} onClose={() => setSelectedUserToDelete(null)} onDelete={handleDeleteUser} />)}
+            {showPostModal && (
+                <AnnouncementModal
+                    user={user}
+                    onClose={() => setShowPostModal(false)}
+                    onPost={handlePostAnnouncement}
+                    API_BASE_URL={API_BASE_URL}
+                    DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH}
+                />
+            )}
             
-// Assuming the root wrapper of this entire component is positioned relatively (e.g., position: 'relative')
-
-// {/* --- SIDEBAR --- */}
-<div
-  className="d-flex flex-column flex-shrink-0 p-3 text-white transition-all position-fixed"
-  style={{
-    width: isSidebarOpen ? "260px" : "80px",
-    transition: "width 0.3s",
-    backgroundColor: "#111827",
-    height: "100vh",
-    zIndex: 1000,
-    top: 0,
-    left: 0
-  }}
->
-  {/* TOP LOGO */}
-  <div className="d-flex align-items-center mb-3 text-white overflow-hidden">
-    <img
-      src={logo}
-      alt="MKFF Admin Logo"
-      style={{ height: "3rem" }}
-      className={isSidebarOpen ? "me-3" : ""}
-    />
-    {isSidebarOpen && <span className="fs-5 fw-bold">MKFF Admin</span>}
-  </div>
-
-  <hr className="border-secondary" />
-
-  {/* MENU */}
-  <ul className="nav nav-pills flex-column mb-3">
-    <li>
-      <button
-        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
-          activeTab === "dashboard" ? "active bg-danger" : ""
-        }`}
-        onClick={() => {
-          setActiveTab("dashboard");
-          setStationMonitorId(null);
-          setReportFilterStationId("All");
-          setStationHistoryId(null);
-          setHighlightedUnitId(null);
-        }}
-      >
-        <i className="bi bi-speedometer2"></i>
-        {isSidebarOpen && "Dashboard"}
-      </button>
-    </li>
-
-    <li>
-      <button
-        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
-          (activeTab === "stations" || activeTab === "station_monitor") ? "active bg-danger" : ""
-        }`}
-        onClick={() => {
-          setActiveTab("stations");
-          setStationMonitorId(null);
-          setReportFilterStationId("All");
-          setStationHistoryId(null);
-          setHighlightedUnitId(null);
-        }}
-      >
-        <i className="bi bi-grid-3x3-gap"></i>
-        {isSidebarOpen && "Stations"}
-      </button>
-    </li>
-
-    <li>
-      <button
-        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
-          activeTab === "reports" ? "active bg-danger" : ""
-        }`}
-        onClick={() => {
-          setActiveTab("reports");
-          setStationMonitorId(null);
-          setReportFilterStationId("All");
-          setStationHistoryId(null);
-          setHighlightedUnitId(null);
-        }}
-      >
-        <i className="bi bi-file-text"></i>
-        {isSidebarOpen && "Reports"}
-      </button>
-    </li>
-
-    {/* --- NEW MODULE: ANNOUNCEMENT BOARD (FORUM) --- */}
-    <li>
-      <button
-        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
-          activeTab === "announcements" ? "active bg-danger" : ""
-        }`}
-        onClick={() => {
-          setActiveTab("announcements");
-          setStationMonitorId(null);
-          setReportFilterStationId("All");
-          setStationHistoryId(null);
-          setHighlightedUnitId(null);
-        }}
-      >
-        <i className="bi bi-megaphone-fill"></i>
-        {isSidebarOpen && "Announcement Board"}
-      </button>
-    </li>
-    {/* ------------------------------------- */}
-
-    <li>
-      <button
-        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
-          activeTab === "approval" ? "active bg-danger" : ""
-        }`}
-        onClick={() => {
-          setActiveTab("approval");
-          setStationHistoryId(null);
-          setHighlightedUnitId(null);
-        }}
-      >
-        <i className="bi bi-check-circle"></i>
-        {isSidebarOpen && "Approvals"}
-      </button>
-    </li>
-
-    <li>
-      <button
-        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
-          activeTab === "manage_account" ? "active bg-danger" : ""
-        }`}
-        onClick={() => {
-          setActiveTab("manage_account");
-          setStationHistoryId(null);
-          setHighlightedUnitId(null);
-        }}
-      >
-        <i className="bi bi-person-gear"></i>
-        {isSidebarOpen && "Manage Account"}
-      </button>
-    </li>
-
-    <li>
-      <button
-        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
-          activeTab === "analytics" ? "active bg-danger" : ""
-        }`}
-        onClick={() => {
-          setActiveTab("analytics");
-          setStationHistoryId(null);
-          setHighlightedUnitId(null);
-        }}
-      >
-        <i className="bi bi-graph-up"></i>
-        {isSidebarOpen && "Analytics"}
-      </button>
-    </li>
-
-
-    {/* ------------------------------------- */}
-  </ul>
-
-  {/* PUSH COPYRIGHT + LOGOUT TO BOTTOM */}
-  <div className="mt-auto">
-    {/* LOGOUT BUTTON */}
-    <button
-      className="btn btn-outline-light w-100"
-      onClick={onLogout}
-    >
-      <i className="bi bi-box-arrow-left me-2"></i>
-      {isSidebarOpen && "Logout"}
-    </button>
-
-    {/* COPYRIGHT TEXT (Now Below Logout with Separator) */}
-    <div className="text-center text-white-50 small pt-2 mt-2 border-top border-secondary">
-      {isSidebarOpen && <small>©2025 MKFF Laser Technique</small>}
-    </div>
-  </div>
-</div>
-
-{/* --- MAIN --- */}
-<div
-  className="flex-grow-1 d-flex flex-column"
-  style={{
-    position: 'fixed',
-    top: 0, 
-    bottom: 0,
-    right: 0,
-    left: isSidebarOpen ? "260px" : "80px", 
-    transition: "left 0.3s", 
-    overflowY: 'auto',
-    overflowX: 'hidden',
-    backgroundColor: '#eeeeeeff', 
-    zIndex: 999,
-  }}
->
-  <header className="bg-white shadow-sm p-3 d-flex justify-content-between align-items-center">
-    {/* Removed 'mb-4' and 'sticky-top' from the header className */}
-    <div className="d-flex align-items-center">
-      <button className="btn btn-light border me-3" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
-        <i className="bi bi-list"></i>
-      </button>
-      <h5 className="mb-0 fw-bold text-secondary text-uppercase">
-        {activeTab === 'station_monitor' ? `${stations.find(s => s.id === stationMonitorId)?.name || 'Monitor'} Details` : activeTab.replace('_', ' ')}
-      </h5>
-    </div>
-    <div className="d-flex align-items-center gap-3">
-      <NotificationBell notifications={notifications} onClick={handleBellClick} />
-      <div className="text-end me-2 d-none d-md-block">
-        <div className="fw-bold small">{headerFullName}</div>
-        <div className="text-muted small" style={{fontSize: '0.75rem'}}>Administrator</div>
-      </div>
-      <img
-        src={headerAvatarSrc}
-        alt="User Avatar"
-        className="rounded-circle border border-danger"
-        style={{width: '35px', height: '35px', objectFit: 'cover'}}
-        onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
-      />
-    </div>
-  </header>
-
-  {/* Added pt-4 and pb-5 to ensure content has space above and below it */}
-  <div className="container-fluid px-4 pt-4 pb-5">
-    {renderContent()}
-  </div>
-</div>
-
-// ... (rest of the modal rendering code)
-
-
-            {/* --- MODAL RENDERING --- */}
-            {selectedUnitToEdit && ( <EditUnitModal unit={selectedUnitToEdit} onClose={() => setSelectedUnitToEdit(null)} onSave={handleSaveEdit} /> )}
-            {selectedReportToView && ( <ReportDetailModal report={selectedReportToView} onClose={() => setSelectedReportToView(null)} API_BASE_URL={API_BASE_URL} /> )}
-            {showReportModal && ( <SubmitReportModal user={user} stations={stations} onClose={() => setShowReportModal(false)} onSave={refreshAndCloseReport} REPORTS_ENDPOINT={REPORTS_ENDPOINT} /> )}
-            {stationHistoryId && ( <StationHistoryModal stationId={stationHistoryId} onClose={() => setStationHistoryId(null)} HISTORY_ENDPOINT={HISTORY_ENDPOINT} /> )}
-            {selectedUserToManage && ( <ManageUserModal userToEdit={selectedUserToManage.id ? selectedUserToManage : initialNewUserData} stations={stations} onClose={() => setSelectedUserToManage(null)} onSave={handleSaveUser} AVATAR_UPLOAD_PATH={AVATAR_UPLOAD_PATH} DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH} /> )}
-            {selectedUserToDelete && ( <DeleteUserModal user={selectedUserToDelete} onClose={() => setSelectedUserToDelete(null)} onDelete={handleDeleteUser} /> )}
-                {/* --- NEW ANNOUNCEMENT MODAL --- */}
-            {showPostModal && ( 
-                <AnnouncementModal 
-                    user={user} 
-                    onClose={() => setShowPostModal(false)} 
-                    onPost={handlePostAnnouncement} 
-                    API_BASE_URL={API_BASE_URL}
-                    DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH}
-                /> 
-            )}
+            {/* --- NEW/MOVED MODALS (Pwedeng i-render dito) --- */}
+            {showDeleteModal && (
+                <DeleteAnnouncementModal
+                    announcementToDelete={announcementToDelete}
+                    onClose={() => setShowDeleteModal(false)}
+                    executeDelete={executeDeleteAnnouncement}
+                />
+            )}
+            
+            {/* Note: Ang ApproveUnitModal ay ni-render na sa loob ng ApprovalQueue.jsx */}
+            
         </div>
     );
 }
