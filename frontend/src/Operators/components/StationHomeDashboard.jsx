@@ -1,6 +1,6 @@
 import React from 'react';
 
-export function StationHomeDashboard({ currentStation, homeStats, setActiveTab }) {
+export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, announcementCount }) {
     return (
         <div className="d-flex flex-column h-100 animate-in fade-in pb-3">
 
@@ -19,7 +19,31 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab }
                 </div>
             </div>
 
+            {/* 🔑 ANNOUNCEMENT ALERT (Uses the correct filtered count) */}
+            {announcementCount > 0 && (
+                <div className="alert alert-warning d-flex justify-content-between align-items-center shadow-sm mb-4 border-start border-4 border-warning" role="alert" style={{ borderRadius: '8px' }}>
+                    <div className="d-flex align-items-center">
+                        <i className="bi bi-megaphone-fill fs-4 me-3 text-warning"></i>
+                        <div className='d-flex flex-column'>
+                            <span className="fw-bold text-dark mb-0">
+                                NEW ANNOUNCEMENT!
+                            </span>
+                            <small className="text-muted">You have **{announcementCount}** unread message{announcementCount > 1 ? 's' : ''} from Admin.</small>
+                        </div>
+                    </div>
+                    <button 
+                        className="btn btn-warning btn-sm fw-bold px-3" 
+                        onClick={() => setActiveTab('announcements')}
+                    >
+                        View Messages
+                    </button>
+                </div>
+            )}
+            {/* 🔑 END ANNOUNCEMENT ALERT */}
+
+
             {/* --- Stats Cards (Modern Enterprise Style) --- */}
+            {/* The alert is now positioned above this row. */}
             <div className="row g-4 mb-4">
                 {/* Completed Card */}
                 <div className="col-md-4">

@@ -13,6 +13,7 @@ import { DailyReportForm } from './components/DailyReportForm';
 import { UnitHistoryLog } from './components/UnitHistoryLog';
 import { UnitListTable } from './components/UnitListTable';
 import { EditUnitModal } from './components/EditUnitModal'; // Imported the separated Modal
+import { AnnouncementView } from './components/AnnouncementView';
 
 
 // REGISTER CHART COMPONENTS (Kept here for global chart setup)
@@ -26,6 +27,7 @@ const UNITS_ENDPOINT = `${API_BASE_URL}/units.php`;
 const HISTORY_ENDPOINT = `${API_BASE_URL}/unit_history.php`;
 const REPORT_ENDPOINT = `${API_BASE_URL}/daily_reports.php`;
 const USER_ENDPOINT = `${API_BASE_URL}/user_management.php`;
+const ANNOUNCEMENT_ENDPOINT = `${API_BASE_URL}/announcements.php`; // Used for polling
 
 // DEFINE THE STRICT STATION ORDER (Kept here as global constant)
 const STATION_ORDER = [
@@ -66,8 +68,22 @@ export default function StationDashboard({ user, onLogout }) {
     const [currentAvatar, setCurrentAvatar] = useState(user?.avatar_url || null);
     const [currentFullName, setCurrentFullName] = useState(user?.full_name || user?.username);
 
+    // --- LOCAL STORAGE KEY (UNIQUE PER USER) ---
+    const ANNOUNCEMENT_READ_KEY = `lastReadAnnouncementId_${user.username}`;
+    
     // --- HOOKS DEFINITIONS ---
     const [activeTab, setActiveTab] = useState("home"); 
+    const [announcements, setAnnouncements] = useState([]); 
+    const [announcementLoading, setAnnouncementLoading] = useState(false);
+    const [announcementError, setAnnouncementError] = useState(null);
+    
+    // 🔑 NEW STATE: Tracks the highest announcement ID the user has seen
+    const [lastReadId, setLastReadId] = useState(() => {
+        // Initialize state from Local Storage on mount
+        return parseInt(localStorage.getItem(ANNOUNCEMENT_READ_KEY) || 0);
+    });
+    
+    // ... (rest of the state hooks)
     const [scanInput, setScanInput] = useState("");
     const [processStatus, setProcessStatus] = useState('idle'); 
     const [statusMessage, setStatusMessage] = useState("");
@@ -89,6 +105,8 @@ export default function StationDashboard({ user, onLogout }) {
     });
     const [selectedFile, setSelectedFile] = useState(null);
     const scannerInputRef = useRef(null); 
+    // ... (end of rest of the state hooks)
+
 
     // --- HELPER FUNCTION: GET STATION NAME ---
     const getStationName = () => {
@@ -171,6 +189,44 @@ export default function StationDashboard({ user, onLogout }) {
             setListLoading(false);
         }
     }, [currentStation]);
+
+    // --- HOOKED FUNCTIONS: FETCH ANNOUNCEMENTS (Used for both tab change and polling) ---
+    const fetchAnnouncements = useCallback(async () => {
+        const isInitialLoad = announcements.length === 0;
+        if (isInitialLoad && activeTab === 'announcements') setAnnouncementLoading(true); 
+        setAnnouncementError(null);
+        try {
+            const res = await axios.get(ANNOUNCEMENT_ENDPOINT);
+            // Assuming the newest announcement has the highest ID/is first in the array
+            setAnnouncements(Array.isArray(res.data) ? res.data : []);
+        } catch (err) {
+            setAnnouncementError(`Failed to load announcements: ${err.message}`);
+        } finally {
+            if (isInitialLoad && activeTab === 'announcements') setAnnouncementLoading(false);
+        }
+    }, [announcements.length, activeTab]);
+
+    // 🔑 NEW FUNCTION: Handles updating the last read announcement ID in Local Storage
+    const handleMarkAsRead = useCallback((newestId) => {
+        const numericNewestId = parseInt(newestId);
+        const numericLastReadId = parseInt(lastReadId);
+        
+        if (numericNewestId > numericLastReadId) {
+            setLastReadId(numericNewestId); // Update state
+            localStorage.setItem(ANNOUNCEMENT_READ_KEY, numericNewestId); // Update Local Storage
+        }
+    }, [lastReadId, ANNOUNCEMENT_READ_KEY]);
+
+    // --- 🔑 POLLING EFFECT FOR REAL-TIME ANNOUNCEMENTS (Set to 1 second) ---
+    useEffect(() => {
+        fetchAnnouncements(); 
+        // ⚠️ WARNING: 1 second polling can cause high server load. Use only for testing.
+        const intervalId = setInterval(fetchAnnouncements, 1000); 
+
+        return () => clearInterval(intervalId);
+    }, [fetchAnnouncements]);
+    // --- END POLLING EFFECT ---
+
 
     // --- HANDLE SCAN LOGIC ---
     const handleScan = async (e) => { 
@@ -438,11 +494,19 @@ export default function StationDashboard({ user, onLogout }) {
     
     const handleEditClick = (unit) => setUnitToEdit(unit);
 
-    // --- USEEFFECT FOR DATA REFRESH ---
+    // --- USEEFFECT FOR DATA REFRESH (Only for Unit/History/Announcements tab change) ---
     useEffect(() => { 
         if (activeTab === 'account_history') {
             fetchHistory();
         } 
+        else if (activeTab === 'announcements') {
+            // Call fetchAnnouncements once when entering the tab
+            fetchAnnouncements(); 
+            // 🔑 IMPORTANT: Mark the newest visible announcement as read instantly
+            if (announcements.length > 0) {
+                 handleMarkAsRead(announcements[0].id);
+            }
+        }
         else if (['home', 'in_progress', 'completed', 'no_good', 'pending'].includes(activeTab)) {
             fetchUnits(activeTab === 'home' ? '' : activeTab);
         }
@@ -450,7 +514,7 @@ export default function StationDashboard({ user, onLogout }) {
             setUnitList([]); 
             setHistoryList([]); 
         }
-    }, [activeTab, fetchUnits, fetchHistory]);
+    }, [activeTab, fetchUnits, fetchHistory, fetchAnnouncements, announcements.length, handleMarkAsRead]);
 
     // --- USEEFFECT FOR SCANNER FOCUS ---
     useEffect(() => { 
@@ -465,6 +529,10 @@ export default function StationDashboard({ user, onLogout }) {
         inProgress: unitList.filter(u => u.status === 'In Progress').length,
         ng: unitList.filter(u => u.status === 'No Good (NG)').length,
     };
+    
+    // 🔑 CALCULATE UNREAD COUNT based on lastReadId from Local Storage
+    const unreadCount = announcements.filter(a => parseInt(a.id) > parseInt(lastReadId)).length;
+
 
     // --- CONTENT RENDERER (Cleaned up Switch) ---
     const renderContent = () => {
@@ -475,6 +543,7 @@ export default function StationDashboard({ user, onLogout }) {
                         currentStation={currentStation}
                         homeStats={homeStats}
                         setActiveTab={setActiveTab}
+                        announcementCount={unreadCount} // 🔑 Pass the UNREAD count
                     />
                 );
 
@@ -520,7 +589,7 @@ export default function StationDashboard({ user, onLogout }) {
                         onEdit={handleEditClick}
                     />
                 );
-
+                
             case "account_history":
                 return (
                     <UnitHistoryLog
@@ -530,6 +599,19 @@ export default function StationDashboard({ user, onLogout }) {
                         listError={listError}
                     />
                 );
+
+            case "announcements":
+                return (
+                    <AnnouncementView
+                        announcements={announcements}
+                        loading={announcementLoading}
+                        error={announcementError}
+                        AVATAR_UPLOAD_PATH={AVATAR_UPLOAD_PATH}
+                        DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH}
+                        onMarkAsRead={handleMarkAsRead} // 🔑 Pass the mark as read handler
+                    />
+                );
+
             default:
                 return <div className="alert alert-info text-center">Under development.</div>;
         }
@@ -568,69 +650,89 @@ export default function StationDashboard({ user, onLogout }) {
                     </div>
 
                     {/* Navigation */}
-                    <nav className="flex-grow-1 overflow-auto custom-scrollbar">
-                        <ul className="nav nav-pills flex-column mb-auto gap-2">
-                            <li className="nav-item">
-                                <button 
-                                    className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'home' ? 'btn-primary shadow' : 'text-white-50 hover-white'}`} 
-                                    onClick={() => setActiveTab('home')}
-                                    style={activeTab !== 'home' ? {background: 'transparent', border: 'none'} : {}}
-                                >
-                                    <i className="bi bi-grid-fill me-3"></i> Dashboard
-                                </button>
-                            </li>
-                            
-                            <li className="nav-item mt-2">
-                                <button 
-                                    className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'input_unit' ? 'btn-primary shadow' : 'text-white-50 hover-white'}`} 
-                                    onClick={() => setActiveTab('input_unit')}
-                                    style={activeTab !== 'input_unit' ? {background: 'transparent', border: 'none'} : {}}
-                                >
-                                    <i className="bi bi-qr-code-scan me-3"></i> Unit Entry
-                                </button>
-                            </li>
+<nav className="flex-grow-1 overflow-auto custom-scrollbar">
+    <ul className="nav nav-pills flex-column mb-auto gap-2">
+        {/* DASHBOARD */}
+        <li className="nav-item">
+            <button 
+                className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'home' ? 'btn-primary shadow' : 'text-white-50 hover-white'}`} 
+                onClick={() => setActiveTab('home')}
+                style={activeTab !== 'home' ? {background: 'transparent', border: 'none'} : {}}
+            >
+                <i className="bi bi-grid-fill me-3"></i> Dashboard
+            </button>
+        </li>
+        
+        {/* UNIT ENTRY */}
+        <li className="nav-item mt-2">
+            <button 
+                className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'input_unit' ? 'btn-primary shadow' : 'text-white-50 hover-white'}`} 
+                onClick={() => setActiveTab('input_unit')}
+                style={activeTab !== 'input_unit' ? {background: 'transparent', border: 'none'} : {}}
+            >
+                <i className="bi bi-qr-code-scan me-3"></i> Unit Entry
+            </button>
+        </li>
 
-                            <li className="text-uppercase small fw-bold text-secondary mt-4 mb-2 px-3" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Monitoring</li>
-                            
-                            {[
-                                { k: 'in_progress', i: 'bi-gear-wide-connected', l: 'In Progress', c: 'text-warning' }, 
-                                { k: 'completed', i: 'bi-check-circle-fill', l: 'Completed', c: 'text-success' }, 
-                                { k: 'no_good', i: 'bi-x-octagon-fill', l: 'No Good (NG)', c: 'text-danger' }, 
-                                { k: 'pending', i: 'bi-clock-history', l: 'Pending', c: 'text-info' }
-                            ].map(({ k, i, l, c }) => (
-                                <li key={k} className="nav-item">
-                                    <button 
-                                        className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === k ? 'bg-white text-dark fw-bold shadow' : 'text-white-50'}`} 
-                                        onClick={() => setActiveTab(k)}
-                                        style={activeTab !== k ? {background: 'transparent', border: 'none'} : {}}
-                                    >
-                                        <i className={`bi ${i} me-3 ${activeTab === k ? c : ''}`}></i> {l}
-                                    </button>
-                                </li>
-                            ))}
+        {/* MONITORING HEADING */}
+        <li className="text-uppercase small fw-bold text-secondary mt-4 mb-2 px-3" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Monitoring</li>
+        
+        {/* MONITORING LINKS */}
+        {[
+            { k: 'in_progress', i: 'bi-gear-wide-connected', l: 'In Progress', c: 'text-warning' }, 
+            { k: 'completed', i: 'bi-check-circle-fill', l: 'Completed', c: 'text-success' }, 
+            { k: 'no_good', i: 'bi-x-octagon-fill', l: 'No Good (NG)', c: 'text-danger' }, 
+            { k: 'pending', i: 'bi-clock-history', l: 'Pending', c: 'text-info' }
+        ].map(({ k, i, l, c }) => (
+            <li key={k} className="nav-item">
+                <button 
+                    className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === k ? 'bg-white text-dark fw-bold shadow' : 'text-white-50'}`} 
+                    onClick={() => setActiveTab(k)}
+                    style={activeTab !== k ? {background: 'transparent', border: 'none'} : {}}
+                >
+                    <i className={`bi ${i} me-3 ${activeTab === k ? c : ''}`}></i> {l}
+                </button>
+            </li>
+        ))}
 
-                            <li className="text-uppercase small fw-bold text-secondary mt-4 mb-2 px-3" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Reports & Logs</li>
-                            
-                            <li className="nav-item">
-                                <button 
-                                    className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'daily_reports' ? 'bg-white text-dark fw-bold' : 'text-white-50'}`} 
-                                    onClick={() => setActiveTab('daily_reports')}
-                                    style={activeTab !== 'daily_reports' ? {background: 'transparent', border: 'none'} : {}}
-                                >
-                                    <i className="bi bi-file-earmark-bar-graph me-3"></i> Daily Report
-                                </button>
-                            </li>
-                            <li className="nav-item">
-                                <button 
-                                    className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'account_history' ? 'bg-white text-dark fw-bold' : 'text-white-50'}`} 
-                                    onClick={() => setActiveTab('account_history')}
-                                    style={activeTab !== 'account_history' ? {background: 'transparent', border: 'none'} : {}}
-                                >
-                                    <i className="bi bi-journals me-3"></i> History Logs
-                                </button>
-                            </li>
-                        </ul>
-                    </nav>
+        {/* REPORTS & LOGS HEADING */}
+        <li className="text-uppercase small fw-bold text-secondary mt-4 mb-2 px-3" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Reports & Logs</li>
+        
+        {/* DAILY REPORT */}
+        <li className="nav-item">
+            <button 
+                className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'daily_reports' ? 'bg-white text-dark fw-bold' : 'text-white-50'}`} 
+                onClick={() => setActiveTab('daily_reports')}
+                style={activeTab !== 'daily_reports' ? {background: 'transparent', border: 'none'} : {}}
+            >
+                <i className="bi bi-file-earmark-bar-graph me-3"></i> Daily Report
+            </button>
+        </li>
+        
+        {/* HISTORY LOGS */}
+        <li className="nav-item">
+            <button 
+                className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'account_history' ? 'bg-white text-dark fw-bold' : 'text-white-50'}`} 
+                onClick={() => setActiveTab('account_history')}
+                style={activeTab !== 'account_history' ? {background: 'transparent', border: 'none'} : {}}
+            >
+                <i className="bi bi-journals me-3"></i> History Logs
+            </button>
+        </li>
+        
+        {/* ANNOUNCEMENTS */}
+        <li className="nav-item">
+            <button 
+                className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'announcements' ? 'bg-white text-dark fw-bold' : 'text-white-50'}`} 
+                onClick={() => setActiveTab('announcements')}
+                style={activeTab !== 'announcements' ? {background: 'transparent', border: 'none'} : {}}
+            >
+                <i className="bi bi-megaphone-fill me-3"></i> Announcements
+            </button>
+        </li>
+        
+    </ul>
+</nav>
 
                     {/* Sidebar Footer (Version) */}
                     <div className="mt-auto pt-3 border-top border-secondary text-center text-white-50 small">
