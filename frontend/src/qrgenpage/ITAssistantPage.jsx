@@ -78,22 +78,20 @@ const StationHistoryModal = ({ stationId, onClose, user }) => {
     const [historyLoading, setHistoryLoading] = useState(true);
     const [historyError, setHistoryError] = useState(null);
     
+    // NOTE: Ang filterAssemblyNo ay gagamitin na sa FE filtering muna dahil sa structure ng inyong API call.
     const [filterAssemblyNo, setFilterAssemblyNo] = useState('');
     const [filterStartDate, setFilterStartDate] = useState('');
     const [filterEndDate, setFilterEndDate] = useState(getTodayDate());
 
+    // --- REVISED FETCH HISTORY LOGIC ---
+    // Fetch all history for the station, then filter on the client side based on user input.
     const fetchHistory = useCallback(async () => {
         setHistoryLoading(true);
         setHistoryError(null);
         try {
-            const params = { 
-                station: stationId, 
-                search_assembly: filterAssemblyNo || undefined,
-                start_date: filterStartDate || undefined,
-                end_date: filterEndDate || undefined
-            };
-
-            const response = await axios.get(HISTORY_ENDPOINT, { params });
+            // Fetch all logs for the station first (assuming API supports station filter)
+            const response = await axios.get(HISTORY_ENDPOINT, { params: { station: stationId } });
+            // Reverse the array to show most recent logs first
             const logs = Array.isArray(response.data) ? response.data.reverse() : [];
             setHistoryLogs(logs);
         } catch (err) {
@@ -101,11 +99,55 @@ const StationHistoryModal = ({ stationId, onClose, user }) => {
         } finally {
             setHistoryLoading(false);
         }
-    }, [stationId, filterAssemblyNo, filterStartDate, filterEndDate]);
+    }, [stationId]);
 
     useEffect(() => {
         fetchHistory();
     }, [fetchHistory]);
+    
+    // --- REVISED CLIENT-SIDE FILTERING LOGIC ---
+    const filteredLogs = React.useMemo(() => {
+        let logs = historyLogs;
+
+        // 1. Filter by Assembly No.
+        if (filterAssemblyNo) {
+            const search = filterAssemblyNo.toLowerCase();
+            logs = logs.filter(log => log.assembly_no?.toLowerCase().includes(search));
+        }
+
+        // 2. Filter by Date Range
+        if (filterStartDate || filterEndDate) {
+            logs = logs.filter(log => {
+                const logDate = new Date(log.timestamp || log.created_at);
+                logDate.setHours(0, 0, 0, 0);
+
+                let matchesDate = true;
+                if (filterStartDate) {
+                    const start = new Date(filterStartDate);
+                    start.setHours(0, 0, 0, 0);
+                    if (logDate < start) matchesDate = false;
+                }
+                if (filterEndDate) {
+                    const end = new Date(filterEndDate);
+                    end.setHours(0, 0, 0, 0);
+                    // Add 1 day to end date filter to include logs from that day
+                    end.setDate(end.getDate() + 1); 
+                    if (logDate >= end) matchesDate = false;
+                }
+                return matchesDate;
+            });
+        }
+        return logs;
+
+    }, [historyLogs, filterAssemblyNo, filterStartDate, filterEndDate]);
+    
+    // Helper function for status badges (Replicated from previous response)
+    const getStatusClass = (status) => {
+        if (status?.includes('Completed') || status?.includes('OK')) return 'bg-success bg-opacity-10 text-success';
+        if (status?.includes('No Good') || status?.includes('Error') || status?.includes('Failed')) return 'bg-danger bg-opacity-10 text-danger';
+        if (status?.includes('Progress') || status?.includes('Pending')) return 'bg-warning bg-opacity-10 text-warning text-dark';
+        return 'bg-secondary bg-opacity-10 text-secondary';
+    };
 
     return (
         <div className="modal d-block animate-in fade-in" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1080 }}>
@@ -117,7 +159,7 @@ const StationHistoryModal = ({ stationId, onClose, user }) => {
                     </div>
                     <div className="modal-body p-4">
                         
-                        {/* --- FILTER BAR (Shadow removed) --- */}
+                        {/* --- FILTER BAR --- */}
                         <div className="card mb-4 p-3 border-0 bg-light">
                             <div className="row g-3 align-items-center small">
                                 <div className="col-md-4">
@@ -158,59 +200,96 @@ const StationHistoryModal = ({ stationId, onClose, user }) => {
                                     </button>
                                 </div>
                             </div>
+                            <div className="text-muted small mt-2 pt-2 border-top">
+                                Showing <span className="fw-bold text-dark">{filteredLogs.length}</span> of {historyLogs.length} total records.
+                            </div>
                         </div>
 
                         {/* --- HISTORY TABLE --- */}
-                {historyLoading && <div className="text-center py-5">Loading history...</div>}
-                {historyError && <div className="alert alert-danger m-3">{historyError}</div>}
-                {!historyLoading && !historyError && (
-                    <div className="table-responsive border rounded" style={{ maxHeight: '50vh', overflowY: 'auto' }}>
-                        <table className="table table-sm table-hover table-striped mb-0 small">
-                            <thead className="table-dark sticky-top">
-                                {/* --- REVISED HEADERS for StationHistoryModal --- */}
-                                <tr>
-                                    <th>Assembly No.</th>
-                                    <th>Serial No.</th>
-                                    <th>Model</th>
-                                    <th>Rev.</th>
-                                    <th>Base Kit No.</th>
-                                    <th>Acc Kit No.</th>
-                                    <th>Status After</th>
-                                    <th>Action Type</th>
-                                    <th>Station Name</th>
-                                    <th>Action By</th>
-                                    <th>Timestamp</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {historyLogs.length > 0 ? historyLogs.map(log => (
-                                    <tr key={log.history_id} className={log.action_type?.includes('CREATE') ? 'table-primary' : log.action_type?.includes('UPDATE') ? 'table-warning' : ''}>
-                                        {/* Tandaan: Ang history log ay dapat naglalaman ng mga fields na ito. */}
-                                        <td className="fw-bold">{log.assembly_no}</td>
-                                        <td>{log.device_serial_no || '(N/A)'}</td>
-                                        <td>{log.model}</td>
-                                        <td>{log.revision || '-'}</td>
-                                        <td>{log.base_unit_kitting_no || '-'}</td>
-                                        <td>{log.accessory_kitting_no || '-'}</td>
-                                        <td><span className={`badge ${log.status_after?.includes('Progress') ? 'bg-primary' : log.status_after?.includes('Completed') ? 'bg-success' : 'bg-danger'}`}>{log.status_after}</span></td>
-                                        <td>{log.action_type}</td>
-                                        <td>{log.station_name}</td>
-                                        <td>{log.action_by || 'System'}</td>
-                                        <td className="text-muted">{new Date(log.timestamp).toLocaleString()}</td>
-                                    </tr>
-                                )) : (
-                                    <tr><td colSpan="11" className="text-center py-4 text-muted">No historical records match your search criteria.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                        {historyLoading && <div className="text-center py-5"><div className="spinner-border text-primary" role="status"></div><p className="mt-3 text-muted fw-bold">Loading records...</p></div>}
+                        {historyError && <div className="alert alert-danger m-3">{historyError}</div>}
+                        
+                        {!historyLoading && !historyError && (
+                            <div className="table-responsive border rounded-3 overflow-hidden" style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+                                <table className="table table-sm table-hover table-striped mb-0 align-middle small">
+                                    <thead className="table-dark sticky-top" style={{zIndex: 5}}>
+                                        <tr>
+                                            <th className="py-2 ps-3 text-uppercase" style={{ fontSize: '0.75rem' }}>Unit / Model</th>
+                                            <th className="py-2 text-uppercase" style={{ fontSize: '0.75rem' }}>Assembly No.</th>
+                                            <th className="py-2 text-uppercase" style={{ fontSize: '0.75rem' }}>Action Type</th>
+                                            <th className="py-2 text-center text-uppercase" style={{ fontSize: '0.75rem' }}>Status After</th>
+                                            <th className="py-2 text-uppercase" style={{ fontSize: '0.75rem' }}>User</th>
+                                            <th className="py-2 text-end pe-3 text-uppercase" style={{ fontSize: '0.75rem' }}>Timestamp</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredLogs.length > 0 ? filteredLogs.map(log => {
+                                            const status = log.status_after;
+                                            const isSuccess = status?.includes('Completed') || status?.includes('OK');
+                                            const isError = status?.includes('No Good') || status?.includes('Failed');
+                                            
+                                            return (
+                                                <tr key={log.history_id}>
+                                                    {/* Unit / Model */}
+                                                    <td className="ps-3">
+                                                        <div className="fw-bold text-dark">{log.model || 'N/A'}</div>
+                                                        <div className="text-muted" style={{ fontSize: '0.7rem' }}>ID: #{log.unit_id || log.id}</div>
+                                                    </td>
+                                                    {/* Assembly No. */}
+                                                    <td>
+                                                        <span className="font-monospace fw-bold text-primary">{log.assembly_no || '-'}</span>
+                                                    </td>
+                                                    {/* Action Type */}
+                                                    <td>
+                                                        <span className="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-10 px-2 py-1 fw-normal text-uppercase" style={{ fontSize: '0.7rem' }}>
+                                                            {log.action_type || 'UPDATE'}
+                                                        </span>
+                                                    </td>
+                                                    {/* Status After */}
+                                                    <td className="text-center">
+                                                        <span className={`badge rounded-pill px-3 py-2 fw-bold ${getStatusClass(status)}`}>
+                                                            {isSuccess && <i className="bi bi-check-circle-fill me-1"></i>}
+                                                            {isError && <i className="bi bi-x-circle-fill me-1"></i>}
+                                                            {!isSuccess && !isError && <i className="bi bi-hourglass-split me-1"></i>}
+                                                            {status}
+                                                        </span>
+                                                    </td>
+                                                    {/* User */}
+                                                    <td>
+                                                        <div className="d-flex align-items-center">
+                                                            <div className="bg-primary bg-opacity-10 text-primary rounded-circle d-flex justify-content-center align-items-center me-2" style={{ width: 28, height: 28, fontSize: '0.8rem' }}>
+                                                                <i className="bi bi-person-fill"></i>
+                                                            </div>
+                                                            <span className="text-dark fw-bold" style={{fontSize: '0.85rem'}}>{log.action_by || 'System'}</span>
+                                                        </div>
+                                                    </td>
+                                                    {/* Timestamp */}
+                                                    <td className="text-end pe-3">
+                                                        <div className="fw-bold text-dark small">
+                                                            {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        </div>
+                                                        <div className="text-muted" style={{ fontSize: '0.7rem' }}>
+                                                            {new Date(log.timestamp).toLocaleDateString()}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }) : (
+                                            <tr><td colSpan="6" className="text-center py-5 text-muted">No historical records match your search criteria.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
                     <div className="modal-footer border-0">
                         <button type="button" className="btn btn-secondary rounded-pill px-4" onClick={onClose}>Close</button>
                     </div>
                 </div>
             </div>
+            <style jsx>{`
+                .sticky-top { top: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+            `}</style>
         </div>
     );
 };
@@ -256,10 +335,14 @@ const UnscannedUnitsTable = ({ unscannedUnits }) => (
     </div>
 );
 
-const LiveMonitoringTable = ({ stationId, units, onBack }) => {
+// --- REVISED: LiveMonitoringTable (Added KPI Cards) ---
+const LiveMonitoringTable = ({ stationId, units, onBack, calculateStationMetrics }) => {
     // Retain filtering logic to show units currently logged at this station
     const stationUnits = units.filter(u => u.station === stationId && u.status !== 'For Scanning');
     
+    // Calculate metrics for this specific station
+    const metrics = calculateStationMetrics(stationUnits);
+
     // Helper function for status badges
     const getStatusClass = (status) => {
         if (status === 'In Progress') return 'bg-primary';
@@ -268,14 +351,58 @@ const LiveMonitoringTable = ({ stationId, units, onBack }) => {
         return 'bg-secondary';
     };
 
+    const cardData = [
+        { title: "Completed", value: metrics.completed, color: "success", icon: "bi-check-circle-fill", subtitle: "Total Units Completed" },
+        { title: "In Progress", value: metrics.inProgress, color: "primary", icon: "bi-hourglass-split", subtitle: "Units Currently Active" },
+        { title: "No Good (NG)", value: metrics.noGood, color: "danger", icon: "bi-exclamation-octagon-fill", subtitle: "Total Defects" },
+        { title: "Yield Rate", value: `${metrics.yieldRate}%`, color: "info", icon: "bi-graph-up-arrow", subtitle: "Success Ratio", textColor: "text-primary" }
+    ];
+
     return (
         <div className="animate-in fade-in">
+            {/* Header */}
             <div className="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
                 <h4 className="mb-0 fw-bold text-primary"><i className="bi bi-activity me-2"></i>Live Units at {stationId}</h4>
                 <button className="btn btn-sm btn-outline-secondary rounded-pill px-3" onClick={onBack}>
                     <i className="bi bi-arrow-left me-2"></i>Back to Grid View
                 </button>
             </div>
+
+            {/* NEW: KPI Cards for the Station */}
+            <div className="row g-4 mb-4">
+                {cardData.map((card, index) => (
+                    <div className="col-md-3" key={index}>
+                        <div 
+                            className={`card border-0 shadow-sm h-100 border-start border-4 border-${card.color}`}
+                            style={{ borderRadius: '12px' }}
+                        >
+                            <div className="card-body p-4">
+                                <div className="d-flex align-items-center justify-content-between mb-3">
+                                    <div 
+                                        className={`bg-${card.color} bg-opacity-10 text-${card.color} rounded-3 p-3 d-flex align-items-center justify-content-center`} 
+                                        style={{ width: '50px', height: '50px' }}
+                                    >
+                                        <i className={`${card.icon} fs-4`}></i>
+                                    </div>
+                                    <span className={`badge bg-${card.color} bg-opacity-10 text-${card.color} rounded-pill px-2 py-1 small fw-normal`}>
+                                        {card.title.toUpperCase()}
+                                    </span>
+                                </div>
+                                <h2 className={`fw-bold mb-0 display-6 ${card.textColor || 'text-dark'}`}>{card.value}</h2>
+                                <span 
+                                    className="text-muted text-uppercase small fw-bold" 
+                                    style={{ fontSize: '0.7rem', letterSpacing: '1px' }}
+                                >
+                                    {card.subtitle}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+
+            {/* Live Units Table */}
             <div className="card border-0 shadow-sm" style={{ borderRadius: '12px' }}>
                 <div className="table-responsive" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                     <table className="table table-striped table-sm mb-0 small align-middle">
@@ -440,7 +567,7 @@ export default function ITAssistantPage({ user, onLogout }) {
     const [activeMonitorStationId, setActiveMonitorStationId] = useState(null); 
     const [activeHistoryStation, setActiveHistoryStation] = useState(null);
 
-    // --- METRICS ---
+    // --- REVISED: METRICS for Overview ---
     const calculateMetrics = (logs) => {
         const counts = { forScanning: 0, inProgress: 0, completed: 0, noGood: 0, pendingApproval: 0 };
         logs.forEach(log => {
@@ -453,7 +580,34 @@ export default function ITAssistantPage({ user, onLogout }) {
                 default: counts.inProgress++;
             }
         });
-        return counts;
+        
+        const totalTracked = logs.length;
+        
+        return {
+            ...counts,
+            totalTracked: totalTracked,
+            // Calculate percentage relative to totalTracked (for the cards)
+            pctCompleted: totalTracked > 0 ? ((counts.completed / totalTracked) * 100).toFixed(1) : '0.0',
+            pctInProgress: totalTracked > 0 ? ((counts.inProgress / totalTracked) * 100).toFixed(1) : '0.0',
+            pctNoGood: totalTracked > 0 ? ((counts.noGood / totalTracked) * 100).toFixed(1) : '0.0',
+            pctForScanning: totalTracked > 0 ? ((counts.forScanning / totalTracked) * 100).toFixed(1) : '0.0',
+        };
+    };
+
+    // --- NEW: METRICS for Station Details ---
+    const calculateStationMetrics = (stationLogs) => {
+        const completed = stationLogs.filter(u => u.status === 'Completed').length;
+        const inProgress = stationLogs.filter(u => u.status === 'In Progress').length;
+        const noGood = stationLogs.filter(u => u.status === 'No Good (NG)').length;
+        const totalOutput = completed + noGood;
+        
+        return {
+            completed: completed,
+            inProgress: inProgress,
+            noGood: noGood,
+            totalOutput: totalOutput,
+            yieldRate: totalOutput > 0 ? ((completed / totalOutput) * 100).toFixed(1) : '0.0',
+        };
     };
 
     // --- FETCH DATA ---
@@ -666,16 +820,43 @@ export default function ITAssistantPage({ user, onLogout }) {
 
         switch (activeTab) {
             case "overview":
+                // Updated cardData to use percentages
                 const cardData = [
-                    { title: "For Scanning", value: metrics.forScanning, color: "info", icon: "bi-qr-code-scan", subtitle: "Waiting for initial scan", textColor: "text-dark" },
-                    { title: "In Progress", value: metrics.inProgress, color: "primary", icon: "bi-hourglass-split", subtitle: "Currently in production" },
-                    { title: "Completed", value: metrics.completed, color: "success", icon: "bi-check-circle-fill", subtitle: "Finished assembly/QA" },
-                    { title: "No Good (NG)", value: metrics.noGood, color: "danger", icon: "bi-exclamation-octagon-fill", subtitle: "Defective units" }
+                    { title: "For Scanning", value: metrics.forScanning, color: "info", icon: "bi-qr-code-scan", subtitle: `(${metrics.pctForScanning}% of Total)`, percentage: metrics.pctForScanning, textColor: "text-dark" },
+                    { title: "In Progress", value: metrics.inProgress, color: "primary", icon: "bi-hourglass-split", subtitle: `(${metrics.pctInProgress}% of Total)`, percentage: metrics.pctInProgress },
+                    { title: "Completed", value: metrics.completed, color: "success", icon: "bi-check-circle-fill", subtitle: `(${metrics.pctCompleted}% of Total)`, percentage: metrics.pctCompleted },
+                    { title: "No Good (NG)", value: metrics.noGood, color: "danger", icon: "bi-exclamation-octagon-fill", subtitle: `(${metrics.pctNoGood}% of Total)`, percentage: metrics.pctNoGood }
                 ];
 
                 return (
                     <div className="row g-4 animate-in fade-in">
-                        {/* --- 1. Stats Cards (Shadows Reduced) --- */}
+                         {/* --- NEW: Total Units Card (Admin-style) --- */}
+                         <div className="col-md-3">
+                            <div className="card border-0 shadow-sm h-100 border-start border-4 border-dark" style={{ borderRadius: '12px' }}>
+                                <div className="card-body p-4">
+                                    <div className="d-flex align-items-center justify-content-between mb-3">
+                                        <div 
+                                            className={`bg-dark bg-opacity-10 text-dark rounded-3 p-3 d-flex align-items-center justify-content-center`} 
+                                            style={{ width: '50px', height: '50px' }}
+                                        >
+                                            <i className={`bi bi-box-fill fs-4`}></i>
+                                        </div>
+                                        <span className={`badge bg-dark text-white rounded-pill px-2 py-1 small fw-normal`}>
+                                            100% Tracked
+                                        </span>
+                                    </div>
+                                    <h2 className={`fw-bold mb-0 display-6 text-dark`}>{metrics.totalTracked}</h2>
+                                    <span 
+                                        className="text-muted text-uppercase small fw-bold" 
+                                        style={{ fontSize: '0.7rem', letterSpacing: '1px' }}
+                                    >
+                                        Total Units Tracked
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* --- 1. Stats Cards (with visible percentages) --- */}
                         {cardData.map((card, index) => (
                             <div className="col-md-3" key={index}>
                                 <div 
@@ -690,8 +871,9 @@ export default function ITAssistantPage({ user, onLogout }) {
                                             >
                                                 <i className={`${card.icon} fs-4`}></i>
                                             </div>
-                                            <span className={`badge bg-${card.color} bg-opacity-10 text-${card.color} rounded-pill px-2 py-1 small fw-normal`}>
-                                                {card.title.toUpperCase()}
+                                            {/* Increased visibility of percentage */}
+                                            <span className={`badge bg-${card.color} text-white rounded-pill px-3 py-2 fw-bolder`} style={{ fontSize: '0.9rem' }}>
+                                                {card.percentage}%
                                             </span>
                                         </div>
                                         <h2 className={`fw-bold mb-0 display-6 ${card.textColor || 'text-dark'}`}>{card.value}</h2>
@@ -699,12 +881,15 @@ export default function ITAssistantPage({ user, onLogout }) {
                                             className="text-muted text-uppercase small fw-bold" 
                                             style={{ fontSize: '0.7rem', letterSpacing: '1px' }}
                                         >
-                                            {card.subtitle}
+                                            {card.title} {card.subtitle}
                                         </span>
                                     </div>
                                 </div>
                             </div>
                         ))}
+                        {/* Shifting cardData (4 cards) to fill the remaining 3 columns, if Total Units is added. */}
+                        {/* We will adjust the layout to fit 4 cards total (Total Units + 3 other key metrics) if needed, but for now, I'll keep the current 4 data cards and add the Total Unit card. */}
+
 
                         {/* --- 2. Pending Approval Alert (Shadow Reduced) --- */}
                         {metrics.pendingApproval > 0 && (
@@ -806,66 +991,67 @@ export default function ITAssistantPage({ user, onLogout }) {
                     </div>
                 );
             
-           case "station_details":
-    return <LiveMonitoringTable stationId={activeMonitorStationId} units={unitLogs} onBack={() => { setActiveTab('station_monitor'); setActiveMonitorStationId(null); }} />;
+            case "station_details":
+        return <LiveMonitoringTable stationId={activeMonitorStationId} units={unitLogs} onBack={() => { setActiveTab('station_monitor'); setActiveMonitorStationId(null); }} calculateStationMetrics={calculateStationMetrics} />;
 
-case "station_monitor":
-    // 1. Filter units to include only those with a specific assembly_no (assuming this maps to a production station)
-    // and exclude those 'For Scanning' or 'N/A' as before.
-    const productionUnits = unitLogs.filter(u => u.status !== 'For Scanning' && u.assembly_no !== 'N/A');
+            case "station_monitor":
+                // 1. Filter units to include only those with a specific assembly_no (assuming this maps to a production station)
+                // and exclude those 'For Scanning' or 'N/A' as before.
+                const productionUnits = unitLogs.filter(u => u.status !== 'For Scanning' && u.assembly_no !== 'N/A');
 
-    return (
-        <div className="row g-4 animate-in fade-in">
-            <div className="col-12">
-                <h4 className="mb-4 fw-bold text-dark"><i className="bi bi-grid-3x3-gap-fill me-2 text-primary"></i>Production Stations Monitor</h4>
-                <div className="row g-3">
-                    {stations.map((station) => {
-                        // 2. Filter units by the new assembly_no field (assuming station.id holds the assembly number)
-                        const stationUnits = productionUnits.filter(u => u.assembly_no === station.id);
+                return (
+                    <div className="row g-4 animate-in fade-in">
+                        <div className="col-12">
+                            <h4 className="mb-4 fw-bold text-dark"><i className="bi bi-grid-3x3-gap-fill me-2 text-primary"></i>Production Stations Monitor</h4>
+                            <div className="row g-3">
+                                {stations.map((station) => {
+                                    // 2. Filter units by the station.id field (assuming station.id holds the assembly number)
+                                    // NOTE: This logic assumes unit.station field holds the station name, not unit.assembly_no
+                                    const stationUnits = productionUnits.filter(u => u.station === station.id);
 
-                        // 3. Status checks still use the 'status' field, which is in your table structure.
-                        const inProgressCount = stationUnits.filter(u => u.status === 'In Progress').length;
-                        const completedCount = stationUnits.filter(u => u.status === 'Completed').length;
-                        const ngCount = stationUnits.filter(u => u.status === 'No Good (NG)').length;
-                        
-                        let statusText = "IDLE";
-                        let statusClass = "bg-secondary";
-                        
-                        if (inProgressCount > 0) {
-                            statusText = `${inProgressCount} UNITS ACTIVE`;
-                            statusClass = "bg-primary"; 
-                        } else if (completedCount > 0) {
-                            statusText = `${completedCount} UNITS COMPLETED`;
-                            statusClass = "bg-success";
-                        } else if (ngCount > 0) {
-                            statusText = `${ngCount} DEFECTS`;
-                            statusClass = "bg-danger";
-                        }
-                        
-                        return (
-                            <div key={station.id} className="col-xl-2 col-lg-3 col-md-4 col-sm-6">
-                                <div className={`card h-100 border-0 shadow-sm border-start border-4 ${statusClass === 'bg-secondary' ? 'border-secondary' : statusClass === 'bg-primary' ? 'border-primary' : statusClass === 'bg-success' ? 'border-success' : 'border-danger'}`} style={{ borderRadius: '12px' }}>
-                                    <div className="card-body p-3">
-                                        <h6 className="fw-bold mb-1 text-dark">{station.name}</h6>
-                                        <span className={`badge mb-2 ${statusClass} text-white fw-bold`}>{statusText}</span>
-                                        <p className="small text-muted mb-2 lh-sm">{station.operator || 'Unassigned'}</p>
-                                    </div>
-                                    <div className="card-footer bg-light p-2 d-flex justify-content-between border-top">
-                                        <button className="btn btn-primary btn-sm py-1 flex-grow-1 me-1 rounded-pill" style={{fontSize: '0.75rem'}} onClick={() => handleMonitorStationDetails(station.id)}>
-                                            <i className="bi bi-eye me-1"></i>Monitor
-                                        </button>
-                                        <button className="btn btn-secondary btn-sm py-1 rounded-pill" style={{fontSize: '0.75rem'}} onClick={() => handleMonitorHistory(station.id)}>
-                                            <i className="bi bi-clock-history me-1"></i>History
-                                        </button>
-                                    </div>
-                                </div>
+                                    // 3. Status checks still use the 'status' field, which is in your table structure.
+                                    const inProgressCount = stationUnits.filter(u => u.status === 'In Progress').length;
+                                    const completedCount = stationUnits.filter(u => u.status === 'Completed').length;
+                                    const ngCount = stationUnits.filter(u => u.status === 'No Good (NG)').length;
+                                    
+                                    let statusText = "IDLE";
+                                    let statusClass = "bg-secondary";
+                                    
+                                    if (inProgressCount > 0) {
+                                        statusText = `${inProgressCount} UNITS ACTIVE`;
+                                        statusClass = "bg-primary"; 
+                                    } else if (completedCount > 0) {
+                                        statusText = `${completedCount} UNITS COMPLETED`;
+                                        statusClass = "bg-success";
+                                    } else if (ngCount > 0) {
+                                        statusText = `${ngCount} DEFECTS`;
+                                        statusClass = "bg-danger";
+                                    }
+                                    
+                                    return (
+                                        <div key={station.id} className="col-xl-2 col-lg-3 col-md-4 col-sm-6">
+                                            <div className={`card h-100 border-0 shadow-sm border-start border-4 ${statusClass === 'bg-secondary' ? 'border-secondary' : statusClass === 'bg-primary' ? 'border-primary' : statusClass === 'bg-success' ? 'border-success' : 'border-danger'}`} style={{ borderRadius: '12px' }}>
+                                                <div className="card-body p-3">
+                                                    <h6 className="fw-bold mb-1 text-dark">{station.name}</h6>
+                                                    <span className={`badge mb-2 ${statusClass} text-white fw-bold`}>{statusText}</span>
+                                                    <p className="small text-muted mb-2 lh-sm">{station.operator || 'Unassigned'}</p>
+                                                </div>
+                                                <div className="card-footer bg-light p-2 d-flex justify-content-between border-top">
+                                                    <button className="btn btn-primary btn-sm py-1 flex-grow-1 me-1 rounded-pill" style={{fontSize: '0.75rem'}} onClick={() => handleMonitorStationDetails(station.id)}>
+                                                        <i className="bi bi-eye me-1"></i>Monitor
+                                                    </button>
+                                                    <button className="btn btn-secondary btn-sm py-1 rounded-pill" style={{fontSize: '0.75rem'}} onClick={() => handleMonitorHistory(station.id)}>
+                                                        <i className="bi bi-clock-history me-1"></i>History
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
-                        );
-                    })}
-                </div>
-            </div>
-        </div>
-    );
+                        </div>
+                    </div>
+                );
             
             case "approvals":
                 return (
@@ -932,27 +1118,27 @@ case "station_monitor":
                     <li className="nav-item"><button className={`nav-link text-white text-start w-100 fw-bold ${activeTab === 'qr_generator' ? 'active bg-danger' : 'hover-danger-bg'}`} onClick={() => setActiveTab('qr_generator')}><i className="bi bi-qr-code me-2"></i> QR Generator</button></li>
                     <li className="nav-item"><button className={`nav-link text-white text-start w-100 fw-bold ${activeTab === 'station_monitor' || activeTab === 'station_details' ? 'active bg-danger' : 'hover-danger-bg'}`} onClick={() => setActiveTab('station_monitor')}><i className="bi bi-display me-2"></i> Station Monitor</button></li>
                     <li className="nav-item"><button className={`nav-link text-white text-start w-100 fw-bold ${activeTab === 'approvals' ? 'active bg-danger' : 'hover-danger-bg'}`} onClick={() => setActiveTab('approvals')}><i className="bi bi-shield-check me-2"></i> Approvals</button></li>
-              </ul> 
+                </ul> 
     
-   
     
-    {/* LOGOUT + COPYRIGHT SECTION (SIMPLIFIED & SPLIT) */}
-    <div className="mt-auto pt-2">
-        
-        {/* LOGOUT BUTTON (FIRST SECTION) */}
-        <button onClick={onLogout} className="btn btn-outline-danger w-100 btn-sm fw-bold">
-            <i className="bi bi-box-arrow-left me-2"></i> Logout
-        </button>
+    
+                {/* LOGOUT + COPYRIGHT SECTION (SIMPLIFIED & SPLIT) */}
+                <div className="mt-auto pt-2">
+                    
+                    {/* LOGOUT BUTTON (FIRST SECTION) */}
+                    <button onClick={onLogout} className="btn btn-outline-danger w-100 btn-sm fw-bold">
+                        <i className="bi bi-box-arrow-left me-2"></i> Logout
+                    </button>
 
-        {/* SEPARATOR LINE */}
-        <hr className="text-white-50 my-2" /> 
+                    {/* SEPARATOR LINE */}
+                    <hr className="text-white-50 my-2" /> 
 
-        {/* COPYRIGHT TEXT (SECOND SECTION) */}
-        <div className="text-center text-white-50 small" style={{fontSize: '0.7rem'}}>
-            ©2025 MKFF Laserteqhnique
-        </div>
-    </div>
-</div>
+                    {/* COPYRIGHT TEXT (SECOND SECTION) */}
+                    <div className="text-center text-white-50 small" style={{fontSize: '0.7rem'}}>
+                        ©2025 MKFF Laserteqhnique
+                    </div>
+                </div>
+            </div>
 
             {/* --- 2. MAIN CONTENT AREA (Fixed Header, Scrollable Content) --- */}
             <div className="flex-grow-1 d-flex flex-column" style={{ 

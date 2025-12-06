@@ -6,14 +6,29 @@ export function Dashboard({
     logs,
     stations,
     calculateMetrics,
-    overallMetrics,
+    overallMetrics, // Contains: completedUnits, pendingUnits, ngUnits, pendingApprovalUnits, yieldRate
     setActiveTab,
     dashboardView,
     nextChart,
     prevChart,
     handleMonitorStation,
 }) {
-    // Note: 'dashboardView', 'nextChart', and 'prevChart' must be defined in AdminPage and passed here.
+    // --- CALCULATIONS FOR PERCENTAGES ---
+    const totalUnits = 
+        overallMetrics.completedUnits + 
+        overallMetrics.pendingUnits + 
+        overallMetrics.ngUnits + 
+        overallMetrics.pendingApprovalUnits;
+
+    // Helper function to safely calculate percentage
+    const calculatePercentage = (value) => {
+        if (totalUnits === 0) return '0.0%';
+        return ((value / totalUnits) * 100).toFixed(1) + '%';
+    };
+
+    const completedPercentage = calculatePercentage(overallMetrics.completedUnits);
+    const pendingPercentage = calculatePercentage(overallMetrics.pendingUnits);
+    const ngPercentage = calculatePercentage(overallMetrics.ngUnits);
 
     // Determine current chart title
     const currentChartTitle = dashboardView === 'bar' ? 'Station Output' : 'Status Distribution';
@@ -41,8 +56,27 @@ export function Dashboard({
                 </div>
             </div>
 
-            {/* --- 2. Stats Cards (Summary) --- */}
+            {/* --- 2. Stats Cards (Summary) - UPDATED FOR VISIBILITY --- */}
             <div className="row g-4 mb-5">
+                
+                {/* 🎯 Total Units Tracked */}
+                <div className="col-md-3">
+                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-primary" style={{ borderRadius: '12px' }}>
+                        <div className="card-body p-4">
+                            <div className="d-flex align-items-center justify-content-between mb-3">
+                                <div className="bg-primary bg-opacity-10 text-primary rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
+                                    <i className="bi bi-box-fill fs-4"></i>
+                                </div>
+                                <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-2 py-1 small fw-bold">
+                                    100% Data Stream
+                                </span>
+                            </div>
+                            <h2 className="fw-bold text-dark mb-0 display-6">{totalUnits}</h2>
+                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Total Units Tracked</span>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Completed Units */}
                 <div className="col-md-3">
                     <div className="card border-0 shadow-sm h-100 border-start border-4 border-success" style={{ borderRadius: '12px' }}>
@@ -51,30 +85,13 @@ export function Dashboard({
                                 <div className="bg-success bg-opacity-10 text-success rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
                                     <i className="bi bi-box-seam-fill fs-4"></i>
                                 </div>
-                                <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-2 py-1 small fw-normal">
-                                    <i className="bi bi-arrow-up-short"></i>On Track
+                                {/* Display Percentage - BIGGER AND BOLDER */}
+                                <span className="badge bg-success text-white px-3 py-2 rounded-pill fw-bolder" style={{ fontSize: '1rem' }}>
+                                    {completedPercentage}
                                 </span>
                             </div>
                             <h2 className="fw-bold text-dark mb-0 display-6">{overallMetrics.completedUnits}</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Completed Units</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Yield Rate */}
-                <div className="col-md-3">
-                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-primary" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <div className="bg-primary bg-opacity-10 text-primary rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
-                                    <i className="bi bi-activity fs-4"></i>
-                                </div>
-                                <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-2 py-1 small fw-normal">
-                                    Target: 98%
-                                </span>
-                            </div>
-                            <h2 className="fw-bold text-dark mb-0 display-6">{overallMetrics.yieldRate}%</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Yield Rate</span>
+                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Completed Units (Yield: {overallMetrics.yieldRate}%)</span>
                         </div>
                     </div>
                 </div>
@@ -87,12 +104,13 @@ export function Dashboard({
                                 <div className="bg-warning bg-opacity-10 text-warning rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
                                     <i className="bi bi-hourglass-split fs-4"></i>
                                 </div>
-                                <span className="badge bg-warning bg-opacity-10 text-warning rounded-pill px-2 py-1 small fw-normal">
-                                    Active
+                                {/* Display Percentage - BIGGER AND BOLDER */}
+                                <span className="badge bg-warning text-dark px-3 py-2 rounded-pill fw-bolder" style={{ fontSize: '1rem' }}>
+                                    {pendingPercentage}
                                 </span>
                             </div>
                             <h2 className="fw-bold text-dark mb-0 display-6">{overallMetrics.pendingUnits}</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>In Progress</span>
+                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>In Progress (Work in progress)</span>
                         </div>
                     </div>
                 </div>
@@ -105,8 +123,9 @@ export function Dashboard({
                                 <div className="bg-danger bg-opacity-10 text-danger rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
                                     <i className="bi bi-exclamation-octagon-fill fs-4"></i>
                                 </div>
-                                <span className="badge bg-danger bg-opacity-10 text-danger rounded-pill px-2 py-1 small fw-normal">
-                                    Alert
+                                {/* Display Percentage - BIGGER AND BOLDER */}
+                                <span className="badge bg-danger text-white px-3 py-2 rounded-pill fw-bolder" style={{ fontSize: '1rem' }}>
+                                    {ngPercentage}
                                 </span>
                             </div>
                             <h2 className="fw-bold text-danger mb-0 display-6">{overallMetrics.ngUnits}</h2>

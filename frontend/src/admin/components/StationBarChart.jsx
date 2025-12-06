@@ -15,17 +15,30 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
     const summaries = stations.map(station => {
         // Calculate metrics for both display and tooltip use
         const metrics = calculateMetrics(station.id, liveLogs) || { completedUnits: 0, ngUnits: 0 };
+        const completed = metrics.completedUnits || 0;
+        const ng = metrics.ngUnits || 0;
+        const total = completed + ng;
+        
+        // Calculate percentage achievements
+        const achievementPercent = total > 0 ? (completed / total) * 100 : 0;
+        const defectPercent = total > 0 ? (ng / total) * 100 : 0;
+        
         return {
             name: station.name,
-            completed: metrics.completedUnits || 0,
-            ng: metrics.ngUnits || 0,
-            total: (metrics.completedUnits || 0) + (metrics.ngUnits || 0)
+            // Raw Counts (kept for richer tooltip data)
+            completedUnits: completed, 
+            ngUnits: ng,
+            totalUnits: total,
+            
+            // Percentage Data (used for the actual bar chart drawing)
+            achievementPercent: parseFloat(achievementPercent.toFixed(1)), // Use percentage for the bar height
+            defectPercent: parseFloat(defectPercent.toFixed(1)),           // Use percentage for the bar height
         };
-    });
+    }).filter(s => s.totalUnits > 0); // Only show stations with some production data
 
-    const totalOutput = summaries.reduce((sum, s) => sum + s.completed + s.ng, 0);
+    const totalOutput = summaries.reduce((sum, s) => sum + s.totalUnits, 0);
 
-    // Create Gradients on Mount/Update (More robust check)
+    // Create Gradients on Mount/Update
     useEffect(() => {
         const chart = chartRef.current;
         if (!chart) return;
@@ -51,19 +64,21 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
         labels: summaries.map(s => s.name),
         datasets: [
             {
-                label: 'Completed',
-                data: summaries.map(s => s.completed),
+                // New Label: Product Plan Achievement %
+                label: 'Product Plan Achievement %',
+                data: summaries.map(s => s.achievementPercent),
                 backgroundColor: gradientSuccess || '#10b981',
-                hoverBackgroundColor: gradientSuccess || '#10b981', // Use the same color for hover
-                borderRadius: 10, // Slightly reduced rounding for cleaner look
+                hoverBackgroundColor: gradientSuccess || '#10b981',
+                borderRadius: 10,
                 borderSkipped: false,
-                barThickness: 10, // Thinner bars for better separation
+                barThickness: 10,
             },
             {
-                label: 'No Good (NG)',
-                data: summaries.map(s => s.ng),
+                // New Label: Defect %
+                label: 'Defect %',
+                data: summaries.map(s => s.defectPercent),
                 backgroundColor: gradientDanger || '#ef4444',
-                hoverBackgroundColor: gradientDanger || '#ef4444', // Use the same color for hover
+                hoverBackgroundColor: gradientDanger || '#ef4444',
                 borderRadius: 10,
                 borderSkipped: false,
                 barThickness: 10,
@@ -79,14 +94,20 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
             x: {
                 stacked: true,
                 beginAtZero: true,
-                grid: {
-                    color: '#f1f5f9',
-                    borderDash: [4, 4],
-                    drawBorder: false, // Remove border line
-                },
+                // --- KEY CHANGE: Set the maximum value to 100
+                max: 100, 
+                // --- KEY CHANGE: Append '%' to the x-axis ticks
                 ticks: {
                     color: '#94a3b8',
                     font: { size: 11, family: "'Inter', sans-serif" },
+                    callback: function(value) {
+                        return value + '%';
+                    }
+                },
+                grid: {
+                    color: '#f1f5f9',
+                    borderDash: [4, 4],
+                    drawBorder: false,
                 },
             },
             y: {
@@ -94,7 +115,7 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
                 grid: { display: false },
                 ticks: {
                     color: '#475569',
-                    // UPDATED FONT: Bolder and slightly larger for readability
+                    // Bolder and slightly larger for readability
                     font: { size: 13, weight: '700', family: "'Inter', sans-serif" }, 
                     autoSkip: false,
                 },
@@ -121,25 +142,39 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
                 cornerRadius: 8,
                 titleFont: { size: 13 },
                 bodyFont: { size: 13 },
-                // ADDED: Custom callback to show total output
+                // Custom callback updated to show raw counts and yield rate
                 callbacks: {
                     title: (tooltipItem) => {
                         const stationName = tooltipItem[0].label;
-                        const stationData = summaries.find(s => s.name === stationName);
                         return stationName;
                     },
+                    label: (context) => {
+                        const stationName = context.label;
+                        const stationData = summaries.find(s => s.name === stationName);
+                        
+                        let label = context.dataset.label || '';
+                        const value = context.parsed.x;
+                        
+                        if (stationData) {
+                            if (context.dataset.label.includes('Achievement')) {
+                                return `${label}: ${value}% (${stationData.completedUnits} units)`;
+                            } else if (context.dataset.label.includes('Defect')) {
+                                return `${label}: ${value}% (${stationData.ngUnits} units)`;
+                            }
+                        }
+                        return `${label}: ${value}%`;
+                    },
                     afterBody: (tooltipItem) => {
-                         const stationName = tooltipItem[0].label;
-                         const stationData = summaries.find(s => s.name === stationName);
-                         if (stationData && stationData.total > 0) {
-                            const yieldRate = ((stationData.completed / stationData.total) * 100).toFixed(1);
+                        const stationName = tooltipItem[0].label;
+                        const stationData = summaries.find(s => s.name === stationName);
+                        
+                        if (stationData && stationData.totalUnits > 0) {
                             return [
                                 `---`,
-                                `Total Output: ${stationData.total}`,
-                                `Yield Rate: ${yieldRate}%`
+                                `Total Output (Units): ${stationData.totalUnits}`,
                             ];
-                         }
-                         return null;
+                        }
+                        return null;
                     }
                 }
             },
@@ -148,13 +183,13 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
 
     return (
         <div className="w-100 h-100 position-relative" style={{ minHeight: '400px' }}>
-            {totalOutput === 0 ? (
+            {summaries.length === 0 || totalOutput === 0 ? (
                 <div className="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
                     <div className="bg-light rounded-circle p-4 mb-3">
                         <i className="bi bi-bar-chart-line fs-1 text-secondary opacity-50"></i>
                     </div>
-                    <h6 className="fw-bold text-dark">No Data Yet</h6>
-                    <p className="small m-0 text-secondary">Start production to see live metrics.</p>
+                    <h6 className="fw-bold text-dark">No Production Data</h6>
+                    <p className="small m-0 text-secondary">No recorded Completed or NG units for active stations.</p>
                 </div>
             ) : (
                 <Bar ref={chartRef} data={chartData} options={options} />

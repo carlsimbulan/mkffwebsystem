@@ -122,7 +122,7 @@ const RenderStationGrid = ({ stations, calculateMetrics, handleMonitorStation, h
     );
 };
 
-// --- STATION MONITOR (station_monitor tab) ---
+// --- STATION MONITOR (station_monitor tab) - UPDATED FOR VISIBILITY ---
 const RenderStationMonitor = ({ stationMonitorId, stations, calculateMetrics, handleEditClick, highlightedUnitId, setActiveTab, fetchData }) => {
     if (!stationMonitorId) return null;
 
@@ -145,9 +145,10 @@ const RenderStationMonitor = ({ stationMonitorId, stations, calculateMetrics, ha
                 </button>
             </div>
 
-            {/* --- Stats Cards (Modern Style) --- */}
+            {/* --- Stats Cards (Modern Style - VISIBILITY ENHANCED) --- */}
             <div className="row g-4 mb-4">
-                {/* Completed */}
+                
+                {/* 1. Completed */}
                 <div className="col-md-6 col-xl-3">
                     <div className="card border-0 shadow-sm h-100 border-start border-4 border-success" style={{ borderRadius: '12px' }}>
                         <div className="card-body p-4">
@@ -155,15 +156,16 @@ const RenderStationMonitor = ({ stationMonitorId, stations, calculateMetrics, ha
                                 <div className="bg-success bg-opacity-10 text-success rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '45px', height: '45px' }}>
                                     <i className="bi bi-check-circle-fill fs-4"></i>
                                 </div>
-                                <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-2 py-1 small fw-normal">Output</span>
+                                <span className="badge bg-success text-white rounded-pill px-3 py-2 fw-bolder" style={{ fontSize: '0.9rem' }}>OUTPUT</span>
                             </div>
-                            <h2 className="fw-bold text-dark mb-0">{monitorMetrics.completedUnits}</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Completed</span>
+                            {/* Make number bigger (display-5) */}
+                            <h2 className="fw-bolder text-dark mb-0 display-5">{monitorMetrics.completedUnits}</h2>
+                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Completed Units</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Yield Rate */}
+                {/* 2. Yield Rate (Made percentage stand out) */}
                 <div className="col-md-6 col-xl-3">
                     <div className="card border-0 shadow-sm h-100 border-start border-4 border-primary" style={{ borderRadius: '12px' }}>
                         <div className="card-body p-4">
@@ -171,15 +173,16 @@ const RenderStationMonitor = ({ stationMonitorId, stations, calculateMetrics, ha
                                 <div className="bg-primary bg-opacity-10 text-primary rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '45px', height: '45px' }}>
                                     <i className="bi bi-graph-up-arrow fs-4"></i>
                                 </div>
-                                <span className="badge bg-primary bg-opacity-10 text-primary rounded-pill px-2 py-1 small fw-normal">Efficiency</span>
+                                <span className="badge bg-primary text-white rounded-pill px-3 py-2 fw-bolder" style={{ fontSize: '0.9rem' }}>TARGET: 98%</span>
                             </div>
-                            <h2 className="fw-bold text-dark mb-0">{monitorMetrics.yieldRate}%</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Yield Rate</span>
+                            {/* Make percentage number bigger (display-5) */}
+                            <h2 className="fw-bolder text-primary mb-0 display-5">{monitorMetrics.yieldRate}%</h2>
+                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Current Yield Rate</span>
                         </div>
                     </div>
                 </div>
 
-                {/* In Progress */}
+                {/* 3. In Progress */}
                 <div className="col-md-6 col-xl-3">
                     <div className="card border-0 shadow-sm h-100 border-start border-4 border-warning" style={{ borderRadius: '12px' }}>
                         <div className="card-body p-4">
@@ -187,15 +190,16 @@ const RenderStationMonitor = ({ stationMonitorId, stations, calculateMetrics, ha
                                 <div className="bg-warning bg-opacity-10 text-warning rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '45px', height: '45px' }}>
                                     <i className="bi bi-hourglass-split fs-4"></i>
                                 </div>
-                                <span className="badge bg-warning bg-opacity-10 text-warning rounded-pill px-2 py-1 small fw-normal">Active</span>
+                                <span className="badge bg-warning text-dark rounded-pill px-3 py-2 fw-bolder" style={{ fontSize: '0.9rem' }}>WIP</span>
                             </div>
-                            <h2 className="fw-bold text-dark mb-0">{monitorMetrics.pendingUnits}</h2>
+                            {/* Make number bigger (display-5) */}
+                            <h2 className="fw-bolder text-dark mb-0 display-5">{monitorMetrics.pendingUnits}</h2>
                             <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>In Progress</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Defects (NG) */}
+                {/* 4. Defects (NG) */}
                 <div className="col-md-6 col-xl-3">
                     <div className="card border-0 shadow-sm h-100 border-start border-4 border-danger" style={{ borderRadius: '12px' }}>
                         <div className="card-body p-4">
@@ -203,10 +207,11 @@ const RenderStationMonitor = ({ stationMonitorId, stations, calculateMetrics, ha
                                 <div className="bg-danger bg-opacity-10 text-danger rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '45px', height: '45px' }}>
                                     <i className="bi bi-exclamation-triangle-fill fs-4"></i>
                                 </div>
-                                <span className="badge bg-danger bg-opacity-10 text-danger rounded-pill px-2 py-1 small fw-normal">Defects</span>
+                                <span className="badge bg-danger text-white rounded-pill px-3 py-2 fw-bolder" style={{ fontSize: '0.9rem' }}>DEFECTS</span>
                             </div>
-                            <h2 className="fw-bold text-dark mb-0">{monitorMetrics.ngUnits}</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Total NG</span>
+                            {/* Make number bigger and red (display-5) */}
+                            <h2 className="fw-bolder text-danger mb-0 display-5">{monitorMetrics.ngUnits}</h2>
+                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Total No Good (NG)</span>
                         </div>
                     </div>
                 </div>
@@ -284,6 +289,7 @@ export function StationsOverview({
                 stationMonitorId={stationMonitorId}
                 stations={stations}
                 calculateMetrics={calculateMetrics}
+                isHighlighted={highlightedUnitId} // Fixed prop name, though 'highlightedUnitId' is passed above
                 handleEditClick={handleEditClick}
                 highlightedUnitId={highlightedUnitId}
                 setActiveTab={setActiveTab}
