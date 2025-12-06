@@ -32,11 +32,13 @@ export function ApprovalQueue({
                 <div className="table-responsive">
                     <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.9rem' }}>
                         <thead className="bg-light text-secondary text-uppercase small" style={{ letterSpacing: '0.5px' }}>
+                            {/* --- REVISED HEADERS: Added Assembly No. --- */}
                             <tr>
-                                <th className="border-0 py-3 ps-4">Unit Details</th>
+                                <th className="border-0 py-3 ps-4">Assembly No.</th> {/* NEW COLUMN */}
+                                <th className="border-0 py-3">Unit Details</th>
                                 <th className="border-0 py-3">Origin Station</th>
                                 <th className="border-0 py-3 text-center">Status</th>
-                                <th className="border-0 py-3" style={{ width: '25%' }}>Remarks</th>
+                                <th className="border-0 py-3" style={{ width: '20%' }}>Remarks</th>
                                 <th className="border-0 py-3 text-end">Timestamp</th>
                                 <th className="border-0 py-3 text-center pe-4">Action</th>
                             </tr>
@@ -44,10 +46,15 @@ export function ApprovalQueue({
                         <tbody className="border-top-0">
                             {approvalQueueLogs.length > 0 ? approvalQueueLogs.map(log => (
                                 <tr key={log.id}>
+                                    {/* --- NEW COLUMN DATA: Assembly No. --- */}
                                     <td className="ps-4">
+                                        <span className="fw-bold text-primary font-monospace">{log.assembly_no}</span>
+                                    </td>
+                                    {/* --- Unit Details --- */}
+                                    <td>
                                         <div className="d-flex flex-column">
                                             <span className="fw-bold text-dark">{log.model} <span className="fw-normal text-muted">({log.revision})</span></span>
-                                            <span className="small text-muted font-monospace">{log.device_serial_no}</span>
+                                            <span className="small text-muted font-monospace">{log.device_serial_no || '(No Serial)'}</span>
                                         </div>
                                     </td>
                                     <td>
@@ -88,7 +95,8 @@ export function ApprovalQueue({
                                 </tr>
                             )) : (
                                 <tr>
-                                    <td colSpan="6" className="py-5 text-center text-muted">
+                                    {/* Updated colspan from 6 to 7 due to new column */}
+                                    <td colSpan="7" className="py-5 text-center text-muted">
                                         <div className="mb-3">
                                             <i className="bi bi-clipboard-check fs-1 text-success opacity-25"></i>
                                         </div>
@@ -102,7 +110,7 @@ export function ApprovalQueue({
                 </div>
             </div>
 
-            {/* --- MODAL RENDERING (Mismong Modal JSX inilabas) --- */}
+            {/* --- MODAL RENDERING --- */}
             {showApproveModal && selectedLogToApprove && (
                 <ApproveUnitModal
                     selectedLogToApprove={selectedLogToApprove}

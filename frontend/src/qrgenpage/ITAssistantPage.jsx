@@ -161,42 +161,50 @@ const StationHistoryModal = ({ stationId, onClose, user }) => {
                         </div>
 
                         {/* --- HISTORY TABLE --- */}
-                        {historyLoading && <div className="text-center py-5">Loading history...</div>}
-                        {historyError && <div className="alert alert-danger m-3">{historyError}</div>}
-                        {!historyLoading && !historyError && (
-                            <div className="table-responsive border rounded" style={{ maxHeight: '50vh', overflowY: 'auto' }}>
-                                <table className="table table-sm table-hover table-striped mb-0 small">
-                                    <thead className="table-dark sticky-top">
-                                        <tr>
-                                            <th>Unit ID</th>
-                                            <th>Model</th>
-                                            <th>Assembly</th>
-                                            <th>Action Type</th>
-                                            <th>Station Name</th>
-                                            <th>Status After</th>
-                                            <th>Action By</th>
-                                            <th>Timestamp</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {historyLogs.length > 0 ? historyLogs.map(log => (
-                                            <tr key={log.history_id} className={log.action_type.includes('CREATE') ? 'table-primary' : log.action_type.includes('UPDATE') ? 'table-warning' : ''}>
-                                                <td>{log.unit_id}</td>
-                                                <td>{log.model}</td>
-                                                <td className="fw-bold">{log.assembly_no}</td>
-                                                <td>{log.action_type}</td>
-                                                <td>{log.station_name}</td>
-                                                <td><span className={`badge ${log.status_after.includes('Progress') ? 'bg-primary' : log.status_after.includes('Completed') ? 'bg-success' : 'bg-danger'}`}>{log.status_after}</span></td>
-                                                <td>{log.action_by || 'System'}</td>
-                                                <td className="text-muted">{new Date(log.timestamp).toLocaleString()}</td>
-                                            </tr>
-                                        )) : (
-                                            <tr><td colSpan="8" className="text-center py-4 text-muted">No historical records match your search criteria.</td></tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
+                {historyLoading && <div className="text-center py-5">Loading history...</div>}
+                {historyError && <div className="alert alert-danger m-3">{historyError}</div>}
+                {!historyLoading && !historyError && (
+                    <div className="table-responsive border rounded" style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+                        <table className="table table-sm table-hover table-striped mb-0 small">
+                            <thead className="table-dark sticky-top">
+                                {/* --- REVISED HEADERS for StationHistoryModal --- */}
+                                <tr>
+                                    <th>Assembly No.</th>
+                                    <th>Serial No.</th>
+                                    <th>Model</th>
+                                    <th>Rev.</th>
+                                    <th>Base Kit No.</th>
+                                    <th>Acc Kit No.</th>
+                                    <th>Status After</th>
+                                    <th>Action Type</th>
+                                    <th>Station Name</th>
+                                    <th>Action By</th>
+                                    <th>Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {historyLogs.length > 0 ? historyLogs.map(log => (
+                                    <tr key={log.history_id} className={log.action_type?.includes('CREATE') ? 'table-primary' : log.action_type?.includes('UPDATE') ? 'table-warning' : ''}>
+                                        {/* Tandaan: Ang history log ay dapat naglalaman ng mga fields na ito. */}
+                                        <td className="fw-bold">{log.assembly_no}</td>
+                                        <td>{log.device_serial_no || '(N/A)'}</td>
+                                        <td>{log.model}</td>
+                                        <td>{log.revision || '-'}</td>
+                                        <td>{log.base_unit_kitting_no || '-'}</td>
+                                        <td>{log.accessory_kitting_no || '-'}</td>
+                                        <td><span className={`badge ${log.status_after?.includes('Progress') ? 'bg-primary' : log.status_after?.includes('Completed') ? 'bg-success' : 'bg-danger'}`}>{log.status_after}</span></td>
+                                        <td>{log.action_type}</td>
+                                        <td>{log.station_name}</td>
+                                        <td>{log.action_by || 'System'}</td>
+                                        <td className="text-muted">{new Date(log.timestamp).toLocaleString()}</td>
+                                    </tr>
+                                )) : (
+                                    <tr><td colSpan="11" className="text-center py-4 text-muted">No historical records match your search criteria.</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
                     </div>
                     <div className="modal-footer border-0">
                         <button type="button" className="btn btn-secondary rounded-pill px-4" onClick={onClose}>Close</button>
@@ -216,11 +224,13 @@ const UnscannedUnitsTable = ({ unscannedUnits }) => (
         <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto' }}>
             <table className="table table-striped table-sm mb-0 small align-middle">
                 <thead className="table-light sticky-top">
+                    {/* --- REVISED HEADERS for UnscannedUnitsTable --- */}
                     <tr>
                         <th className="fw-bold">Assembly No.</th>
                         <th>Model</th>
                         <th>Revision</th>
-                        <th>Kitting No.</th>
+                        <th>Base Unit Kitting No.</th>
+                        <th>Accessory Kitting No.</th>
                         <th>Status</th>
                         <th>Created At</th>
                     </tr>
@@ -228,15 +238,17 @@ const UnscannedUnitsTable = ({ unscannedUnits }) => (
                 <tbody>
                     {unscannedUnits.length > 0 ? unscannedUnits.map(unit => (
                         <tr key={unit.id}>
+                            {/* --- REVISED DATA for UnscannedUnitsTable --- */}
                             <td className="fw-bold text-primary">{unit.assembly_no}</td>
                             <td>{unit.model}</td>
                             <td>{unit.revision}</td>
                             <td>{unit.base_unit_kitting_no}</td>
+                            <td>{unit.accessory_kitting_no || 'N/A'}</td>
                             <td><span className="badge bg-info text-dark fw-bold">For Scanning</span></td>
                             <td>{new Date(unit.created_at).toLocaleString()}</td>
                         </tr>
                     )) : (
-                        <tr><td colSpan="6" className="text-center py-4 text-muted">No units currently require initial scanning.</td></tr>
+                        <tr><td colSpan="7" className="text-center py-4 text-muted">No units currently require initial scanning.</td></tr>
                     )}
                 </tbody>
             </table>
@@ -245,8 +257,17 @@ const UnscannedUnitsTable = ({ unscannedUnits }) => (
 );
 
 const LiveMonitoringTable = ({ stationId, units, onBack }) => {
+    // Retain filtering logic to show units currently logged at this station
     const stationUnits = units.filter(u => u.station === stationId && u.status !== 'For Scanning');
     
+    // Helper function for status badges
+    const getStatusClass = (status) => {
+        if (status === 'In Progress') return 'bg-primary';
+        if (status === 'Completed') return 'bg-success';
+        if (status === 'No Good (NG)' || status === 'Pending Approval') return 'bg-danger';
+        return 'bg-secondary';
+    };
+
     return (
         <div className="animate-in fade-in">
             <div className="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
@@ -259,27 +280,35 @@ const LiveMonitoringTable = ({ stationId, units, onBack }) => {
                 <div className="table-responsive" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                     <table className="table table-striped table-sm mb-0 small align-middle">
                         <thead className="table-dark sticky-top">
+                            {/* --- REVISED TABLE HEADERS START HERE --- */}
                             <tr>
+                                <th className="fw-bold">Model</th>
+                                <th>Revision</th>
+                                <th>Base Unit Kitting No.</th>
                                 <th className="fw-bold">Assembly No.</th>
-                                <th>Serial No.</th>
-                                <th>Model</th>
+                                <th>Device Serial No.</th>
+                                <th>Accessory Kitting No.</th>
                                 <th>Status</th>
                                 <th>Remarks</th>
-                                <th>Time Logged</th>
                             </tr>
+                            {/* --- REVISED TABLE HEADERS END HERE --- */}
                         </thead>
                         <tbody>
                             {stationUnits.length > 0 ? stationUnits.map(unit => (
                                 <tr key={unit.id}>
+                                    {/* --- REVISED TABLE DATA CELLS START HERE --- */}
+                                    <td>{unit.model}</td>
+                                    <td>{unit.revision}</td>
+                                    <td>{unit.base_unit_kitting_no || 'N/A'}</td>
                                     <td className="fw-bold text-primary">{unit.assembly_no}</td>
                                     <td>{unit.device_serial_no || <span className="text-muted fst-italic">Pending</span>}</td>
-                                    <td>{unit.model}</td>
-                                    <td><span className={`badge ${unit.status === 'In Progress' ? 'bg-primary' : unit.status === 'Completed' ? 'bg-success' : 'bg-danger'}`}>{unit.status}</span></td>
-                                    <td><small className="text-muted">{unit.remarks}</small></td>
-                                    <td>{new Date(unit.created_at).toLocaleTimeString()}</td>
+                                    <td>{unit.accessory_kitting_no || 'N/A'}</td>
+                                    <td><span className={`badge ${getStatusClass(unit.status)}`}>{unit.status}</span></td>
+                                    <td><small className="text-muted">{unit.remarks || 'N/A'}</small></td>
+                                    {/* --- REVISED TABLE DATA CELLS END HERE --- */}
                                 </tr>
                             )) : (
-                                <tr><td colSpan="6" className="text-center py-4 text-muted">No live units currently logged at this station.</td></tr>
+                                <tr><td colSpan="8" className="text-center py-4 text-muted">No live units currently logged at this station.</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -777,59 +806,66 @@ export default function ITAssistantPage({ user, onLogout }) {
                     </div>
                 );
             
-            case "station_details":
-                return <LiveMonitoringTable stationId={activeMonitorStationId} units={unitLogs} onBack={() => { setActiveTab('station_monitor'); setActiveMonitorStationId(null); }} />;
+           case "station_details":
+    return <LiveMonitoringTable stationId={activeMonitorStationId} units={unitLogs} onBack={() => { setActiveTab('station_monitor'); setActiveMonitorStationId(null); }} />;
 
-            case "station_monitor":
-                const productionUnits = unitLogs.filter(u => u.status !== 'For Scanning' && u.station !== 'N/A');
-                return (
-                    <div className="row g-4 animate-in fade-in">
-                        <div className="col-12">
-                            <h4 className="mb-4 fw-bold text-dark"><i className="bi bi-grid-3x3-gap-fill me-2 text-primary"></i>Production Stations Monitor</h4>
-                            <div className="row g-3">
-                                {stations.map((station) => {
-                                    const stationUnits = productionUnits.filter(u => u.station === station.id);
-                                    const inProgressCount = stationUnits.filter(u => u.status === 'In Progress').length;
-                                    const completedCount = stationUnits.filter(u => u.status === 'Completed').length;
-                                    const ngCount = stationUnits.filter(u => u.status === 'No Good (NG)').length;
-                                    
-                                    let statusText = "IDLE";
-                                    let statusClass = "bg-secondary";
-                                    if (inProgressCount > 0) {
-                                        statusText = `${inProgressCount} UNITS ACTIVE`;
-                                        statusClass = "bg-primary"; 
-                                    } else if (completedCount > 0) {
-                                        statusText = `${completedCount} UNITS COMPLETED`;
-                                        statusClass = "bg-success";
-                                    } else if (ngCount > 0) {
-                                        statusText = `${ngCount} DEFECTS`;
-                                        statusClass = "bg-danger";
-                                    }
-                                    
-                                    return (
-                                        <div key={station.id} className="col-xl-2 col-lg-3 col-md-4 col-sm-6">
-                                            <div className={`card h-100 border-0 shadow-sm border-start border-4 ${statusClass === 'bg-secondary' ? 'border-secondary' : statusClass === 'bg-primary' ? 'border-primary' : statusClass === 'bg-success' ? 'border-success' : 'border-danger'}`} style={{ borderRadius: '12px' }}>
-                                                <div className="card-body p-3">
-                                                    <h6 className="fw-bold mb-1 text-dark">{station.name}</h6>
-                                                    <span className={`badge mb-2 ${statusClass} text-white fw-bold`}>{statusText}</span>
-                                                    <p className="small text-muted mb-2 lh-sm">{station.operator || 'Unassigned'}</p>
-                                                </div>
-                                                <div className="card-footer bg-light p-2 d-flex justify-content-between border-top">
-                                                    <button className="btn btn-primary btn-sm py-1 flex-grow-1 me-1 rounded-pill" style={{fontSize: '0.75rem'}} onClick={() => handleMonitorStationDetails(station.id)}>
-                                                        <i className="bi bi-eye me-1"></i>Monitor
-                                                    </button>
-                                                    <button className="btn btn-secondary btn-sm py-1 rounded-pill" style={{fontSize: '0.75rem'}} onClick={() => handleMonitorHistory(station.id)}>
-                                                        <i className="bi bi-clock-history me-1"></i>History
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+case "station_monitor":
+    // 1. Filter units to include only those with a specific assembly_no (assuming this maps to a production station)
+    // and exclude those 'For Scanning' or 'N/A' as before.
+    const productionUnits = unitLogs.filter(u => u.status !== 'For Scanning' && u.assembly_no !== 'N/A');
+
+    return (
+        <div className="row g-4 animate-in fade-in">
+            <div className="col-12">
+                <h4 className="mb-4 fw-bold text-dark"><i className="bi bi-grid-3x3-gap-fill me-2 text-primary"></i>Production Stations Monitor</h4>
+                <div className="row g-3">
+                    {stations.map((station) => {
+                        // 2. Filter units by the new assembly_no field (assuming station.id holds the assembly number)
+                        const stationUnits = productionUnits.filter(u => u.assembly_no === station.id);
+
+                        // 3. Status checks still use the 'status' field, which is in your table structure.
+                        const inProgressCount = stationUnits.filter(u => u.status === 'In Progress').length;
+                        const completedCount = stationUnits.filter(u => u.status === 'Completed').length;
+                        const ngCount = stationUnits.filter(u => u.status === 'No Good (NG)').length;
+                        
+                        let statusText = "IDLE";
+                        let statusClass = "bg-secondary";
+                        
+                        if (inProgressCount > 0) {
+                            statusText = `${inProgressCount} UNITS ACTIVE`;
+                            statusClass = "bg-primary"; 
+                        } else if (completedCount > 0) {
+                            statusText = `${completedCount} UNITS COMPLETED`;
+                            statusClass = "bg-success";
+                        } else if (ngCount > 0) {
+                            statusText = `${ngCount} DEFECTS`;
+                            statusClass = "bg-danger";
+                        }
+                        
+                        return (
+                            <div key={station.id} className="col-xl-2 col-lg-3 col-md-4 col-sm-6">
+                                <div className={`card h-100 border-0 shadow-sm border-start border-4 ${statusClass === 'bg-secondary' ? 'border-secondary' : statusClass === 'bg-primary' ? 'border-primary' : statusClass === 'bg-success' ? 'border-success' : 'border-danger'}`} style={{ borderRadius: '12px' }}>
+                                    <div className="card-body p-3">
+                                        <h6 className="fw-bold mb-1 text-dark">{station.name}</h6>
+                                        <span className={`badge mb-2 ${statusClass} text-white fw-bold`}>{statusText}</span>
+                                        <p className="small text-muted mb-2 lh-sm">{station.operator || 'Unassigned'}</p>
+                                    </div>
+                                    <div className="card-footer bg-light p-2 d-flex justify-content-between border-top">
+                                        <button className="btn btn-primary btn-sm py-1 flex-grow-1 me-1 rounded-pill" style={{fontSize: '0.75rem'}} onClick={() => handleMonitorStationDetails(station.id)}>
+                                            <i className="bi bi-eye me-1"></i>Monitor
+                                        </button>
+                                        <button className="btn btn-secondary btn-sm py-1 rounded-pill" style={{fontSize: '0.75rem'}} onClick={() => handleMonitorHistory(station.id)}>
+                                            <i className="bi bi-clock-history me-1"></i>History
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                );
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
             
             case "approvals":
                 return (
