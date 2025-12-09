@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios'; 
 import 'bootstrap-icons/font/bootstrap-icons.css';
+import logo from '../logo.png';
 
 // --- CONFIGURATION ---
 const API_BASE_URL = "http://localhost/mkffwebsystem/backend/api";
@@ -820,105 +821,140 @@ export default function ITAssistantPage({ user, onLogout }) {
 
         switch (activeTab) {
             case "overview":
-                // Updated cardData to use percentages
-                const cardData = [
-                    { title: "For Scanning", value: metrics.forScanning, color: "info", icon: "bi-qr-code-scan", subtitle: `(${metrics.pctForScanning}% of Total)`, percentage: metrics.pctForScanning, textColor: "text-dark" },
-                    { title: "In Progress", value: metrics.inProgress, color: "primary", icon: "bi-hourglass-split", subtitle: `(${metrics.pctInProgress}% of Total)`, percentage: metrics.pctInProgress },
-                    { title: "Completed", value: metrics.completed, color: "success", icon: "bi-check-circle-fill", subtitle: `(${metrics.pctCompleted}% of Total)`, percentage: metrics.pctCompleted },
-                    { title: "No Good (NG)", value: metrics.noGood, color: "danger", icon: "bi-exclamation-octagon-fill", subtitle: `(${metrics.pctNoGood}% of Total)`, percentage: metrics.pctNoGood }
-                ];
+    // Updated cardData to use percentages
+    const cardData = [
+        { title: "For Scanning", value: metrics.forScanning, color: "info", icon: "bi-qr-code-scan", subtitle: `(${metrics.pctForScanning}% of Total)`, percentage: metrics.pctForScanning, textColor: "text-dark" },
+        { title: "In Progress", value: metrics.inProgress, color: "primary", icon: "bi-hourglass-split", subtitle: `(${metrics.pctInProgress}% of Total)`, percentage: metrics.pctInProgress },
+        { title: "Completed", value: metrics.completed, color: "success", icon: "bi-check-circle-fill", subtitle: `(${metrics.pctCompleted}% of Total)`, percentage: metrics.pctCompleted },
+        { title: "No Good (NG)", value: metrics.noGood, color: "danger", icon: "bi-exclamation-octagon-fill", subtitle: `(${metrics.pctNoGood}% of Total)`, percentage: metrics.pctNoGood }
+    ];
 
-                return (
-                    <div className="row g-4 animate-in fade-in">
-                         {/* --- NEW: Total Units Card (Admin-style) --- */}
-                         <div className="col-md-3">
-                            <div className="card border-0 shadow-sm h-100 border-start border-4 border-dark" style={{ borderRadius: '12px' }}>
-                                <div className="card-body p-4">
-                                    <div className="d-flex align-items-center justify-content-between mb-3">
-                                        <div 
-                                            className={`bg-dark bg-opacity-10 text-dark rounded-3 p-3 d-flex align-items-center justify-content-center`} 
-                                            style={{ width: '50px', height: '50px' }}
-                                        >
-                                            <i className={`bi bi-box-fill fs-4`}></i>
-                                        </div>
-                                        <span className={`badge bg-dark text-white rounded-pill px-2 py-1 small fw-normal`}>
-                                            100% Tracked
-                                        </span>
-                                    </div>
-                                    <h2 className={`fw-bold mb-0 display-6 text-dark`}>{metrics.totalTracked}</h2>
-                                    <span 
-                                        className="text-muted text-uppercase small fw-bold" 
-                                        style={{ fontSize: '0.7rem', letterSpacing: '1px' }}
-                                    >
-                                        Total Units Tracked
-                                    </span>
-                                </div>
+    // Separate the card data for the two rows
+    const topRowCards = [
+        // 1. Total Units Tracked (Already defined below, but we'll include it visually first)
+        // 2. For Scanning (First item in cardData)
+        cardData[0]
+    ];
+    const bottomRowCards = cardData.slice(1); // The remaining three cards
+
+    return (
+        <div className="row g-4 animate-in fade-in">
+            {/* 1. TOP ROW: Total Units Tracked (col-md-6) */}
+            <div className="col-md-6">
+                <div className="card border-0 shadow-sm h-100 border-start border-4 border-dark" style={{ borderRadius: '12px' }}>
+                    <div className="card-body p-4">
+                        <div className="d-flex align-items-center justify-content-between mb-3">
+                            <div 
+                                className={`bg-dark bg-opacity-10 text-dark rounded-3 p-3 d-flex align-items-center justify-content-center`} 
+                                style={{ width: '50px', height: '50px' }}
+                            >
+                                <i className={`bi bi-box-fill fs-4`}></i>
                             </div>
+                            <span className={`badge bg-dark text-white rounded-pill px-2 py-1 small fw-normal`}>
+                                100% Tracked
+                            </span>
                         </div>
+                        <h2 className={`fw-bold mb-0 display-6 text-dark`}>{metrics.totalTracked}</h2>
+                        <span 
+                            className="text-muted text-uppercase small fw-bold" 
+                            style={{ fontSize: '0.7rem', letterSpacing: '1px' }}
+                        >
+                            Total Units Tracked
+                        </span>
+                    </div>
+                </div>
+            </div>
 
-                        {/* --- 1. Stats Cards (with visible percentages) --- */}
-                        {cardData.map((card, index) => (
-                            <div className="col-md-3" key={index}>
+            {/* 2. TOP ROW: For Scanning (col-md-6) */}
+            {topRowCards.map((card, index) => (
+                <div className="col-md-6" key={card.title}>
+                    <div 
+                        className={`card border-0 shadow-sm h-100 border-start border-4 border-${card.color}`}
+                        style={{ borderRadius: '12px' }}
+                    >
+                        <div className="card-body p-4">
+                            <div className="d-flex align-items-center justify-content-between mb-3">
                                 <div 
-                                    className={`card border-0 shadow-sm h-100 border-start border-4 border-${card.color}`}
-                                    style={{ borderRadius: '12px' }}
+                                    className={`bg-${card.color} bg-opacity-10 text-${card.color} rounded-3 p-3 d-flex align-items-center justify-content-center`} 
+                                    style={{ width: '50px', height: '50px' }}
                                 >
-                                    <div className="card-body p-4">
-                                        <div className="d-flex align-items-center justify-content-between mb-3">
-                                            <div 
-                                                className={`bg-${card.color} bg-opacity-10 text-${card.color} rounded-3 p-3 d-flex align-items-center justify-content-center`} 
-                                                style={{ width: '50px', height: '50px' }}
-                                            >
-                                                <i className={`${card.icon} fs-4`}></i>
-                                            </div>
-                                            {/* Increased visibility of percentage */}
-                                            <span className={`badge bg-${card.color} text-white rounded-pill px-3 py-2 fw-bolder`} style={{ fontSize: '0.9rem' }}>
-                                                {card.percentage}%
-                                            </span>
-                                        </div>
-                                        <h2 className={`fw-bold mb-0 display-6 ${card.textColor || 'text-dark'}`}>{card.value}</h2>
-                                        <span 
-                                            className="text-muted text-uppercase small fw-bold" 
-                                            style={{ fontSize: '0.7rem', letterSpacing: '1px' }}
-                                        >
-                                            {card.title} {card.subtitle}
-                                        </span>
-                                    </div>
+                                    <i className={`${card.icon} fs-4`}></i>
                                 </div>
+                                <span className={`badge bg-${card.color} text-white rounded-pill px-3 py-2 fw-bolder`} style={{ fontSize: '0.9rem' }}>
+                                    {card.percentage}%
+                                </span>
                             </div>
-                        ))}
-                        {/* Shifting cardData (4 cards) to fill the remaining 3 columns, if Total Units is added. */}
-                        {/* We will adjust the layout to fit 4 cards total (Total Units + 3 other key metrics) if needed, but for now, I'll keep the current 4 data cards and add the Total Unit card. */}
-
-
-                        {/* --- 2. Pending Approval Alert (Shadow Reduced) --- */}
-                        {metrics.pendingApproval > 0 && (
-                            <div className="col-12">
-                                <div 
-                                    className="alert alert-warning d-flex justify-content-between align-items-center shadow-sm border-start border-4 border-danger" 
-                                    role="alert"
-                                    style={{ borderRadius: '12px' }}
-                                >
-                                    <h5 className="mb-0 text-dark fw-bold">
-                                        <i className="bi bi-exclamation-triangle-fill me-2 text-danger"></i> 
-                                        {metrics.pendingApproval} UNITS AWAITING APPROVAL!
-                                    </h5>
-                                    <button 
-                                        className="btn btn-sm btn-danger px-3 rounded-pill fw-bold" 
-                                        onClick={() => setActiveTab('approvals')}
-                                    >
-                                        <i className="bi bi-eye me-2"></i> Review Approvals
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* --- 3. Unscanned Units Table (Shadow Reduced) --- */}
-                        <div className="col-12 mt-4">
-                            <UnscannedUnitsTable unscannedUnits={unitsForScanning} />
+                            <h2 className={`fw-bold mb-0 display-6 ${card.textColor || 'text-dark'}`}>{card.value}</h2>
+                            <span 
+                                className="text-muted text-uppercase small fw-bold" 
+                                style={{ fontSize: '0.7rem', letterSpacing: '1px' }}
+                            >
+                                {card.title} {card.subtitle}
+                            </span>
                         </div>
                     </div>
-                );
+                </div>
+            ))}
+            
+            {/* 3. BOTTOM ROW: In Progress, Completed, No Good (NG) (col-md-4) */}
+            {bottomRowCards.map((card, index) => (
+                <div className="col-md-4" key={card.title}> 
+                    <div 
+                        className={`card border-0 shadow-sm h-100 border-start border-4 border-${card.color}`}
+                        style={{ borderRadius: '12px' }}
+                    >
+                        <div className="card-body p-4">
+                            <div className="d-flex align-items-center justify-content-between mb-3">
+                                <div 
+                                    className={`bg-${card.color} bg-opacity-10 text-${card.color} rounded-3 p-3 d-flex align-items-center justify-content-center`} 
+                                    style={{ width: '50px', height: '50px' }}
+                                >
+                                    <i className={`${card.icon} fs-4`}></i>
+                                </div>
+                                <span className={`badge bg-${card.color} text-white rounded-pill px-3 py-2 fw-bolder`} style={{ fontSize: '0.9rem' }}>
+                                    {card.percentage}%
+                                </span>
+                            </div>
+                            <h2 className={`fw-bold mb-0 display-6 ${card.textColor || 'text-dark'}`}>{card.value}</h2>
+                            <span 
+                                className="text-muted text-uppercase small fw-bold" 
+                                style={{ fontSize: '0.7rem', letterSpacing: '1px' }}
+                            >
+                                {card.title} {card.subtitle}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            ))}
+
+            {/* --- 4. Pending Approval Alert (Kept at col-12) --- */}
+            {metrics.pendingApproval > 0 && (
+                <div className="col-12 mt-4">
+                    <div 
+                        className="alert alert-warning d-flex justify-content-between align-items-center shadow-sm border-start border-4 border-danger" 
+                        role="alert"
+                        style={{ borderRadius: '12px' }}
+                    >
+                        <h5 className="mb-0 text-dark fw-bold">
+                            <i className="bi bi-exclamation-triangle-fill me-2 text-danger"></i> 
+                            {metrics.pendingApproval} UNITS AWAITING APPROVAL!
+                        </h5>
+                        <button 
+                            className="btn btn-sm btn-danger px-3 rounded-pill fw-bold" 
+                            onClick={() => setActiveTab('approvals')}
+                        >
+                            <i className="bi bi-eye me-2"></i> Review Approvals
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* --- 5. Unscanned Units Table (Kept at col-12) --- */}
+            <div className="col-12 mt-4">
+                <UnscannedUnitsTable unscannedUnits={unitsForScanning} />
+            </div>
+        </div>
+    );
 
             case "qr_generator":
                 const currentQuantity = parseInt(qrFormData.quantity, 10) || 0;
@@ -1107,8 +1143,9 @@ export default function ITAssistantPage({ user, onLogout }) {
                 overflowY: 'auto'
             }}>
                 <a href="/" className="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
-                    <i className="bi bi-hdd-rack fs-4 me-2 text-danger"></i>
-                    <span className="fs-5 fw-bold">IT Support</span>
+                    {/* Assuming 'logo' is imported from '../logo.png' as you mentioned */}
+                    <img src={logo} alt="IT Assistant Logo" style={{ width: '32px', height: '32px', marginRight: '8px' }} />
+                    <span className="fs-5 fw-bold">IT Assistant</span>
                 </a>
                 <hr className="text-white-50"/>
                 
