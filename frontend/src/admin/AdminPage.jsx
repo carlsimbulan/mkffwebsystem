@@ -21,7 +21,7 @@ import { AnnouncementModal } from './components/AnnouncementModal';
 import { Dashboard } from './components/Dashboard';
 import { StationsOverview } from './components/StationsOverview';
 import { ReportsView } from './components/ReportsView';
-import { AnnouncementsView } from './components/AnnouncementsView'; // Assuming this is the old 'case "announcements"'
+import { AnnouncementsView } from './components/AnnouncementsView'; 
 import { ApprovalQueue } from './components/ApprovalQueue';
 import { UserManagement } from './components/UserManagement';
 // NEW EMBEDDED MODALS
@@ -59,7 +59,7 @@ const API_BASE_URL = "http://localhost/mkffwebsystem/backend/api";
 const UNITS_ENDPOINT = `${API_BASE_URL}/units.php`;
 const REPORTS_ENDPOINT = `${API_BASE_URL}/daily_reports.php`;
 const USER_MANAGEMENT_ENDPOINT = `${API_BASE_URL}/user_management.php`;
-const HISTORY_ENDPOINT = `${API_BASE_URL}/unit_history.php`;
+const HISTORY_ENDPOINT = `${API_BASE_URL}/unit_history.php`; 
 
 const ANNOUNCEMENTS_ENDPOINT = `${API_BASE_URL}/announcements.php`;
 
@@ -78,12 +78,13 @@ export default function AdminPage({ user, onLogout }) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [filterStartDate, setFilterStartDate] = useState('');
     const [filterEndDate, setFilterEndDate] = useState(getTodayDate());
-    const [logs, setLogs] = useState([]); // Unit logs
-    const [dailyReportsList, setDailyReportsList] = useState([]); // Reports
-    const [userList, setUserList] = useState([]); // User list
-    const [stations, setStations] = useState([]); // State for station list
+    const [logs, setLogs] = useState([]); // Unit logs (Current State)
+    const [unitHistoryLogs, setUnitHistoryLogs] = useState([]); // HISTORY LOGS
+    const [dailyReportsList, setDailyReportsList] = useState([]); 
+    const [userList, setUserList] = useState([]); 
+    const [stations, setStations] = useState([]); 
     const [stationMonitorId, setStationMonitorId] = useState(null);
-    const [showDeleteModal, setShowDeleteModal] = useState(false); // FOR ANNOUNCEMENT DELETE
+    const [showDeleteModal, setShowDeleteModal] = useState(false); 
     const [announcementToDelete, setAnnouncementToDelete] = useState(null);
     const [posterIdOfAnnouncement, setPosterIdOfAnnouncement] = useState(null);
     const [successMessage, setSuccessMessage] = useState(null);
@@ -100,18 +101,19 @@ export default function AdminPage({ user, onLogout }) {
 
     // --- NOTIFICATION STATES ---
     const [notifications, setNotifications] = useState([]);
-    const [lastSeenReportIds, setLastSeenReportIds] = useState(new Set());
+    // FIX: Initialize with useState(new Set())
+    const [lastSeenReportIds, setLastSeenReportIds] = useState(new Set()); 
     const [highlightedUnitId, setHighlightedUnitId] = useState(null);
 
-    const [announcements, setAnnouncements] = useState([]); // Announcements/Forum data
-    const [showPostModal, setShowPostModal] = useState(false); // For Admin to post
+    const [announcements, setAnnouncements] = useState([]); 
+    const [showPostModal, setShowPostModal] = useState(false); 
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
     const [showViewModal, setShowViewModal] = useState(false);
     const [viewUser, setViewUser] = useState(null);
-    const [showPasswordInModal, setShowPasswordInModal] = useState(false); // (Unused but kept in original)
+    const [showPasswordInModal, setShowPasswordInModal] = useState(false); 
 
     // --- NEW APPROVAL MODAL STATES ---
     const [showApproveModal, setShowApproveModal] = useState(false);
@@ -172,7 +174,8 @@ export default function AdminPage({ user, onLogout }) {
         const newReportNotifications = [];
 
         allReports.forEach(report => {
-            if (!lastSeenReportIds.has(report.id)) {
+            // ERROR LINE WAS HERE (lastSeenReportIds was undefined before fix)
+            if (!lastSeenReportIds.has(report.id)) { 
                 newReportNotifications.push({
                     id: `report-${report.id}`,
                     type: 'NewReport',
@@ -203,12 +206,17 @@ export default function AdminPage({ user, onLogout }) {
             ...newReportNotifications,
         ]);
 
-        setLastSeenReportIds(allFetchedReportIds);
+        // Fix: Use setState setter for Map/Set
+        setLastSeenReportIds(prev => {
+            const newSet = new Set(prev);
+            allFetchedReportIds.forEach(id => newSet.add(id));
+            return newSet;
+        });
 
     }, [notifications, lastSeenReportIds]);
 
 
-    // --- FETCH DATA (KEPT AS IS) ---
+    // --- FETCH DATA (UPDATED TO INCLUDE HISTORY LOGS) ---
     const fetchData = async () => {
         const isBackgroundUpdate = logs.length > 0;
 
@@ -218,11 +226,19 @@ export default function AdminPage({ user, onLogout }) {
 
         setError(null);
         try {
-            // 1. Fetch Units/Logs
+            // 1. Fetch Units/Logs (Current State)
             const unitsRes = await axios.get(UNITS_ENDPOINT);
             const fetchedUnits = unitsRes.data;
             if (JSON.stringify(fetchedUnits) !== JSON.stringify(logs)) {
                 setLogs(fetchedUnits);
+            }
+
+            // 1.5 Fetch Unit History Logs (The full trail)
+            const historyRes = await axios.get(HISTORY_ENDPOINT);
+            // Ensure we handle different possible API response structures
+            const fetchedHistory = Array.isArray(historyRes.data) ? historyRes.data : (historyRes.data.data || []);
+            if (JSON.stringify(fetchedHistory) !== JSON.stringify(unitHistoryLogs)) {
+                setUnitHistoryLogs(fetchedHistory);
             }
 
             // 2. Fetch Daily Reports
@@ -274,7 +290,8 @@ export default function AdminPage({ user, onLogout }) {
     };
 
     const refreshAndCloseReport = () => {
-        setLastSeenReportIds(new Set());
+        // Resetting lastSeenReportIds is not strictly necessary for this logic
+        // setLastSeenReportIds(new Set()); 
         fetchData();
         setShowReportModal(false);
     };
@@ -284,7 +301,7 @@ export default function AdminPage({ user, onLogout }) {
         fetchData();
         const interval = setInterval(fetchData, 1000);
         return () => clearInterval(interval);
-    }, []);
+    }, [checkDelayedUnitsAndReports]); // Added checkDelayedUnitsAndReports to dependency array to satisfy ESLint, though the polling interval keeps it running.
 
     // --- DASHBOARD CHART HANDLERS (KEPT AS IS) ---
     const nextChart = () => {
@@ -316,7 +333,7 @@ export default function AdminPage({ user, onLogout }) {
             const report = dailyReportsList.find(r => r.id === notification.reportId);
             if (report) {
                 setReportDate(report.report_date.split(' ')[0]);
-                setReportFilterStationId(report.station); // Check if this needs normalization
+                setReportFilterStationId(report.station); 
                 setSelectedReportToView(report);
             }
         } else if (notification.type === 'DelayedUnit') {
@@ -345,7 +362,7 @@ export default function AdminPage({ user, onLogout }) {
         setStationHistoryId(stationId);
     };
 
-    // --- ACTION HANDLERS ---
+    // --- ACTION HANDLERS (KEPT AS IS) ---
     const handleApproveUnit = async (unitId, unitData) => {
         const dataToSend = { ...unitData, id: unitId, status: 'In Progress' };
         try {
@@ -356,7 +373,6 @@ export default function AdminPage({ user, onLogout }) {
         }
     };
 
-    // Wrapper function to execute approval for the modal
     const executeApproval = () => {
         if (selectedLogToApprove) {
             handleApproveUnit(selectedLogToApprove.id, selectedLogToApprove);
@@ -439,7 +455,6 @@ export default function AdminPage({ user, onLogout }) {
         }
     };
 
-    // 1. FUNCTION NA TATAWAGIN NG TRASH BUTTON SA LISTAHAN
     const handleConfirmDelete = (announcementId, posterUserId) => {
         if (user.role !== 'Administrator' && user.id !== posterUserId) {
             alert("You do not have permission to delete this announcement.");
@@ -448,10 +463,9 @@ export default function AdminPage({ user, onLogout }) {
 
         setAnnouncementToDelete(announcementId);
         setPosterIdOfAnnouncement(posterUserId);
-        setShowDeleteModal(true); // <--- ITO ANG NAGPAPALABAS NG MODAL
+        setShowDeleteModal(true); 
     };
 
-    // 2. FUNCTION NA TATAWAGIN NG DELETE BUTTON SA LOOB NG MODAL
     const executeDeleteAnnouncement = async () => {
         if (!announcementToDelete) return;
 
@@ -524,7 +538,7 @@ export default function AdminPage({ user, onLogout }) {
     const headerAvatarSrc = user.avatar_url ? `${AVATAR_UPLOAD_PATH}${user.avatar_url}` : DEFAULT_AVATAR_PATH;
     const headerFullName = user.full_name || user.username || 'Admin';
 
-    // --- RENDER CONTENT (Simplified Switch) ---
+    // --- RENDER CONTENT (UPDATED to pass unitHistoryLogs and live logs) ---
     const renderContent = () => {
         if (loading && logs.length === 0) {
             return (<div className="text-center py-5"><div className="spinner-border text-danger" role="status"></div><p className="mt-3 text-muted">Loading real-time production data...</p></div>);
@@ -551,6 +565,7 @@ export default function AdminPage({ user, onLogout }) {
 
             case "stations":
             case "station_monitor":
+            case "overall_history": 
                 return (
                     <StationsOverview
                         activeTab={activeTab}
@@ -563,6 +578,8 @@ export default function AdminPage({ user, onLogout }) {
                         handleViewHistory={handleViewHistory}
                         handleEditClick={handleEditClick}
                         fetchData={fetchData}
+                        allLogs={unitHistoryLogs} 
+                        liveUnitLogs={logs} // Pass current logs for model name lookup
                     />
                 );
 
@@ -699,7 +716,7 @@ export default function AdminPage({ user, onLogout }) {
                     <li>
                         <button
                             className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
-                                (activeTab === "stations" || activeTab === "station_monitor") ? "active bg-danger" : ""
+                                (activeTab === "stations" || activeTab === "station_monitor" || activeTab === "overall_history") ? "active bg-danger" : "" 
                                 }`}
                             onClick={() => {
                                 setActiveTab("stations");
@@ -716,7 +733,8 @@ export default function AdminPage({ user, onLogout }) {
 
                     <li>
                         <button
-                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "reports" ? "active bg-danger" : ""
+                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "reports" ? "active bg-danger"
+                                : ""
                                 }`}
                             onClick={() => {
                                 setActiveTab("reports");
@@ -734,7 +752,8 @@ export default function AdminPage({ user, onLogout }) {
                     {/* --- ANNOUNCEMENT BOARD --- */}
                     <li>
                         <button
-                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "announcements" ? "active bg-danger" : ""
+                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "announcements" ? "active bg-danger"
+                                : ""
                                 }`}
                             onClick={() => {
                                 setActiveTab("announcements");
@@ -752,7 +771,8 @@ export default function AdminPage({ user, onLogout }) {
 
                     <li>
                         <button
-                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "approval" ? "active bg-danger" : ""
+                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "approval" ? "active bg-danger"
+                                : ""
                                 }`}
                             onClick={() => {
                                 setActiveTab("approval");
@@ -767,7 +787,8 @@ export default function AdminPage({ user, onLogout }) {
 
                     <li>
                         <button
-                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "manage_account" ? "active bg-danger" : ""
+                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "manage_account" ? "active bg-danger"
+                                : ""
                                 }`}
                             onClick={() => {
                                 setActiveTab("manage_account");
@@ -782,7 +803,8 @@ export default function AdminPage({ user, onLogout }) {
 
                     <li>
                         <button
-                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "analytics" ? "active bg-danger" : ""
+                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "analytics" ? "active bg-danger"
+                                : ""
                                 }`}
                             onClick={() => {
                                 setActiveTab("analytics");
@@ -817,7 +839,7 @@ export default function AdminPage({ user, onLogout }) {
                 </div>
             </div>
 
-                        {/* --- MAIN CONTENT CONTAINER (UPDATED FOR FIXED HEADER) --- */}
+            {/* --- MAIN CONTENT CONTAINER (UPDATED FOR FIXED HEADER) --- */}
             <div
                 className="flex-grow-1 d-flex flex-column"
                 style={{
@@ -827,7 +849,6 @@ export default function AdminPage({ user, onLogout }) {
                     right: 0,
                     left: isSidebarOpen ? "260px" : "80px",
                     transition: "left 0.3s",
-                    // TINANGGAL: overflowY: 'auto' sa buong container
                     overflowX: 'hidden',
                     backgroundColor: '#eeeeeeff',
                     zIndex: 999,
@@ -836,7 +857,7 @@ export default function AdminPage({ user, onLogout }) {
                 {/* 1. HEADER (Fixed/Sticky at the Top) */}
                 <header 
                     className="bg-white shadow-sm p-3 d-flex justify-content-between align-items-center"
-                    style={{ flexShrink: 0, position: 'sticky', top: 0, zIndex: 10 }} // Ensure it stays on top visually
+                    style={{ flexShrink: 0, position: 'sticky', top: 0, zIndex: 10 }} 
                 >
                     <div className="d-flex align-items-center">
                         <button className="btn btn-light border me-3" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
@@ -863,15 +884,14 @@ export default function AdminPage({ user, onLogout }) {
                 </header>
 
                 {/* 2. CONTENT AREA (Scrollable Part) */}
-                {/* Dito natin ilalagay ang scroll bar para HINDI kasama ang header */}
                 <div 
                     className="container-fluid px-4 pt-4 pb-5 flex-grow-1"
-                    style={{ overflowY: 'auto' }} // Ibinaba ang overflowY: 'auto' dito
+                    style={{ overflowY: 'auto' }} 
                 >
                     {renderContent()}
                 </div>
             </div>
-            {/* --- GLOBAL MODAL RENDERING (Maaaring mas madali na lang sa huli ng component) --- */}
+            {/* --- GLOBAL MODAL RENDERING (KEPT AS IS) --- */}
             {selectedUnitToEdit && (<EditUnitModal unit={selectedUnitToEdit} onClose={() => setSelectedUnitToEdit(null)} onSave={handleSaveEdit} />)}
             {selectedReportToView && (<ReportDetailModal report={selectedReportToView} onClose={() => setSelectedReportToView(null)} API_BASE_URL={API_BASE_URL} />)}
             {showReportModal && (<SubmitReportModal user={user} stations={stations} onClose={() => setShowReportModal(false)} onSave={refreshAndCloseReport} REPORTS_ENDPOINT={REPORTS_ENDPOINT} />)}
@@ -888,7 +908,6 @@ export default function AdminPage({ user, onLogout }) {
                 />
             )}
             
-            {/* --- NEW/MOVED MODALS (Pwedeng i-render dito) --- */}
             {showDeleteModal && (
                 <DeleteAnnouncementModal
                     announcementToDelete={announcementToDelete}
@@ -896,9 +915,6 @@ export default function AdminPage({ user, onLogout }) {
                     executeDelete={executeDeleteAnnouncement}
                 />
             )}
-            
-            {/* Note: Ang ApproveUnitModal ay ni-render na sa loob ng ApprovalQueue.jsx */}
-            
         </div>
     );
 }

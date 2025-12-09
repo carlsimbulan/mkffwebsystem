@@ -13,7 +13,6 @@ const AnnouncementModal = ({ user, onClose, onPost, API_BASE_URL, DEFAULT_AVATAR
         e.preventDefault();
         if (content.trim() === '') return;
         setIsPosting(true);
-
         try {
             // onPost is called with content, AdminPage handles the user ID
             await onPost(content.trim());
