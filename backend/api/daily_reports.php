@@ -2,13 +2,20 @@
 // daily_reports.php - Handles POST (Submission) and GET (Fetching Reports List)
 
 // 1. Setup CORS Headers
-header("Access-Control-Allow-Origin: *");
+$allowedOrigins = ["http://localhost:3000", "http://localhost:3001"];
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if (in_array($origin, $allowedOrigins)) {
+    header("Access-Control-Allow-Origin: $origin"); // Use allowed origin
+} 
+// If origin is not allowed, no Access-Control-Allow-Origin header is set, blocking the request.
+
 header("Content-Type: application/json; charset=UTF-8");
 // Allow both POST (for submission) and GET (for fetching the list)
 header("Access-Control-Allow-Methods: GET, POST");
 header("Access-Control-Max-Age: 3600");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
+// Include the database connection file (must provide $pdo)
 include '../db.php'; 
 
 // Check if $pdo variable is defined and connected (provided by db.php)
@@ -21,19 +28,18 @@ if (!isset($pdo)) {
 $response = ["status" => "error", "message" => ""];
 
 // -----------------------------------------------------------
-// A. HANDLE GET REQUEST (FETCHING REPORTS LIST) - UPDATED!
+// A. HANDLE GET REQUEST (FETCHING REPORTS LIST)
 // -----------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     try {
-        // 🌟 UPDATED QUERY: Gumamit ng LEFT JOIN para i-fetch ang full_name mula sa 'users' table.
-        // Tiyaking tama ang paggamit ng table/column names: daily_reports (dr), users (u), submitted_by, at username.
+        // Query to fetch reports and join with the users table to get the full name
         $sql = "SELECT
-                    dr.*,  -- Lahat ng columns mula sa daily_reports
-                    u.full_name AS submitted_by_name  -- Kukunin ang Full Name at papangalanang 'submitted_by_name'
+                    dr.*,  -- All columns from daily_reports
+                    u.full_name AS submitted_by_name  -- Kukunin ang Full Name
                 FROM
                     daily_reports dr
                 LEFT JOIN
-                    users u ON dr.submitted_by = u.username -- I-join base sa submitted_by (report) at username (user)
+                    users u ON dr.submitted_by = u.username -- Joins based on username
                 ORDER BY dr.created_at DESC";
 
         $stmt = $pdo->prepare($sql);
@@ -70,6 +76,7 @@ else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // --- 1. Process Form Data ---
     $station = $_POST['station'] ?? 'N/A';
+    // EXPECTED FROM REACT: the user's username
     $username = $_POST['username'] ?? 'N/A';
     $report_date = $_POST['date'] ?? date("Y-m-d");
     $shift = $_POST['shift'] ?? 'Day Shift';
@@ -80,6 +87,7 @@ else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $file_path_db = NULL; 
 
     // --- 2. Handle File Upload ---
+    // This key 'file' must match the key used in React's FormData.append()
     if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
         $file = $_FILES['file'];
         
@@ -92,10 +100,11 @@ else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $file_ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        $allowed_ext = array("jpg", "jpeg", "png", "pdf");
+        // Added .xlsx and .csv to allowed_ext as per React's accept attribute
+        $allowed_ext = array("jpg", "jpeg", "png", "pdf", "xlsx", "csv");
         
         if (!in_array($file_ext, $allowed_ext)) {
-            $response["message"] = "Only JPG, PNG, and PDF files are allowed.";
+            $response["message"] = "Only JPG, PNG, PDF, XLSX, and CSV files are allowed.";
             http_response_code(400); 
             echo json_encode($response);
             exit();
@@ -106,6 +115,7 @@ else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $target_file = $upload_dir . $new_file_name;
 
         if (move_uploaded_file($file['tmp_name'], $target_file)) {
+            // Only store the filename in the database (relative path from uploads directory)
             $file_path_db = $new_file_name; 
         } else {
             $response["message"] = "Failed to move uploaded file. Check folder permissions (must be 0777).";
@@ -118,7 +128,7 @@ else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // --- 3. Insert Data into Database ---
 
     $sql = "INSERT INTO daily_reports (station, report_date, shift, total_units_processed, total_ng, downtime_minutes, summary, attachment_filename, submitted_by) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
     try {
         $stmt = $pdo->prepare($sql);
@@ -132,7 +142,7 @@ else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $downtime_minutes, 
             $summary, 
             $file_path_db,
-            $username
+            $username // This is the submitted_by (username) that links to the users table
         ]);
 
         $response["status"] = "success";

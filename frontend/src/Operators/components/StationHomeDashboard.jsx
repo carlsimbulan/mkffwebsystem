@@ -1,10 +1,58 @@
-import React from 'react';
+import React, { useRef } from 'react';
+import 'bootstrap-icons/font/bootstrap-icons.css';
+// 💡 Import the new Doughnut Chart component
+import { StationSingleDoughnutChart } from './StationSingleDoughnutChart'; 
 
-export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, announcementCount }) {
+
+export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, announcementCount, logs, calculateMetrics }) {
+    
+    // 💡 Ref to access the Chart.js instance for exporting
+    const chartRef = useRef(null);
+
+    // Function to handle chart export using the exposed chart method
+    const handleExportChart = () => {
+        const chartInstance = chartRef.current;
+        if (!chartInstance) {
+             alert("Chart data not ready for export.");
+             return;
+        }
+        
+        try {
+            // Use the method exposed via useImperativeHandle
+            const imageURI = chartInstance.toBase64Image('image/png', 1);
+            
+            // Create a temporary link element to trigger the download
+            const a = document.createElement('a');
+            a.href = imageURI;
+            a.download = `Daily_Completion_Ratio_${currentStation}_${new Date().toISOString()}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+        } catch (err) {
+             console.error("Export failed:", err);
+             alert("Export failed due to browser security or drawing error.");
+        }
+    };
+    
+    // 🌟 NEW: Calculate total units and percentages based on homeStats (Current Station only) 🌟
+    const totalUnits = homeStats.completed + homeStats.inProgress + homeStats.ng;
+    
+    const calculateStationPercentage = (value) => {
+        if (totalUnits === 0) return '0%';
+        return ((value / totalUnits) * 100).toFixed(1) + '%';
+    };
+
+    const completedPercentage = calculateStationPercentage(homeStats.completed);
+    const inProgressPercentage = calculateStationPercentage(homeStats.inProgress);
+    const ngPercentage = calculateStationPercentage(homeStats.ng);
+    // --------------------------------------------------------------------------------------
+    
+    // --- RENDER FUNCTION ---
     return (
         <div className="d-flex flex-column h-100 animate-in fade-in pb-3">
 
-            {/* Header Section */}
+            {/* Header Section (Unchanged) */}
             <div className="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <h3 className="fw-bold text-dark mb-1" style={{ letterSpacing: '-0.5px' }}>{currentStation}</h3>
@@ -19,7 +67,7 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
                 </div>
             </div>
 
-            {/* 🔑 ANNOUNCEMENT ALERT (Uses the correct filtered count) */}
+            {/* 🔑 ANNOUNCEMENT ALERT (Unchanged) */}
             {announcementCount > 0 && (
                 <div className="alert alert-warning d-flex justify-content-between align-items-center shadow-sm mb-4 border-start border-4 border-warning" role="alert" style={{ borderRadius: '8px' }}>
                     <div className="d-flex align-items-center">
@@ -42,65 +90,105 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
             {/* 🔑 END ANNOUNCEMENT ALERT */}
 
 
-            {/* --- Stats Cards (Modern Enterprise Style) --- */}
-            {/* The alert is now positioned above this row. */}
+            {/* ----------------------------------------------------- */}
+            {/* --- NEW LAYOUT ROW: CHART (Left) & CARDS (Right) --- */}
+            {/* ----------------------------------------------------- */}
             <div className="row g-4 mb-4">
-                {/* Completed Card */}
-                <div className="col-md-4">
-                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-success" style={{ borderRadius: '12px' }}>
+                
+                {/* 1. LEFT COLUMN (CHART) - Takes 7/12 column width */}
+                <div className="col-lg-7">
+                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
+                        <div className="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3">
+                            <h5 className="mb-0 fw-bold text-dark"><i className="bi bi-pie-chart-fill me-2 text-primary"></i> Daily Completion Ratio (Total: {totalUnits})</h5>
+                            {/* Export Button */}
+                            <button 
+                                className="btn btn-outline-secondary btn-sm px-3 rounded-pill d-flex align-items-center"
+                                onClick={handleExportChart}
+                                title="Export Chart as PNG"
+                                disabled={!logs || totalUnits === 0} // Disabled if total units is zero
+                            >
+                                <i className="bi bi-download me-1"></i> Export
+                            </button>
+                        </div>
                         <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <div className="bg-success bg-opacity-10 text-success rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
-                                    <i className="bi bi-box-seam-fill fs-4"></i>
-                                </div>
-                                <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-2 py-1 small fw-normal">
-                                    Output
-                                </span>
-                            </div>
-                            <h2 className="fw-bold text-dark mb-0 display-6">{homeStats.completed}</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Completed Units</span>
+                            {/* Render the Doughnut Chart */}
+                            <StationSingleDoughnutChart 
+                                ref={chartRef}
+                                stationId={currentStation} 
+                                logs={logs} 
+                                calculateMetrics={calculateMetrics}
+                            />
                         </div>
                     </div>
                 </div>
 
-                {/* In Progress Card */}
-                <div className="col-md-4">
-                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-warning" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <div className="bg-warning bg-opacity-10 text-warning rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
-                                    <i className="bi bi-hourglass-split fs-4"></i>
+                {/* 2. RIGHT COLUMN (CARDS) - Takes 5/12 column width, stacked */}
+                <div className="col-lg-5">
+                    <div className="row g-4 h-100">
+                        {/* CARD 1: Completed Units */}
+                        <div className="col-12">
+                            <div className="card border-0 shadow-sm h-100 border-start border-4 border-success" style={{ borderRadius: '12px' }}>
+                                <div className="card-body p-4">
+                                    <div className="d-flex align-items-center justify-content-between mb-3">
+                                        <div className="bg-success bg-opacity-10 text-success rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
+                                            <i className="bi bi-box-seam-fill fs-4"></i>
+                                        </div>
+                                        {/* 🌟 PERCENTAGE DISPLAY 🌟 */}
+                                        <span className="badge bg-success text-white px-3 py-2 rounded-pill fw-bolder" style={{ fontSize: '1rem' }}>
+                                            {completedPercentage}
+                                        </span>
+                                    </div>
+                                    <h2 className="fw-bold text-dark mb-0 display-6">{homeStats.completed}</h2>
+                                    <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Completed Units</span>
                                 </div>
-                                <span className="badge bg-warning bg-opacity-10 text-warning rounded-pill px-2 py-1 small fw-normal">
-                                    Active
-                                </span>
                             </div>
-                            <h2 className="fw-bold text-dark mb-0 display-6">{homeStats.inProgress}</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>In Progress</span>
                         </div>
-                    </div>
-                </div>
 
-                {/* NG Card */}
-                <div className="col-md-4">
-                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-danger" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <div className="bg-danger bg-opacity-10 text-danger rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
-                                    <i className="bi bi-exclamation-octagon-fill fs-4"></i>
+                        {/* CARD 2: In Progress Card */}
+                        <div className="col-12">
+                            <div className="card border-0 shadow-sm h-100 border-start border-4 border-warning" style={{ borderRadius: '12px' }}>
+                                <div className="card-body p-4">
+                                    <div className="d-flex align-items-center justify-content-between mb-3">
+                                        <div className="bg-warning bg-opacity-10 text-warning rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
+                                            <i className="bi bi-hourglass-split fs-4"></i>
+                                        </div>
+                                        {/* 🌟 PERCENTAGE DISPLAY 🌟 */}
+                                        <span className="badge bg-warning text-dark px-3 py-2 rounded-pill fw-bolder" style={{ fontSize: '1rem' }}>
+                                            {inProgressPercentage}
+                                        </span>
+                                    </div>
+                                    <h2 className="fw-bold text-dark mb-0 display-6">{homeStats.inProgress}</h2>
+                                    <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>In Progress</span>
                                 </div>
-                                <span className="badge bg-danger bg-opacity-10 text-danger rounded-pill px-2 py-1 small fw-normal">
-                                    Defects
-                                </span>
                             </div>
-                            <h2 className="fw-bold text-danger mb-0 display-6">{homeStats.ng}</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Total NG</span>
+                        </div>
+
+                        {/* CARD 3: NG Card */}
+                        <div className="col-12">
+                            <div className="card border-0 shadow-sm h-100 border-start border-4 border-danger" style={{ borderRadius: '12px' }}>
+                                <div className="card-body p-4">
+                                    <div className="d-flex align-items-center justify-content-between mb-3">
+                                        <div className="bg-danger bg-opacity-10 text-danger rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
+                                            <i className="bi bi-exclamation-octagon-fill fs-4"></i>
+                                        </div>
+                                        {/* 🌟 PERCENTAGE DISPLAY 🌟 */}
+                                        <span className="badge bg-danger text-white px-3 py-2 rounded-pill fw-bolder" style={{ fontSize: '1rem' }}>
+                                            {ngPercentage}
+                                        </span>
+                                    </div>
+                                    <h2 className="fw-bold text-danger mb-0 display-6">{homeStats.ng}</h2>
+                                    <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Total NG</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+            {/* ----------------------------------------------------- */}
+            {/* --- END LAYOUT ROW: CHART & CARDS --- */}
+            {/* ----------------------------------------------------- */}
 
-            {/* --- Start Scanning Hero Section --- */}
+            {/* --- Start Scanning Hero Section (BELOW THE MAIN ROW) --- */}
             <div className="card border-0 shadow-sm flex-grow-1 position-relative overflow-hidden"
                 style={{ borderRadius: '16px', background: '#fff', border: '1px solid #f1f5f9' }}>
 

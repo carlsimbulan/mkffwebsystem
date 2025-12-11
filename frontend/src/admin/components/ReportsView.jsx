@@ -11,6 +11,26 @@ export function ReportsView({
     handleViewReport,
     getTodayDate
 }) {
+    // 1. Prepare Stations array, adding the 'Overall Report' option for filtering (best practice)
+    const enhancedFilterStations = [
+        { id: 'All', name: 'All Stations' }, 
+        { id: 'overall', name: 'Overall Reports Only' }, // Added filter for overall reports
+        ...stations
+    ];
+
+    // Helper to find station name or display custom tag (for overall reports)
+    const getStationDisplay = (reportId) => {
+        if (reportId === 'overall') {
+            return (
+                <span className="badge bg-warning text-dark px-2 py-1 rounded-pill fw-bold">
+                    <i className="bi bi-gear-fill me-1"></i> OVERALL
+                </span>
+            );
+        }
+        const station = stations.find(s => s.id === reportId);
+        return station ? station.name : `Station ${reportId}`;
+    };
+
     return (
         <div className="animate-in fade-in pb-5">
             {/* Header */}
@@ -46,12 +66,19 @@ export function ReportsView({
                         <i className="bi bi-funnel text-secondary me-2 fs-5"></i>
                         <select
                             className="form-select border-0 bg-light fw-bold text-secondary"
-                            style={{ maxWidth: '200px' }}
+                            style={{ maxWidth: '250px' }} // Increased width to fit 'Overall Reports Only'
                             value={reportFilterStationId}
                             onChange={(e) => setReportFilterStationId(e.target.value)}
                         >
-                            <option value="All">All Stations</option>
-                            {stations.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
+                            {enhancedFilterStations.map(s => (
+                                <option 
+                                    key={s.id} 
+                                    value={s.id}
+                                    className={s.id === 'overall' ? 'fw-bold text-primary' : ''}
+                                >
+                                    {s.name}
+                                </option>
+                            ))}
                         </select>
                     </div>
                     <div className="text-muted small ms-auto">
@@ -78,11 +105,11 @@ export function ReportsView({
                                 <tr key={report.id}>
                                     <td className="ps-4">
                                         <div className="d-flex align-items-center">
-                                            <div className="bg-primary bg-opacity-10 text-primary rounded p-2 me-3">
-                                                <i className="bi bi-layers-fill"></i>
+                                            <div className={`rounded p-2 me-3 ${report.station === 'overall' ? 'bg-warning bg-opacity-10 text-warning' : 'bg-primary bg-opacity-10 text-primary'}`}>
+                                                <i className={`bi ${report.station === 'overall' ? 'bi-journals' : 'bi-layers-fill'}`}></i>
                                             </div>
                                             <div>
-                                                <div className="fw-bold text-dark">{report.station}</div>
+                                                <div className="fw-bold text-dark">{getStationDisplay(report.station)}</div>
                                                 <div className="small text-muted">{report.shift}</div>
                                             </div>
                                         </div>
@@ -124,8 +151,9 @@ export function ReportsView({
                 </div>
             </div>
 
-            <style jsx>{`
-                .hover-scale:hover { transform: scale(1.02); }
+            {/* Replaced <style jsx> with standard <style> to eliminate the warning */}
+            <style>{`
+                .hover-scale:hover { transform: scale(1.02); transition: transform 0.2s; }
                 .hover-primary:hover { background-color: #0d6efd; color: white !important; border-color: #0d6efd !important; }
             `}</style>
         </div>

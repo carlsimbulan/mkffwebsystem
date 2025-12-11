@@ -104,6 +104,8 @@ export default function AdminPage({ user, onLogout }) {
     // FIX: Initialize with useState(new Set())
     const [lastSeenReportIds, setLastSeenReportIds] = useState(new Set()); 
     const [highlightedUnitId, setHighlightedUnitId] = useState(null);
+    // NEW STATE: For New Reports Today Count
+    const [newReportsToday, setNewReportsToday] = useState(0); 
 
     const [announcements, setAnnouncements] = useState([]); 
     const [showPostModal, setShowPostModal] = useState(false); 
@@ -136,87 +138,66 @@ export default function AdminPage({ user, onLogout }) {
     };
 
     // --- CHECK DELAYED UNITS AND REPORTS (KEPT AS IS) ---
-    const checkDelayedUnitsAndReports = useCallback((allUnits, allReports) => {
-        const now = new Date();
-        const newDelayedNotifications = [];
-        const currentDelayedUnitIds = new Set();
+    const checkDelayedUnitsAndReports = useCallback((allUnits) => {
+    // TANGGALIN ang allReports dependency at parameter.
+    const now = new Date();
+    const newDelayedNotifications = [];
+    const currentDelayedUnitIds = new Set();
 
-        // 1. Delayed Units Check
-        const inProgressUnits = allUnits.filter(l => l.status === 'In Progress');
+    // 1. Delayed Units Check (NO CHANGE)
+    const inProgressUnits = allUnits.filter(l => l.status === 'In Progress');
 
-        inProgressUnits.forEach(unit => {
-            const stationId = unit.station;
-            // Flexible check for threshold
-            const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationId] || DELAY_THRESHOLDS_MINUTES[stationId.replace(' ', '')] || 0;
+    inProgressUnits.forEach(unit => {
+        const stationId = unit.station;
+        // Flexible check for threshold
+        const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationId] || DELAY_THRESHOLDS_MINUTES[stationId.replace(' ', '')] || 0;
 
-            if (thresholdMinutes > 0) {
-                const createdAt = new Date(unit.created_at);
-                const elapsedMilliseconds = now.getTime() - createdAt.getTime();
-                const elapsedMinutes = Math.floor(elapsedMilliseconds / (1000 * 60));
+        if (thresholdMinutes > 0) {
+            const createdAt = new Date(unit.created_at);
+            const elapsedMilliseconds = now.getTime() - createdAt.getTime();
+            const elapsedMinutes = Math.floor(elapsedMilliseconds / (1000 * 60));
 
-                if (elapsedMinutes > thresholdMinutes) {
-                    currentDelayedUnitIds.add(unit.id);
-                    newDelayedNotifications.push({
-                        id: `delayed-${unit.id}`,
-                        type: 'DelayedUnit',
-                        title: `⚠️ Unit Delay Alert at ${stationId}`,
-                        message: `Unit ${unit.device_serial_no} has been In Progress for ${elapsedMinutes} mins (Limit: ${thresholdMinutes} mins).`,
-                        timestamp: now.toISOString(),
-                        unitId: unit.id,
-                        stationId: stationId,
-                    });
-                }
-            }
-        });
-
-        // 2. New Reports Check
-        const allFetchedReportIds = new Set(allReports.map(r => r.id));
-        const newReportNotifications = [];
-
-        allReports.forEach(report => {
-            // ERROR LINE WAS HERE (lastSeenReportIds was undefined before fix)
-            if (!lastSeenReportIds.has(report.id)) { 
-                newReportNotifications.push({
-                    id: `report-${report.id}`,
-                    type: 'NewReport',
-                    title: `📄 New Report from ${report.station} (${report.shift})`,
-                    message: `Processed: ${report.total_units_processed}, NG: ${report.total_ng}. Submitted by: ${report.submitted_by}.`,
-                    timestamp: new Date(report.created_at).toISOString(),
-                    reportId: report.id,
+            if (elapsedMinutes > thresholdMinutes) {
+                currentDelayedUnitIds.add(unit.id);
+                newDelayedNotifications.push({
+                    id: `delayed-${unit.id}`,
+                    type: 'DelayedUnit',
+                    title: `⚠️ Unit Delay Alert at ${stationId}`,
+                    message: `Unit ${unit.device_serial_no} has been In Progress for ${elapsedMinutes} mins (Limit: ${thresholdMinutes} mins).`,
+                    timestamp: now.toISOString(),
+                    unitId: unit.id,
+                    stationId: stationId,
                 });
             }
-        });
+        }
+    });
+
+    
 
         // 3. Merge Notifications
-        const existingNotifications = notifications.filter(n => {
-            if (n.type === 'DelayedUnit') {
-                return currentDelayedUnitIds.has(n.unitId);
-            }
-            return n.type === 'NewReport';
-        });
+       const existingDelayedNotifications = notifications.filter(n => {
+        // Tanging DelayedUnit notifications lang ang i-check
+        return n.type === 'DelayedUnit' && currentDelayedUnitIds.has(n.unitId);
+    });
 
-        const updatedDelayedNotifications = newDelayedNotifications.filter(newN =>
-            !existingNotifications.some(existingN => existingN.id === newN.id)
-        );
+    const updatedDelayedNotifications = newDelayedNotifications.filter(newN =>
+        !existingDelayedNotifications.some(existingN => existingN.id === newN.id)
+    );
+    
+    // Ang final notifications array ay naglalaman lang ng Delayed Units
+    setNotifications([
+        ...existingDelayedNotifications,
+        ...updatedDelayedNotifications,
+    ]);
 
-        setNotifications([
-            ...existingNotifications.filter(n => n.type === 'DelayedUnit'),
-            ...updatedDelayedNotifications,
-            ...existingNotifications.filter(n => n.type === 'NewReport'),
-            ...newReportNotifications,
-        ]);
+    // TANGGALIN: lastSeenReportIds logic ay hindi na kailangan
+    // TANGGALIN: setLastSeenReportIds logic ay hindi na kailangan
 
-        // Fix: Use setState setter for Map/Set
-        setLastSeenReportIds(prev => {
-            const newSet = new Set(prev);
-            allFetchedReportIds.forEach(id => newSet.add(id));
-            return newSet;
-        });
-
-    }, [notifications, lastSeenReportIds]);
+// TANGGALIN: Ang 'lastSeenReportIds' mula sa dependency array
+}, [notifications]);
 
 
-    // --- FETCH DATA (UPDATED TO INCLUDE HISTORY LOGS) ---
+    // --- FETCH DATA (UPDATED TO INCLUDE HISTORY LOGS AND NEW REPORT COUNT) ---
     const fetchData = async () => {
         const isBackgroundUpdate = logs.length > 0;
 
@@ -247,6 +228,15 @@ export default function AdminPage({ user, onLogout }) {
             if (JSON.stringify(fetchedReports) !== JSON.stringify(dailyReportsList)) {
                 setDailyReportsList(fetchedReports);
             }
+
+            // --- NEW: Calculate New Reports Today ---
+            const today = getTodayDate();
+            const reportsToday = fetchedReports.filter(report => {
+                const reportDatePart = report.report_date ? report.report_date.split(' ')[0] : null;
+                return reportDatePart === today;
+            }).length;
+            setNewReportsToday(reportsToday);
+            // ---------------------------------------
 
             // 3. Fetch User List
             const usersRes = await axios.get(USER_MANAGEMENT_ENDPOINT);
@@ -538,7 +528,7 @@ export default function AdminPage({ user, onLogout }) {
     const headerAvatarSrc = user.avatar_url ? `${AVATAR_UPLOAD_PATH}${user.avatar_url}` : DEFAULT_AVATAR_PATH;
     const headerFullName = user.full_name || user.username || 'Admin';
 
-    // --- RENDER CONTENT (UPDATED to pass unitHistoryLogs and live logs) ---
+    // --- RENDER CONTENT (UPDATED to pass newReportsToday) ---
     const renderContent = () => {
         if (loading && logs.length === 0) {
             return (<div className="text-center py-5"><div className="spinner-border text-danger" role="status"></div><p className="mt-3 text-muted">Loading real-time production data...</p></div>);
@@ -560,6 +550,7 @@ export default function AdminPage({ user, onLogout }) {
                         nextChart={nextChart}
                         prevChart={prevChart}
                         handleMonitorStation={handleMonitorStation}
+                        newReportsToday={newReportsToday} // <-- NEW PROP: Passed the calculated count
                     />
                 );
 
@@ -913,6 +904,14 @@ export default function AdminPage({ user, onLogout }) {
                     announcementToDelete={announcementToDelete}
                     onClose={() => setShowDeleteModal(false)}
                     executeDelete={executeDeleteAnnouncement}
+                />
+            )}
+            {/* The Approval Modal must also be rendered here if the `ApprovalQueue` is not rendered/used */}
+            {showApproveModal && selectedLogToApprove && (
+                <ApproveUnitModal
+                    selectedLogToApprove={selectedLogToApprove}
+                    onClose={() => setShowApproveModal(false)}
+                    onApprove={executeApproval}
                 />
             )}
         </div>

@@ -1,5 +1,16 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ViewUserModal } from './ViewUserModal'; // Existing Modal
+
+// Helper function to extract the station number for correct numerical sorting
+const getStationNumber = (station) => {
+    // 999 is used as a high number to push 'Not Assigned' to the end of a group
+    if (!station || station.toLowerCase().includes('not assigned')) return 999; 
+    
+    // Extract the number from strings like "Station1" or "Station 1"
+    const match = station.match(/(\d+)$/); 
+    // Return the number, or 999 if extraction fails
+    return match ? parseInt(match[1], 10) : 999; 
+};
 
 export function UserManagement({
     user,
@@ -14,6 +25,45 @@ export function UserManagement({
     setShowViewModal,
     handleEditUser
 }) {
+    // Implement Custom Sorting Logic
+    const sortedUserList = useMemo(() => {
+        if (!userList || userList.length === 0) {
+            return [];
+        }
+
+        const listCopy = [...userList];
+
+        return listCopy.sort((a, b) => {
+            // Helper function for assigning custom sort priority based on role
+            const getRolePriority = (role) => {
+                if (role === 'Administrator') return 1;
+                if (role === 'IT Assistant') return 2;
+                if (role === 'Operator') return 3;
+                return 4; // Other roles go last
+            };
+
+            const priorityA = getRolePriority(a.role);
+            const priorityB = getRolePriority(b.role);
+
+            // 1. Sort by Role Priority (Admin -> IT Assistant -> Operator -> Other)
+            if (priorityA !== priorityB) {
+                return priorityA - priorityB;
+            }
+
+            // 2. If roles are the same, sort by Station Number (numerical ascending, 'Not Assigned' last)
+            const stationNumA = getStationNumber(a.station);
+            const stationNumB = getStationNumber(b.station);
+
+            if (stationNumA !== stationNumB) {
+                return stationNumA - stationNumB;
+            }
+            
+            // 3. Fallback: Sort by user ID if all previous criteria are identical (ensures stable sort)
+            return a.id - b.id; 
+        });
+    }, [userList]);
+
+    // The rest of the component remains the same, only using sortedUserList for rendering
     return (
         <div className="animate-in fade-in pb-5">
             {/* Header */}
@@ -50,10 +100,29 @@ export function UserManagement({
                             </tr>
                         </thead>
                         <tbody className="border-top-0">
-                            {userList.length > 0 ? userList.map(u => {
-                                const isMe = u.id === user.id; // Assuming 'user' is the logged-in admin
-                                const roleColor = u.role === 'Administrator' ? 'danger' : 'primary';
-                                const roleIcon = u.role === 'Administrator' ? 'bi-shield-lock-fill' : 'bi-person-badge-fill';
+                            {/* Use sortedUserList for rendering */}
+                            {sortedUserList.length > 0 ? sortedUserList.map(u => {
+                                const isMe = u.id === user.id; 
+                                
+                                // Dynamic styling based on the roles observed in your data
+                                let roleColor;
+                                let roleIcon;
+                                
+                                switch (u.role) {
+                                    case 'Administrator':
+                                        roleColor = 'danger';
+                                        roleIcon = 'bi-shield-lock-fill';
+                                        break;
+                                    case 'IT Assistant':
+                                        roleColor = 'info';
+                                        roleIcon = 'bi-person-gear-fill';
+                                        break;
+                                    case 'Operator':
+                                    default:
+                                        roleColor = 'primary';
+                                        roleIcon = 'bi-person-badge-fill';
+                                        break;
+                                }
 
                                 return (
                                     <tr key={u.id}>
@@ -105,22 +174,20 @@ export function UserManagement({
                                         <td className="text-center">
                                             <div className="d-flex justify-content-center gap-2">
                                                 <button
-                                                    className="btn btn-sm btn-light border text-primary hover-primary rounded-circle"
-                                                    style={{ width: '32px', height: '32px', padding: 0 }}
+                                                    className="btn btn-sm btn-outline-primary"
                                                     onClick={() => handleViewUser(u)}
                                                     title="View Details"
                                                 >
-                                                    <i className="bi bi-eye-fill"></i>
+                                                    View
                                                 </button>
 
                                                 <button
-                                                    className="btn btn-sm btn-light border text-danger hover-danger rounded-circle"
-                                                    style={{ width: '32px', height: '32px', padding: 0 }}
+                                                    className="btn btn-sm btn-outline-danger"
                                                     onClick={() => handleConfirmDeleteUser(u)}
                                                     disabled={u.id === 1 || isMe}
                                                     title="Delete User"
                                                 >
-                                                    <i className="bi bi-trash-fill"></i>
+                                                    Delete
                                                 </button>
                                             </div>
                                         </td>

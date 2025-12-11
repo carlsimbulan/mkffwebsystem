@@ -10,7 +10,7 @@ export const NotificationBell = ({ notifications, onClick }) => {
     return (
         <div className="notification-bell"> 
             <button
-                className="btn btn-light border position-relative"
+                className={`btn btn-light border position-relative ${totalCount > 0 ? 'shaking-alert-bell' : ''}`}
                 type="button"
                 // Mahalaga: Ito ang tatawag sa function na magpapalit ng tab sa AdminPage
                 onClick={onClick} 
@@ -26,6 +26,30 @@ export const NotificationBell = ({ notifications, onClick }) => {
                     </span>
                 )}
             </button>
+            
+            {/* Custom Style for Bell Animation */}
+            <style jsx>{`
+                /* Keyframes for Bell Pulse/Shake Effect (Similar to Approvals, but applied to the button itself) */
+                @keyframes pulse-danger-bell {
+                    0% {
+                        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4);
+                        transform: scale(1);
+                    }
+                    50% {
+                        box-shadow: 0 0 0 6px rgba(220, 53, 69, 0);
+                        transform: scale(1.05); /* Slightly bigger pulse */
+                    }
+                    100% {
+                        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+                        transform: scale(1);
+                    }
+                }
+
+                /* Apply stronger pulse effect when notifications are present */
+                .shaking-alert-bell {
+                    animation: pulse-danger-bell 2s infinite;
+                }
+            `}</style>
         </div>
     );
 };

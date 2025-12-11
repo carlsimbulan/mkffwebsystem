@@ -120,6 +120,16 @@ export default function StationDashboard({ user, onLogout }) {
 
     const currentStation = getStationName();
 
+    // 🌟 CHART METRICS FUNCTION DEFINITION (CORRECT HOOK PLACEMENT) 🌟
+    const calculateMetrics = useCallback((stationId, logs) => {
+        // This function calculates metrics needed by the chart based on the passed logs (unitList)
+        const completedUnits = logs.filter(log => log.status === 'Completed').length;
+        const ngUnits = logs.filter(log => log.status === 'No Good (NG)').length;
+        
+        return { completedUnits, ngUnits };
+    }, []); 
+    // ---------------------------------------------------------------------
+
     // --- HELPER FUNCTION: RESET FORM ---
     const resetForm = () => {
         setFormData({ model: "", revision: "", baseUnitKittingNo: "", assemblyNo: "", deviceSerialNo: "", accessoryKittingNo: "", status: "In Progress", remarks: "" });
@@ -523,7 +533,8 @@ export default function StationDashboard({ user, onLogout }) {
 
     if (!user) return <div className="d-flex justify-content-center align-items-center min-vh-100 text-muted">Initializing session...</div>;
     
-    // 1. Calculate Stats for Dashboard Tab
+    
+    // 2. Calculate Stats for Dashboard Tab
     const homeStats = {
         completed: unitList.filter(u => u.status === 'Completed').length,
         inProgress: unitList.filter(u => u.status === 'In Progress').length,
@@ -544,6 +555,11 @@ export default function StationDashboard({ user, onLogout }) {
                         homeStats={homeStats}
                         setActiveTab={setActiveTab}
                         announcementCount={unreadCount} // 🔑 Pass the UNREAD count
+                        // 🌟 ADDED CHART PROPS (Fix for TypeError) 🌟
+                        logs={unitList} // The unitList when activeTab is 'home' contains all units for currentStation
+                        calculateMetrics={calculateMetrics} // Pass the defined function
+                        // Pass minimal station info, required by the chart component's original design
+                        stations={[{ id: currentStation, name: currentStation }]} 
                     />
                 );
 

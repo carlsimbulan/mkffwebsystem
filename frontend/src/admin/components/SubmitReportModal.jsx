@@ -10,7 +10,9 @@ const getTodayDate = () => {
 
 // --- Submit Report Modal ---
 export const SubmitReportModal = ({ user, stations, onClose, onSave, REPORTS_ENDPOINT }) => {
-    const defaultStationId = user.station || (stations.length > 0 ? stations[0].id : '');
+    
+    // 💡 UPDATE: Set the defaultStationId to 'overall' if user.station is not set
+    const defaultStationId = user.station || (stations.length > 0 ? stations[0].id : 'overall');
     
     const [formData, setFormData] = useState({
         station: defaultStationId,
@@ -48,19 +50,19 @@ export const SubmitReportModal = ({ user, stations, onClose, onSave, REPORTS_END
         const dataToSend = new FormData();
         
         // Add metadata
-        dataToSend.append('submitted_by', user.full_name || user.username || 'Unknown');
-        dataToSend.append('report_date', getTodayDate());
+        dataToSend.append('username', user.username || 'Unknown');
+        dataToSend.append('date', getTodayDate()); 
         
         // Add form data
         dataToSend.append('shift', formData.shift);
-        dataToSend.append('station', formData.station);
+        dataToSend.append('station', formData.station); // This will now send 'overall' if selected
         dataToSend.append('total_units_processed', formData.total_units_processed);
         dataToSend.append('total_ng', formData.total_ng || 0);
         dataToSend.append('downtime_minutes', formData.downtime_minutes || 0);
         dataToSend.append('summary', formData.summary);
 
         if (formData.attachment_file) {
-            dataToSend.append('attachment', formData.attachment_file, formData.attachment_file.name);
+            dataToSend.append('file', formData.attachment_file, formData.attachment_file.name);
         }
 
         try {
@@ -69,7 +71,8 @@ export const SubmitReportModal = ({ user, stations, onClose, onSave, REPORTS_END
             onClose();
         } catch (err) {
             console.error("Report submission failed:", err);
-            setError(err.response?.data?.message || "Failed to submit report. Please check the network connection and server endpoint.");
+            const errorMessage = err.response?.data?.message || err.message || "Failed to submit report. Please check the network connection and server endpoint.";
+            setError(errorMessage);
         } finally {
             setIsSubmitting(false);
         }
@@ -108,6 +111,8 @@ export const SubmitReportModal = ({ user, stations, onClose, onSave, REPORTS_END
                                     <label className="form-label fw-medium small">Station <span className="text-danger">*</span></label>
                                     <select className="form-select" name="station" value={formData.station} onChange={handleChange} required>
                                         <option value="">Select Station</option>
+                                        {/* 💡 UPDATE: Added the 'Overall Report' option here */}
+                                        <option value="overall" className='fw-bold text-primary'>[ Overall Report ]</option>
                                         {stations.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
                                     </select>
                                 </div>
@@ -131,7 +136,7 @@ export const SubmitReportModal = ({ user, stations, onClose, onSave, REPORTS_END
                                 <div className="col-md-4 mb-3">
                                     <label className="form-label fw-medium small">Downtime (Minutes)</label>
                                     <input type="number" className="form-control" name="downtime_minutes" value={formData.downtime_minutes} onChange={handleChange} min="0" placeholder="0" />
-                                                                </div>
+                                </div>
                             </div>
 
                             <h6 className="fw-bold text-primary mb-3 mt-4 pt-2 border-top">Summary & Attachments</h6>
