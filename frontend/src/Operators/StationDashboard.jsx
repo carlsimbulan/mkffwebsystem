@@ -820,6 +820,49 @@ export default function StationDashboard({ user, onLogout }) {
                     </div>
                 </div>
             </div>
+
+            {/* CSS Helper para sa Hover effects ng Sidebar (and Scrollbar) */}
+{/* CSS Helper para sa Hover effects ng Sidebar (and Scrollbar) */}
+        <style jsx>{`
+            .hover-white:hover { color: white !important; background: rgba(255,255,255,0.1) !important; }
+            .fade-in-up { animation: fadeInUp 0.5s ease-out; }
+            @keyframes fadeInUp {
+                from { opacity: 0; transform: translateY(20px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
+            /* 🚨 ULTRA-THIN SCROLLBAR OVERRIDE: 1 PIXEL LAMANG */
+            
+            /* Target ang buong scrollbar area (Chrome, Safari, Edge) */
+            .custom-scrollbar::-webkit-scrollbar {
+                width: 1px !important; /* ⬅️ BINABA SA 1 PIXEL: Sobrang Nipis! */
+                height: 1px !important;
+            }
+
+            /* Target ang drag handle */
+            .custom-scrollbar::-webkit-scrollbar-thumb {
+                background-color: rgba(255, 255, 255, 0.1) !important; /* ⬅️ Sobrang transparent */
+                border-radius: 10px !important;
+            }
+            
+            /* Target ang track (background) */
+            .custom-scrollbar::-webkit-scrollbar-track {
+                background: transparent !important;
+            }
+
+            /* Fix para sa Firefox */
+            .custom-scrollbar {
+                scrollbar-width: none; /* Ginagamit ng Firefox para itago ang default scrollbar track */
+                scrollbar-color: rgba(255, 255, 255, 0.1) transparent !important;
+                -ms-overflow-style: none; /* Fix para sa Internet Explorer/Edge (pre-Chromium) */
+            }
+            
+            /* Optional: Para sa mga nagtatago ng scrollbar kapag hindi ginagamit (Advanced look) */
+            .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+                background-color: rgba(255, 255, 255, 0.3) !important; /* Magiging mas visible kapag hinover */
+            }
+            
+        `}</style>
             
             {/* CSS Helper para sa Hover effects ng Sidebar */}
             <style jsx>{`

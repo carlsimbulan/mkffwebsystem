@@ -2,7 +2,7 @@ import React from 'react';
 
 export const UnitListTable = ({ units, listStatus, loading, error, onEdit }) => {
     // Determine if the table should display the 'ACTIONS' column based on status.
-    const canEdit = ['in progress', 'completed', 'no good', 'pending'].some(s => listStatus.toLowerCase().includes(s.replace(' (ng)', '')));
+    const canEdit = ['in progress', 'completed', 'no good'].some(s => listStatus.toLowerCase().includes(s.replace(' (ng)', '')));
     
     // Header for the content section
     const displayTitle = listStatus.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');

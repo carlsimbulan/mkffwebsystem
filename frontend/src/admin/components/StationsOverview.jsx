@@ -239,12 +239,13 @@ const RenderStationGrid = ({ stations, calculateMetrics, handleMonitorStation, h
                     <p className="text-muted small mb-0">Overview of all {namedStations.length} production stations.</p>
                 </div>
                 {/* Overall History Button (Black Button) */}
-                <button
-                    className="btn btn-dark btn-sm rounded-pill px-4 fw-bold shadow-sm hover-lift"
-                    onClick={() => setActiveTab('overall_history')}
-                >
-                    View Overall History
-                </button>
+                        <button
+            className="btn btn-primary btn-sm rounded-pill px-4 fw-bold shadow-sm hover-lift"
+            onClick={() => setActiveTab('overall_history')}
+        >
+            View Overall History
+        </button>
+
             </div>
 
             {/* Grid Container */}
