@@ -28,6 +28,9 @@ import { UserManagement } from './components/UserManagement';
 import { ApproveUnitModal } from './components/ApproveUnitModal';
 import { DeleteAnnouncementModal } from './components/DeleteAnnouncementModal';
 
+import { Shipment } from './components/Shipment';
+
+import NoGoodUnits from './components/NoGoodUnits';
 
 // REGISTER CHART COMPONENTS GLOBALLY
 ChartJS.register(
@@ -647,9 +650,21 @@ export default function AdminPage({ user, onLogout }) {
                 );
 
 
-            case "analytics":
-            case "guide":
-                return (<div className="text-center py-5 text-muted"><i className="bi bi-cone-striped display-1"></i><h3 className="mt-3">Under Construction</h3><p>The module **{activeTab}** is currently being developed.</p></div>);
+            case "no_good_list":
+                return (
+                    <NoGoodUnits
+                        logs={logs} // Pass the main logs data
+                        userList={userList}
+                        handleEditClick={handleEditClick} // Pass the edit handler for potential rework/update
+                    />
+                );
+            
+                case "shipment": // <<< NEW CASE
+                return (
+                    <Shipment 
+                        liveUnitLogs={logs} // Pass the main unit logs
+                    />
+                );
 
             default:
                 return (<div className="alert alert-info text-center"><i className="bi bi-info-circle-fill me-2"></i>The module **{activeTab}** is under development.</div>);
@@ -672,142 +687,172 @@ export default function AdminPage({ user, onLogout }) {
                     left: 0
                 }}
             >
-                {/* TOP LOGO */}
-                <div className="d-flex align-items-center mb-3 text-white overflow-hidden">
-                    <img
-                        src={logo}
-                        alt="MKFF Admin Logo"
-                        style={{ height: "3rem" }}
-                        className={isSidebarOpen ? "me-3" : ""}
-                    />
-                    {isSidebarOpen && <span className="fs-5 fw-bold">MKFF Admin</span>}
-                </div>
+   
+    {/* TOP LOGO */}
+    <div className="d-flex align-items-center mb-3 text-white overflow-hidden">
+        <img
+            src={logo}
+            alt="MKFF Admin Logo"
+            style={{ height: "3rem" }}
+            className={isSidebarOpen ? "me-3" : ""}
+        />
+        {isSidebarOpen && <span className="fs-5 fw-bold">MKFF Admin</span>}
+    </div>
 
-                <hr className="border-secondary" />
+    <hr className="border-secondary" />
 
-                {/* MENU */}
-                <ul className="nav nav-pills flex-column mb-3">
-                    <li>
-                        <button
-                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "dashboard" ? "active bg-danger" : ""
-                                }`}
-                            onClick={() => {
-                                setActiveTab("dashboard");
-                                setStationMonitorId(null);
-                                setReportFilterStationId("All");
-                                setStationHistoryId(null);
-                                setHighlightedUnitId(null);
-                            }}
-                        >
-                            <i className="bi bi-speedometer2"></i>
-                            {isSidebarOpen && "Dashboard"}
-                        </button>
-                    </li>
+    {/* MENU: Naka-ayos at pinaganda ang pagkakasunod-sunod */}
+    <ul className="nav nav-pills flex-column mb-3">
+        {/* 1. Dashboard (Overview) */}
+        <li>
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "dashboard" ? "active bg-danger" : ""
+                    }`}
+                onClick={() => {
+                    setActiveTab("dashboard");
+                    setStationMonitorId(null);
+                    setReportFilterStationId("All");
+                    setStationHistoryId(null);
+                    setHighlightedUnitId(null);
+                }}
+            >
+                <i className="bi bi-speedometer2"></i>
+                {isSidebarOpen && "Dashboard"}
+            </button>
+        </li>
 
-                    <li>
-                        <button
-                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
-                                (activeTab === "stations" || activeTab === "station_monitor" || activeTab === "overall_history") ? "active bg-danger" : "" 
-                                }`}
-                            onClick={() => {
-                                setActiveTab("stations");
-                                setStationMonitorId(null);
-                                setReportFilterStationId("All");
-                                setStationHistoryId(null);
-                                setHighlightedUnitId(null);
-                            }}
-                        >
-                            <i className="bi bi-grid-3x3-gap"></i>
-                            {isSidebarOpen && "Stations"}
-                        </button>
-                    </li>
+        {/* 2. Stations (Live Monitoring) */}
+        <li>
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
+                    (activeTab === "stations" || activeTab === "station_monitor" || activeTab === "overall_history") ? "active bg-danger" : "" 
+                    }`}
+                onClick={() => {
+                    setActiveTab("stations");
+                    setStationMonitorId(null);
+                    setReportFilterStationId("All");
+                    setStationHistoryId(null);
+                    setHighlightedUnitId(null);
+                }}
+            >
+                <i className="bi bi-grid-3x3-gap"></i>
+                {isSidebarOpen && "Stations"}
+            </button>
+        </li>
 
-                    <li>
-                        <button
-                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "reports" ? "active bg-danger"
-                                : ""
-                                }`}
-                            onClick={() => {
-                                setActiveTab("reports");
-                                setStationMonitorId(null);
-                                setReportFilterStationId("All");
-                                setStationHistoryId(null);
-                                setHighlightedUnitId(null);
-                            }}
-                        >
-                            <i className="bi bi-file-text"></i>
-                            {isSidebarOpen && "Reports"}
-                        </button>
-                    </li>
+        {/* 3. Shipment (Operational Output) */}
+        <li> 
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "shipment" ? "active bg-danger"
+                    : ""
+                    }`}
+                onClick={() => {
+                    setActiveTab("shipment");
+                    setStationHistoryId(null);
+                    setHighlightedUnitId(null);
+                    setReportFilterStationId("All");
+                }}
+            >
+                <i className="bi bi-truck-flatbed"></i>
+                {isSidebarOpen && "Shipment"}
+            </button>
+        </li>
 
-                    {/* --- ANNOUNCEMENT BOARD --- */}
-                    <li>
-                        <button
-                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "announcements" ? "active bg-danger"
-                                : ""
-                                }`}
-                            onClick={() => {
-                                setActiveTab("announcements");
-                                setStationMonitorId(null);
-                                setReportFilterStationId("All");
-                                setStationHistoryId(null);
-                                setHighlightedUnitId(null);
-                            }}
-                        >
-                            <i className="bi bi-megaphone-fill"></i>
-                            {isSidebarOpen && "Announcement Board"}
-                        </button>
-                    </li>
-                    {/* ------------------------------------- */}
+        {/* 4. Reports (Historical Data) */}
+        <li>
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "reports" ? "active bg-danger"
+                    : ""
+                    }`}
+                onClick={() => {
+                    setActiveTab("reports");
+                    setStationMonitorId(null);
+                    setReportFilterStationId("All");
+                    setStationHistoryId(null);
+                    setHighlightedUnitId(null);
+                }}
+            >
+                <i className="bi bi-file-text"></i>
+                {isSidebarOpen && "Reports"}
+            </button>
+        </li>
 
-                    <li>
-                        <button
-                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "approval" ? "active bg-danger"
-                                : ""
-                                }`}
-                            onClick={() => {
-                                setActiveTab("approval");
-                                setStationHistoryId(null);
-                                setHighlightedUnitId(null);
-                            }}
-                        >
-                            <i className="bi bi-check-circle"></i>
-                            {isSidebarOpen && "Approvals"}
-                        </button>
-                    </li>
+        <hr className="border-secondary my-2" /> {/* Separator para sa Workflow/Management */}
 
-                    <li>
-                        <button
-                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "manage_account" ? "active bg-danger"
-                                : ""
-                                }`}
-                            onClick={() => {
-                                setActiveTab("manage_account");
-                                setStationHistoryId(null);
-                                setHighlightedUnitId(null);
-                            }}
-                        >
-                            <i className="bi bi-person-gear"></i>
-                            {isSidebarOpen && "Manage Account"}
-                        </button>
-                    </li>
+        {/* 5. Approvals (Workflow) */}
+        <li>
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "approval" ? "active bg-danger"
+                    : ""
+                    }`}
+                onClick={() => {
+                    setActiveTab("approval");
+                    setStationHistoryId(null);
+                    setHighlightedUnitId(null);
+                }}
+            >
+                <i className="bi bi-check-circle"></i>
+                {isSidebarOpen && "Approvals"}
+            </button>
+        </li>
 
-                    <li>
-                        <button
-                            className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "analytics" ? "active bg-danger"
-                                : ""
-                                }`}
-                            onClick={() => {
-                                setActiveTab("analytics");
-                                setStationHistoryId(null);
-                                setHighlightedUnitId(null);
-                            }}
-                        >
-                            <i className="bi bi-graph-up"></i>
-                            {isSidebarOpen && "Analytics"}
-                        </button>
-                    </li>
+        {/* 6. No Good List (Quality/Rework) */}
+        <li> 
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "no_good_list" ? "active bg-danger"
+                    : ""
+                    }`}
+                onClick={() => {
+                    setActiveTab("no_good_list");
+                    setStationHistoryId(null);
+                    setHighlightedUnitId(null);
+                }}
+            >
+                <i className="bi bi-x-octagon-fill"></i>
+                {isSidebarOpen && "No Good List"}
+            </button>
+        </li>
+        
+        <hr className="border-secondary my-2" /> {/* Separator para sa System/User */}
 
+        {/* 7. Announcement Board (Communication) */}
+        <li>
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "announcements" ? "active bg-danger"
+                    : ""
+                    }`}
+                onClick={() => {
+                    setActiveTab("announcements");
+                    setStationMonitorId(null);
+                    setReportFilterStationId("All");
+                    setStationHistoryId(null);
+                    setHighlightedUnitId(null);
+                }}
+            >
+                <i className="bi bi-megaphone-fill"></i>
+                {isSidebarOpen && "Announcement Board"}
+            </button>
+        </li>
+
+        {/* 8. Manage Account (System Management) */}
+        <li>
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "manage_account" ? "active bg-danger"
+                    : ""
+                    }`}
+                onClick={() => {
+                    setActiveTab("manage_account");
+                    setStationHistoryId(null);
+                    setHighlightedUnitId(null);
+                }}
+            >
+                <i className="bi bi-person-gear"></i>
+                {isSidebarOpen && "Manage Account"}
+            </button>
+        </li>
+ 
+
+{/* --- SIDEBAR MENU END --- */}
 
                     {/* ------------------------------------- */}
                 </ul>
