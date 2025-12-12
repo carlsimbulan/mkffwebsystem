@@ -16,6 +16,7 @@ This system enables **real-time tracking and monitoring of units** throughout th
 
 ### Backend
 - **PHP** – For server-side logic and API development  
+- **Node.js + Express.js** — For analytics, delay root-cause detection
 
 ### Database
 - **MySQL** – For secure and structured storage of unit and production data  
