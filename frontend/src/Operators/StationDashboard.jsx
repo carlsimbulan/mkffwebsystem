@@ -12,7 +12,7 @@ import { UnitEntryForm } from './components/UnitEntryForm';
 import { DailyReportForm } from './components/DailyReportForm';
 import { UnitHistoryLog } from './components/UnitHistoryLog';
 import { UnitListTable } from './components/UnitListTable';
-import { EditUnitModal } from './components/EditUnitModal'; // Imported the separated Modal
+import { EditUnitModal } from './components/EditUnitModal';
 import { AnnouncementView } from './components/AnnouncementView';
 
 
@@ -27,7 +27,7 @@ const UNITS_ENDPOINT = `${API_BASE_URL}/units.php`;
 const HISTORY_ENDPOINT = `${API_BASE_URL}/unit_history.php`;
 const REPORT_ENDPOINT = `${API_BASE_URL}/daily_reports.php`;
 const USER_ENDPOINT = `${API_BASE_URL}/user_management.php`;
-const ANNOUNCEMENT_ENDPOINT = `${API_BASE_URL}/announcements.php`; // Used for polling
+const ANNOUNCEMENT_ENDPOINT = `${API_BASE_URL}/announcements.php`; 
 
 // DEFINE THE STRICT STATION ORDER (Kept here as global constant)
 const STATION_ORDER = [
@@ -36,7 +36,9 @@ const STATION_ORDER = [
     "Station 11", "Station 12", "Station 13", "Station 14", "Station 15"
 ];
 
-// --- UTILITY COMPONENT: LOADING OVERLAY (Kept here or moved to a central utility file) ---
+// --- UTILITY COMPONENTS ---
+
+// 1. LOADING OVERLAY (Unchanged)
 const LoadingOverlay = ({ status, message }) => {
     if (status === 'idle') return null;
     let iconClass, spinnerVisible = false, bgColor, statusText;
@@ -60,6 +62,31 @@ const LoadingOverlay = ({ status, message }) => {
     );
 };
 
+// 2. Unit Status Change Notification Toast (Retained for unit approval notification)
+const StatusChangeToast = ({ message, onClose }) => {
+    if (!message) return null;
+    return (
+        <div 
+            className="toast show align-items-center text-white bg-success border-0 position-fixed bottom-0 end-0 m-3 shadow-lg" 
+            role="alert" 
+            aria-live="assertive" 
+            aria-atomic="true"
+            style={{ zIndex: 1070 }}
+        >
+            <div className="d-flex">
+                <div className="toast-body d-flex align-items-center">
+                    <i className="bi bi-patch-check-fill me-2 fs-5"></i>
+                    <strong className="me-auto">{message}</strong>
+                </div>
+                <button type="button" className="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close" onClick={onClose}></button>
+            </div>
+        </div>
+    );
+};
+
+
+// 3. ❌ Removed: NewAnnouncementPopup component (Gagamitin na lang ang Alert Banner sa Dashboard)
+
 
 // --- MAIN OPERATOR COMPONENT (Controller) ---
 export default function StationDashboard({ user, onLogout }) { 
@@ -77,13 +104,15 @@ export default function StationDashboard({ user, onLogout }) {
     const [announcementLoading, setAnnouncementLoading] = useState(false);
     const [announcementError, setAnnouncementError] = useState(null);
     
-    // 🔑 NEW STATE: Tracks the highest announcement ID the user has seen
     const [lastReadId, setLastReadId] = useState(() => {
         // Initialize state from Local Storage on mount
         return parseInt(localStorage.getItem(ANNOUNCEMENT_READ_KEY) || 0);
     });
     
-    // ... (rest of the state hooks)
+    // 🔑 State for Unit Status Change Notification
+    const [unitStatusNotification, setUnitStatusNotification] = useState(null);
+    // ❌ Removed: [showAnnouncementPopup] state
+    
     const [scanInput, setScanInput] = useState("");
     const [processStatus, setProcessStatus] = useState('idle'); 
     const [statusMessage, setStatusMessage] = useState("");
@@ -93,6 +122,9 @@ export default function StationDashboard({ user, onLogout }) {
     const [listError, setListError] = useState(null);
     const [unitToEdit, setUnitToEdit] = useState(null); 
     const [scannedUnitId, setScannedUnitId] = useState(null); 
+
+    // 🔑 REF for Previous Unit List (used for status change detection)
+    const prevUnitListRef = useRef([]);
 
     const [formData, setFormData] = useState({
         model: "", revision: "", baseUnitKittingNo: "", assemblyNo: "",
@@ -105,10 +137,9 @@ export default function StationDashboard({ user, onLogout }) {
     });
     const [selectedFile, setSelectedFile] = useState(null);
     const scannerInputRef = useRef(null); 
-    // ... (end of rest of the state hooks)
 
 
-    // --- HELPER FUNCTION: GET STATION NAME ---
+    // --- HELPER FUNCTION: GET STATION NAME (Unchanged) ---
     const getStationName = () => {
         const rawName = (user?.station || user?.username || "").toLowerCase();
         if (rawName.includes('station')) {
@@ -120,7 +151,7 @@ export default function StationDashboard({ user, onLogout }) {
 
     const currentStation = getStationName();
 
-    // 🌟 CHART METRICS FUNCTION DEFINITION (CORRECT HOOK PLACEMENT) 🌟
+    // 🌟 CHART METRICS FUNCTION DEFINITION (Unchanged) 🌟
     const calculateMetrics = useCallback((stationId, logs) => {
         // This function calculates metrics needed by the chart based on the passed logs (unitList)
         const completedUnits = logs.filter(log => log.status === 'Completed').length;
@@ -128,15 +159,14 @@ export default function StationDashboard({ user, onLogout }) {
         
         return { completedUnits, ngUnits };
     }, []); 
-    // ---------------------------------------------------------------------
-
-    // --- HELPER FUNCTION: RESET FORM ---
+    
+    // --- HELPER FUNCTION: RESET FORM (Unchanged) ---
     const resetForm = () => {
         setFormData({ model: "", revision: "", baseUnitKittingNo: "", assemblyNo: "", deviceSerialNo: "", accessoryKittingNo: "", status: "In Progress", remarks: "" });
         setScanInput(""); setStatusMessage(""); setProcessStatus('idle'); setScannedUnitId(null);
     };
 
-    // --- HOOKED FUNCTIONS: FETCH USER DATA / AVATAR ---
+    // --- HOOKED FUNCTIONS: FETCH USER DATA / AVATAR (Unchanged) ---
     useEffect(() => {
         const fetchUserData = async () => {
             try {
@@ -155,9 +185,11 @@ export default function StationDashboard({ user, onLogout }) {
         fetchUserData();
     }, [user]);
     
-    // --- HOOKED FUNCTIONS: FETCH UNIT LIST ---
+    // --- HOOKED FUNCTIONS: FETCH UNIT LIST (Retained polling and ref update logic) ---
     const fetchUnits = useCallback(async (status) => { 
-        setListLoading(true); setListError(null); setUnitList([]); 
+        if (activeTab !== 'home') {
+            setListLoading(true); setListError(null); setUnitList([]);
+        }
         
         let dbStatus = status.replace(/_/g, ' ').replace(' unit', '');
         if (dbStatus === 'in progress') dbStatus = 'In Progress';
@@ -166,7 +198,6 @@ export default function StationDashboard({ user, onLogout }) {
         if (dbStatus === 'pending') dbStatus = 'Pending Approval'; 
         
         if (['daily reports', 'account history', 'guide', 'home'].includes(dbStatus.toLowerCase())) {
-            // 'home' maps to '' status, which fetches all units.
             dbStatus = ''; 
         }
         
@@ -177,15 +208,37 @@ export default function StationDashboard({ user, onLogout }) {
                     status: dbStatus
                 }
             });
-            setUnitList(Array.isArray(res.data) ? res.data : []);
+            const newUnitList = Array.isArray(res.data) ? res.data : [];
+
+            // 🔑 STATUS CHANGE DETECTION LOGIC:
+            const newlyApprovedUnits = newUnitList.filter(newUnit => {
+                const prevUnit = prevUnitListRef.current.find(oldUnit => oldUnit.id === newUnit.id);
+                // Check if unit was previously 'Pending Approval' AND is now 'In Progress'
+                return (
+                    prevUnit && 
+                    prevUnit.status === 'Pending Approval' && 
+                    newUnit.status === 'In Progress'
+                );
+            });
+            
+                if (newlyApprovedUnits.length > 0) {
+            const names = newlyApprovedUnits.map(u => u.assemblyNo).join(', ');
+            setUnitStatusNotification(`✅ Admin Accepted: Unit(s) ${names} are now 'In Progress'. Press X to dismiss.`);
+            // Walang setTimeout, kaya mananatili ang Toast.
+        }
+            
+            // Update the list and the ref
+            setUnitList(newUnitList);
+            prevUnitListRef.current = newUnitList;
+
         } catch (err) {
             setListError(`Failed to load data: ${err.message}`);
         } finally {
-            setListLoading(false);
+            if (activeTab !== 'home') setListLoading(false);
         }
-    }, [currentStation]); 
+    }, [currentStation, activeTab]); 
     
-    // --- HOOKED FUNCTIONS: FETCH HISTORY ---
+    // --- HOOKED FUNCTIONS: FETCH HISTORY (Unchanged) ---
     const fetchHistory = useCallback(async () => {
         setListLoading(true); setListError(null); setHistoryList([]);
         try {
@@ -200,14 +253,14 @@ export default function StationDashboard({ user, onLogout }) {
         }
     }, [currentStation]);
 
-    // --- HOOKED FUNCTIONS: FETCH ANNOUNCEMENTS (Used for both tab change and polling) ---
+    // --- HOOKED FUNCTIONS: FETCH ANNOUNCEMENTS (Modified: Removed popup trigger) ---
     const fetchAnnouncements = useCallback(async () => {
         const isInitialLoad = announcements.length === 0;
         if (isInitialLoad && activeTab === 'announcements') setAnnouncementLoading(true); 
         setAnnouncementError(null);
         try {
             const res = await axios.get(ANNOUNCEMENT_ENDPOINT);
-            // Assuming the newest announcement has the highest ID/is first in the array
+            // 🔑 NOTE: The unread count calculation is now the only way to notify the user.
             setAnnouncements(Array.isArray(res.data) ? res.data : []);
         } catch (err) {
             setAnnouncementError(`Failed to load announcements: ${err.message}`);
@@ -216,7 +269,7 @@ export default function StationDashboard({ user, onLogout }) {
         }
     }, [announcements.length, activeTab]);
 
-    // 🔑 NEW FUNCTION: Handles updating the last read announcement ID in Local Storage
+    // 🔑 FUNCTION: Handles updating the last read announcement ID in Local Storage
     const handleMarkAsRead = useCallback((newestId) => {
         const numericNewestId = parseInt(newestId);
         const numericLastReadId = parseInt(lastReadId);
@@ -227,18 +280,30 @@ export default function StationDashboard({ user, onLogout }) {
         }
     }, [lastReadId, ANNOUNCEMENT_READ_KEY]);
 
-    // --- 🔑 POLLING EFFECT FOR REAL-TIME ANNOUNCEMENTS (Set to 1 second) ---
+    // --- 🔑 POLLING EFFECT FOR ANNOUNCEMENTS (1 second) ---
     useEffect(() => {
         fetchAnnouncements(); 
-        // ⚠️ WARNING: 1 second polling can cause high server load. Use only for testing.
         const intervalId = setInterval(fetchAnnouncements, 1000); 
 
         return () => clearInterval(intervalId);
     }, [fetchAnnouncements]);
-    // --- END POLLING EFFECT ---
+    // --- END ANNOUNCEMENT POLLING EFFECT ---
 
+    // --- 🔑 POLLING EFFECT FOR UNIT STATUS CHECK (1 second) ---
+    useEffect(() => {
+        let intervalId;
+        if (activeTab === 'home') {
+             fetchUnits(activeTab);
+             intervalId = setInterval(() => fetchUnits(activeTab), 1000); 
+        }
 
-    // --- HANDLE SCAN LOGIC ---
+        return () => {
+            if (intervalId) clearInterval(intervalId);
+        };
+    }, [activeTab, fetchUnits]);
+    // --- END UNIT POLLING EFFECT ---
+
+    // --- HANDLE SCAN LOGIC (Omitted for brevity, unchanged) ---
     const handleScan = async (e) => { 
         e.preventDefault();
         setProcessStatus('loading'); 
@@ -366,7 +431,7 @@ export default function StationDashboard({ user, onLogout }) {
         setScanInput(""); 
     };
 
-    // --- HANDLE UNIT SUBMISSION / UPDATE ---
+    // --- HANDLE UNIT SUBMISSION / UPDATE (Omitted for brevity, unchanged) ---
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!formData.assemblyNo) {
@@ -430,7 +495,7 @@ export default function StationDashboard({ user, onLogout }) {
         }
     };
     
-    // --- HANDLE REPORT SUBMISSION ---
+    // --- HANDLE REPORT SUBMISSION (Omitted for brevity, unchanged) ---
     const handleReportSubmit = async (e) => {
         e.preventDefault();
         const reportData = new FormData();
@@ -469,7 +534,7 @@ export default function StationDashboard({ user, onLogout }) {
         }
     };
 
-    // --- HANDLE UNIT EDIT (FROM LIST) ---
+    // --- HANDLE UNIT EDIT (FROM LIST) (Omitted for brevity, unchanged) ---
     const handleSaveEdit = async (id, updatedData) => {
         setUnitToEdit(null); 
         setProcessStatus('loading');
@@ -504,21 +569,23 @@ export default function StationDashboard({ user, onLogout }) {
     
     const handleEditClick = (unit) => setUnitToEdit(unit);
 
-    // --- USEEFFECT FOR DATA REFRESH (Only for Unit/History/Announcements tab change) ---
+    // --- USEEFFECT FOR DATA REFRESH (Handles fetch on tab switch) ---
     useEffect(() => { 
         if (activeTab === 'account_history') {
             fetchHistory();
         } 
         else if (activeTab === 'announcements') {
-            // Call fetchAnnouncements once when entering the tab
             fetchAnnouncements(); 
             // 🔑 IMPORTANT: Mark the newest visible announcement as read instantly
             if (announcements.length > 0) {
                  handleMarkAsRead(announcements[0].id);
             }
         }
-        else if (['home', 'in_progress', 'completed', 'no_good', 'pending'].includes(activeTab)) {
-            fetchUnits(activeTab === 'home' ? '' : activeTab);
+        else if (['in_progress', 'completed', 'no_good', 'pending'].includes(activeTab)) {
+            fetchUnits(activeTab);
+        }
+        else if (activeTab === 'home') {
+            // Initial fetch handled by the unit polling effect above
         }
         else { 
             setUnitList([]); 
@@ -526,7 +593,7 @@ export default function StationDashboard({ user, onLogout }) {
         }
     }, [activeTab, fetchUnits, fetchHistory, fetchAnnouncements, announcements.length, handleMarkAsRead]);
 
-    // --- USEEFFECT FOR SCANNER FOCUS ---
+    // --- USEEFFECT FOR SCANNER FOCUS (Unchanged) ---
     useEffect(() => { 
         if (activeTab === "input_unit" && scannerInputRef.current && processStatus === 'idle') scannerInputRef.current.focus();
     }, [activeTab, processStatus]);
@@ -545,7 +612,7 @@ export default function StationDashboard({ user, onLogout }) {
     const unreadCount = announcements.filter(a => parseInt(a.id) > parseInt(lastReadId)).length;
 
 
-    // --- CONTENT RENDERER (Cleaned up Switch) ---
+    // --- CONTENT RENDERER (Unchanged) ---
     const renderContent = () => {
         switch (activeTab) {
             case "home":
@@ -554,10 +621,9 @@ export default function StationDashboard({ user, onLogout }) {
                         currentStation={currentStation}
                         homeStats={homeStats}
                         setActiveTab={setActiveTab}
-                        announcementCount={unreadCount} // 🔑 Pass the UNREAD count
-                        // 🌟 ADDED CHART PROPS (Fix for TypeError) 🌟
-                        logs={unitList} // The unitList when activeTab is 'home' contains all units for currentStation
-                        calculateMetrics={calculateMetrics} // Pass the defined function
+                        announcementCount={unreadCount} 
+                        logs={unitList} 
+                        calculateMetrics={calculateMetrics} 
                         // Pass minimal station info, required by the chart component's original design
                         stations={[{ id: currentStation, name: currentStation }]} 
                     />
@@ -644,13 +710,21 @@ export default function StationDashboard({ user, onLogout }) {
             {/* Render Modal globally */}
             {unitToEdit && <EditUnitModal unit={unitToEdit} onClose={() => setUnitToEdit(null)} onSave={handleSaveEdit} />}
             
+            {/* 🔑 Unit Status Change Toast (Still active) */}
+            <StatusChangeToast 
+                message={unitStatusNotification} 
+                onClose={() => setUnitStatusNotification(null)} 
+            />
+
+            {/* ❌ Removed: New Announcement Pop-up Modal rendering block */}
+            
             <div className="d-flex flex-row min-vh-100 bg-light font-sans"> 
                 
-                {/* --- SIDEBAR: BLUE BACKGROUND --- */}
+                {/* --- SIDEBAR: BLUE BACKGROUND (Unchanged) --- */}
                 <div className="d-flex flex-column flex-shrink-0 p-3 text-white shadow-lg" 
                     style={{ width: '260px', position: 'sticky', top: 0, height: '100vh', backgroundColor: '#0f172a', zIndex: 1000 }}>
                     
-                    {/* Brand / Logo */}
+                    {/* Brand / Logo (Unchanged) */}
                     <div className="d-flex align-items-center mb-4 pb-3 border-bottom border-secondary pt-2 px-2">
                         <img 
                             src={logo} 
@@ -659,13 +733,13 @@ export default function StationDashboard({ user, onLogout }) {
                             style={{ height: '45px', width: 'auto', objectFit: 'contain' }} 
                         />
                         
-                        {/* Text Description */}
+                        {/* Text Description (Unchanged) */}
                         <div>
                             <span className="fs-5 fw-bold d-block lh-1">OPERATOR PANEL</span>
                         </div>
                     </div>
 
-                    {/* Navigation */}
+                    {/* Navigation (Unchanged) */}
 <nav className="flex-grow-1 overflow-auto custom-scrollbar">
     <ul className="nav nav-pills flex-column mb-auto gap-2">
         {/* DASHBOARD */}
@@ -750,19 +824,19 @@ export default function StationDashboard({ user, onLogout }) {
     </ul>
 </nav>
 
-                    {/* Sidebar Footer (Version) */}
+                    {/* Sidebar Footer (Version) (Unchanged) */}
                     <div className="mt-auto pt-3 border-top border-secondary text-center text-white-50 small">
                         <small>@2025 MKFF Laser Technique</small>
                     </div>
                 </div>
 
-                {/* --- MAIN CONTENT AREA --- */}
+                {/* --- MAIN CONTENT AREA (Unchanged) --- */}
                 <div className="d-flex flex-column flex-grow-1" style={{ backgroundColor: '#eeeeeeff' }}> 
                     
-                    {/* --- HEADER: WHITE BACKGROUND --- */}
+                    {/* --- HEADER: WHITE BACKGROUND (Unchanged) --- */}
                     <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm px-4 py-3 sticky-top z-2">
                         <div className="container-fluid p-0">
-                            {/* Left: Station Name */}
+                            {/* Left: Station Name (Unchanged) */}
                             <div className="d-flex align-items-center">
                                 <div className="bg-primary text-white rounded p-2 me-3 d-flex align-items-center justify-content-center" style={{width: '40px', height: '40px'}}>
                                     <i className="bi bi-layers-fill fs-5"></i>
@@ -773,18 +847,18 @@ export default function StationDashboard({ user, onLogout }) {
                                 </div>
                             </div>
 
-                            {/* Right: User Profile & Logout */}
+                            {/* Right: User Profile & Logout (Unchanged) */}
                             <div className="d-flex align-items-center gap-3">
-                                {/* Divider */}
+                                {/* Divider (Unchanged) */}
                                 <div className="border-start mx-2" style={{height: '30px'}}></div>
 
-                                {/* User Info */}
+                                {/* User Info (Unchanged) */}
                                 <div className="text-end d-none d-md-block">
                                     <div className="fw-bold text-dark small">{currentFullName}</div>
                                     <div className="text-muted" style={{fontSize: '0.7rem'}}>Authorized Operator</div>
                                 </div>
 
-                                {/* Avatar */}
+                                {/* Avatar (Unchanged) */}
                                 <div className="position-relative">
                                     <img 
                                         src={headerAvatarSrc} 
@@ -796,11 +870,11 @@ export default function StationDashboard({ user, onLogout }) {
                                             e.target.src = DEFAULT_AVATAR_PATH; 
                                         }} 
                                     />
-                                    {/* Online Status Dot */}
+                                    {/* Online Status Dot (Unchanged) */}
                                     <span className="position-absolute bottom-0 end-0 bg-success border border-white rounded-circle" style={{width: '12px', height: '12px'}}></span>
                                 </div>
 
-                                {/* Logout Button */}
+                                {/* Logout Button (Unchanged) */}
                                 <button 
                                     className="btn btn-outline-danger btn-sm ms-2 d-flex align-items-center px-3 rounded-pill" 
                                     onClick={onLogout}
@@ -812,7 +886,7 @@ export default function StationDashboard({ user, onLogout }) {
                         </div>
                     </nav>
 
-                    {/* --- DYNAMIC CONTENT --- */}
+                    {/* --- DYNAMIC CONTENT (Unchanged) --- */}
                     <div className="container-fluid p-4 flex-grow-1 overflow-auto">
                         <div className="fade-in-up">
                             {renderContent()}
@@ -821,50 +895,7 @@ export default function StationDashboard({ user, onLogout }) {
                 </div>
             </div>
 
-            {/* CSS Helper para sa Hover effects ng Sidebar (and Scrollbar) */}
-{/* CSS Helper para sa Hover effects ng Sidebar (and Scrollbar) */}
-        <style jsx>{`
-            .hover-white:hover { color: white !important; background: rgba(255,255,255,0.1) !important; }
-            .fade-in-up { animation: fadeInUp 0.5s ease-out; }
-            @keyframes fadeInUp {
-                from { opacity: 0; transform: translateY(20px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-
-            /* 🚨 ULTRA-THIN SCROLLBAR OVERRIDE: 1 PIXEL LAMANG */
-            
-            /* Target ang buong scrollbar area (Chrome, Safari, Edge) */
-            .custom-scrollbar::-webkit-scrollbar {
-                width: 1px !important; /* ⬅️ BINABA SA 1 PIXEL: Sobrang Nipis! */
-                height: 1px !important;
-            }
-
-            /* Target ang drag handle */
-            .custom-scrollbar::-webkit-scrollbar-thumb {
-                background-color: rgba(255, 255, 255, 0.1) !important; /* ⬅️ Sobrang transparent */
-                border-radius: 10px !important;
-            }
-            
-            /* Target ang track (background) */
-            .custom-scrollbar::-webkit-scrollbar-track {
-                background: transparent !important;
-            }
-
-            /* Fix para sa Firefox */
-            .custom-scrollbar {
-                scrollbar-width: none; /* Ginagamit ng Firefox para itago ang default scrollbar track */
-                scrollbar-color: rgba(255, 255, 255, 0.1) transparent !important;
-                -ms-overflow-style: none; /* Fix para sa Internet Explorer/Edge (pre-Chromium) */
-            }
-            
-            /* Optional: Para sa mga nagtatago ng scrollbar kapag hindi ginagamit (Advanced look) */
-            .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-                background-color: rgba(255, 255, 255, 0.3) !important; /* Magiging mas visible kapag hinover */
-            }
-            
-        `}</style>
-            
-            {/* CSS Helper para sa Hover effects ng Sidebar */}
+            {/* CSS Helper para sa Hover effects ng Sidebar (and Scrollbar) (Unchanged) */}
             <style jsx>{`
                 .hover-white:hover { color: white !important; background: rgba(255,255,255,0.1) !important; }
                 .fade-in-up { animation: fadeInUp 0.5s ease-out; }
@@ -872,7 +903,41 @@ export default function StationDashboard({ user, onLogout }) {
                     from { opacity: 0; transform: translateY(20px); }
                     to { opacity: 1; transform: translateY(0); }
                 }
+
+                /* 🚨 ULTRA-THIN SCROLLBAR OVERRIDE: 1 PIXEL LAMANG */
+                
+                /* Target ang buong scrollbar area (Chrome, Safari, Edge) */
+                .custom-scrollbar::-webkit-scrollbar {
+                    width: 1px !important; 
+                    height: 1px !important;
+                }
+
+                /* Target ang drag handle */
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background-color: rgba(255, 255, 255, 0.1) !important; 
+                    border-radius: 10px !important;
+                }
+                
+                /* Target ang track (background) */
+                .custom-scrollbar::-webkit-scrollbar-track {
+                    background: transparent !important;
+                }
+
+                /* Fix para sa Firefox */
+                .custom-scrollbar {
+                    scrollbar-width: none; 
+                    scrollbar-color: rgba(255, 255, 255, 0.1) transparent !important;
+                    -ms-overflow-style: none;
+                }
+                
+                /* Optional: Para sa mga nagtatago ng scrollbar kapag hindi ginagamit (Advanced look) */
+                .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+                    background-color: rgba(255, 255, 255, 0.3) !important; 
+                }
+                
             `}</style>
+            
+            {/* CSS Helper para sa Hover effects ng Sidebar (Redundant style block removed) */}
         </>
     )
 };

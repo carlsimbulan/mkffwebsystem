@@ -1,16 +1,27 @@
 import React from 'react';
 
+// Helper function para makuha ang kasalukuyang petsa sa format na 'YYYY-MM-DD'.
+// Tiyakin nito na laging ngayon ang default na petsa.
+const getTodayDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 export function ReportsView({
+    // Ipinapalagay na ang reports ay pre-filtered na (filteredReports) at ang state ay controlled ng Parent.
     filteredReports,
     stations,
-    reportDate,
-    setReportDate,
+    reportDate, // State ng petsa galing sa Parent
+    setReportDate, // Setter ng petsa galing sa Parent
     reportFilterStationId,
     setReportFilterStationId,
     setShowReportModal,
     handleViewReport,
-    getTodayDate
 }) {
+    
     // 1. Prepare Stations array, adding the 'Overall Report' option for filtering (best practice)
     const enhancedFilterStations = [
         { id: 'All', name: 'All Stations' }, 
@@ -56,9 +67,11 @@ export function ReportsView({
                             type="date"
                             className="form-control border-0 bg-light fw-bold text-secondary"
                             style={{ maxWidth: '160px' }}
+                            // FIX 1: Gumagamit na ng reportDate galing sa Parent
                             value={reportDate}
                             onChange={(e) => setReportDate(e.target.value)}
-                            max={getTodayDate()}
+                            // FIX 2: Tiyak na ngayon ang max date
+                            max={getTodayDate()} 
                         />
                     </div>
                     <div className="vr text-secondary opacity-25 mx-2"></div>
@@ -66,7 +79,7 @@ export function ReportsView({
                         <i className="bi bi-funnel text-secondary me-2 fs-5"></i>
                         <select
                             className="form-select border-0 bg-light fw-bold text-secondary"
-                            style={{ maxWidth: '250px' }} // Increased width to fit 'Overall Reports Only'
+                            style={{ maxWidth: '250px' }}
                             value={reportFilterStationId}
                             onChange={(e) => setReportFilterStationId(e.target.value)}
                         >
@@ -101,7 +114,7 @@ export function ReportsView({
                             </tr>
                         </thead>
                         <tbody className="border-top-0">
-                            {filteredReports.length > 0 ? filteredReports.map(report => (
+                            {filteredReports && filteredReports.length > 0 ? filteredReports.map(report => (
                                 <tr key={report.id}>
                                     <td className="ps-4">
                                         <div className="d-flex align-items-center">
@@ -126,8 +139,11 @@ export function ReportsView({
                                         </div>
                                     </td>
                                     <td className="text-end pe-4 text-muted font-monospace small">
-                                        {new Date(report.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        <div style={{ fontSize: '0.7rem' }}>{new Date(report.created_at).toLocaleDateString()}</div>
+                                        {/* Improved Timestamp Display */}
+                                        <div className="text-dark fw-bold">{new Date(report.created_at).toLocaleDateString()}</div>
+                                        <div style={{ fontSize: '0.75rem' }}>
+                                            {new Date(report.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
                                     </td>
                                     <td className="text-center">
                                         <button
@@ -151,7 +167,7 @@ export function ReportsView({
                 </div>
             </div>
 
-            {/* Replaced <style jsx> with standard <style> to eliminate the warning */}
+            {/* CSS styles */}
             <style>{`
                 .hover-scale:hover { transform: scale(1.02); transition: transform 0.2s; }
                 .hover-primary:hover { background-color: #0d6efd; color: white !important; border-color: #0d6efd !important; }

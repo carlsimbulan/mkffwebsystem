@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import 'bootstrap-icons/font/bootstrap-icons.css';
 
 // Helper function to render status badges
 const getStatusBadgeClass = (status) => {
@@ -17,7 +18,7 @@ const getStatusBadgeClass = (status) => {
 };
 
 
-// --- UnitHistoryTable Component (Improved) ---
+// --- UnitHistoryTable Component (Unit ID Removed) ---
 const UnitHistoryTable = ({ historyLogs, loading, error }) => {
     if (loading) return <div className="text-center py-5"><div className="spinner-border text-primary"></div><p className="mt-2 text-muted">Loading history...</p></div>;
     if (error) return <div className="alert alert-danger shadow-sm mt-3">Error: {error}</div>;
@@ -28,7 +29,7 @@ const UnitHistoryTable = ({ historyLogs, loading, error }) => {
             <table className="table table-hover table-striped mb-0 small">
                 <thead className="table-primary sticky-top">
                     <tr>
-                        <th className="py-2">Unit ID</th>
+                        {/* ❌ REMOVED: <th className="py-2">Unit ID</th> */}
                         <th className="py-2">Model</th>
                         <th className="py-2">Assembly No</th>
                         <th className="py-2">Action</th>
@@ -41,7 +42,7 @@ const UnitHistoryTable = ({ historyLogs, loading, error }) => {
                 <tbody>
                     {historyLogs.map((log) => (
                         <tr key={log.history_id}>
-                            <td className="text-muted">{log.unit_id}</td>
+                            {/* ❌ REMOVED: <td className="text-muted">{log.unit_id}</td> */}
                             <td className="fw-bold text-dark">{log.model || '-'}</td>
                             <td className="font-monospace text-primary">{log.assembly_no || '-'}</td>
                             <td className="text-capitalize">{log.action_type}</td>

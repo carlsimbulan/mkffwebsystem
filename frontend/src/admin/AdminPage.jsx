@@ -847,30 +847,50 @@ export default function AdminPage({ user, onLogout }) {
             >
                 {/* 1. HEADER (Fixed/Sticky at the Top) */}
                 <header 
-                    className="bg-white shadow-sm p-3 d-flex justify-content-between align-items-center"
+                    className="bg-white border-bottom p-3 d-flex justify-content-between align-items-center"
                     style={{ flexShrink: 0, position: 'sticky', top: 0, zIndex: 10 }} 
                 >
                     <div className="d-flex align-items-center">
                         <button className="btn btn-light border me-3" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
                             <i className="bi bi-list"></i>
                         </button>
-                        <h5 className="mb-0 fw-bold text-secondary text-uppercase">
-                            {activeTab === 'station_monitor' ? `${stations.find(s => s.id === stationMonitorId)?.name || 'Monitor'} Details` : activeTab.replace('_', ' ')}
+                        <h5 className="mb-0 fw-bold text-dark text-uppercase" style={{ fontSize: '1rem' }}>
+                            {activeTab === 'station_monitor' ? `${stations.find(s => s.id === stationMonitorId)?.name || 'Monitor'} Details` : activeTab.replace(/_/g, ' ')}
                         </h5>
                     </div>
+                    
+                    {/* --- RIGHT SIDE: NOTIFICATIONS & USER PROFILE --- */}
                     <div className="d-flex align-items-center gap-3">
+                        
+                        {/* Notification Bell */}
                         <NotificationBell notifications={notifications} onClick={handleBellClick} />
-                        <div className="text-end me-2 d-none d-md-block">
-                            <div className="fw-bold small">{headerFullName}</div>
-                            <div className="text-muted small" style={{ fontSize: '0.75rem' }}>Administrator</div>
+                        
+                        {/* User Info and Avatar (Professional Look) */}
+                        <div className="d-flex align-items-center">
+                            
+                            {/* Text Info */}
+                            <div className="text-end me-3 d-none d-md-block">
+                                {/* Use text-dark for full name */}
+                                <div className="fw-bold text-dark" style={{ lineHeight: 1.2 }}>{headerFullName}</div>
+                                {/* Highlight Admin role */}
+                                <div className="fw-medium text-danger small" style={{ fontSize: '0.75rem' }}>ADMINISTRATOR</div> 
+                            </div>
+                            
+                            {/* Avatar (Increased size to 45px) */}
+                            <img
+                                src={headerAvatarSrc}
+                                alt="User Avatar"
+                                // 💡 BINAGO: Inalis ang 'border-danger' at pinalitan ng 'border-secondary'
+                                className="rounded-circle border border-secondary" 
+                                style={{ 
+                                    width: '45px', 
+                                    height: '45px', 
+                                    objectFit: 'cover' 
+                                }}
+                                onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
+                            />
                         </div>
-                        <img
-                            src={headerAvatarSrc}
-                            alt="User Avatar"
-                            className="rounded-circle border border-danger"
-                            style={{ width: '35px', height: '35px', objectFit: 'cover' }}
-                            onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
-                        />
+                        
                     </div>
                 </header>
 

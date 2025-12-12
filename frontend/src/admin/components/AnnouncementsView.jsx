@@ -1,6 +1,17 @@
 import React from 'react';
 import { DeleteAnnouncementModal } from './DeleteAnnouncementModal'; // Import the new modal
 
+// Tiyakin na ang getTodayDate() ay nasa Parent Component at ibinibigay bilang prop
+// OR, ilipat ang function dito kung wala itong external dependencies.
+// Para mas madaling gamitin, i-define natin dito (assuming it returns 'YYYY-MM-DD').
+const getTodayDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 export function AnnouncementsView({
     user,
     announcements,
@@ -8,7 +19,9 @@ export function AnnouncementsView({
     setFilterStartDate,
     filterEndDate,
     setFilterEndDate,
-    getTodayDate, // Utility function to get today's date string
+    // Tinanggal ang getTodayDate sa props dahil ginawa na nating local helper,
+    // pero ibinalik ko na lang para consistent sa iyong props structure.
+    getTodayDate: getTodayDateProp, // I-rename to avoid conflict kung meron ka nang local getTodayDate
     setShowPostModal,
     handleConfirmDelete,
     executeDeleteAnnouncement, 
@@ -19,27 +32,34 @@ export function AnnouncementsView({
     DEFAULT_AVATAR_PATH
 }) {
 
-    // 1. FILTERING LOGIC (Ensures compatibility with date inputs)
+    // Gumamit ng prop version o local version. Para safe, gamitin natin ang prop if available.
+    const todayDateString = getTodayDateProp ? getTodayDateProp() : getTodayDate();
+
+    // 1. FILTERING LOGIC (Optimized for date string comparison)
     const announcementsToDisplay = announcements.filter(announcement => {
-        const postDate = new Date(announcement.created_at.split(' ')[0]);
+        // Kukunin ang petsa lang (YYYY-MM-DD)
+        const postDateString = announcement.created_at.split(' ')[0] || announcement.created_at.split('T')[0];
 
-        // Use new Date(filterDate) for accurate comparison
-        let start = filterStartDate ? new Date(filterStartDate) : new Date('2000-01-01');
-        let end = filterEndDate ? new Date(filterEndDate) : new Date(getTodayDate());
+        // START DATE: Kung walang filterStartDate, simulan sa simula ng oras.
+        const startFilter = filterStartDate || '2000-01-01'; // Default to a very old date
 
-        // Normalize end date to cover the entire day
-        end.setHours(23, 59, 59, 999);
-
-        const normalizedPostDate = new Date(postDate.getFullYear(), postDate.getMonth(), postDate.getDate());
+        // END DATE: FIX: Kung walang filterEndDate, simulan sa current day (todayDateString).
+        const endFilter = filterEndDate || todayDateString;
 
         return (
-            normalizedPostDate.getTime() >= start.getTime() &&
-            normalizedPostDate.getTime() <= end.getTime()
+            postDateString >= startFilter &&
+            postDateString <= endFilter
         );
     });
     
     const isAdministrator = user.role === 'Administrator';
-    const isManager = user.role === 'Manager'; // Assuming Manager might also use this view
+    const isManager = user.role === 'Manager';
+
+    // Handler para i-reset ang filter
+    const handleResetFilter = () => {
+        setFilterStartDate(''); 
+        setFilterEndDate(todayDateString); // FIX: Laging i-set sa ngayon ang End Date pag nag-reset.
+    };
 
     return (
         <>
@@ -56,12 +76,13 @@ export function AnnouncementsView({
                         </p>
                     </div>
                     {(isAdministrator || isManager) && ( // Only show Create button for Admins/Managers
-                        <button
-                            className="btn btn-primary px-4 py-2 rounded-pill shadow fw-bold d-flex align-items-center hover-scale"
-                            onClick={() => setShowPostModal(true)}
-                        >
-                            <i className="bi bi-send-fill me-2"></i> Create New Post
-                        </button>
+                    <button
+                        // 💡 INALIS: ang 'shadow' class
+                        className="btn btn-primary px-4 py-2 rounded-pill fw-bold d-flex align-items-center hover-scale"
+                        onClick={() => setShowPostModal(true)}
+                    >
+                        <i className="bi bi-send-fill me-2"></i> Create New Post
+                    </button>
                     )}
                 </div>
 
@@ -90,16 +111,16 @@ export function AnnouncementsView({
                                 type="date"
                                 className="form-control form-control-sm bg-light fw-bold"
                                 style={{ maxWidth: '140px' }}
-                                value={filterEndDate}
+                                value={filterEndDate || todayDateString} // FIX: Default value to show is TODAY
                                 onChange={(e) => setFilterEndDate(e.target.value)}
-                                max={getTodayDate()}
+                                max={todayDateString} // FIX: Use todayDateString
                             />
                         </div>
 
                         {/* Clear Filter Button */}
                         <button
                             className="btn btn-sm btn-outline-secondary ms-auto"
-                            onClick={() => { setFilterStartDate(''); setFilterEndDate(getTodayDate()); }}
+                            onClick={handleResetFilter}
                         >
                             <i className="bi bi-x-circle me-1"></i> Reset Filter
                         </button>
@@ -110,7 +131,6 @@ export function AnnouncementsView({
 
                 {/* --- Announcement Feed: Timeline List --- */}
                 <div className="announcement-feed-container bg-white p-4 rounded-3 shadow-lg">
-                    {/* 🔑 Applied custom scrollbar padding/margin here */}
                     <div className="announcement-list custom-scroll-margin" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
 
                         {announcementsToDisplay.length > 0 ? (
@@ -163,17 +183,17 @@ export function AnnouncementsView({
                                                 </div>
                                             </div>
 
-                                            {/* Announcement Content Box (Made position relative to position delete button) */}
+                                            {/* Announcement Content Box */}
                                             <div className="p-3 rounded-3 mt-1 shadow-sm position-relative" style={{ borderLeft: '4px solid #0d6efd', backgroundColor: '#f8f8f8' }}>
                                                 <p className="mb-0 text-secondary fw-medium" style={{ whiteSpace: 'pre-wrap', fontSize: '0.95rem', lineHeight: '1.4', paddingRight: canDelete ? '50px' : '0' }}>
                                                     {announcement.content}
                                                 </p>
                                                 
-                                                {/* 🔑 RELOCATED DELETE BUTTON (Always positioned at top-right corner of the content box) */}
+                                                {/* DELETE BUTTON */}
                                                 {canDelete && (
                                                     <button
                                                         className="btn btn-sm btn-link text-danger p-0 fw-bold position-absolute top-0 end-0 m-2"
-                                                        onClick={() => handleConfirmDelete(announcement.id, announcement.user_id)}
+                                                        onClick={() => handleConfirmDelete(announcement)} // Passed the whole object for DeleteModal prop
                                                         style={{ fontSize: '0.8rem', opacity: 0.7 }}
                                                         title="Delete Post"
                                                     >
@@ -197,21 +217,23 @@ export function AnnouncementsView({
                 </div>
                 {/* --- END Announcement Feed Container --- */}
 
-                {/* MODAL IS RENDERED GLOBALLY IN PARENT (Assuming it's not rendered here) */}
+                {/* MODAL IS RENDERED GLOBALLY IN PARENT */}
                 {showDeleteModal && (
                     <DeleteAnnouncementModal
                         show={showDeleteModal}
                         onClose={() => setShowDeleteModal(false)}
+                        // Tiyakin na ipinapasa ang tamang ID/UserID sa execute function
                         onConfirm={() => executeDeleteAnnouncement(announcementToDelete.id, announcementToDelete.user_id)}
                         announcementId={announcementToDelete?.id}
                     />
                 )}
             </div>
 
-            <style jsx>{`
+            {/* FIX: Replaced <style jsx> with standard <style> */}
+            <style>{`
                 .hover-scale:hover { transform: scale(1.02); }
                 
-                /* 🔑 Custom Scrollbar Padding/Margin */
+                /* Custom Scrollbar Padding/Margin */
                 .custom-scroll-margin {
                     padding-right: 15px; /* Adds space inside the scrollable area */
                 }
