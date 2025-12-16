@@ -89,8 +89,9 @@ export default function AdminPage({ user, onLogout }) {
     const [stationMonitorId, setStationMonitorId] = useState(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false); 
     const [announcementToDelete, setAnnouncementToDelete] = useState(null);
-    const [posterIdOfAnnouncement, setPosterIdOfAnnouncement] = useState(null);
+  
     const [successMessage, setSuccessMessage] = useState(null);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     // STATES for Reports and Editing
     const [reportDate, setReportDate] = useState(getTodayDate());
@@ -356,15 +357,21 @@ export default function AdminPage({ user, onLogout }) {
     };
 
     // --- ACTION HANDLERS (KEPT AS IS) ---
-    const handleApproveUnit = async (unitId, unitData) => {
-        const dataToSend = { ...unitData, id: unitId, status: 'In Progress' };
-        try {
-            await axios.post(`${UNITS_ENDPOINT}?method=PUT`, dataToSend, { headers: { 'Content-Type': 'application/json' } });
-            fetchData();
-        } catch (error) {
-            console.error(`Error approving unit ${unitId}:`, error);
-        }
-    };
+const handleApproveUnit = async (unitId, unitData) => {
+        const dataToSend = { ...unitData, id: unitId, status: 'In Progress' };
+        setIsProcessing(true); // START LOADING
+        try {
+            await axios.post(`${UNITS_ENDPOINT}?method=PUT`, dataToSend, { headers: { 'Content-Type': 'application/json' } });
+            setSuccessMessage("Unit successfully approved and set to In Progress.");
+            setTimeout(() => setSuccessMessage(null), 4000); 
+            fetchData();
+        } catch (error) {
+            console.error(`Error approving unit ${unitId}:`, error);
+            alert(`Failed to approve unit: ${error.message}`);
+        } finally {
+            setIsProcessing(false); // STOP LOADING
+        }
+    };
 
     const executeApproval = () => {
         if (selectedLogToApprove) {
@@ -376,27 +383,33 @@ export default function AdminPage({ user, onLogout }) {
 
 
     const handleSaveEdit = async (id, updatedData) => {
-        setSelectedUnitToEdit(null);
-        const dataToSend = {
-            id: id,
-            model: updatedData.model,
-            revision: updatedData.revision,
-            base_unit_kitting_no: updatedData.base_unit_kitting_no,
-            assembly_no: updatedData.assembly_no,
-            device_serial_no: updatedData.device_serial_no,
-            accessory_kitting_no: updatedData.accessory_kitting_no,
-            status: updatedData.status,
-            remarks: updatedData.remarks,
-            station: updatedData.station,
-        };
-        try {
-            await axios.post(`${UNITS_ENDPOINT}?method=PUT`, dataToSend, { headers: { 'Content-Type': 'application/json' } });
-        } catch (error) {
-            console.error(`Error saving unit ${id}:`, error);
-        } finally {
+        setSelectedUnitToEdit(null);
+        const dataToSend = {
+            // ... dataToSend payload ...
+            id: id,
+            model: updatedData.model,
+            revision: updatedData.revision,
+            base_unit_kitting_no: updatedData.base_unit_kitting_no,
+            assembly_no: updatedData.assembly_no,
+            device_serial_no: updatedData.device_serial_no,
+            accessory_kitting_no: updatedData.accessory_kitting_no,
+            status: updatedData.status,
+            remarks: updatedData.remarks,
+            station: updatedData.station,
+        };
+        setIsProcessing(true); // START LOADING
+        try {
+            await axios.post(`${UNITS_ENDPOINT}?method=PUT`, dataToSend, { headers: { 'Content-Type': 'application/json' } });
+            setSuccessMessage(`Unit ${id} successfully updated.`);
+            setTimeout(() => setSuccessMessage(null), 4000); 
+        } catch (error) {
+            console.error(`Error saving unit ${id}:`, error);
+            alert(`Failed to save unit: ${error.message}`);
+        } finally {
             fetchData(); // This refreshes the logs
-        }
-    };
+            setIsProcessing(false); // STOP LOADING
+        }
+    };
 
     // --- USER MANAGEMENT HANDLERS (KEPT AS IS) ---
     const handleAddUser = () => { setSelectedUserToManage(initialNewUserData); };
@@ -409,83 +422,108 @@ export default function AdminPage({ user, onLogout }) {
         setShowViewModal(true);
     };
 
-    const handleSaveUser = async (payload, headers, urlQuery) => {
-        if (!payload) throw new Error("Invalid user data received. Cannot save.");
-        try {
-            await axios.post(USER_MANAGEMENT_ENDPOINT + urlQuery, payload, { headers });
-            await fetchData();
-        } catch (error) {
-            console.error(`Error saving user:`, error);
-            throw new Error(error.response?.data?.message || "Failed to save changes.");
-        }
-    };
+const handleSaveUser = async (payload, headers, urlQuery) => {
+        if (!payload) throw new Error("Invalid user data received. Cannot save.");
+        setIsProcessing(true); // START LOADING
+        try {
+            const response = await axios.post(USER_MANAGEMENT_ENDPOINT + urlQuery, payload, { headers });
+            setSuccessMessage(`User successfully saved/updated: ${payload.full_name}.`);
+            setTimeout(() => setSuccessMessage(null), 4000); 
+            await fetchData();
+        } catch (error) {
+            console.error(`Error saving user:`, error);
+            throw new Error(error.response?.data?.message || "Failed to save changes.");
+        } finally {
+            setIsProcessing(false); // STOP LOADING
+        }
+    };
 
-    const handleDeleteUser = async (userId) => {
-        setSelectedUserToDelete(null);
-        try {
-            await axios.post(`${USER_MANAGEMENT_ENDPOINT}?method=DELETE`, { id: userId }, { headers: { 'Content-Type': 'application/json' } });
-            fetchData();
-        } catch (error) {
-            console.error(`Error deleting user ${userId}:`, error);
-        }
-    };
+ const handleDeleteUser = async (userId) => {
+        setSelectedUserToDelete(null);
+        setIsProcessing(true); // START LOADING
+        try {
+            await axios.post(`${USER_MANAGEMENT_ENDPOINT}?method=DELETE`, { id: userId }, { headers: { 'Content-Type': 'application/json' } });
+            setSuccessMessage(`User ID ${userId} successfully deleted.`);
+            setTimeout(() => setSuccessMessage(null), 4000); 
+            fetchData();
+        } catch (error) {
+            console.error(`Error deleting user ${userId}:`, error);
+            alert(`Failed to delete user: ${error.message}`);
+        } finally {
+            setIsProcessing(false); // STOP LOADING
+        }
+    };
 
     // --- ANNOUNCEMENT HANDLERS (KEPT AS IS) ---
-    const handlePostAnnouncement = async (content) => {
-        if (user.role !== 'Administrator') {
-            throw new Error("Only Administrators can post announcements.");
-        }
-        const payload = {
-            user_id: user.id,
-            content: content,
+const handlePostAnnouncement = async (content) => {
+        if (user.role !== 'Administrator') {
+            throw new Error("Only Administrators can post announcements.");
+        }
+        const payload = {
+            user_id: user.id,
+            content: content,
+        };
+        setIsProcessing(true); // START LOADING
+        try {
+            await axios.post(ANNOUNCEMENTS_ENDPOINT, payload, { headers: { 'Content-Type': 'application/json' } });
+            setSuccessMessage("Announcement successfully posted!");
+            setTimeout(() => setSuccessMessage(null), 4000); 
+            fetchData();
+        } catch (error) {
+            console.error("Error posting announcement:", error);
+            throw new Error(error.response?.data?.message || "Failed to post announcement. Check console for API error.");
+        } finally {
+            setIsProcessing(false); // STOP LOADING
+        }
+    };
+
+        const handleConfirmDelete = (announcement) => {
+            // Ensure the user has permission (Admin or owner)
+            if (user.role !== 'Administrator' && user.id !== announcement.user_id) {
+                alert("You do not have permission to delete this announcement.");
+                return;
+            }
+
+            // 💡 FIX 2: Set the entire object (or just the ID and user_id)
+            // We will set the entire object, as the DeleteAnnouncementModal might use the content.
+            setAnnouncementToDelete(announcement); // <-- Store the whole object
+            setShowDeleteModal(true); 
         };
-        try {
-            await axios.post(ANNOUNCEMENTS_ENDPOINT, payload, { headers: { 'Content-Type': 'application/json' } });
-            fetchData();
-        } catch (error) {
-            console.error("Error posting announcement:", error);
-            throw new Error(error.response?.data?.message || "Failed to post announcement. Check console for API error.");
-        }
-    };
-
-    const handleConfirmDelete = (announcementId, posterUserId) => {
-        if (user.role !== 'Administrator' && user.id !== posterUserId) {
-            alert("You do not have permission to delete this announcement.");
-            return;
-        }
-
-        setAnnouncementToDelete(announcementId);
-        setPosterIdOfAnnouncement(posterUserId);
-        setShowDeleteModal(true); 
-    };
+// --- ANNOUNCEMENT HANDLERS (UPDATED for 404 fix) ---
 
     const executeDeleteAnnouncement = async () => {
-        if (!announcementToDelete) return;
+        if (!announcementToDelete || !announcementToDelete.id) return;
+        
+        const announcementId = announcementToDelete.id;
+        const deleterUserId = user.id;
 
-        setShowDeleteModal(false);
+        setShowDeleteModal(false);
+        setIsProcessing(true); // START LOADING
 
-        try {
-            const response = await axios.delete(`${ANNOUNCEMENTS_ENDPOINT}`, {
-                data: {
-                    id: announcementToDelete,
-                    user_id: user.id
-                },
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
+        try {
+            const response = await axios.delete(ANNOUNCEMENTS_ENDPOINT, { 
+                data: { 
+                    id: announcementId,
+                    user_id: deleterUserId
+                },
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
 
-            alert(response.data.message || "Announcement deleted successfully.");
-            fetchData();
+            // 💡 SUCCESS LOGIC
+            setSuccessMessage(response.data.message || "Announcement deleted successfully.");
+            setTimeout(() => setSuccessMessage(null), 4000); 
+            fetchData();
 
-        } catch (error) {
-            console.error("Error deleting announcement:", error);
-            alert(`Failed to delete announcement: ${error.response?.data?.message || error.message}`);
-        } finally {
-            setAnnouncementToDelete(null);
-            setPosterIdOfAnnouncement(null);
-        }
-    };
+        } catch (error) {
+            console.error("Error deleting announcement:", error);
+            alert(`Failed to delete announcement: ${error.response?.data?.message || error.message}`);
+        } finally {
+            setIsProcessing(false); // STOP LOADING
+            setAnnouncementToDelete(null);
+        }
+    };
 
     // --- CALCULATE METRICS (KEPT AS IS) ---
     const calculateStationMetrics = (stationId, currentLogs = logs) => {
@@ -592,7 +630,7 @@ export default function AdminPage({ user, onLogout }) {
                     />
                 );
 
-            case "announcements":
+case "announcements":
                 return (
                     <AnnouncementsView
                         user={user}
@@ -603,7 +641,16 @@ export default function AdminPage({ user, onLogout }) {
                         setFilterEndDate={setFilterEndDate}
                         getTodayDate={getTodayDate}
                         setShowPostModal={setShowPostModal}
-                        handleConfirmDelete={handleConfirmDelete}
+                        
+                        // NOTE: This handler (handleConfirmDelete) must be updated 
+                        // in AdminPage.jsx to accept the full announcement object.
+                        handleConfirmDelete={handleConfirmDelete} 
+                        
+                        // NOTE: These props were removed from AnnouncementsView because the modal
+                        // is rendered globally in AdminPage.jsx. You should ensure 
+                        // the AnnouncementsView component does *not* try to receive them 
+                        // if you don't intend to pass them.
+
                         AVATAR_UPLOAD_PATH={AVATAR_UPLOAD_PATH}
                         DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH}
                     />
@@ -671,314 +718,355 @@ export default function AdminPage({ user, onLogout }) {
         }
     };
 
-    return (
-        <div className="d-flex min-vh-100 bg-light overflow-hidden">
+    // Assume isSidebarOpen and setIsSidebarOpen are no longer needed/used for toggling
+// isSidebarOpen is now effectively and permanently TRUE
+// Note: If 'isSidebarOpen' is still used in other places like rendering elements inside the sidebar, 
+// you may need to ensure it is set to 'true' or simply remove the conditional rendering if not needed.
 
-            {/* --- SIDEBAR (KEPT AS IS) --- */}
-            <div
-                className="d-flex flex-column flex-shrink-0 p-3 text-white transition-all position-fixed"
-                style={{
-                    width: isSidebarOpen ? "260px" : "80px",
-                    transition: "width 0.3s",
-                    backgroundColor: "#111827",
-                    height: "100vh",
-                    zIndex: 1000,
-                    top: 0,
-                    left: 0
-                }}
-            >
-   
-    {/* TOP LOGO */}
-    <div className="d-flex align-items-center mb-3 text-white overflow-hidden">
-        <img
-            src={logo}
-            alt="MKFF Admin Logo"
-            style={{ height: "3rem" }}
-            className={isSidebarOpen ? "me-3" : ""}
-        />
-        {isSidebarOpen && <span className="fs-5 fw-bold">MKFF Admin</span>}
-    </div>
+return (
+    // Tinanggal ang overflow-hidden sa root container, baka maging sanhi ng scrolling issue sa fixed elements
+    <div className="d-flex min-vh-100 bg-light"> 
 
-    <hr className="border-secondary" />
+        {/* --- SIDEBAR (GINAWANG FIXED WIDTH: 260px) --- */}
+        <div
+            className="d-flex flex-column flex-shrink-0 p-3 text-white position-fixed"
+            style={{
+                // 💡 BINAGO: Fixed width, inalis ang isSidebarOpen condition at transition
+                width: "260px", 
+                backgroundColor: "#111827",
+                height: "100vh",
+                zIndex: 1000,
+                top: 0,
+                left: 0
+            }}
+        >
 
-    {/* MENU: Naka-ayos at pinaganda ang pagkakasunod-sunod */}
-    <ul className="nav nav-pills flex-column mb-3">
-        {/* 1. Dashboard (Overview) */}
-        <li>
-            <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "dashboard" ? "active bg-danger" : ""
-                    }`}
-                onClick={() => {
-                    setActiveTab("dashboard");
-                    setStationMonitorId(null);
-                    setReportFilterStationId("All");
-                    setStationHistoryId(null);
-                    setHighlightedUnitId(null);
-                }}
-            >
-                <i className="bi bi-speedometer2"></i>
-                {isSidebarOpen && "Dashboard"}
-            </button>
-        </li>
+            {/* TOP LOGO */}
+            {/* 💡 BINAGO: Inalis ang conditional rendering ({isSidebarOpen && ...}) at inalis ang className={isSidebarOpen ? "me-3" : ""} */}
+            <div className="d-flex align-items-center mb-3 text-white overflow-hidden">
+                <img
+                    src={logo}
+                    alt="MKFF Admin Logo"
+                    style={{ height: "3rem" }}
+                    className="me-3" // Laging may margin dahil laging bukas
+                />
+                <span className="fs-5 fw-bold">MKFF Admin</span> {/* Laging visible */}
+            </div>
 
-        {/* 2. Stations (Live Monitoring) */}
-        <li>
-            <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
-                    (activeTab === "stations" || activeTab === "station_monitor" || activeTab === "overall_history") ? "active bg-danger" : "" 
-                    }`}
-                onClick={() => {
-                    setActiveTab("stations");
-                    setStationMonitorId(null);
-                    setReportFilterStationId("All");
-                    setStationHistoryId(null);
-                    setHighlightedUnitId(null);
-                }}
-            >
-                <i className="bi bi-grid-3x3-gap"></i>
-                {isSidebarOpen && "Stations"}
-            </button>
-        </li>
+            <hr className="border-secondary" />
 
-        {/* 3. Shipment (Operational Output) */}
-        <li> 
-            <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "shipment" ? "active bg-danger"
-                    : ""
-                    }`}
-                onClick={() => {
-                    setActiveTab("shipment");
-                    setStationHistoryId(null);
-                    setHighlightedUnitId(null);
-                    setReportFilterStationId("All");
-                }}
-            >
-                <i className="bi bi-truck-flatbed"></i>
-                {isSidebarOpen && "Shipment"}
-            </button>
-        </li>
+            {/* MENU: Naka-ayos at pinaganda ang pagkakasunod-sunod */}
+            <ul className="nav nav-pills flex-column mb-3">
+                {/* 1. Dashboard (Overview) */}
+                <li>
+                    <button
+                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "dashboard" ? "active bg-danger" : ""
+                            }`}
+                        onClick={() => {
+                            setActiveTab("dashboard");
+                            setStationMonitorId(null);
+                            setReportFilterStationId("All");
+                            setStationHistoryId(null);
+                            setHighlightedUnitId(null);
+                        }}
+                    >
+                        <i className="bi bi-speedometer2"></i>
+                        Dashboard {/* Laging visible */}
+                    </button>
+                </li>
 
-        {/* 4. Reports (Historical Data) */}
-        <li>
-            <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "reports" ? "active bg-danger"
-                    : ""
-                    }`}
-                onClick={() => {
-                    setActiveTab("reports");
-                    setStationMonitorId(null);
-                    setReportFilterStationId("All");
-                    setStationHistoryId(null);
-                    setHighlightedUnitId(null);
-                }}
-            >
-                <i className="bi bi-file-text"></i>
-                {isSidebarOpen && "Reports"}
-            </button>
-        </li>
+                {/* 2. Stations (Live Monitoring) */}
+                <li>
+                    <button
+                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
+                            (activeTab === "stations" || activeTab === "station_monitor" || activeTab === "overall_history") ? "active bg-danger" : "" 
+                            }`}
+                        onClick={() => {
+                            setActiveTab("stations");
+                            setStationMonitorId(null);
+                            setReportFilterStationId("All");
+                            setStationHistoryId(null);
+                            setHighlightedUnitId(null);
+                        }}
+                    >
+                        <i className="bi bi-grid-3x3-gap"></i>
+                        Stations {/* Laging visible */}
+                    </button>
+                </li>
 
-        <hr className="border-secondary my-2" /> {/* Separator para sa Workflow/Management */}
 
-        {/* 5. Approvals (Workflow) */}
-        <li>
-            <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "approval" ? "active bg-danger"
-                    : ""
-                    }`}
-                onClick={() => {
-                    setActiveTab("approval");
-                    setStationHistoryId(null);
-                    setHighlightedUnitId(null);
-                }}
-            >
-                <i className="bi bi-check-circle"></i>
-                {isSidebarOpen && "Approvals"}
-            </button>
-        </li>
 
-        {/* 6. No Good List (Quality/Rework) */}
-        <li> 
-            <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "no_good_list" ? "active bg-danger"
-                    : ""
-                    }`}
-                onClick={() => {
-                    setActiveTab("no_good_list");
-                    setStationHistoryId(null);
-                    setHighlightedUnitId(null);
-                }}
-            >
-                <i className="bi bi-x-octagon-fill"></i>
-                {isSidebarOpen && "No Good List"}
-            </button>
-        </li>
-        
-        <hr className="border-secondary my-2" /> {/* Separator para sa System/User */}
+                <hr className="border-secondary my-2" /> {/* Separator para sa Workflow/Management */}
 
-        {/* 7. Announcement Board (Communication) */}
-        <li>
-            <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "announcements" ? "active bg-danger"
-                    : ""
-                    }`}
-                onClick={() => {
-                    setActiveTab("announcements");
-                    setStationMonitorId(null);
-                    setReportFilterStationId("All");
-                    setStationHistoryId(null);
-                    setHighlightedUnitId(null);
-                }}
-            >
-                <i className="bi bi-megaphone-fill"></i>
-                {isSidebarOpen && "Announcement Board"}
-            </button>
-        </li>
+                {/* 5. Approvals (Workflow) */}
+                <li>
+                    <button
+                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "approval" ? "active bg-danger"
+                            : ""
+                            }`}
+                        onClick={() => {
+                            setActiveTab("approval");
+                            setStationHistoryId(null);
+                            setHighlightedUnitId(null);
+                        }}
+                    >
+                        <i className="bi bi-check-circle"></i>
+                        Approvals {/* Laging visible */}
+                    </button>
+                </li>
 
-        {/* 8. Manage Account (System Management) */}
-        <li>
-            <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "manage_account" ? "active bg-danger"
-                    : ""
-                    }`}
-                onClick={() => {
-                    setActiveTab("manage_account");
-                    setStationHistoryId(null);
-                    setHighlightedUnitId(null);
-                }}
-            >
-                <i className="bi bi-person-gear"></i>
-                {isSidebarOpen && "Manage Account"}
-            </button>
-        </li>
- 
+                {/* 6. No Good List (Quality/Rework) */}
+                <li> 
+                    <button
+                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "no_good_list" ? "active bg-danger"
+                            : ""
+                            }`}
+                        onClick={() => {
+                            setActiveTab("no_good_list");
+                            setStationHistoryId(null);
+                            setHighlightedUnitId(null);
+                        }}
+                    >
+                        <i className="bi bi-x-octagon-fill"></i>
+                        No Good List {/* Laging visible */}
+                    </button>
+                </li>
+
+                                {/* 3. Shipment (Operational Output) */}
+                <li> 
+                    <button
+                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "shipment" ? "active bg-danger"
+                            : ""
+                            }`}
+                        onClick={() => {
+                            setActiveTab("shipment");
+                            setStationHistoryId(null);
+                            setHighlightedUnitId(null);
+                            setReportFilterStationId("All");
+                        }}
+                    >
+                        <i className="bi bi-truck-flatbed"></i>
+                        Shipment {/* Laging visible */}
+                    </button>
+                </li>
+                
+                <hr className="border-secondary my-2" /> {/* Separator para sa System/User */}
+
+                {/* 4. Reports (Historical Data) */}
+                <li>
+                    <button
+                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "reports" ? "active bg-danger"
+                            : ""
+                            }`}
+                        onClick={() => {
+                            setActiveTab("reports");
+                            setStationMonitorId(null);
+                            setReportFilterStationId("All");
+                            setStationHistoryId(null);
+                            setHighlightedUnitId(null);
+                        }}
+                    >
+                        <i className="bi bi-file-text"></i>
+                        Reports {/* Laging visible */}
+                    </button>
+                </li>
+
+                {/* 7. Announcement Board (Communication) */}
+                <li>
+                    <button
+                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "announcements" ? "active bg-danger"
+                            : ""
+                            }`}
+                        onClick={() => {
+                            setActiveTab("announcements");
+                            setStationMonitorId(null);
+                            setReportFilterStationId("All");
+                            setStationHistoryId(null);
+                            setHighlightedUnitId(null);
+                        }}
+                    >
+                        <i className="bi bi-megaphone-fill"></i>
+                        Announcement Board {/* Laging visible */}
+                    </button>
+                </li>
+                    
+
+                {/* 8. Manage Account (System Management) */}
+                <li>
+                    <button
+                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "manage_account" ? "active bg-danger"
+                            : ""
+                            }`}
+                        onClick={() => {
+                            setActiveTab("manage_account");
+                            setStationHistoryId(null);
+                            setHighlightedUnitId(null);
+                        }}
+                    >
+                        <i className="bi bi-person-gear"></i>
+                        Manage Account {/* Laging visible */}
+                    </button>
+                </li>
+
 
 {/* --- SIDEBAR MENU END --- */}
 
-                    {/* ------------------------------------- */}
-                </ul>
+                {/* ------------------------------------- */}
+            </ul>
 
-                {/* PUSH COPYRIGHT + LOGOUT TO BOTTOM */}
-                <div className="mt-auto">
-                    {/* LOGOUT BUTTON */}
-                    <button
-                        className="btn btn-outline-light w-100"
-                        onClick={onLogout}
-                    >
-                        <i className="bi bi-box-arrow-left me-2"></i>
-                        {isSidebarOpen && "Logout"}
-                    </button>
+            {/* PUSH COPYRIGHT + LOGOUT TO BOTTOM */}
+            <div className="mt-auto">
+                {/* LOGOUT BUTTON */}
+                <button
+                    className="btn btn-outline-light w-100"
+                    onClick={onLogout}
+                >
+                    <i className="bi bi-box-arrow-left me-2"></i>
+                    Logout {/* Laging visible */}
+                </button>
 
-                    {/* COPYRIGHT TEXT (Now Below Logout with Separator) */}
-                    <div className="text-center text-white-50 small pt-2 mt-2 border-top border-secondary">
-                        {isSidebarOpen && <small>©2025 MKFF Laser Technique</small>}
-                    </div>
+                {/* COPYRIGHT TEXT (Now Below Logout with Separator) */}
+                <div className="text-center text-white-50 small pt-2 mt-2 border-top border-secondary">
+                    <small>©2025 MKFF Laser Technique</small> {/* Laging visible */}
                 </div>
             </div>
+        </div>
 
-            {/* --- MAIN CONTENT CONTAINER (UPDATED FOR FIXED HEADER) --- */}
-            <div
-                className="flex-grow-1 d-flex flex-column"
-                style={{
-                    position: 'fixed',
-                    top: 0,
-                    bottom: 0,
-                    right: 0,
-                    left: isSidebarOpen ? "260px" : "80px",
-                    transition: "left 0.3s",
-                    overflowX: 'hidden',
-                    backgroundColor: '#eeeeeeff',
-                    zIndex: 999,
-                }}
+        {/* --- MAIN CONTENT CONTAINER (UPDATED FOR FIXED SIDEBAR) --- */}
+        <div
+            className="flex-grow-1 d-flex flex-column"
+            style={{
+                position: 'fixed',
+                top: 0,
+                bottom: 0,
+                right: 0,
+                // 💡 BINAGO: Fixed left margin, inalis ang isSidebarOpen condition at transition
+                left: "260px", 
+                overflowX: 'hidden',
+                backgroundColor: '#eeeeeeff',
+                zIndex: 999,
+            }}
+        >
+            {/* 1. HEADER (Fixed/Sticky at the Top) */}
+            <header 
+                className="bg-white border-bottom p-3 d-flex justify-content-between align-items-center"
+                style={{ flexShrink: 0, position: 'sticky', top: 0, zIndex: 10 }} 
             >
-                {/* 1. HEADER (Fixed/Sticky at the Top) */}
-                <header 
-                    className="bg-white border-bottom p-3 d-flex justify-content-between align-items-center"
-                    style={{ flexShrink: 0, position: 'sticky', top: 0, zIndex: 10 }} 
-                >
-                    <div className="d-flex align-items-center">
-                        <button className="btn btn-light border me-3" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
-                            <i className="bi bi-list"></i>
-                        </button>
-                        <h5 className="mb-0 fw-bold text-dark text-uppercase" style={{ fontSize: '1rem' }}>
-                            {activeTab === 'station_monitor' ? `${stations.find(s => s.id === stationMonitorId)?.name || 'Monitor'} Details` : activeTab.replace(/_/g, ' ')}
-                        </h5>
-                    </div>
+                <div className="d-flex align-items-center">
+                    {/* ❌ TINANGGAL: Sidebar Toggle Button */}
+                    <h5 className="mb-0 fw-bold text-dark text-uppercase" style={{ fontSize: '1rem' }}>
+                        {activeTab === 'station_monitor' ? `${stations.find(s => s.id === stationMonitorId)?.name || 'Monitor'} Details` : activeTab.replace(/_/g, ' ')}
+                    </h5>
+                </div>
+                
+                {/* --- RIGHT SIDE: NOTIFICATIONS & USER PROFILE --- */}
+                <div className="d-flex align-items-center gap-3">
                     
-                    {/* --- RIGHT SIDE: NOTIFICATIONS & USER PROFILE --- */}
-                    <div className="d-flex align-items-center gap-3">
+                    {/* Notification Bell */}
+                    <NotificationBell notifications={notifications} onClick={handleBellClick} />
+                    
+                    {/* User Info and Avatar (Professional Look) */}
+                    <div className="d-flex align-items-center">
                         
-                        {/* Notification Bell */}
-                        <NotificationBell notifications={notifications} onClick={handleBellClick} />
-                        
-                        {/* User Info and Avatar (Professional Look) */}
-                        <div className="d-flex align-items-center">
-                            
-                            {/* Text Info */}
-                            <div className="text-end me-3 d-none d-md-block">
-                                {/* Use text-dark for full name */}
-                                <div className="fw-bold text-dark" style={{ lineHeight: 1.2 }}>{headerFullName}</div>
-                                {/* Highlight Admin role */}
-                                <div className="fw-medium text-danger small" style={{ fontSize: '0.75rem' }}>ADMINISTRATOR</div> 
-                            </div>
-                            
-                            {/* Avatar (Increased size to 45px) */}
-                            <img
-                                src={headerAvatarSrc}
-                                alt="User Avatar"
-                                // 💡 BINAGO: Inalis ang 'border-danger' at pinalitan ng 'border-secondary'
-                                className="rounded-circle border border-secondary" 
-                                style={{ 
-                                    width: '45px', 
-                                    height: '45px', 
-                                    objectFit: 'cover' 
-                                }}
-                                onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
-                            />
+                        {/* Text Info */}
+                        <div className="text-end me-3 d-none d-md-block">
+                            {/* Use text-dark for full name */}
+                            <div className="fw-bold text-dark" style={{ lineHeight: 1.2 }}>{headerFullName}</div>
+                            {/* Highlight Admin role */}
+                            <div className="fw-medium text-danger small" style={{ fontSize: '0.75rem' }}>ADMINISTRATOR</div> 
                         </div>
                         
+                        {/* Avatar (Increased size to 45px) */}
+                        <img
+                            src={headerAvatarSrc}
+                            alt="User Avatar"
+                            // 💡 BINAGO: Inalis ang 'border-danger' at pinalitan ng 'border-secondary'
+                            className="rounded-circle border border-secondary" 
+                            style={{ 
+                                width: '45px', 
+                                height: '45px', 
+                                objectFit: 'cover' 
+                            }}
+                            onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
+                        />
                     </div>
-                </header>
+                    
+                </div>
+            </header>
 
-                {/* 2. CONTENT AREA (Scrollable Part) */}
-                <div 
-                    className="container-fluid px-4 pt-4 pb-5 flex-grow-1"
-                    style={{ overflowY: 'auto' }} 
-                >
-                    {renderContent()}
+            {/* 2. CONTENT AREA (Scrollable Part) */}
+            <div 
+                className="container-fluid px-4 pt-4 pb-5 flex-grow-1"
+                style={{ overflowY: 'auto' }} 
+            >
+                {renderContent()}
+            </div>
+        </div>
+        
+        {/* ======================================================= */}
+        {/* === START: GLOBAL MESSAGING AND LOADING OVERLAYS (NEW) == */}
+        {/* ======================================================= */}
+        
+        {/* Global Success Banner */}
+        {successMessage && (
+            <div 
+                className="alert alert-success alert-dismissible fade show fixed-top mt-3 mx-auto"
+                role="alert"
+                style={{ width: 'auto', maxWidth: '400px', zIndex: 1050, transform: 'translateY(10px)' }}
+            >
+                <i className="bi bi-check-circle-fill me-2"></i>
+                {successMessage}
+                <button type="button" className="btn-close" onClick={() => setSuccessMessage(null)} aria-label="Close"></button>
+            </div>
+        )}
+
+        {/* Global Processing/Loading Overlay */}
+        {isProcessing && (
+            <div className="d-flex justify-content-center align-items-center position-fixed top-0 start-0 w-100 h-100" style={{ zIndex: 1040, backgroundColor: 'rgba(255, 255, 255, 0.8)' }}>
+                <div className="text-center">
+                    <div className="spinner-border text-danger" role="status" style={{ width: '3rem', height: '3rem' }}>
+                        <span className="visually-hidden">Processing...</span>
+                    </div>
+                    <p className="text-danger fw-bold mt-2">Processing Request...</p>
                 </div>
             </div>
-            {/* --- GLOBAL MODAL RENDERING (KEPT AS IS) --- */}
-            {selectedUnitToEdit && (<EditUnitModal unit={selectedUnitToEdit} onClose={() => setSelectedUnitToEdit(null)} onSave={handleSaveEdit} />)}
-            {selectedReportToView && (<ReportDetailModal report={selectedReportToView} onClose={() => setSelectedReportToView(null)} API_BASE_URL={API_BASE_URL} />)}
-            {showReportModal && (<SubmitReportModal user={user} stations={stations} onClose={() => setShowReportModal(false)} onSave={refreshAndCloseReport} REPORTS_ENDPOINT={REPORTS_ENDPOINT} />)}
-            {stationHistoryId && (<StationHistoryModal stationId={stationHistoryId} onClose={() => setStationHistoryId(null)} HISTORY_ENDPOINT={HISTORY_ENDPOINT} />)}
-            {selectedUserToManage && (<ManageUserModal userToEdit={selectedUserToManage.id ? selectedUserToManage : initialNewUserData} stations={stations} onClose={() => setSelectedUserToManage(null)} onSave={handleSaveUser} AVATAR_UPLOAD_PATH={AVATAR_UPLOAD_PATH} DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH} />)}
-            {selectedUserToDelete && (<DeleteUserModal user={selectedUserToDelete} onClose={() => setSelectedUserToDelete(null)} onDelete={handleDeleteUser} />)}
-            {showPostModal && (
-                <AnnouncementModal
-                    user={user}
-                    onClose={() => setShowPostModal(false)}
-                    onPost={handlePostAnnouncement}
-                    API_BASE_URL={API_BASE_URL}
-                    DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH}
-                />
-            )}
-            
-            {showDeleteModal && (
-                <DeleteAnnouncementModal
-                    announcementToDelete={announcementToDelete}
-                    onClose={() => setShowDeleteModal(false)}
-                    executeDelete={executeDeleteAnnouncement}
-                />
-            )}
-            {/* The Approval Modal must also be rendered here if the `ApprovalQueue` is not rendered/used */}
-            {showApproveModal && selectedLogToApprove && (
-                <ApproveUnitModal
-                    selectedLogToApprove={selectedLogToApprove}
-                    onClose={() => setShowApproveModal(false)}
-                    onApprove={executeApproval}
-                />
-            )}
-        </div>
-    );
-}
+        )}
+        
+        {/* ======================================================= */}
+        {/* === END: GLOBAL MESSAGING AND LOADING OVERLAYS ========== */}
+        {/* ======================================================= */}
+
+        {/* --- GLOBAL MODAL RENDERING (KEPT AS IS) --- */}
+        {selectedUnitToEdit && (<EditUnitModal unit={selectedUnitToEdit} onClose={() => setSelectedUnitToEdit(null)} onSave={handleSaveEdit} />)}
+        {selectedReportToView && (<ReportDetailModal report={selectedReportToView} onClose={() => setSelectedReportToView(null)} API_BASE_URL={API_BASE_URL} />)}
+        {showReportModal && (<SubmitReportModal user={user} stations={stations} onClose={() => setShowReportModal(false)} onSave={refreshAndCloseReport} REPORTS_ENDPOINT={REPORTS_ENDPOINT} />)}
+        {stationHistoryId && (<StationHistoryModal stationId={stationHistoryId} onClose={() => setStationHistoryId(null)} HISTORY_ENDPOINT={HISTORY_ENDPOINT} />)}
+        {selectedUserToManage && (<ManageUserModal userToEdit={selectedUserToManage.id ? selectedUserToManage : initialNewUserData} stations={stations} onClose={() => setSelectedUserToManage(null)} onSave={handleSaveUser} AVATAR_UPLOAD_PATH={AVATAR_UPLOAD_PATH} DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH} />)}
+        {selectedUserToDelete && (<DeleteUserModal user={selectedUserToDelete} onClose={() => setSelectedUserToDelete(null)} onDelete={handleDeleteUser} />)}
+        {showPostModal && (
+            <AnnouncementModal
+                user={user}
+                onClose={() => setShowPostModal(false)}
+                onPost={handlePostAnnouncement}
+                API_BASE_URL={API_BASE_URL}
+                DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH}
+            />
+        )}
+        
+        {showDeleteModal && (
+            <DeleteAnnouncementModal
+                announcementToDelete={announcementToDelete}
+                onClose={() => setShowDeleteModal(false)}
+                executeDelete={executeDeleteAnnouncement}
+            />
+        )}
+        {/* The Approval Modal must also be rendered here if the `ApprovalQueue` is not rendered/used */}
+        {showApproveModal && selectedLogToApprove && (
+            <ApproveUnitModal
+                selectedLogToApprove={selectedLogToApprove}
+                onClose={() => setShowApproveModal(false)}
+                onApprove={executeApproval}
+            />
+        )}
+    </div>
+)};
