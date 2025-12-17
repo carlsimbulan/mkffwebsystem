@@ -9,12 +9,15 @@ const COLOR_COMPLETED = '#10b981'; // Emerald Green
 const COLOR_NG = '#ef4444';      // Red
 const COLOR_IN_PROGRESS = '#f59e0b'; // Amber
 
-// Helper to render metric card
 const StatItem = ({ label, value, color, icon, total }) => {
     const percentage = total > 0 ? ((value / total) * 100).toFixed(0) : 0;
     return (
-        <div className="d-flex align-items-center justify-content-between p-3 rounded shadow-sm mb-4" 
-             style={{backgroundColor: `${color}15`, borderLeft: `5px solid ${color}`}}>
+        <div className="d-flex align-items-center justify-content-between p-3 rounded mb-4" 
+             style={{
+                backgroundColor: `${color}15`, 
+                borderLeft: `5px solid ${color}`,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)' // Static shadow instead of complex classes
+             }}>
             <div className="d-flex align-items-center">
                 <div className="d-flex align-items-center justify-content-center rounded-circle me-3 flex-shrink-0" 
                       style={{width: '30px', height: '30px', backgroundColor: color}}>
@@ -30,7 +33,6 @@ const StatItem = ({ label, value, color, icon, total }) => {
     );
 };
 
-
 export const UnitPieChart = ({ metrics, title }) => {
     const total = metrics.completedUnits + metrics.ngUnits + metrics.pendingUnits;
 
@@ -42,7 +44,7 @@ export const UnitPieChart = ({ metrics, title }) => {
                 backgroundColor: [COLOR_COMPLETED, COLOR_NG, COLOR_IN_PROGRESS],
                 borderColor: ['#fff', '#fff', '#fff'],
                 borderWidth: 4, 
-                hoverOffset: 10, 
+                hoverOffset: 0, // Disabled hover offset to prevent movement lag
                 cutout: '70%', 
                 borderRadius: 10, 
                 spacing: 2 
@@ -53,30 +55,32 @@ export const UnitPieChart = ({ metrics, title }) => {
     const options = {
         responsive: true,
         maintainAspectRatio: false,
-        animation: {
-            animateScale: true,
-            animateRotate: true
+        // --- DISABLE ALL ANIMATIONS ---
+        animation: false, 
+        transitions: {
+            active: {
+                animation: {
+                    duration: 0 // Instant update
+                }
+            }
         },
+        // ------------------------------
         plugins: {
             legend: { display: false },
             tooltip: {
-                // --- FIX: DISABLED TOOLTIP ENTIRELY AS REQUESTED ---
                 enabled: false, 
             },
         },
     };
 
     return (
-        // Main Container: Increased p-5 for overall spaciousness
         <div className="w-100 h-100 p-5"> 
-            {/* Increased g-5 for horizontal gap between columns */}
             <div className="row g-5 justify-content-center align-items-center h-100">
                 
                 {/* LEFT COLUMN: Metric Cards */}
                 <div className="col-md-5 d-flex flex-column justify-content-center">
                     <h6 className="fw-bold text-uppercase small text-muted mb-4 d-none d-md-block" style={{letterSpacing: '1px'}}>Status Breakdown</h6>
                     
-                    {/* Stat Items now have mb-4 spacing */}
                     <StatItem 
                         label="Completed" 
                         value={metrics.completedUnits} 
@@ -102,25 +106,24 @@ export const UnitPieChart = ({ metrics, title }) => {
 
                 {/* RIGHT COLUMN: Chart Section */}
                 <div className="col-md-7 d-flex align-items-center justify-content-center position-relative">
-                    
-                    {/* Doughnut Chart Container */}
                     <div style={{ height: '100%', minHeight: '300px', width: '100%', maxWidth: '350px' }}>
                         <Doughnut data={chartData} options={options} />
 
-                        {/* Clean Center Label */}
-                        <div className="position-absolute top-50 start-50 translate-middle text-center rounded-circle d-flex flex-column align-items-center justify-content-center shadow-md bg-white" 
-                             style={{ width: '130px', height: '130px', pointerEvents: 'none', zIndex: 5 }}>
+                        {/* Center Label - Static Position */}
+                        <div className="position-absolute top-50 start-50 translate-middle text-center rounded-circle d-flex flex-column align-items-center justify-content-center bg-white" 
+                             style={{ 
+                                width: '130px', 
+                                height: '130px', 
+                                pointerEvents: 'none', 
+                                zIndex: 5,
+                                border: '1px solid #eee' 
+                             }}>
                             <span className="text-muted text-uppercase fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Total Units</span>
                             <h1 className="mb-0 fw-bolder text-dark display-6" style={{ lineHeight: '1', letterSpacing: '-1px' }}>{total}</h1>
                         </div>
                     </div>
                 </div>
-
             </div>
-            
-            <style jsx>{`
-                .shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06); }
-            `}</style>
         </div>
     );
 };
