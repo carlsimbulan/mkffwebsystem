@@ -106,22 +106,30 @@ if ($method === 'PUT') {
     try {
         $pdo->beginTransaction();
         
-        $stmt = $pdo->prepare("UPDATE units SET status = :status, remarks = :remarks WHERE id = :id");
+        // PINALITAN: Idinagdag ang station = :station sa SQL UPDATE query
+        $stmt = $pdo->prepare("UPDATE units SET 
+                                status = :status, 
+                                remarks = :remarks, 
+                                station = :station 
+                               WHERE id = :id");
+                               
         $stmt->execute([
             'id' => $data['id'],
             'status' => $data['status'],
-            'remarks' => $data['remarks'] ?? ''
+            'remarks' => $data['remarks'] ?? '',
+            'station' => $data['station'] ?? 'N/A' // <--- Idinagdag para ma-update ang DB
         ]);
 
         $mod = $data['model'] ?? '';
         $assy = $data['assemblyNo'] ?? $data['assembly_no'] ?? '';
         
-        logUnitAction($pdo, $data['id'], $mod, $assy, $data['station'] ?? 'N/A', $data['status'], 'STATUS_UPDATED', $data['remarks'] ?? '', $data['username'] ?? 'System');
+        // Ang history logging ay gagamit na rin ng bagong station name
+        logUnitAction($pdo, $data['id'], $mod, $assy, $data['station'] ?? 'N/A', $data['status'], 'ADMIN_MANUAL_EDIT', $data['remarks'] ?? '', $data['username'] ?? 'Admin');
 
         $pdo->commit();
         echo json_encode(["status" => "success", "message" => "Unit updated successfully."]);
     } catch (Exception $e) {
-        $pdo->rollBack();
+        if ($pdo->inTransaction()) $pdo->rollBack();
         http_response_code(500); echo json_encode(['error' => $e->getMessage()]);
     }
     exit;

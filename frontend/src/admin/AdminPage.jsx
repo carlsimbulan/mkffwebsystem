@@ -382,34 +382,40 @@ const handleApproveUnit = async (unitId, unitData) => {
     };
 
 
-    const handleSaveEdit = async (id, updatedData) => {
-        setSelectedUnitToEdit(null);
-        const dataToSend = {
-            // ... dataToSend payload ...
-            id: id,
-            model: updatedData.model,
-            revision: updatedData.revision,
-            base_unit_kitting_no: updatedData.base_unit_kitting_no,
-            assembly_no: updatedData.assembly_no,
-            device_serial_no: updatedData.device_serial_no,
-            accessory_kitting_no: updatedData.accessory_kitting_no,
-            status: updatedData.status,
-            remarks: updatedData.remarks,
-            station: updatedData.station,
-        };
-        setIsProcessing(true); // START LOADING
-        try {
-            await axios.post(`${UNITS_ENDPOINT}?method=PUT`, dataToSend, { headers: { 'Content-Type': 'application/json' } });
-            setSuccessMessage(`Unit ${id} successfully updated.`);
-            setTimeout(() => setSuccessMessage(null), 4000); 
-        } catch (error) {
-            console.error(`Error saving unit ${id}:`, error);
-            alert(`Failed to save unit: ${error.message}`);
-        } finally {
-            fetchData(); // This refreshes the logs
-            setIsProcessing(false); // STOP LOADING
-        }
-    };
+const handleSaveEdit = async (id, updatedData) => {
+    setSelectedUnitToEdit(null);
+    
+    // Siguraduhin na lahat ng fields na ito ay ipinapadala sa backend
+    const dataToSend = {
+        id: id,
+        model: updatedData.model,
+        revision: updatedData.revision,
+        base_unit_kitting_no: updatedData.base_unit_kitting_no,
+        assembly_no: updatedData.assembly_no,
+        device_serial_no: updatedData.device_serial_no,
+        accessory_kitting_no: updatedData.accessory_kitting_no,
+        status: updatedData.status,
+        remarks: updatedData.remarks,
+        station: updatedData.station, // <--- ITO ANG IMPORTANTE PARA SA DB UPDATE
+    };
+
+    setIsProcessing(true); 
+    try {
+        // Gumagamit ka ng POST na may ?method=PUT base sa code mo
+        await axios.post(`${UNITS_ENDPOINT}?method=PUT`, dataToSend, { 
+            headers: { 'Content-Type': 'application/json' } 
+        });
+        
+        setSuccessMessage(`Unit ${id} successfully updated and moved to ${updatedData.station}.`);
+        setTimeout(() => setSuccessMessage(null), 4000); 
+    } catch (error) {
+        console.error(`Error saving unit ${id}:`, error);
+        alert(`Failed to save unit: ${error.message}`);
+    } finally {
+        fetchData(); // I-refresh ang listahan para makita ang bagong station
+        setIsProcessing(false); 
+    }
+};
 
     // --- USER MANAGEMENT HANDLERS (KEPT AS IS) ---
     const handleAddUser = () => { setSelectedUserToManage(initialNewUserData); };

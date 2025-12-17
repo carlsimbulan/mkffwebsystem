@@ -1,387 +1,298 @@
-import React, { useRef, useState } from 'react';
-import { UnitPieChart } from './UnitPieChart'; // Existing component
-import { StationBarChart } from './StationBarChart'; // Existing component
-
-// Assume html2canvas is installed: npm install html2canvas
-import html2canvas from 'html2canvas'; // <--- UNCOMMENTED: Ito na ang tamang import
+import React, { useRef } from 'react';
+import { UnitPieChart } from './UnitPieChart'; 
+import { StationBarChart } from './StationBarChart'; 
+import html2canvas from 'html2canvas'; 
 
 export function Dashboard({
     logs,
     stations,
     calculateMetrics,
-    overallMetrics, // Contains: completedUnits, pendingUnits, ngUnits, pendingApprovalUnits, yieldRate
+    overallMetrics, 
     setActiveTab,
     dashboardView,
     nextChart,
     prevChart,
     handleMonitorStation,
-    newReportsToday, // <-- NEW PROP: Added for displaying new reports count
+    newReportsToday, 
 }) {
     
-    // 1. CHART REFERENCE: Gumawa ng ref para ituro ang Chart Container
     const chartRef = useRef(null); 
 
-    // --- CHART EXPORT FUNCTION ---
     const exportChartAsImage = () => {
         const chartElement = chartRef.current;
-        if (!chartElement) {
-            console.error("Chart reference is null.");
-            alert("Chart element not found for export.");
-            return;
-        }
+        if (!chartElement) return;
 
-        // Production implementation of html2canvas logic:
         html2canvas(chartElement, {
             allowTaint: true,
             useCORS: true,
-            // These options adjust the captured area to match the visible window:
-            scrollX: -window.scrollX,
-            scrollY: -window.scrollY,
-            windowWidth: document.documentElement.offsetWidth,
-            windowHeight: document.documentElement.offsetHeight
+            backgroundColor: "#ffffff",
+            scale: 2 
         }).then(canvas => {
             const image = canvas.toDataURL('image/png');
             const link = document.createElement('a');
             link.href = image;
-            link.download = `${currentChartTitle.replace(/\s/g, '_')}_${new Date().toISOString()}.png`;
-            document.body.appendChild(link);
+            link.download = `MKFF_Report_${new Date().getTime()}.png`;
             link.click();
-            document.body.removeChild(link);
-        }).catch(err => {
-            console.error("Error generating image:", err);
-            alert("Failed to export chart. Check console for details.");
         });
     };
     
-    // --- ADDITIONAL CALCULATIONS ---
-    const forScanningUnits = logs.filter(l => l.status === 'For Scanning').length;
+    const forScanningLogs = logs.filter(l => l.status === 'For Scanning');
+    const forScanningUnitsCount = forScanningLogs.length;
 
-    // --- CALCULATIONS FOR CORE PRODUCTION UNITS (Units that are 'in station') ---
     const coreProductionUnits = 
         overallMetrics.completedUnits + 
         overallMetrics.pendingUnits + 
         overallMetrics.ngUnits + 
         overallMetrics.pendingApprovalUnits; 
 
-    const totalUnits = coreProductionUnits + forScanningUnits; 
+    const totalUnits = coreProductionUnits + forScanningUnitsCount; 
 
     const calculatePercentage = (value) => {
         if (totalUnits === 0) return '0.0%';
         return ((value / totalUnits) * 100).toFixed(1) + '%';
     };
 
-    const completedPercentage = calculatePercentage(overallMetrics.completedUnits);
-    const pendingPercentage = calculatePercentage(overallMetrics.pendingUnits);
-    const ngPercentage = calculatePercentage(overallMetrics.ngUnits);
-    const forScanningPercentage = calculatePercentage(forScanningUnits);
-    const coreProductionPercentage = calculatePercentage(coreProductionUnits);
-
-    // Determine current chart title
-    const currentChartTitle = dashboardView === 'bar' ? 'Station Output' : 'Status Distribution';
-    const currentChartSubtitle = dashboardView === 'bar' ? 'Live production count per station' : 'Overall yield ratio';
+    const currentChartTitle = dashboardView === 'bar' ? 'STATION OUTPUT' : 'STATUS DISTRIBUTION';
 
     return (
-        <div className="animate-in fade-in pb-4">
-            {/* --- 1. Header Section --- (No Change) */}
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h3 className="fw-bold text-dark mb-1" style={{ letterSpacing: '-0.5px' }}>Production Overview</h3>
-                    <p className="text-muted small mb-0">Real-time data stream from all active stations.</p>
-                </div>
-                <div className="d-flex align-items-center gap-2">
-                    
-                    {/* UPDATED: New Reports Today (Blink Highlight Effect) */}
-                    {newReportsToday > 0 && (
-                        <button 
-                            className="btn btn-sm btn-light border border-info px-3 py-2 rounded shadow-sm d-flex align-items-center text-start hover-info-light blink-highlight-info" 
-                            onClick={() => setActiveTab('reports')}
-                            title={`View ${newReportsToday} New Reports`}
-                            style={{ '--bs-border-opacity': '.5' }}
-                        >
-                            <i className="bi bi-file-earmark-text-fill text-info fs-5 me-2"></i>
-                            <span className="fw-bold text-dark small" style={{ fontSize: '0.8rem' }}>
-                                <span className="text-info me-1">{newReportsToday}</span>
-                                New Report{newReportsToday > 1 ? 's' : ''} Today
-                            </span>
-                        </button>
-                    )}
-                    
-                    {/* System Live Status */}
-                    <div className="bg-white border px-3 py-2 rounded shadow-sm d-flex align-items-center">
-                        <span className="position-relative d-flex h-2 w-2 me-2">
-                            <span className="animate-ping position-absolute d-inline-flex h-100 w-100 rounded-circle bg-success opacity-75"></span>
-                            <span className="position-relative d-inline-flex rounded-circle h-2 w-2 bg-success" style={{ width: '10px', height: '10px' }}></span>
-                        </span>
-                        <span className="fw-bold text-dark small" style={{ fontSize: '0.8rem' }}>System Live</span>
-                    </div>
-
-                    {/* Current Date */}
-                    <div className="bg-white border px-3 py-2 rounded shadow-sm text-secondary fw-bold small">
-                        {new Date().toLocaleDateString()}
-                    </div>
-                </div>
-            </div>
-
-            {/* --- 2. Stats Cards (Summary) --- */}
-            <div className="row g-4 mb-4"> 
+        <div className="container-fluid px-0 py-2 animate-in fade-in">
+            <style>{`
+                .stat-card-pro {
+                    background: #ffffff;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 12px;
+                    padding: 22px;
+                    height: 100%;
+                    border-left: 5px solid #334155;
+                }
+                .label-caps {
+                    font-size: 0.65rem;
+                    font-weight: 800;
+                    color: #64748b;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                    margin-bottom: 8px;
+                    display: block;
+                }
+                .value-bold {
+                    font-size: 2rem;
+                    font-weight: 900;
+                    color: #0f172a;
+                    margin: 0;
+                    line-height: 1;
+                }
+                .badge-flat {
+                    font-size: 0.75rem;
+                    font-weight: 700;
+                    padding: 4px 10px;
+                    border-radius: 6px;
+                    margin-top: 10px;
+                    display: inline-block;
+                }
+                .chart-wrapper-flat {
+                    background: #ffffff;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 16px;
+                    overflow: hidden;
+                }
+                .chart-header-flat {
+                    background: #f8fafc;
+                    border-bottom: 1px solid #e2e8f0;
+                    padding: 18px 24px;
+                }
+                .btn-ui-flat {
+                    background: #fff;
+                    border: 1px solid #e2e8f0;
+                    color: #475569;
+                    font-size: 0.75rem;
+                    font-weight: 700;
+                    padding: 6px 14px;
+                    border-radius: 8px;
+                    transition: all 0.2s;
+                }
+                .btn-ui-flat:hover { background: #f1f5f9; border-color: #cbd5e1; }
                 
-                {/* 1. Total Scanned Units (Na-scan na at nasa production) */}
-                <div className="col-md-6">
-                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-primary" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <div className="bg-primary bg-opacity-10 text-primary rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
-                                    <i className="bi bi-box-fill fs-4"></i>
-                                </div>
-                                <span className="badge bg-primary text-white px-3 py-2 rounded-pill fw-bolder" style={{ fontSize: '1rem' }}>
-                                    {coreProductionPercentage}
-                                </span>
-                            </div>
-                            <h2 className="fw-bold text-dark mb-0 display-6">{coreProductionUnits}</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Total Scanned Units (In-Production)</span>
-                        </div>
-                    </div>
-                </div>
+                .pulse-indicator {
+                    width: 10px; height: 10px;
+                    background: #107c55;
+                    border-radius: 50%;
+                    display: inline-block;
+                    margin-right: 10px;
+                    animation: pulse-ring 2s infinite;
+                }
+                @keyframes pulse-ring {
+                    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 124, 85, 0.7); }
+                    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(16, 124, 85, 0); }
+                    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 124, 85, 0); }
+                }
 
-                {/* 2. For Scanning Units (Hindi pa na-scan) */}
-                <div className="col-md-6">
-                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-info" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <div className="bg-info bg-opacity-10 text-info rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
-                                    <i className="bi bi-qr-code-scan fs-4"></i>
-                                </div>
-                                <span className="badge bg-info text-dark px-3 py-2 rounded-pill fw-bolder" style={{ fontSize: '1rem' }}>
-                                    {forScanningPercentage}
-                                </span>
-                            </div>
-                            <h2 className="fw-bold text-dark mb-0 display-6">{forScanningUnits}</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Total Units Not Scanned (For Scanning)</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* ROW 2: PRODUCTION STATUS BREAKDOWN (3 Cards: Completed, WIP, NG) */}
-            <div className="row g-4 mb-5">
+                .text-violet { color: #8b5cf6 !important; }
+                .bg-violet-subtle { background-color: #f5f3ff !important; color: #7c3aed !important; border: 1px solid #ddd6fe; }
+                .border-violet { border-left-color: #8b5cf6 !important; }
+                .bg-yellow-subtle { background-color: #fffbeb !important; color: #d97706 !important; border: 1px solid #fef3c7; }
                 
-                {/* 3. Completed Units */}
-                <div className="col-md-4">
-                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-success" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <div className="bg-success bg-opacity-10 text-success rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
-                                    <i className="bi bi-box-seam-fill fs-4"></i>
-                                </div>
-                                <span className="badge bg-success text-white px-3 py-2 rounded-pill fw-bolder" style={{ fontSize: '1rem' }}>
-                                    {completedPercentage}
-                                </span>
-                            </div>
-                            <h2 className="fw-bold text-dark mb-0 display-6">{overallMetrics.completedUnits}</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Completed Units (Yield: {overallMetrics.yieldRate}%)</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* 4. In Progress */}
-                <div className="col-md-4">
-                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-warning" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <div className="bg-warning bg-opacity-10 text-warning rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
-                                    <i className="bi bi-hourglass-split fs-4"></i>
-                                </div>
-                                <span className="badge bg-warning text-dark px-3 py-2 rounded-pill fw-bolder" style={{ fontSize: '1rem' }}>
-                                    {pendingPercentage}
-                                </span>
-                            </div>
-                            <h2 className="fw-bold text-dark mb-0 display-6">{overallMetrics.pendingUnits}</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>In Progress (Work in progress)</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* 5. Defects (NG) */}
-                <div className="col-md-4">
-                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-danger" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <div className="bg-danger bg-opacity-10 text-danger rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
-                                    <i className="bi bi-exclamation-octagon-fill fs-4"></i>
-                                </div>
-                                <span className="badge bg-danger text-white px-3 py-2 rounded-pill fw-bolder" style={{ fontSize: '1rem' }}>
-                                    {ngPercentage}
-                                </span>
-                            </div>
-                            <h2 className="fw-bold text-danger mb-0 display-6">{overallMetrics.ngUnits}</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Total Defects (NG)</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* --- 3. Approvals Alert (Action Bar) --- */}
-            {overallMetrics.pendingApprovalUnits > 0 && (
-                <div className="card border-0 shadow-sm mb-4 border-start border-4 border-danger bg-white blink-highlight-danger"> 
-                    <div className="card-body d-flex align-items-center justify-content-between p-3">
-                        <div className="d-flex align-items-center">
-                            <i className="bi bi-bell-fill text-danger fs-4 me-3 ms-2"></i>
-                            <div>
-                                <h6 className="fw-bold text-dark mb-0">Action Required: QA Validation</h6>
-                                <small className="text-secondary">There are <span className="fw-bold text-danger">{overallMetrics.pendingApprovalUnits} units</span> waiting for QA validation.</small>
-                            </div>
-                        </div>
-                        <button className="btn btn-sm btn-danger px-4 rounded-pill" onClick={() => setActiveTab('approval')}>
-                            Review Queue
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* ----------------------------------------------------- */}
-            {/* --- 5. PAGING CHART CONTAINER (Secondary Visual) --- */}
-            {/* ----------------------------------------------------- */}
-            <div className="row g-4 mb-4"> 
-                <div className="col-12">
-                    {/* Attach chartRef to the entire chart card body that needs to be captured */}
-                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px', minHeight: '480px' }}>
-
-                        {/* CHART HEADER - BUTTONS ARE VISIBLE AND IN THE TOP CENTER/RIGHT */}
-                        <div className="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
-
-                            {/* Left: Title and Subtitle */}
-                            <div>
-                                <h5 className="fw-bold text-dark mb-0">{currentChartTitle}</h5>
-                                <small className="text-muted" style={{ fontSize: '0.75rem' }}>{currentChartSubtitle}</small>
-                            </div>
-
-                            {/* Right: Navigation Buttons (Highly Visible) */}
-                            <div className="d-flex gap-2 ms-auto">
-                                {/* NEW EXPORT BUTTON HERE */}
-                                <button className="btn btn-light border btn-sm rounded-pill fw-bold text-dark" onClick={exportChartAsImage} title="Export Chart as PNG">
-                                    <i className="bi bi-download me-1"></i> Export
-                                </button>
-                                
-                                <button className="btn btn-dark btn-sm rounded-pill fw-bold" onClick={prevChart} title="Previous Chart">
-                                    <i className="bi bi-arrow-left me-1"></i> Prev
-                                </button>
-                                <button className="btn btn-dark btn-sm rounded-pill fw-bold" onClick={nextChart} title="Next Chart">
-                                    Next <i className="bi bi-arrow-right ms-1"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Chart Body Container - ATTACH THE REF HERE */}
-                        <div className="card-body d-flex align-items-center justify-content-center p-4" ref={chartRef}>
-                            <div className="w-100 h-100 fade-in" style={{ height: '400px' }}>
-                                {/* Conditional Rendering based on dashboardView state */}
-                                {dashboardView === 'bar' && (
-                                    <StationBarChart logs={logs} stations={stations} calculateMetrics={calculateMetrics} />
-                                )}
-                                {dashboardView === 'pie' && (
-                                    <UnitPieChart metrics={overallMetrics} title="" />
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-
-            {/* --- 4. LIVE UNITS OVERVIEW (PRIORITIZED TABLE) --- */}
-            <div className="row g-4 mb-4">
-                <div className="col-12">
-                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
-                        <div className="card-header bg-white py-3 border-0">
-                            <h5 className="fw-bold text-dark mb-0">Live Units Overview</h5>
-                            <small className="text-muted" style={{ fontSize: '0.75rem' }}>Detailed breakdown of active and recent logs.</small>
-                        </div>
-                        <div className="card-body p-4">
-                            <div className="table-responsive" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                                <table className="table table-sm table-striped align-middle mb-0 small">
-                                    <thead className="table-light">
-                                        <tr>
-                                            <th>Time</th>
-                                            <th>Station</th>
-                                            <th>Device Serial No</th>
-                                            <th>Status</th>
-                                            <th>Remarks</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {logs.slice(0, 10).map(log => ( // Show only the last 10 logs for a quick overview
-                                            <tr key={log.id}>
-                                                <td className="text-muted" style={{ fontSize: '00.7rem' }}>{new Date(log.created_at).toLocaleTimeString()}</td>
-                                                <td className="fw-medium">{log.station}</td>
-                                                <td className="font-monospace">{log.device_serial_no}</td>
-                                                {/* Nagdagdag ng 'For Scanning' status sa badge logic */}
-                                                <td><span className={`badge ${log.status === 'Completed' ? 'bg-success' : log.status === 'No Good (NG)' ? 'bg-danger' : log.status === 'In Progress' ? 'bg-primary' : log.status === 'For Scanning' ? 'bg-info text-dark' : 'bg-warning text-dark'}`}>{log.status}</span></td>
-                                                <td className="small text-truncate" style={{ maxWidth: '200px' }}>{log.remarks || 'N/A'}</td>
-                                            </tr>
-                                        ))}
-                                        {logs.length === 0 && (
-                                            <tr><td colSpan="5" className="text-center py-3 text-muted">No recent activity to display.</td></tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            {/* Custom Styles for visual feedback */}
-            <style jsx>{`
-                /* ... (Custom styles are unchanged) ... */
-                /* Style for the New Reports Button (Hover effect maintained) */
-                .hover-info-light:hover { 
-                    background-color: #e0f7ff !important; /* Lighter info blue background */
-                    border-color: #0dcaf0 !important;
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+                .scan-table { font-size: 0.8rem; }
+                .scan-table thead th {
+                    background: #f8fafc;
+                    color: #475569;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    font-size: 0.65rem;
+                    letter-spacing: 1px;
+                    padding: 12px 10px;
+                    border-bottom: 2px solid #e2e8f0;
+                    position: sticky;
+                    top: 0;
+                    z-index: 10;
                 }
-                
-                /* Keyframes for Info Blink Highlight (New Reports) */
-                @keyframes highlight-info {
-                    0% {
-                        background-color: #ffffff; /* White background */
-                        box-shadow: 0 0 0 0 rgba(13, 202, 240, 0.4); /* Info blue shadow */
-                    }
-                    50% {
-                        background-color: #e0f7ff; /* Very Light Info background */
-                        box-shadow: 0 0 0 8px rgba(13, 202, 240, 0); /* Fading shadow pulse */
-                    }
-                    100% {
-                        background-color: #ffffff;
-                        box-shadow: 0 0 0 0 rgba(13, 202, 240, 0);
-                    }
+                .serial-text {
+                    font-family: 'Monaco', 'Consolas', monospace;
+                    background: #f1f5f9;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    font-weight: 600;
                 }
-
-                /* Keyframes for Danger Blink Highlight (Approvals) */
-                @keyframes highlight-danger {
-                    0% {
-                        background-color: #ffffff; /* White background */
-                        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.5); /* Danger red shadow */
-                    }
-                    50% {
-                        background-color: #fce7e7; /* Very Light Danger background */
-                        box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); /* Fading shadow pulse */
-                    }
-                    100% {
-                        background-color: #ffffff;
-                        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
-                    }
-                }
-
-                /* Apply blink-highlight for New Reports */
-                .blink-highlight-info {
-                    animation: highlight-info 3s infinite;
-                }
-
-                /* Apply blink-highlight for Pending Approvals */
-                .blink-highlight-danger {
-                    animation: highlight-danger 3s infinite;
+                .table-scroll {
+                    max-height: 500px;
+                    overflow-y: auto;
                 }
             `}</style>
+
+            <div className="d-flex justify-content-between align-items-center mb-4 px-2">
+                <div>
+                    <h3 className="fw-bold text-dark mb-0 tracking-tight">Production Overview</h3>
+                    <p className="text-muted small mb-0">MKFF Dashboard • Full System Monitoring</p>
+                </div>
+                <div className="btn-ui-flat d-flex align-items-center">
+                    <span className="pulse-indicator"></span> SYSTEM LIVE
+                </div>
+            </div>
+
+            {/* --- 3x2 CARDS GRID (REORDERED) --- */}
+            <div className="row g-4 mb-4">
+                <div className="col-md-4">
+                    <div className="stat-card-pro" style={{ borderLeftColor: '#0f172a' }}>
+                        <span className="label-caps">Total Scanned Units</span>
+                        <h3 className="value-bold">{coreProductionUnits}</h3>
+                        <span className="badge-flat bg-dark text-white">{calculatePercentage(coreProductionUnits)} Share</span>
+                    </div>
+                </div>
+                <div className="col-md-4">
+                    <div className="stat-card-pro" style={{ borderLeftColor: '#0ea5e9' }}>
+                        <span className="label-caps text-info">For Scanning Queue</span>
+                        <h3 className="value-bold">{forScanningUnitsCount}</h3>
+                        <span className="badge-flat bg-info bg-opacity-10 text-info">{calculatePercentage(forScanningUnitsCount)} Pending</span>
+                    </div>
+                </div>
+                {/* --- IN PROGRESS (NILIPAT SA TAAS / 3rd Position) --- */}
+                <div className="col-md-4">
+                    <div className="stat-card-pro" style={{ borderLeftColor: '#fbbf24' }}>
+                        <span className="label-caps text-warning">In Progress (WIP)</span>
+                        <h3 className="value-bold">{overallMetrics.pendingUnits}</h3>
+                        <span className="badge-flat bg-yellow-subtle">{calculatePercentage(overallMetrics.pendingUnits)} Capacity</span>
+                    </div>
+                </div>
+                {/* --- COMPLETED (NILIPAT SA BABA / 4th Position) --- */}
+                <div className="col-md-4">
+                    <div className="stat-card-pro" style={{ borderLeftColor: '#10b981' }}>
+                        <span className="label-caps text-success">Completed (Yield)</span>
+                        <h3 className="value-bold">{overallMetrics.completedUnits}</h3>
+                        <span className="badge-flat bg-success bg-opacity-10 text-success">{calculatePercentage(overallMetrics.completedUnits)} Rate</span>
+                    </div>
+                </div>
+                <div className="col-md-4">
+                    <div className="stat-card-pro" style={{ borderLeftColor: '#ef4444' }}>
+                        <span className="label-caps text-danger">Total Defects (NG)</span>
+                        <h3 className="value-bold text-danger">{overallMetrics.ngUnits}</h3>
+                        <span className="badge-flat bg-danger bg-opacity-10 text-danger">{calculatePercentage(overallMetrics.ngUnits)} Failure</span>
+                    </div>
+                </div>
+                <div className="col-md-4">
+                    <div className="stat-card-pro border-violet" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('approval')}>
+                        <span className="label-caps text-violet">Pending QA Approval</span>
+                        <h3 className="value-bold text-violet">{overallMetrics.pendingApprovalUnits}</h3>
+                        <span className="badge-flat bg-violet-subtle">Needs Validation</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* --- CHART SECTION --- */}
+            <div className="chart-wrapper-flat mb-4">
+                <div className="chart-header-flat d-flex justify-content-between align-items-center">
+                    <span className="label-caps m-0">{currentChartTitle}</span>
+                    <div className="d-flex gap-2">
+                        <button className="btn-ui-flat" onClick={exportChartAsImage}><i className="bi bi-download me-2"></i>EXPORT</button>
+                        <div className="btn-group">
+                            <button className="btn-ui-flat border-end-0" onClick={prevChart}>PREV</button>
+                            <button className="btn-ui-flat" onClick={nextChart}>NEXT</button>
+                        </div>
+                    </div>
+                </div>
+                <div className="p-4" ref={chartRef}>
+                    <div style={{ minHeight: '400px' }}>
+                        {dashboardView === 'bar' ? (
+                            <StationBarChart logs={logs} stations={stations} calculateMetrics={calculateMetrics} />
+                        ) : (
+                            <UnitPieChart metrics={overallMetrics} title="" />
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* --- FULL LIST: FOR SCANNING UNITS --- */}
+            <div className="chart-wrapper-flat">
+                <div className="chart-header-flat d-flex justify-content-between align-items-center">
+                    <span className="label-caps m-0">Units Pending Scanning (Full Registry)</span>
+                    <span className="badge bg-info text-dark fw-bold px-3">{forScanningUnitsCount} Units Found</span>
+                </div>
+                <div className="table-responsive table-scroll">
+                    <table className="table table-hover align-middle mb-0 scan-table">
+                        <thead>
+                            <tr>
+                                <th>MODEL</th>
+                                <th>REVISION</th>
+                                <th>BASE UNIT</th>
+                                <th>ASSEMBLY</th>
+                                <th>DEVICE SERIAL</th>
+                                <th>ACCESSORY</th>
+                                <th>STATUS</th>
+                                <th>REMARKS</th>
+                                <th>TIME DATE</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {forScanningLogs.length === 0 ? (
+                                <tr>
+                                    <td colSpan="9" className="text-center py-5 text-muted">
+                                        <i className="bi bi-inbox fs-2 d-block mb-2 opacity-50"></i>
+                                        No units are currently pending for scanning.
+                                    </td>
+                                </tr>
+                            ) : (
+                                forScanningLogs.map(log => (
+                                    <tr key={log.id}>
+                                        <td className="fw-bold">{log.model || 'N/A'}</td>
+                                        <td>{log.revision || 'N/A'}</td>
+                                        <td>{log.base_unit_kitting_no || 'N/A'}</td>
+                                        <td>{log.assembly_no || 'N/A'}</td>
+                                        <td><span className="serial-text">{log.device_serial_no}</span></td>
+                                        <td>{log.accessory_kitting_no || 'N/A'}</td>
+                                        <td>
+                                            <span className="badge bg-info-subtle text-info border border-info border-opacity-25 px-3 py-1 rounded-pill">
+                                                {log.status}
+                                            </span>
+                                        </td>
+                                        <td className="text-muted small italic">{log.remarks || '---'}</td>
+                                        <td className="text-muted small">
+                                            {new Date(log.created_at).toLocaleDateString()} | {new Date(log.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     );
 }

@@ -1,602 +1,293 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
-// Define the fixed list of station names based on the process flow (from AdminPage.jsx)
 const processStations = [
-    "PCB Pairing",
-    "Integrated Board Test",
-    "Main Board Conformal Coating",
-    "RTV Application",
-    "Casing/Harnessing",
-    "Complete Unit Test/Calibration",
-    "Pre BI Hi-Pot Test",
-    "Burn-in Testing",
-    "Sealing",
-    "Post BI Hi-Pot Test",
-    "Final Functional/Connectivity Test",
-    "Label Sticker Attachment",
-    "FVI",
-    "Packing",
-    "QC Stamping"
+    "PCB Pairing", "Integrated Board Test", "Main Board Conformal Coating",
+    "RTV Application", "Casing/Harnessing", "Complete Unit Test/Calibration",
+    "Pre BI Hi-Pot Test", "Burn-in Testing", "Sealing", "Post BI Hi-Pot Test",
+    "Final Functional/Connectivity Test", "Label Sticker Attachment", "FVI",
+    "Packing", "QC Stamping"
 ];
 
-// List of available statuses for filtering
-const allStatuses = ['All', 'In Progress', 'Completed', 'No Good (NG)', 'Pending Approval'];
+const allStatuses = ['All', 'In Progress', 'Completed', 'No Good (NG)', 'Pending Approval', 'For Scanning'];
 
-
-// Helper function to format date/time
 const formatTimestamp = (isoString) => {
     if (!isoString) return { date: 'N/A', time: 'N/A' };
     const date = new Date(isoString);
     return {
-        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
     };
 };
 
+// FIXED: Pinatibay ang mga kulay para hindi mag-invisible sa Overall History
 const getStatusBadgeClass = (status) => {
     const statusText = status?.toLowerCase() || '';
-    if (statusText.includes('completed') || statusText.includes('ok')) return 'bg-success';
-    if (statusText.includes('no good') || statusText.includes('pending approval')) return 'bg-danger';
-    if (statusText.includes('in progress')) return 'bg-primary';
-    if (statusText.includes('scanning') || statusText.includes('unit in')) return 'bg-info text-dark';
-    return 'bg-secondary';
-};
-
-// --- NEW COMPONENT: OVERALL HISTORY VIEW (KEPT FOR TAB SWITCHING) ---
-const RenderOverallHistory = ({ allLogs, setActiveTab }) => {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
-
-    if (!allLogs || allLogs.length === 0) {
-        return (
-            <div className="animate-in fade-in py-5 text-center bg-white shadow-sm rounded-4 mt-4">
-                <i className="bi bi-server fs-1 text-muted opacity-50 mb-3 d-block"></i>
-                <h5 className="fw-bold text-dark">No Production History Data</h5>
-                <p className="text-muted">No historical logs recorded across all stations yet.</p>
-                <button
-                    className="btn btn-dark btn-sm mt-3 px-4 rounded-pill fw-bold hover-lift"
-                    onClick={() => setActiveTab('stations')}
-                >
-                    Back to Station Overview
-                </button>
-            </div>
-        );
-    }
+    if (statusText.includes('completed') || statusText.includes('ok')) return 'bg-success-subtle text-success border border-success-subtle';
+    if (statusText.includes('no good')) return 'bg-danger-subtle text-danger border border-danger-subtle';
     
-    // --- Filtering Logic ---
-    const filteredLogs = allLogs.filter(log => {
-        // 1. Assembly ID Search (Case insensitive)
-        const matchesSearch = log.assembly_no?.toLowerCase().includes(searchTerm.toLowerCase());
-
-        // 2. Date Range Filter
-        const logTimestamp = log.timestamp || log.created_at; 
-        const logDate = new Date(logTimestamp);
-        let matchesDate = true;
-
-        if (startDate) {
-            const start = new Date(startDate);
-            start.setHours(0, 0, 0, 0); 
-            matchesDate = matchesDate && logDate >= start;
-        }
-
-        if (endDate) {
-            const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999); 
-            matchesDate = matchesDate && logDate <= end;
-        }
-
-        return matchesSearch && matchesDate;
-    });
-
-    // Sort logs by timestamp (most recent first)
-    const sortedLogs = filteredLogs.sort((a, b) => new Date(b.timestamp || b.created_at) - new Date(a.timestamp || a.created_at));
-
-    const resetFilters = () => {
-        setSearchTerm('');
-        setStartDate('');
-        setEndDate('');
-        // setStatusFilter('All'); // Status filter not implemented in this component yet, just clearing
-    };
-
-    return (
-        <div className="animate-in fade-in pb-5">
-            {/* Header: Black Text, No Icons */}
-            <div className="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3">
-                <div>
-                    <h3 className="fw-bolder text-dark mb-1">Overall Production History (All 15 Stations)</h3>
-                    <p className="text-muted small mb-0">Historical logs across the production line ({sortedLogs.length} entries displayed).</p>
-                </div>
-                <button
-                    className="btn btn-light border btn-sm px-3 fw-bold text-dark hover-lift rounded-pill"
-                    onClick={() => { setActiveTab('stations'); }}
-                >
-                    Back to Overview
-                </button>
-            </div>
-
-            {/* Filter and Search Bar */}
-            <div className="card shadow-sm mb-4 p-3 rounded-4 bg-white">
-                <div className="row g-3 align-items-end">
-                    
-                    {/* Search Assembly ID */}
-                    <div className="col-md-5">
-                        <label className="form-label small text-muted fw-medium">Search Assembly ID</label>
-                        <input
-                            type="text"
-                            className="form-control"
-                            placeholder="Enter Assembly ID..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                    
-                    {/* Date Range Filters */}
-                    <div className="col-md-3">
-                        <label className="form-label small text-muted fw-medium">Start Date</label>
-                        <input
-                            type="date"
-                            className="form-control"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                        />
-                    </div>
-                    <div className="col-md-3">
-                        <label className="form-label small text-muted fw-medium">End Date</label>
-                        <input
-                            type="date"
-                            className="form-control"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                        />
-                    </div>
-                    
-                    {/* Reset Button */}
-                    <div className="col-md-1 d-flex justify-content-end">
-                        <button 
-                            className="btn btn-outline-secondary" 
-                            onClick={resetFilters}
-                            title="Clear All Filters"
-                        >
-                            <i className="bi bi-x-circle"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Main History Table */}
-            <div className="card border-0 shadow-lg rounded-4 overflow-hidden">
-                <div className="table-responsive">
-                    <table className="table table-striped table-hover align-middle mb-0 small" style={{ fontSize: '0.85rem' }}>
-                        <thead className="bg-dark text-white text-uppercase" style={{ letterSpacing: '0.5px' }}>
-                            <tr>
-                                <th className="py-3 ps-4">Model</th> 
-                                <th>Assembly No.</th>
-                                <th>Action Type</th>
-                                <th>Station</th>
-                                <th className="text-center">Status After</th>
-                                <th>Action By</th>
-                                <th className="text-end pe-4">Timestamp</th>
-                            </tr>
-                        </thead>
-                        <tbody className="border-top-0">
-                            {sortedLogs.length > 0 ? sortedLogs.map(log => {
-                                // Use the timestamp column from the history log
-                                const timestamp = formatTimestamp(log.timestamp || log.created_at);
-                                const status = log.status_after || log.status; 
-                                const statusClass = getStatusBadgeClass(status);
-                                
-                                // Display Model ID
-                                const modelDisplay = log.model || log.model_id; 
-
-                                return (
-                                    <tr key={log.id}>
-                                        <td className="ps-4 fw-bold text-dark">{modelDisplay}</td> 
-                                        <td className="font-monospace text-primary fw-bold">{log.assembly_no}</td>
-                                        <td>{log.action_type || 'UPDATE'}</td>
-                                        <td>{log.station_name || log.station}</td>
-                                        <td className="text-center">
-                                            <span className={`badge ${statusClass} rounded-pill px-3 py-1 fw-bold`}>{status}</span>
-                                        </td>
-                                        <td>{log.action_by || 'System'}</td>
-                                        <td className="text-end pe-4 small text-muted">
-                                            <div className="fw-bold text-dark">{timestamp.date}</div>
-                                            <div style={{ fontSize: '0.75rem' }}>{timestamp.time}</div>
-                                        </td>
-                                    </tr>
-                                );
-                            }) : (
-                                <tr>
-                                    <td colSpan="7" className="text-center py-4 text-muted">
-                                        No logs found matching the current filters.
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    );
+    // Violet for Pending Approval - Siniguradong may contrast
+    if (statusText.includes('pending approval')) return 'bg-primary-subtle text-primary border border-primary-subtle'; 
+    
+    if (statusText.includes('in progress')) return 'bg-yellow-subtle text-warning border border-yellow-subtle'; 
+    
+    // Cyan/Info for Scanning
+    if (statusText.includes('scanning')) return 'bg-info-subtle text-info border border-info-subtle';
+    
+    return 'bg-light text-secondary border';
 };
 
-
-// --- STATION OVERVIEW (Stations tab) ---
-const RenderStationGrid = ({ stations, calculateMetrics, handleMonitorStation, handleViewHistory, setActiveTab }) => { 
-    // Map the new names to the mock stations while preserving their IDs and metrics.
-    const namedStations = stations.slice(0, processStations.length).map((station, index) => ({
-        ...station, // Keep existing data like ID
-        name: processStations[index], // Overwrite the name with the process name
-    }));
-
-    return (
-        <div className="animate-in fade-in pb-4">
-            {/* Title Header: Black Text, No Icons */}
-            <div className="d-flex justify-content-between align-items-end mb-4 border-bottom pb-3">
-                <div>
-                    <h3 className="fw-bolder text-dark mb-1">Station Management Overview</h3>
-                    <p className="text-muted small mb-0">Overview of all {namedStations.length} production stations.</p>
-                </div>
-                {/* Overall History Button (Black Button) */}
-                        <button
-            className="btn btn-primary btn-sm rounded-pill px-4 fw-bold shadow-sm hover-lift"
-            onClick={() => setActiveTab('overall_history')}
-        >
-            View Overall History
-        </button>
-
-            </div>
-
-            {/* Grid Container */}
-            <div className="row g-4">
-                {namedStations.map((station) => {
-                    const metrics = calculateMetrics(station.id);
-                    const hasActivity = metrics.pendingUnits > 0;
-                    const hasError = metrics.ngUnits > 0 && metrics.completedUnits === 0;
-
-                    let statusColor = "secondary";
-                    let statusLabel = "Idle";
-
-                    if (hasActivity) {
-                        statusColor = "primary";
-                        statusLabel = "Running";
-                    }
-                    if (hasError) {
-                        statusColor = "danger";
-                        statusLabel = "Attention";
-                    }
-
-                    return (
-                        <div key={station.id} className="col-12 col-sm-6 col-lg-4 col-xl-3">
-                            <div className="card shadow-sm h-100 border-0 rounded-3 hover-lift">
-                                <div className="card-body d-flex flex-column">
-
-                                    {/* Station Name + ID */}
-                                    <h6 className="fw-bolder text-dark mb-1">{station.name}</h6>
-                                    <small className="text-muted mb-2">ID: {station.id}</small>
-
-                                    {/* Status */}
-                                    <div className="mb-3">
-                                        <span className={`badge bg-${statusColor} bg-opacity-10 text-${statusColor} px-3 py-2 rounded-pill fw-bold`}>
-                                            {hasActivity && (
-                                                <span className="spinner-grow spinner-grow-sm me-1"
-                                                    role="status"
-                                                    aria-hidden="true"
-                                                    style={{ width: "0.5rem", height: "0.5rem" }}>
-                                                </span>
-                                            )}
-                                            {statusLabel}
-                                        </span>
-                                    </div>
-
-                                    {/* Metrics */}
-                                    <div className="mb-3 p-2 border-top border-bottom bg-light rounded">
-                                        <div className="d-flex justify-content-between">
-                                            <small className="text-muted">Completed</small>
-                                            <span className="fw-bold text-dark">{metrics.completedUnits}</span>
-                                        </div>
-
-                                        <div className="d-flex justify-content-between">
-                                            <small className="text-muted">Defects (NG)</small>
-                                            <span className={`fw-bold ${metrics.ngUnits > 0 ? "text-danger" : "text-dark"}`}>
-                                                {metrics.ngUnits}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Actions (Removed Icons, Dark Buttons) */}
-                                    <div className="mt-auto d-flex gap-2 pt-2">
-                                        <button
-                                            className="btn btn-sm btn-outline-dark fw-bold flex-grow-1 rounded-pill"
-                                            onClick={() => handleMonitorStation(station.id)}
-                                        >
-                                            Monitor
-                                        </button>
-
-                                        <button
-                                            className="btn btn-sm btn-outline-secondary fw-bold flex-grow-1 rounded-pill"
-                                            onClick={() => handleViewHistory(station.id)}
-                                        >
-                                            History
-                                        </button>
-                                    </div>
-
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-            <style jsx>{`
-                .hover-lift:hover { transform: translateY(-2px); transition: transform 0.2s; }
-            `}</style>
-        </div>
-    );
-};
-
-// --- STATION MONITOR (station_monitor tab) ---
-const RenderStationMonitor = ({ stationMonitorId, stations, calculateMetrics, handleEditClick, highlightedUnitId, setActiveTab, fetchData }) => {
-    // Filter states
+// --- SUB-COMPONENT: STATION MONITOR ---
+const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClick, highlightedUnitId, setActiveTab, fetchData }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All'); 
+    const [selectedUnitProcess, setSelectedUnitProcess] = useState(null); 
 
-    if (!stationMonitorId) return null;
-
-    const station = stations.find(s => s.id === stationMonitorId);
-    
-    // Calculate metrics first to get raw logs for the station
     const monitorMetrics = calculateMetrics(stationMonitorId);
+
+    const filteredLogs = useMemo(() => {
+        return (monitorMetrics.stationLogs || [])
+            .filter(log => log.assembly_no?.toLowerCase().includes(searchTerm.toLowerCase()))
+            .filter(log => statusFilter === 'All' || log.status === statusFilter);
+    }, [monitorMetrics.stationLogs, searchTerm, statusFilter]);
     
-    // Filter logs based on Assembly ID search term AND selected status
-    const filteredLogs = monitorMetrics.stationLogs
-        // 1. Filter by Assembly No.
-        .filter(log => {
-            return log.assembly_no?.toLowerCase().includes(searchTerm.toLowerCase());
-        })
-        // 2. Filter by Status
-        .filter(log => {
-            if (statusFilter === 'All') {
-                return true;
-            }
-            return log.status === statusFilter;
-        });
-    
-    // Determine the user-facing station name based on the ID index
     const stationIndex = parseInt(stationMonitorId.replace('Station', '')) - 1;
     const processName = processStations[stationIndex] || stationMonitorId;
 
-    // Handler: Reset Filters
-    const handleResetFilters = () => {
-        setSearchTerm(''); // Reset search term
-        setStatusFilter('All'); // Reset status filter
-        fetchData(); // Fetch fresh data
-    };
-
-
     return (
-        <div className="animate-in fade-in pb-5">
-            {/* --- Header Section: FIXED HEADER --- */}
-            <div className="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3">
-                <div>
-                    <h3 className="fw-bolder text-dark mb-1">{processName}</h3> {/* Display Process Name */}
-                    <p className="text-muted small mb-0">ID: {stationMonitorId}</p> {/* Display Station ID below */}
-                </div>
-                <button
-                    className="btn btn-light border btn-sm px-3 fw-bold text-dark hover-lift rounded-pill"
-                    onClick={() => { setActiveTab('stations'); }}
-                >
-                    Back to Overview
-                </button>
-            </div>
-
-            {/* --- Stats Cards (Content and styling remain optimized) --- */}
-            <div className="row g-4 mb-4">
+        <div className="animate-in fade-in pb-5 container-fluid px-0">
+            <style>{`
+                .stat-card-pro { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 22px; height: 100%; border-left: 5px solid #334155; }
+                .label-caps { font-size: 0.65rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: block; }
+                .value-bold { font-size: 2.2rem; font-weight: 900; color: #0f172a; margin: 0; line-height: 1; }
+                .text-violet { color: #6366f1 !important; }
+                .bg-violet-subtle { background-color: #eef2ff !important; color: #6366f1 !important; border: 1px solid #e0e7ff; }
+                .bg-yellow-subtle { background-color: #fffbeb !important; color: #d97706 !important; border: 1px solid #fef3c7; }
                 
-                {/* 1. Completed */}
-                <div className="col-md-6 col-xl-3">
-                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-success" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <div className="bg-success bg-opacity-10 text-success rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '45px', height: '45px' }}>
-                                    <i className="bi bi-check-circle-fill fs-4"></i>
-                                </div>
-                                <span className="badge bg-success text-white rounded-pill px-3 py-2 fw-bolder" style={{ fontSize: '0.9rem' }}>OUTPUT</span>
-                            </div>
-                            <h2 className="fw-bolder text-dark mb-0 display-5">{monitorMetrics.completedUnits}</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Completed Units</span>
-                        </div>
-                    </div>
-                </div>
+                .process-step { padding: 12px 15px; border-left: 3px solid #e2e8f0; position: relative; margin-left: 15px; transition: all 0.3s ease; }
+                .process-step.done { border-left-color: #10b981; }
+                .process-step.current-progressing { border-left-color: #fbbf24; }
+                .process-step.current-ready { border-left-color: #10b981; }
+                .process-step.ng { border-left-color: #ef4444; }
+                
+                .step-dot { position: absolute; left: -9px; top: 18px; width: 15px; height: 15px; border-radius: 50%; background: #e2e8f0; border: 2px solid white; }
+                .done .step-dot, .current-ready .step-dot { background: #10b981; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
+                .current-progressing .step-dot { background: #fbbf24; box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.2); }
+                .ng .step-dot { background: #ef4444; box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2); }
+            `}</style>
 
-                {/* 2. Yield Rate (Made percentage stand out) */}
-                <div className="col-md-6 col-xl-3">
-                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-primary" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <div className="bg-primary bg-opacity-10 text-primary rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '45px', height: '45px' }}>
-                                    <i className="bi bi-graph-up-arrow fs-4"></i>
-                                </div>
-                                <span className="badge bg-primary text-white rounded-pill px-3 py-2 fw-bolder" style={{ fontSize: '0.9rem' }}>TARGET: 98%</span>
-                            </div>
-                            <h2 className="fw-bolder text-primary mb-0 display-5">{monitorMetrics.yieldRate}%</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Current Yield Rate</span>
-                        </div>
-                    </div>
+            <div className="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3 px-2">
+                <div>
+                    <h3 className="fw-black text-dark mb-1 tracking-tight">{processName}</h3>
+                    <p className="text-muted small mb-0">Station Insight • ID: {stationMonitorId}</p>
                 </div>
-
-                {/* 3. In Progress */}
-                <div className="col-md-6 col-xl-3">
-                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-warning" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <div className="bg-warning bg-opacity-10 text-warning rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '45px', height: '45px' }}>
-                                    <i className="bi bi-hourglass-split fs-4"></i>
-                                </div>
-                                <span className="badge bg-warning text-dark rounded-pill px-3 py-2 fw-bolder" style={{ fontSize: '0.9rem' }}>WIP</span>
-                            </div>
-                            <h2 className="fw-bolder text-dark mb-0 display-5">{monitorMetrics.pendingUnits}</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>In Progress</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* 4. Defects (NG) */}
-                <div className="col-md-6 col-xl-3">
-                    <div className="card border-0 shadow-sm h-100 border-start border-4 border-danger" style={{ borderRadius: '12px' }}>
-                        <div className="card-body p-4">
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <div className="bg-danger bg-opacity-10 text-danger rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '45px', height: '45px' }}>
-                                    <i className="bi bi-exclamation-triangle-fill fs-4"></i>
-                                </div>
-                                <span className="badge bg-danger text-white rounded-pill px-3 py-2 fw-bolder" style={{ fontSize: '0.9rem' }}>DEFECTS</span>
-                            </div>
-                            <h2 className="fw-bolder text-danger mb-0 display-5">{monitorMetrics.ngUnits}</h2>
-                            <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Total No Good (NG)</span>
-                        </div>
-                    </div>
-                </div>
+                <button className="btn btn-outline-dark btn-sm px-4 fw-bold rounded-pill" onClick={() => setActiveTab('stations')}>BACK TO GRID</button>
             </div>
 
-            {/* --- Live Logs Table --- */}
-            <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
-                <div className="card-header bg-white py-3 px-4 border-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <h6 className="fw-bold text-dark mb-0">Production Feed ({filteredLogs.length} Units)</h6>
-                    
-                    <div className="d-flex align-items-center gap-3 flex-grow-1 justify-content-end">
-                        
-                        {/* Status Filter Dropdown */}
-                        <div className="input-group input-group-sm" style={{ maxWidth: '150px' }}>
-                            <select
-                                className="form-select"
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value)}
-                            >
-                                <option disabled>Status</option>
-                                {allStatuses.map(status => (
-                                    <option key={status} value={status}>{status}</option>
-                                ))}
-                            </select>
-                        </div>
-                        
-                        {/* Search Input for Assembly No. (Adjusted Width) */}
-                        <div className="input-group input-group-sm" style={{ maxWidth: '250px' }}>
-                            <input
-                                type="text"
-                                className="form-control"
-                                placeholder="Search Assembly No..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                            <span className="input-group-text bg-white text-muted"><i className="bi bi-search"></i></span>
-                        </div>
-                        
-                        {/* UPDATED: Reset Filters Button */}
-                        <button 
-                            className="btn btn-danger text-white fw-bold border rounded-pill px-3" 
-                            onClick={handleResetFilters}
-                        >
-                            <i className="bi bi-arrow-clockwise me-1"></i> Reset Filters
-                        </button>
+            <div className="row g-4 mb-4">
+                <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{ borderLeftColor: '#10b981' }}><span className="label-caps text-success">Completed Units</span><h3 className="value-bold">{monitorMetrics.completedUnits}</h3></div></div>
+                <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{ borderLeftColor: '#3b82f6' }}><span className="label-caps text-primary">Yield Rate</span><h3 className="value-bold text-primary">{monitorMetrics.yieldRate}%</h3></div></div>
+                <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{ borderLeftColor: '#fbbf24' }}><span className="label-caps text-warning">In Progress</span><h3 className="value-bold">{monitorMetrics.pendingUnits}</h3></div></div>
+                <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{ borderLeftColor: '#ef4444' }}><span className="label-caps text-danger">Defects (NG)</span><h3 className="value-bold text-danger">{monitorMetrics.ngUnits}</h3></div></div>
+            </div>
+
+            <div className="bg-white border rounded-4 overflow-hidden">
+                <div className="p-3 border-bottom d-flex justify-content-between align-items-center bg-light bg-opacity-50">
+                    <h6 className="fw-bold mb-0 small text-uppercase tracking-wider">Station Feed</h6>
+                    <div className="d-flex gap-2">
+                        <select className="form-select form-select-sm border-0 shadow-none bg-white" style={{width:'150px'}} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>{allStatuses.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                        <input type="text" className="form-control form-control-sm border-0 shadow-none bg-white" style={{width:'200px'}} placeholder="Search ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                        <button className="btn btn-danger btn-sm rounded-pill px-3 fw-bold" onClick={() => {setSearchTerm(''); setStatusFilter('All'); fetchData();}}>RESET</button>
                     </div>
                 </div>
                 <div className="table-responsive">
-                    <table className="table table-hover table-striped mb-0 small text-start align-middle">
-                        <thead className="table-dark text-uppercase">
+                    <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem' }}>
+                        <thead className="bg-dark text-white text-uppercase">
                             <tr>
-                                {/* RESTORED ORIGINAL COLUMNS, CENTERING STATUS */}
-                                <th className="ps-4">MODEL</th>
-                                <th>REVISION</th>
-                                <th>BASE UNIT</th>
-                                <th style={{ width: '15%' }}>ASSEMBLY</th>
-                                <th style={{ width: '15%' }}>DEVICE SERIAL</th>
-                                <th>ACCESSORY</th>
-                                <th className="text-center">STATUS</th>
-                                <th>REMARKS</th>
-                                <th style={{ width: '15%' }}>TIME DATE</th>
-                                <th className="text-center">ACTIONS</th>
+                                <th className="ps-4">MODEL</th><th>REVISION</th><th>BASE UNIT</th><th>ASSEMBLY</th><th>DEVICE SERIAL</th><th>ACCESSORY</th><th className="text-center">STATUS</th><th>REMARKS</th><th>TIME DATE</th><th className="text-center">ACTIONS</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredLogs.length > 0 ? filteredLogs.map(log => {
-                                const isHighlighted = highlightedUnitId === log.id;
-                                const timestamp = new Date(log.created_at).toLocaleString(); // Simple date format for table
-                                return (
-                                    <tr key={log.id} className={isHighlighted ? 'table-danger fw-bold' : ''}>
-                                        <td className="ps-4">{log.model}</td>
-                                        <td>{log.revision}</td>
-                                        <td className="font-monospace">{log.base_unit_kitting_no}</td>
-                                        <td className="font-monospace text-dark fw-bold">{log.assembly_no}</td>
-                                        <td className="fw-bold">{log.device_serial_no}</td>
-                                        <td>{log.accessory_kitting_no}</td>
-                                        <td className="text-center"><span className={`badge ${log.status === 'Completed' ? 'bg-success' : log.status === 'No Good (NG)' ? 'bg-danger' : log.status === 'In Progress' ? 'bg-primary' : 'bg-warning text-dark'}`}>{log.status}</span></td>
-                                        <td>{log.remarks}</td>
-                                        <td className="small text-muted">{timestamp}</td>
-                                        <td className="text-center">
-                                            <button className="btn btn-sm btn-outline-danger py-0" onClick={() => handleEditClick(log)}><i className="bi bi-pencil"></i> Edit</button>
-                                        </td>
-                                    </tr>
-                                );
-                            }) : (<tr><td colSpan="10" className="text-center py-4">No live logs found for this station matching the current filters.</td></tr>)}
+                            {filteredLogs.map(log => (
+                                <tr key={log.id} className={highlightedUnitId === log.id ? 'table-danger fw-bold' : ''}>
+                                    <td className="ps-4 fw-bold">{log.model}</td><td>{log.revision}</td><td>{log.base_unit_kitting_no}</td><td><code className="text-primary fw-bold">{log.assembly_no}</code></td><td className="fw-bold">{log.device_serial_no}</td><td>{log.accessory_kitting_no}</td>
+                                    <td className="text-center"><span className={`badge rounded-pill px-3 py-1 ${getStatusBadgeClass(log.status)}`}>{log.status}</span></td>
+                                    <td className="text-muted small italic">{log.remarks || '---'}</td><td className="small text-muted">{new Date(log.created_at).toLocaleString()}</td>
+                                    <td className="text-center">
+                                        <div className="d-flex gap-1 justify-content-center">
+                                            <button className="btn btn-sm btn-outline-primary py-1 px-3 fw-bold rounded-pill" style={{fontSize:'0.7rem'}} onClick={() => setSelectedUnitProcess(log)}>DETAILS</button>
+                                            <button className="btn btn-sm btn-outline-danger py-1 px-3 fw-bold rounded-pill" style={{fontSize:'0.7rem'}} onClick={() => handleEditClick(log)}>EDIT</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <style jsx>{`
-                .hover-lift:hover { transform: translateY(-1px); }
-            `}</style>
+            {/* DETAILS MODAL */}
+            {selectedUnitProcess && (
+                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(15, 23, 42, 0.7)', zIndex: 1050, backdropFilter: 'blur(4px)' }}>
+                    <div className="bg-white rounded-4 shadow-lg p-0 overflow-hidden" style={{ width: '95%', maxWidth: '500px' }}>
+                        <div className="bg-dark p-3 d-flex justify-content-between align-items-center">
+                            <h6 className="text-white mb-0 fw-bold"><i className="bi bi-cpu me-2"></i>TRACKING: {selectedUnitProcess.assembly_no}</h6>
+                            <button className="btn-close btn-close-white" onClick={() => setSelectedUnitProcess(null)}></button>
+                        </div>
+                        <div className="p-4" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                            {processStations.map((station, idx) => {
+                                const isCurrent = idx === stationIndex;
+                                const isDoneBefore = idx < stationIndex;
+                                const unitStatus = selectedUnitProcess.status?.toLowerCase() || '';
+                                
+                                const isNG = isCurrent && unitStatus.includes('no good');
+                                const isCompletedHere = isCurrent && unitStatus.includes('completed');
+                                
+                                let stepClass = "";
+                                let subText = "Pending Station";
+                                let textColor = "text-muted";
+
+                                if (isDoneBefore) {
+                                    stepClass = "done";
+                                    subText = "STATION COMPLETED";
+                                    textColor = "text-success";
+                                } else if (isNG) {
+                                    stepClass = "ng";
+                                    subText = "DEFECT DETECTED (NG)";
+                                    textColor = "text-danger";
+                                } else if (isCompletedHere) {
+                                    stepClass = "current-ready";
+                                    subText = "READY TO GO TO NEXT STATION";
+                                    textColor = "text-success";
+                                } else if (isCurrent) {
+                                    stepClass = "current-progressing";
+                                    subText = "IN PROGRESS";
+                                    textColor = "text-warning";
+                                }
+
+                                return (
+                                    <div key={idx} className={`process-step ${stepClass}`}>
+                                        <div className="step-dot"></div>
+                                        <div className="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <div className={`fw-black mb-0 ${isCurrent || isDoneBefore ? 'text-dark' : 'text-muted opacity-50'}`} style={{fontSize: '0.9rem'}}>
+                                                    {idx + 1}. {station}
+                                                </div>
+                                                <div className={`fw-bold small ${textColor}`} style={{fontSize: '0.7rem', letterSpacing: '0.5px'}}>
+                                                    {subText}
+                                                </div>
+                                            </div>
+                                            {isCurrent && <span className="badge bg-dark rounded-pill" style={{fontSize: '0.6rem'}}>CURRENT</span>}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="p-3 bg-light border-top">
+                            <button className="btn btn-dark w-100 rounded-pill fw-bold" onClick={() => setSelectedUnitProcess(null)}>CLOSE TRACKER</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
 // --- MAIN EXPORT COMPONENT ---
 export function StationsOverview({
-    activeTab,
-    stations,
-    calculateMetrics,
-    stationMonitorId,
-    highlightedUnitId,
-    setActiveTab,
-    handleMonitorStation,
-    handleViewHistory,
-    handleEditClick,
-    fetchData,
-    allLogs, 
+    activeTab, stations, calculateMetrics, stationMonitorId, highlightedUnitId, setActiveTab, handleMonitorStation, handleViewHistory, handleEditClick, fetchData, allLogs, 
 }) {
-    // 1. Render Station Monitor
+    const processedHistoryLogs = useMemo(() => {
+        if (!allLogs) return [];
+        return [...allLogs].sort((a, b) => new Date(b.timestamp || b.created_at) - new Date(a.timestamp || a.created_at));
+    }, [allLogs]);
+
     if (activeTab === "station_monitor" && stationMonitorId) {
-        return (
-            <RenderStationMonitor
-                stationMonitorId={stationMonitorId}
-                stations={stations}
-                calculateMetrics={calculateMetrics}
-                handleEditClick={handleEditClick}
-                highlightedUnitId={highlightedUnitId}
-                setActiveTab={setActiveTab}
-                fetchData={fetchData}
-            />
-        );
+        return <StationMonitorView {...{stationMonitorId, stations, calculateMetrics, handleEditClick, highlightedUnitId, setActiveTab, fetchData}} />;
     }
-    
-    // 2. Render Overall History
+
     if (activeTab === "overall_history") {
         return (
-            <RenderOverallHistory
-                allLogs={allLogs}
-                setActiveTab={setActiveTab}
-            />
+            <div className="animate-in fade-in pb-5 container-fluid px-0">
+                <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3 px-2">
+                    <div>
+                        <h4 className="fw-bold text-dark mb-0 tracking-tight">Production Registry (Backtrack)</h4>
+                        <p className="text-muted small mb-0">Global history log across all assembly stations.</p>
+                    </div>
+                    <button className="btn btn-outline-dark btn-sm px-4 fw-bold rounded-pill" onClick={() => setActiveTab('stations')}>BACK TO GRID</button>
+                </div>
+                <div className="bg-white border rounded-4 overflow-hidden shadow-sm">
+                    <div className="table-responsive" style={{maxHeight:'700px'}}>
+                        <table className="table table-hover align-middle mb-0" style={{fontSize: '0.85rem'}}>
+                            <thead className="bg-dark text-white sticky-top">
+                                <tr>
+                                    <th className="ps-4 py-3">MODEL</th><th>ASSEMBLY</th><th>TYPE</th><th>STATION</th><th className="text-center">STATUS AFTER</th><th>ACTION BY</th><th className="text-end pe-4">TIMESTAMP</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {processedHistoryLogs.map(log => {
+                                    const ts = formatTimestamp(log.timestamp || log.created_at);
+                                    return (
+                                        <tr key={log.id}>
+                                            <td className="ps-4 fw-bold">{log.model || log.model_id}</td>
+                                            <td><code className="text-primary fw-bold">{log.assembly_no}</code></td>
+                                            <td className="text-muted small fw-bold">{log.action_type || 'UPDATE'}</td>
+                                            <td className="fw-semibold text-dark">{log.station_name || log.station}</td>
+                                            <td className="text-center">
+                                                {/* FIXED: Dito lumalabas ang status badges sa history */}
+                                                <span className={`badge rounded-pill px-3 py-1 ${getStatusBadgeClass(log.status_after || log.status)}`}>
+                                                    {log.status_after || log.status}
+                                                </span>
+                                            </td>
+                                            <td className="small fw-medium text-dark">{log.action_by || 'System'}</td>
+                                            <td className="text-end pe-4 small text-muted">
+                                                <div className="fw-bold text-dark">{ts.date}</div>
+                                                <div>{ts.time}</div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         );
     }
 
-    // 3. Render Station Grid (Default view)
+    const namedStations = stations.slice(0, processStations.length).map((station, index) => ({
+        ...station, name: processStations[index],
+    }));
+
     return (
-        <RenderStationGrid
-            stations={stations}
-            calculateMetrics={calculateMetrics}
-            handleMonitorStation={handleMonitorStation}
-            handleViewHistory={handleViewHistory}
-            setActiveTab={setActiveTab} 
-        />
+        <div className="animate-in fade-in container-fluid px-0">
+            <style>{`.station-card-flat { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; height: 100%; border-top: 4px solid #e2e8f0; transition: all 0.2s; } .station-card-flat:hover { transform: translateY(-2px); border-color: #cbd5e1; }`}</style>
+            <div className="d-flex justify-content-between align-items-center mb-4 px-2 border-bottom pb-3">
+                <div><h4 className="fw-bold text-dark mb-0 tracking-tight">Station Control Panel</h4><p className="text-muted small mb-0">Operational status of all assembly units.</p></div>
+                <button className="btn btn-primary btn-sm rounded-pill px-4 fw-bold border-0" style={{background:'#107c55'}} onClick={() => setActiveTab('overall_history')}>VIEW HISTORY</button>
+            </div>
+            <div className="row g-4">
+                {namedStations.map((station) => {
+                    const metrics = calculateMetrics(station.id);
+                    const isRunning = metrics.pendingUnits > 0;
+                    const isAlert = metrics.ngUnits > 0 && metrics.completedUnits === 0;
+                    return (
+                        <div key={station.id} className="col-md-3">
+                            <div className="station-card-flat" style={{ borderTopColor: isAlert ? '#ef4444' : isRunning ? '#107c55' : '#e2e8f0' }}>
+                                <h6 className="fw-black text-dark mb-1">{station.name}</h6>
+                                <div className="bg-light rounded-3 p-3 my-3 border border-light-subtle">
+                                    <div className="d-flex justify-content-between small fw-bold"><span>COMPLETED</span><span>{metrics.completedUnits}</span></div>
+                                    <div className="d-flex justify-content-between small fw-bold mt-2 text-danger"><span>DEFECTS (NG)</span><span>{metrics.ngUnits}</span></div>
+                                </div>
+                                <div className="d-flex gap-2 mt-auto">
+                                    <button className="btn btn-dark btn-sm rounded-pill flex-grow-1 fw-bold" onClick={() => handleMonitorStation(station.id)}>MONITOR</button>
+                                    <button className="btn btn-light border btn-sm rounded-pill px-3" onClick={() => handleViewHistory(station.id)}><i className="bi bi-clock-history"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
     );
 }

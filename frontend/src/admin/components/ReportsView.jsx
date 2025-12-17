@@ -1,7 +1,5 @@
 import React from 'react';
 
-// Helper function para makuha ang kasalukuyang petsa sa format na 'YYYY-MM-DD'.
-// Tiyakin nito na laging ngayon ang default na petsa.
 const getTodayDate = () => {
     const today = new Date();
     const year = today.getFullYear();
@@ -11,154 +9,203 @@ const getTodayDate = () => {
 };
 
 export function ReportsView({
-    // Ipinapalagay na ang reports ay pre-filtered na (filteredReports) at ang state ay controlled ng Parent.
     filteredReports,
     stations,
-    reportDate, // State ng petsa galing sa Parent
-    setReportDate, // Setter ng petsa galing sa Parent
+    reportDate,
+    setReportDate,
     reportFilterStationId,
     setReportFilterStationId,
     setShowReportModal,
     handleViewReport,
 }) {
     
-    // 1. Prepare Stations array, adding the 'Overall Report' option for filtering (best practice)
     const enhancedFilterStations = [
-        { id: 'All', name: 'All Stations' }, 
-        { id: 'overall', name: 'Overall Reports Only' }, // Added filter for overall reports
-        ...stations
+        { id: 'All', name: 'ALL STATIONS' }, 
+        { id: 'overall', name: 'OVERALL REPORTS ONLY' },
+        ...stations.map(s => ({ ...s, name: s.name.toUpperCase() }))
     ];
 
-    // Helper to find station name or display custom tag (for overall reports)
     const getStationDisplay = (reportId) => {
         if (reportId === 'overall') {
             return (
-                <span className="badge bg-warning text-dark px-2 py-1 rounded-pill fw-bold">
+                <span className="badge border border-warning text-warning rounded-pill px-3 py-1 fw-bold" style={{ fontSize: '0.65rem', background: '#fffbeb' }}>
                     <i className="bi bi-gear-fill me-1"></i> OVERALL
                 </span>
             );
         }
         const station = stations.find(s => s.id === reportId);
-        return station ? station.name : `Station ${reportId}`;
+        return <span className="fw-bold text-dark">{station ? station.name : `Station ${reportId}`}</span>;
     };
 
     return (
-        <div className="animate-in fade-in pb-5">
-            {/* Header */}
-            <div className="d-flex justify-content-between align-items-center mb-4">
+        <div className="container-fluid px-0 py-2 animate-in fade-in">
+            <style>{`
+                .reports-container {
+                    background: #ffffff;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 12px;
+                    overflow: hidden;
+                }
+                .filter-strip {
+                    background: #f8fafc;
+                    border-bottom: 1px solid #e2e8f0;
+                    padding: 15px 25px;
+                }
+                .reports-table thead th {
+                    background: #f8fafc;
+                    color: #64748b;
+                    text-transform: uppercase;
+                    font-size: 0.7rem;
+                    letter-spacing: 1px;
+                    font-weight: 700;
+                    padding: 15px 20px;
+                    border-bottom: 2px solid #e2e8f0;
+                }
+                .reports-table tbody td {
+                    padding: 15px 20px;
+                    border-bottom: 1px solid #f1f5f9;
+                    vertical-align: middle;
+                }
+                .btn-new-report {
+                    background: #107c55;
+                    border: none;
+                    font-weight: 700;
+                    font-size: 0.85rem;
+                    padding: 10px 20px;
+                    border-radius: 8px;
+                    transition: all 0.2s;
+                }
+                .btn-new-report:hover { background: #0d6646; }
+                
+                .filter-input-flat {
+                    background: #ffffff;
+                    border: 1px solid #cbd5e1;
+                    font-size: 0.85rem;
+                    font-weight: 600;
+                    border-radius: 6px;
+                    padding: 6px 12px;
+                }
+                .metric-badge {
+                    font-size: 0.85rem;
+                    font-weight: 700;
+                    padding: 6px 12px;
+                    border-radius: 6px;
+                }
+                .label-caps {
+                    font-size: 0.65rem;
+                    font-weight: 800;
+                    color: #64748b;
+                    text-transform: uppercase;
+                    letter-spacing: 1px;
+                }
+            `}</style>
+
+            {/* HEADER */}
+            <div className="d-flex justify-content-between align-items-end mb-4 px-2">
                 <div>
-                    <h3 className="fw-bold text-dark mb-1">Production Reports</h3>
-                    <p className="text-muted small mb-0">Daily performance records from all stations.</p>
+                    <h4 className="fw-bold text-dark mb-0 tracking-tight">Production Archives</h4>
+                    <p className="text-muted small mb-0 fw-medium">Registry of daily station throughput and technical reports</p>
                 </div>
                 <button
-                    className="btn btn-primary px-4 py-2 rounded-pill shadow-sm fw-bold hover-scale"
+                    className="btn btn-primary btn-new-report d-flex align-items-center"
                     onClick={() => setShowReportModal(true)}
                 >
-                    <i className="bi bi-plus-lg me-2"></i>New Report
+                    <i className="bi bi-plus-lg me-2"></i> CREATE REPORT
                 </button>
             </div>
 
-            {/* Filter Bar */}
-            <div className="card border-0 shadow-sm mb-4" style={{ borderRadius: '12px' }}>
-                <div className="card-body p-3 d-flex flex-wrap align-items-center gap-3">
-                    <div className="d-flex align-items-center">
-                        <i className="bi bi-calendar-event text-secondary me-2 fs-5"></i>
-                        <input
-                            type="date"
-                            className="form-control border-0 bg-light fw-bold text-secondary"
-                            style={{ maxWidth: '160px' }}
-                            // FIX 1: Gumagamit na ng reportDate galing sa Parent
-                            value={reportDate}
-                            onChange={(e) => setReportDate(e.target.value)}
-                            // FIX 2: Tiyak na ngayon ang max date
-                            max={getTodayDate()} 
-                        />
-                    </div>
-                    <div className="vr text-secondary opacity-25 mx-2"></div>
-                    <div className="d-flex align-items-center flex-grow-1">
-                        <i className="bi bi-funnel text-secondary me-2 fs-5"></i>
-                        <select
-                            className="form-select border-0 bg-light fw-bold text-secondary"
-                            style={{ maxWidth: '250px' }}
-                            value={reportFilterStationId}
-                            onChange={(e) => setReportFilterStationId(e.target.value)}
-                        >
-                            {enhancedFilterStations.map(s => (
-                                <option 
-                                    key={s.id} 
-                                    value={s.id}
-                                    className={s.id === 'overall' ? 'fw-bold text-primary' : ''}
-                                >
-                                    {s.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="text-muted small ms-auto">
-                        Showing <strong className="text-dark">{filteredReports.length}</strong> records
+            <div className="reports-container">
+                {/* FILTER BAR */}
+                <div className="filter-strip">
+                    <div className="row g-3 align-items-center">
+                        <div className="col-auto">
+                            <label className="label-caps d-block mb-1">Target Date</label>
+                            <input
+                                type="date"
+                                className="form-control filter-input-flat shadow-none"
+                                value={reportDate}
+                                onChange={(e) => setReportDate(e.target.value)}
+                                max={getTodayDate()} 
+                            />
+                        </div>
+                        <div className="col-auto">
+                            <label className="label-caps d-block mb-1">Source Station</label>
+                            <select
+                                className="form-select filter-input-flat shadow-none"
+                                style={{ minWidth: '220px' }}
+                                value={reportFilterStationId}
+                                onChange={(e) => setReportFilterStationId(e.target.value)}
+                            >
+                                {enhancedFilterStations.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="col text-end pt-3">
+                            <span className="label-caps">Records Found:</span>
+                            <span className="ms-2 fw-bold text-dark h6 mb-0">{filteredReports.length}</span>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Reports Table */}
-            <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
+                {/* TABLE */}
                 <div className="table-responsive">
-                    <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.9rem' }}>
-                        <thead className="bg-light text-secondary text-uppercase small" style={{ letterSpacing: '0.5px' }}>
+                    <table className="table table-hover reports-table mb-0">
+                        <thead>
                             <tr>
-                                <th className="border-0 py-3 ps-4">Station & Shift</th>
-                                <th className="border-0 py-3 text-center">Output</th>
-                                <th className="border-0 py-3 text-center">Defects / Downtime</th>
-                                <th className="border-0 py-3 text-end pe-4">Timestamp</th>
-                                <th className="border-0 py-3 text-center">Action</th>
+                                <th>Source Details</th>
+                                <th className="text-center">Net Output</th>
+                                <th className="text-center">Technical Metrics</th>
+                                <th className="text-end">Submission Time</th>
+                                <th className="text-center">Operations</th>
                             </tr>
                         </thead>
-                        <tbody className="border-top-0">
+                        <tbody>
                             {filteredReports && filteredReports.length > 0 ? filteredReports.map(report => (
                                 <tr key={report.id}>
-                                    <td className="ps-4">
+                                    <td>
                                         <div className="d-flex align-items-center">
-                                            <div className={`rounded p-2 me-3 ${report.station === 'overall' ? 'bg-warning bg-opacity-10 text-warning' : 'bg-primary bg-opacity-10 text-primary'}`}>
-                                                <i className={`bi ${report.station === 'overall' ? 'bi-journals' : 'bi-layers-fill'}`}></i>
+                                            <div className={`rounded-3 p-2 me-3 d-flex align-items-center justify-content-center border ${report.station === 'overall' ? 'border-warning text-warning bg-warning bg-opacity-10' : 'border-primary text-primary bg-primary bg-opacity-10'}`} style={{ width: '38px', height: '38px' }}>
+                                                <i className={`bi ${report.station === 'overall' ? 'bi-journals' : 'bi-layers-half'} fs-5`}></i>
                                             </div>
                                             <div>
-                                                <div className="fw-bold text-dark">{getStationDisplay(report.station)}</div>
-                                                <div className="small text-muted">{report.shift}</div>
+                                                <div className="small">{getStationDisplay(report.station)}</div>
+                                                <div className="label-caps mt-1" style={{ fontSize: '0.6rem' }}>{report.shift?.toUpperCase()}</div>
                                             </div>
                                         </div>
                                     </td>
                                     <td className="text-center">
-                                        <span className="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-2 fw-normal fs-6">
-                                            {report.total_units_processed}
+                                        <span className="metric-badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">
+                                            {report.total_units_processed} <small className="fw-normal">UNITS</small>
                                         </span>
                                     </td>
                                     <td className="text-center">
-                                        <div className="d-flex flex-column justify-content-center align-items-center">
-                                            <span className="text-danger fw-bold">{report.total_ng} NG</span>
-                                            <small className="text-muted" style={{ fontSize: '0.75rem' }}>{report.downtime_minutes} min down</small>
+                                        <div className="d-flex flex-column align-items-center">
+                                            <span className="text-danger fw-bold small uppercase">{report.total_ng} DEFECTS</span>
+                                            <span className="text-muted" style={{ fontSize: '0.7rem', fontWeight: '600' }}>{report.downtime_minutes}M DOWNTIME</span>
                                         </div>
                                     </td>
-                                    <td className="text-end pe-4 text-muted font-monospace small">
-                                        {/* Improved Timestamp Display */}
-                                        <div className="text-dark fw-bold">{new Date(report.created_at).toLocaleDateString()}</div>
-                                        <div style={{ fontSize: '0.75rem' }}>
+                                    <td className="text-end">
+                                        <div className="fw-bold text-dark small">{new Date(report.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</div>
+                                        <div className="text-muted font-monospace" style={{ fontSize: '0.7rem' }}>
                                             {new Date(report.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </div>
                                     </td>
                                     <td className="text-center">
                                         <button
-                                            className="btn btn-sm btn-light border text-primary hover-primary rounded-pill px-3"
+                                            className="btn btn-sm btn-light border fw-bold px-3 py-1 shadow-none"
+                                            style={{ fontSize: '0.75rem', borderRadius: '6px' }}
                                             onClick={() => handleViewReport(report)}
                                         >
-                                            Details
+                                            VIEW DATA
                                         </button>
                                     </td>
                                 </tr>
                             )) : (
                                 <tr>
                                     <td colSpan="5" className="py-5 text-center text-muted">
-                                        <div className="mb-3"><i className="bi bi-file-earmark-x fs-1 opacity-25"></i></div>
-                                        <p className="mb-0">No reports found for the selected date or station.</p>
+                                        <i className="bi bi-file-earmark-x display-4 opacity-10"></i>
+                                        <p className="mt-3 fw-bold uppercase tracking-wider small">No data entries matched the criteria</p>
                                     </td>
                                 </tr>
                             )}
@@ -166,12 +213,6 @@ export function ReportsView({
                     </table>
                 </div>
             </div>
-
-            {/* CSS styles */}
-            <style>{`
-                .hover-scale:hover { transform: scale(1.02); transition: transform 0.2s; }
-                .hover-primary:hover { background-color: #0d6efd; color: white !important; border-color: #0d6efd !important; }
-            `}</style>
         </div>
     );
 }

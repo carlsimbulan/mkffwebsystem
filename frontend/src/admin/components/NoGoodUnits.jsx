@@ -1,168 +1,239 @@
 import React, { useState, useMemo } from 'react';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
-// EXPORT AS DEFAULT to match your import style in AdminPage.jsx
-const NoGoodUnits = ({ logs, userList, handleEditClick }) => {
-    // 1. DEFINE BUTTONS/OPTIONS (Mapped to specific Station IDs where the unit failed/became NG)
+const NoGoodUnits = ({ logs, handleEditClick }) => {
+    const [activeId, setActiveId] = useState(null);
+
     const actionButtons = [
-        // Grid 1: PCB Pairing (Station1) -> VI Process Flow
-        { id: 'VI_PROCEDURE', label: 'Refer to VI Process Flow Work Procedure', stationIDs: ['Station1'] }, 
-        
-        // Grid 2: Integrated Board Test (Station2) -> Customer Verification Hold
-        { id: 'CUSTOMER_VERIFICATION', label: 'PUT on Hold For Customer Verification', stationIDs: ['Station2'] }, 
-        
-        // Grid 3: Complete Unit Test/Calibration (Station6) -> Complete Unit Test Flow
-        { id: 'UNIT_TEST_FLOW', label: 'Refer to Complete Unit Test Flow Work Procedure', stationIDs: ['Station6'] },
-        
-        // Grid 4: Pre BI Hi-Pot Test (Station7) -> Hi-Pot Test Flow
-        { id: 'HI_POT_TEST', label: 'Refer to Hi-Pot Test Flow Work Procedure', stationIDs: ['Station7'] },
-        
-        // Grid 5: Burn-in Testing (Station8) -> Burn In Test Flow
-        { id: 'BURN_IN_TEST', label: 'Refer to Burn In Test Flow Work Procedure', stationIDs: ['Station8'] },
-        
-        // Grid 6: Final Functional/Connectivity Test (Station11) -> Final Functionality Test Flow
-        { id: 'FINAL_FUNC_TEST', label: 'Refer to Final Functionality Test Flow Work Procedure', stationIDs: ['Station11'] },
-        
-        // Grid 7: Rework Procedure (Station9, 12, 13)
-        // Station9: Sealing, Station12: Label Sticker, Station13: FVI
-        { id: 'REJECTED_REWORK', label: 'Refer to CONTROL OF REJECTED MATERIALS/PRODUCT Rework Procedure', stationIDs: ['Station9', 'Station12', 'Station13'] },
-        
-        // Grid 8: QC Stamping (Station15) -> Batch for Shipment Hold
-        { id: 'BATCH_SHIPMENT_HOLD', label: 'Batch for Shipment PUT-ON HOLD', stationIDs: ['Station15'] },
+        { id: 'VI_PROCEDURE', label: 'VI Process Flow', color: '#e11d48', icon: 'bi-cpu', match: 'Station 1' },
+        { id: 'CUSTOMER_VERIFICATION', label: 'Customer Hold', color: '#f59e0b', icon: 'bi-pause-circle', match: 'Station 2' },
+        { id: 'UNIT_TEST_FLOW', label: 'Unit Test Flow', color: '#2563eb', icon: 'bi-gear-wide-connected', match: 'Station 6' },
+        { id: 'HI_POT_TEST', label: 'Hi-Pot Test Flow', color: '#7c3aed', icon: 'bi-lightning-charge', match: 'Station 7' },
+        { id: 'BURN_IN_TEST', label: 'Burn-In Test Flow', color: '#db2777', icon: 'bi-thermometer-half', match: 'Station 8' },
+        { id: 'FINAL_FUNC_TEST', label: 'Final Function Test', color: '#059669', icon: 'bi-check2-all', match: 'Station 11' },
+        { id: 'REJECTED_REWORK', label: 'Rework Procedure', color: '#4b5563', icon: 'bi-tools', match: ['Station 9', 'Station 12', 'Station 13'] },
+        { id: 'BATCH_SHIPMENT_HOLD', label: 'Shipment Hold', color: '#0f172a', icon: 'bi-truck-flatbed', match: 'Station 15' },
     ];
 
-    // 2. STATE MANAGEMENT
-    const [selectedAction, setSelectedAction] = useState(null); 
-
-    // Filter all logs once to get only 'No Good (NG)' units
     const initialNoGoodLogs = useMemo(() => {
         return logs.filter(log => log.status === 'No Good (NG)');
     }, [logs]);
 
-    // 3. FILTERED LOGS BASED ON SELECTED ACTION (Logic based on Station ID)
-    const filteredLogs = useMemo(() => {
-        if (!selectedAction) return [];
-        
-        const targetStationIDs = selectedAction.stationIDs;
-
-        // Filter the initial NG logs based on the unit's recorded station
-        return initialNoGoodLogs.filter(log => {
-            // Normalize the log station name for direct comparison (remove spaces)
-            const logStationId = log.station.replace(/\s+/g, '');
-            
-            // Check if the log's station ID is included in the target list of stations for the action
-            return targetStationIDs.includes(logStationId);
-        });
-
-    }, [selectedAction, initialNoGoodLogs]);
-
-
-    // Helper function to format date/time
     const formatTimestamp = (isoString) => {
         if (!isoString) return 'N/A';
-        return new Date(isoString).toLocaleString();
+        const date = new Date(isoString);
+        return date.toLocaleDateString('en-US', {
+            month: 'short', day: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit', hour12: true
+        });
     };
 
+    const toggleSection = (id) => {
+        setActiveId(activeId === id ? null : id);
+    };
 
-    // 4. RENDER METHOD
     return (
-        <div className="container-fluid px-0">
-            <div className="card shadow-sm mb-4">
-                <div className="card-header bg-danger text-white d-flex justify-content-between align-items-center">
-                    <h5 className="mb-0">
-                        <i className="bi bi-x-octagon-fill me-2"></i> No Good (NG) Units Action Tracker
-                    </h5>
-                    <span className="badge bg-light text-dark">Total NG Units in System: {initialNoGoodLogs.length}</span>
-                </div>
+        <div className="container-fluid px-0 py-3 animate-in fade-in">
+            <style>
+                {`
+                .ng-card {
+                    background: #ffffff;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 12px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+                    overflow: hidden;
+                    margin-bottom: 12px;
+                    transition: all 0.2s ease;
+                }
+                .ng-card.active {
+                    border-color: #cbd5e1;
+                    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+                    margin-bottom: 20px;
+                }
+                .ng-header {
+                    display: flex;
+                    align-items: center;
+                    padding: 16px 24px;
+                    cursor: pointer;
+                    user-select: none;
+                    background: #fff;
+                }
+                .ng-header:hover { background: #f8fafc; }
                 
-                <div className="card-body">
-                    <p className="text-muted">Select an action/procedure below to view the **No Good units that failed at the specific station(s)** associated with it.</p>
-                    
-                    {/* ACTION BUTTONS GRID */}
-                    <div className="row g-2 mb-4">
-                        {actionButtons.map((action) => {
-                            // Calculate how many NG units match this action (for display count)
-                            const count = initialNoGoodLogs.filter(log => action.stationIDs.includes(log.station.replace(/\s+/g, ''))).length;
-                            
-                            return (
-                                <div className="col-12 col-md-6 col-lg-4 col-xl-3" key={action.id}>
-                                    <button
-                                        className={`btn w-100 text-start d-flex align-items-center justify-content-between ${selectedAction?.id === action.id ? 'btn-danger' : 'btn-outline-danger'}`}
-                                        onClick={() => setSelectedAction(action)}
-                                        style={{ whiteSpace: 'normal', height: '100%' }}
-                                    >
-                                        <div className="d-flex align-items-center">
-                                            {selectedAction?.id === action.id 
-                                                ? <i className="bi bi-check-circle-fill me-2 fs-5"></i> 
-                                                : <i className="bi bi-arrow-right-short me-2 fs-5"></i>
-                                            }
-                                            <span className="fw-medium">{action.label}</span>
-                                        </div>
-                                        <span className={`badge ${selectedAction?.id === action.id ? 'bg-light text-danger' : 'bg-danger'} fw-bold ms-2`}>{count}</span>
-                                    </button>
-                                </div>
-                            );
-                        })}
-                    </div>
+                .ng-icon-box {
+                    width: 48px; height: 48px;
+                    display: flex; align-items: center; justify-content: center;
+                    border-radius: 10px; margin-right: 20px;
+                    font-size: 1.4rem;
+                }
+                .ng-title { 
+                    font-weight: 700; color: #334155; margin: 0; font-size: 1.05rem; 
+                    letter-spacing: -0.01em;
+                }
+                .ng-badge {
+                    margin-left: auto; font-weight: 700; font-size: 0.8rem;
+                    padding: 4px 12px; border-radius: 20px;
+                }
 
-                    {/* DYNAMIC CONTENT / TABLE DISPLAY */}
-                    {selectedAction && (
-                        <div className="mt-4 border-top pt-3">
-                            <h5 className="mb-3 text-danger">
-                                Units for: <span className="fw-bold">{selectedAction.label}</span>
-                                <span className="badge bg-secondary ms-2">{filteredLogs.length} Total Units</span>
-                            </h5>
+                .table-ng { font-size: 0.85rem; width: 100%; border-collapse: separate; border-spacing: 0; }
+                .table-ng thead th {
+                    background: #f1f5f9;
+                    color: #64748b;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    font-size: 0.7rem;
+                    letter-spacing: 0.05em;
+                    padding: 12px 16px;
+                    border-bottom: 1px solid #e2e8f0;
+                }
+                .table-ng tbody td {
+                    padding: 14px 16px;
+                    border-bottom: 1px solid #f1f5f9;
+                    vertical-align: middle;
+                    color: #475569;
+                }
+                .table-ng tbody tr:last-child td { border-bottom: none; }
+                
+                .mono-box {
+                    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+                    background: #f8fafc;
+                    padding: 4px 8px;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 6px;
+                    font-size: 0.8rem;
+                    color: #1e293b;
+                }
+                .btn-action-rework {
+                    background: #0f172a;
+                    color: #fff;
+                    border: none;
+                    padding: 6px 16px;
+                    border-radius: 8px;
+                    font-weight: 700;
+                    font-size: 0.75rem;
+                    text-transform: uppercase;
+                    transition: all 0.2s;
+                }
+                .btn-action-rework:hover {
+                    background: #334155;
+                    transform: translateY(-1px);
+                }
+                .summary-box {
+                    background: #fff;
+                    padding: 20px;
+                    border-radius: 12px;
+                    border: 1px solid #e2e8f0;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                `}
+            </style>
 
-                            {filteredLogs.length === 0 ? (
-                                <div className="alert alert-warning text-center">
-                                    No No Good (NG) units found that failed at the associated station(s).
+            {/* Header Summary */}
+            <div className="summary-box mb-4">
+                <div>
+                    <h4 className="fw-bold text-slate-800 mb-1">NG Action Registry</h4>
+                    <p className="text-muted small mb-0">Centralized tracking for non-conforming units across all stations.</p>
+                </div>
+                <div className="text-end">
+                    <span className="text-muted small fw-bold text-uppercase tracking-wider">Total NG Units</span>
+                    <h2 className="text-danger fw-black mb-0" style={{ lineHeight: 1 }}>{initialNoGoodLogs.length}</h2>
+                </div>
+            </div>
+
+            {/* Content List */}
+            <div className="row g-0">
+                {actionButtons.map((action) => {
+                    const logsForStation = initialNoGoodLogs.filter(log => {
+                        if (Array.isArray(action.match)) {
+                            return action.match.some(m => log.station.includes(m));
+                        }
+                        return log.station.includes(action.match);
+                    });
+
+                    const isOpen = activeId === action.id;
+
+                    return (
+                        <div key={action.id} className={`ng-card ${isOpen ? 'active' : ''}`}>
+                            <div className="ng-header" onClick={() => toggleSection(action.id)}>
+                                <div className="ng-icon-box" style={{ backgroundColor: `${action.color}15`, color: action.color }}>
+                                    <i className={`bi ${action.icon}`}></i>
                                 </div>
-                            ) : (
-                                <div className="table-responsive" style={{ maxHeight: '500px', overflowY: 'auto' }}>
-                                    <table className="table table-bordered table-striped table-sm">
-                                        <thead className="table-danger sticky-top">
-                                            <tr>
-                                                <th>MODEL</th>
-                                                <th>REVISION</th>
-                                                <th>BASE UNIT</th>
-                                                <th>ASSEMBLY</th>
-                                                <th>DEVICE SERIAL</th>
-                                                <th>ACCESSORY</th>
-                                                <th>STATUS</th>
-                                                <th>REMARKS</th>
-                                                <th>TIME DATE</th>
-                                                <th>ACTIONS</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {filteredLogs.map(log => (
-                                                <tr key={log.id}>
-                                                    <td>{log.model}</td>
-                                                    <td>{log.revision}</td>
-                                                    <td>{log.base_unit_kitting_no}</td>
-                                                    <td>{log.assembly_no}</td>
-                                                    <td>{log.device_serial_no}</td>
-                                                    <td>{log.accessory_kitting_no}</td>
-                                                    <td><span className="badge bg-danger">{log.status}</span></td>
-                                                    <td>{log.remarks || '-'}</td>
-                                                    <td>{formatTimestamp(log.created_at)}</td>
-                                                    <td>
-                                                        <button 
-                                                            className="btn btn-sm btn-primary"
-                                                            onClick={() => handleEditClick(log)}
-                                                        >
-                                                            Edit/Rework
-                                                        </button>
-                                                    </td>
+                                <div>
+                                    <p className="ng-title">{action.label}</p>
+                                    <span className="text-muted small">Process Category Tracking</span>
+                                </div>
+                                
+                                <div className={`ng-badge ${logsForStation.length > 0 ? 'bg-danger text-white' : 'bg-light text-muted'}`}>
+                                    {logsForStation.length} Units
+                                </div>
+                                
+                                <i className={`bi bi-chevron-${isOpen ? 'up' : 'down'} ms-4 text-slate-400`}></i>
+                            </div>
+
+                            {isOpen && (
+                                <div className="bg-white border-top animate-in slide-in-from-top-2">
+                                    <div className="table-responsive">
+                                        <table className="table-ng">
+                                            <thead>
+                                                <tr>
+                                                    <th>Unit Model</th>
+                                                    <th>Assembly #</th>
+                                                    <th>Device Serial</th>
+                                                    <th>Process Station</th>
+                                                    <th>Issue / Status</th>
+                                                    <th>Remarks</th>
+                                                    <th>Last Update</th>
+                                                    <th className="text-center">Operation</th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                            </thead>
+                                            <tbody>
+                                                {logsForStation.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan="8" className="text-center py-5 text-muted">
+                                                            <div className="py-3">
+                                                                <i className="bi bi-shield-check fs-2 opacity-25 d-block mb-2"></i>
+                                                                No units requiring attention in this category.
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    logsForStation.map(log => (
+                                                        <tr key={log.id}>
+                                                            <td className="fw-bold">{log.model}</td>
+                                                            <td><span className="mono-box">{log.assembly_no}</span></td>
+                                                            <td><span className="mono-box text-primary">{log.device_serial_no}</span></td>
+                                                            <td className="small fw-semibold">{log.station}</td>
+                                                            <td>
+                                                                <span className="text-danger fw-bold small">
+                                                                    <i className="bi bi-exclamation-triangle-fill me-1"></i> {log.status}
+                                                                </span>
+                                                            </td>
+                                                            <td className="small text-muted" style={{ maxWidth: '200px' }}>{log.remarks || '---'}</td>
+                                                            <td className="small">{formatTimestamp(log.created_at)}</td>
+                                                            <td className="text-center">
+                                                                <button 
+                                                                    className="btn-action-rework"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleEditClick(log);
+                                                                    }}
+                                                                >
+                                                                    Manage Unit
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             )}
                         </div>
-                    )}
-                </div>
+                    );
+                })}
             </div>
         </div>
     );
