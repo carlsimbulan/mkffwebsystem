@@ -20,20 +20,13 @@ const formatTimestamp = (isoString) => {
     };
 };
 
-// FIXED: Pinatibay ang mga kulay para hindi mag-invisible sa Overall History
 const getStatusBadgeClass = (status) => {
     const statusText = status?.toLowerCase() || '';
     if (statusText.includes('completed') || statusText.includes('ok')) return 'bg-success-subtle text-success border border-success-subtle';
     if (statusText.includes('no good')) return 'bg-danger-subtle text-danger border border-danger-subtle';
-    
-    // Violet for Pending Approval - Siniguradong may contrast
     if (statusText.includes('pending approval')) return 'bg-primary-subtle text-primary border border-primary-subtle'; 
-    
     if (statusText.includes('in progress')) return 'bg-yellow-subtle text-warning border border-yellow-subtle'; 
-    
-    // Cyan/Info for Scanning
     if (statusText.includes('scanning')) return 'bg-info-subtle text-info border border-info-subtle';
-    
     return 'bg-light text-secondary border';
 };
 
@@ -55,25 +48,20 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
     const processName = processStations[stationIndex] || stationMonitorId;
 
     return (
-        <div className="animate-in fade-in pb-5 container-fluid px-0">
+        <div className="pb-5 container-fluid px-0">
             <style>{`
                 .stat-card-pro { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 22px; height: 100%; border-left: 5px solid #334155; }
                 .label-caps { font-size: 0.65rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: block; }
                 .value-bold { font-size: 2.2rem; font-weight: 900; color: #0f172a; margin: 0; line-height: 1; }
-                .text-violet { color: #6366f1 !important; }
-                .bg-violet-subtle { background-color: #eef2ff !important; color: #6366f1 !important; border: 1px solid #e0e7ff; }
-                .bg-yellow-subtle { background-color: #fffbeb !important; color: #d97706 !important; border: 1px solid #fef3c7; }
-                
-                .process-step { padding: 12px 15px; border-left: 3px solid #e2e8f0; position: relative; margin-left: 15px; transition: all 0.3s ease; }
+                .process-step { padding: 12px 15px; border-left: 3px solid #e2e8f0; position: relative; margin-left: 15px; }
                 .process-step.done { border-left-color: #10b981; }
                 .process-step.current-progressing { border-left-color: #fbbf24; }
                 .process-step.current-ready { border-left-color: #10b981; }
                 .process-step.ng { border-left-color: #ef4444; }
-                
                 .step-dot { position: absolute; left: -9px; top: 18px; width: 15px; height: 15px; border-radius: 50%; background: #e2e8f0; border: 2px solid white; }
-                .done .step-dot, .current-ready .step-dot { background: #10b981; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2); }
-                .current-progressing .step-dot { background: #fbbf24; box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.2); }
-                .ng .step-dot { background: #ef4444; box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2); }
+                .done .step-dot, .current-ready .step-dot { background: #10b981; }
+                .current-progressing .step-dot { background: #fbbf24; }
+                .ng .step-dot { background: #ef4444; }
             `}</style>
 
             <div className="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3 px-2">
@@ -126,9 +114,8 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 </div>
             </div>
 
-            {/* DETAILS MODAL */}
             {selectedUnitProcess && (
-                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(15, 23, 42, 0.7)', zIndex: 1050, backdropFilter: 'blur(4px)' }}>
+                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(15, 23, 42, 0.8)', zIndex: 1050 }}>
                     <div className="bg-white rounded-4 shadow-lg p-0 overflow-hidden" style={{ width: '95%', maxWidth: '500px' }}>
                         <div className="bg-dark p-3 d-flex justify-content-between align-items-center">
                             <h6 className="text-white mb-0 fw-bold"><i className="bi bi-cpu me-2"></i>TRACKING: {selectedUnitProcess.assembly_no}</h6>
@@ -139,7 +126,6 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                 const isCurrent = idx === stationIndex;
                                 const isDoneBefore = idx < stationIndex;
                                 const unitStatus = selectedUnitProcess.status?.toLowerCase() || '';
-                                
                                 const isNG = isCurrent && unitStatus.includes('no good');
                                 const isCompletedHere = isCurrent && unitStatus.includes('completed');
                                 
@@ -197,10 +183,29 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
 export function StationsOverview({
     activeTab, stations, calculateMetrics, stationMonitorId, highlightedUnitId, setActiveTab, handleMonitorStation, handleViewHistory, handleEditClick, fetchData, allLogs, 
 }) {
-    const processedHistoryLogs = useMemo(() => {
+    // History Filters State
+    const [historySearch, setHistorySearch] = useState('');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+
+    // Optimization: Memoize filtered logs to prevent lag
+    const filteredHistory = useMemo(() => {
         if (!allLogs) return [];
-        return [...allLogs].sort((a, b) => new Date(b.timestamp || b.created_at) - new Date(a.timestamp || a.created_at));
-    }, [allLogs]);
+        return allLogs
+            .filter(log => {
+                const matchesSearch = log.assembly_no?.toLowerCase().includes(historySearch.toLowerCase());
+                if (!startDate && !endDate) return matchesSearch;
+
+                const logDate = new Date(log.timestamp || log.created_at);
+                const start = startDate ? new Date(startDate) : null;
+                const end = endDate ? new Date(endDate) : null;
+                if (start) start.setHours(0, 0, 0, 0);
+                if (end) end.setHours(23, 59, 59, 999);
+
+                return matchesSearch && (!start || logDate >= start) && (!end || logDate <= end);
+            })
+            .sort((a, b) => new Date(b.timestamp || b.created_at) - new Date(a.timestamp || a.created_at));
+    }, [allLogs, historySearch, startDate, endDate]);
 
     if (activeTab === "station_monitor" && stationMonitorId) {
         return <StationMonitorView {...{stationMonitorId, stations, calculateMetrics, handleEditClick, highlightedUnitId, setActiveTab, fetchData}} />;
@@ -208,45 +213,94 @@ export function StationsOverview({
 
     if (activeTab === "overall_history") {
         return (
-            <div className="animate-in fade-in pb-5 container-fluid px-0">
+            <div className="pb-5 container-fluid px-0">
+                <style>{`
+                    .history-table-container { max-height: 700px; overflow-y: auto; border-radius: 12px; scrollbar-width: thin; }
+                    .sticky-header th { position: sticky; top: 0; background: #1e293b !important; color: white; z-index: 20; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+                    .filter-bar { background: #f8fafc; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px; }
+                `}</style>
+
                 <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3 px-2">
                     <div>
-                        <h4 className="fw-bold text-dark mb-0 tracking-tight">Production Registry (Backtrack)</h4>
-                        <p className="text-muted small mb-0">Global history log across all assembly stations.</p>
+                        <h4 className="fw-bold text-dark mb-0 tracking-tight">Production Registry</h4>
+                        <p className="text-muted small mb-0">Total: {filteredHistory.length} records</p>
                     </div>
                     <button className="btn btn-outline-dark btn-sm px-4 fw-bold rounded-pill" onClick={() => setActiveTab('stations')}>BACK TO GRID</button>
                 </div>
-                <div className="bg-white border rounded-4 overflow-hidden shadow-sm">
-                    <div className="table-responsive" style={{maxHeight:'700px'}}>
+
+                {/* SEARCH AND DATE FILTERS */}
+                <div className="filter-bar d-flex flex-wrap gap-3 align-items-end mx-2">
+                    <div className="flex-grow-1">
+                        <label className="fw-bold small text-muted text-uppercase mb-1 d-block" style={{fontSize: '0.7rem'}}>Assembly No.</label>
+                        <div className="position-relative">
+                            <i className="bi bi-search position-absolute top-50 start-0 translate-middle-y ms-3 text-muted"></i>
+                            <input 
+                                type="text" 
+                                className="form-control form-control-sm ps-5 border-2 shadow-none" 
+                                placeholder="Search assembly..." 
+                                value={historySearch}
+                                onChange={(e) => setHistorySearch(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="fw-bold small text-muted text-uppercase mb-1 d-block" style={{fontSize: '0.7rem'}}>Start Date</label>
+                        <input type="date" className="form-control form-control-sm" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                    </div>
+                    <div>
+                        <label className="fw-bold small text-muted text-uppercase mb-1 d-block" style={{fontSize: '0.7rem'}}>End Date</label>
+                        <input type="date" className="form-control form-control-sm" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                    </div>
+                    <button 
+                        className="btn btn-danger btn-sm rounded-pill px-3 fw-bold"
+                        onClick={() => { setHistorySearch(''); setStartDate(''); setEndDate(''); }}
+                    >
+                        RESET
+                    </button>
+                </div>
+
+                <div className="bg-white border rounded-4 overflow-hidden shadow-sm mx-2">
+                    <div className="history-table-container">
                         <table className="table table-hover align-middle mb-0" style={{fontSize: '0.85rem'}}>
-                            <thead className="bg-dark text-white sticky-top">
+                            <thead className="sticky-header">
                                 <tr>
-                                    <th className="ps-4 py-3">MODEL</th><th>ASSEMBLY</th><th>TYPE</th><th>STATION</th><th className="text-center">STATUS AFTER</th><th>ACTION BY</th><th className="text-end pe-4">TIMESTAMP</th>
+                                    <th className="ps-4 py-3">MODEL</th>
+                                    <th>ASSEMBLY</th>
+                                    <th>TYPE</th>
+                                    <th>STATION</th>
+                                    <th className="text-center">STATUS AFTER</th>
+                                    <th>ACTION BY</th>
+                                    <th className="text-end pe-4">TIMESTAMP</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                {processedHistoryLogs.map(log => {
-                                    const ts = formatTimestamp(log.timestamp || log.created_at);
-                                    return (
-                                        <tr key={log.id}>
-                                            <td className="ps-4 fw-bold">{log.model || log.model_id}</td>
-                                            <td><code className="text-primary fw-bold">{log.assembly_no}</code></td>
-                                            <td className="text-muted small fw-bold">{log.action_type || 'UPDATE'}</td>
-                                            <td className="fw-semibold text-dark">{log.station_name || log.station}</td>
-                                            <td className="text-center">
-                                                {/* FIXED: Dito lumalabas ang status badges sa history */}
-                                                <span className={`badge rounded-pill px-3 py-1 ${getStatusBadgeClass(log.status_after || log.status)}`}>
-                                                    {log.status_after || log.status}
-                                                </span>
-                                            </td>
-                                            <td className="small fw-medium text-dark">{log.action_by || 'System'}</td>
-                                            <td className="text-end pe-4 small text-muted">
-                                                <div className="fw-bold text-dark">{ts.date}</div>
-                                                <div>{ts.time}</div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
+                            <tbody style={{ borderTop: '0' }}>
+                                {filteredHistory.length > 0 ? (
+                                    filteredHistory.map(log => {
+                                        const ts = formatTimestamp(log.timestamp || log.created_at);
+                                        return (
+                                            <tr key={log.id}>
+                                                <td className="ps-4 fw-bold">{log.model || log.model_id}</td>
+                                                <td><code className="text-primary fw-bold" style={{background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px'}}>{log.assembly_no}</code></td>
+                                                <td className="text-muted small fw-bold">{log.action_type || 'UPDATE'}</td>
+                                                <td className="fw-semibold text-dark">{log.station_name || log.station}</td>
+                                                <td className="text-center">
+                                                    <span className={`badge rounded-pill px-3 py-1 ${getStatusBadgeClass(log.status_after || log.status)}`}>
+                                                        {log.status_after || log.status}
+                                                    </span>
+                                                </td>
+                                                <td className="small fw-medium text-dark">{log.action_by || 'System'}</td>
+                                                <td className="text-end pe-4 small text-muted">
+                                                    <div className="fw-bold text-dark">{ts.date}</div>
+                                                    <div>{ts.time}</div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                ) : (
+                                    <tr>
+                                        <td colSpan="7" className="text-center py-5 text-muted fw-bold">No records found.</td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
@@ -260,10 +314,13 @@ export function StationsOverview({
     }));
 
     return (
-        <div className="animate-in fade-in container-fluid px-0">
-            <style>{`.station-card-flat { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; height: 100%; border-top: 4px solid #e2e8f0; transition: all 0.2s; } .station-card-flat:hover { transform: translateY(-2px); border-color: #cbd5e1; }`}</style>
+        <div className="container-fluid px-0">
+            <style>{`
+                .station-card-flat { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; height: 100%; border-top: 4px solid #e2e8f0; }
+                .station-card-flat:hover { border-color: #cbd5e1; }
+            `}</style>
             <div className="d-flex justify-content-between align-items-center mb-4 px-2 border-bottom pb-3">
-                <div><h4 className="fw-bold text-dark mb-0 tracking-tight">Station Control Panel</h4><p className="text-muted small mb-0">Operational status of all assembly units.</p></div>
+                <div><h4 className="fw-bold text-dark mb-0 tracking-tight">Station Control Panel</h4><p className="text-muted small mb-0">Operational status.</p></div>
                 <button className="btn btn-primary btn-sm rounded-pill px-4 fw-bold border-0" style={{background:'#107c55'}} onClick={() => setActiveTab('overall_history')}>VIEW HISTORY</button>
             </div>
             <div className="row g-4">

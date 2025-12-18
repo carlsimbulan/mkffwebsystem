@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
 
@@ -9,76 +9,59 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
     const [gradientSuccess, setGradientSuccess] = useState(null);
     const [gradientDanger, setGradientDanger] = useState(null);
 
-    const liveLogs = logs.filter(l => l.status !== 'Pending Approval');
-
-    // Prepare dataset for ALL stations (No filter applied here)
-    const summaries = stations.map(station => {
-        // Calculate metrics for both display and tooltip use
-        const metrics = calculateMetrics(station.id, liveLogs) || { completedUnits: 0, ngUnits: 0 };
-        const completed = metrics.completedUnits || 0;
-        const ng = metrics.ngUnits || 0;
-        const total = completed + ng;
-        
-        // Calculate percentage achievements
-        const achievementPercent = total > 0 ? (completed / total) * 100 : 0;
-        const defectPercent = total > 0 ? (ng / total) * 100 : 0;
-        
-        return {
-            name: station.name,
-            // Raw Counts (kept for richer tooltip data)
-            completedUnits: completed, 
-            ngUnits: ng,
-            totalUnits: total,
+    // UseMemo to prevent recalculating summaries on every render unless logs/stations change
+    const summaries = useMemo(() => {
+        const liveLogs = logs.filter(l => l.status !== 'Pending Approval');
+        return stations.map(station => {
+            const metrics = calculateMetrics(station.id, liveLogs) || { completedUnits: 0, ngUnits: 0 };
+            const completed = metrics.completedUnits || 0;
+            const ng = metrics.ngUnits || 0;
+            const total = completed + ng;
             
-            // Percentage Data (used for the actual bar chart drawing)
-            achievementPercent: parseFloat(achievementPercent.toFixed(1)), 
-            defectPercent: parseFloat(defectPercent.toFixed(1)),          
-        };
-    }); // <-- TINANGGAL ANG .filter(s => s.totalUnits > 0)
+            return {
+                name: station.name,
+                completedUnits: completed, 
+                ngUnits: ng,
+                totalUnits: total,
+                achievementPercent: total > 0 ? parseFloat(((completed / total) * 100).toFixed(1)) : 0, 
+                defectPercent: total > 0 ? parseFloat(((ng / total) * 100).toFixed(1)) : 0,          
+            };
+        });
+    }, [logs, stations, calculateMetrics]);
 
-    const totalOutput = summaries.reduce((sum, s) => sum + s.totalUnits, 0);
-
-    // Create Gradients on Mount/Update
     useEffect(() => {
         const chart = chartRef.current;
         if (!chart) return;
 
         const ctx = chart.ctx;
         
-        // Success Gradient (Emerald/Bootstrap Success) - Vertical gradient
+        // Only create gradients if they don't exist to save resources
         const gradSuccess = ctx.createLinearGradient(0, 0, 0, chart.height);
-        gradSuccess.addColorStop(0, '#34d399'); // Light Green Start (Top)
-        gradSuccess.addColorStop(1, '#10b981'); // Dark Green End (Bottom)
+        gradSuccess.addColorStop(0, '#34d399'); 
+        gradSuccess.addColorStop(1, '#10b981'); 
         setGradientSuccess(gradSuccess);
 
-        // Danger Gradient (Red/Bootstrap Danger) - Vertical gradient
         const gradDanger = ctx.createLinearGradient(0, 0, 0, chart.height);
-        gradDanger.addColorStop(0, '#f87171'); // Light Red Start (Top)
-        gradDanger.addColorStop(1, '#ef4444'); // Dark Red End (Bottom)
+        gradDanger.addColorStop(0, '#f87171'); 
+        gradDanger.addColorStop(1, '#ef4444'); 
         setGradientDanger(gradDanger);
+    }, [summaries.length]); // Only re-run if station count changes
 
-    }, [totalOutput]); 
-
-    // Chart data
     const chartData = {
-        labels: summaries.map(s => s.name), // Lahat ng 15 stations kasama dito
+        labels: summaries.map(s => s.name),
         datasets: [
             {
-                // Product Plan Achievement %
                 label: 'Product Plan Achievement %',
-                data: summaries.map(s => s.achievementPercent), // Magiging 0% kung walang output
+                data: summaries.map(s => s.achievementPercent),
                 backgroundColor: gradientSuccess || '#10b981',
-                hoverBackgroundColor: gradientSuccess || '#10b981',
                 borderRadius: 10,
                 borderSkipped: false,
                 barThickness: 15, 
             },
             {
-                // Defect %
                 label: 'Defect %',
-                data: summaries.map(s => s.defectPercent), // Magiging 0% kung walang output
+                data: summaries.map(s => s.defectPercent),
                 backgroundColor: gradientDanger || '#ef4444',
-                hoverBackgroundColor: gradientDanger || '#ef4444',
                 borderRadius: 10,
                 borderSkipped: false,
                 barThickness: 15, 
@@ -89,33 +72,51 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
     const options = {
         responsive: true,
         maintainAspectRatio: false,
-        indexAxis: 'x', // Vertical bars
+        
+        // --- PERFORMANCE-OPTIMIZED ANIMATIONS ---
+        animation: {
+            duration: 750,          // Snappy but visible
+            easing: 'easeOutQuart', // Smooth deceleration
+            delay: (context) => {
+                // Staggered delay: prevents CPU spikes by not animating all bars at once
+                let delay = 0;
+                if (context.type === 'data' && context.mode === 'default') {
+                    delay = context.dataIndex * 100 + context.datasetIndex * 100;
+                }
+                return delay;
+            }
+        },
+        // Hover interactions stay instant to prevent "laggy" feeling mouse movement
+        transitions: {
+            active: {
+                animation: { duration: 0 }
+            }
+        },
+        // ----------------------------------------
+        
+        indexAxis: 'x',
         scales: {
-            x: { // X-axis (Stations)
+            x: {
                 stacked: true,
                 grid: { display: false },
                 ticks: {
                     color: '#475569',
-                    font: { size: 13, weight: '700', family: "'Inter', sans-serif" }, 
-                    autoSkip: false, // <-- Siguraduhin na lahat ng station label ay lumabas
+                    font: { size: 12, weight: '600' }, 
+                    autoSkip: false,
                 },
-                border: { display: false },
             },
-            y: { // Y-axis (Percentage)
+            y: {
                 stacked: true,
                 beginAtZero: true,
                 max: 100, 
                 ticks: {
                     color: '#94a3b8',
-                    font: { size: 11, family: "'Inter', sans-serif" },
-                    callback: function(value) {
-                        return value + '%';
-                    }
+                    font: { size: 11 },
+                    callback: (value) => value + '%'
                 },
                 grid: {
                     color: '#f1f5f9',
                     borderDash: [4, 4],
-                    drawBorder: false,
                 },
             },
         },
@@ -126,68 +127,39 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
                 labels: {
                     usePointStyle: true,
                     boxWidth: 8,
-                    padding: 25,
+                    padding: 20,
                     color: '#64748b',
-                    font: { size: 12, family: "'Inter', sans-serif" }
                 }
             },
             tooltip: {
-                backgroundColor: 'rgba(30, 41, 59, 0.95)',
-                titleColor: '#fff',
-                bodyColor: '#e2e8f0',
+                enabled: true,
+                animation: { duration: 150 }, // Slight fade for tooltips
+                backgroundColor: '#1e293b',
                 padding: 12,
                 cornerRadius: 8,
-                titleFont: { size: 13 },
-                bodyFont: { size: 13 },
                 callbacks: {
-                    title: (tooltipItem) => {
-                        return tooltipItem[0].label;
-                    },
                     label: (context) => {
-                        const stationName = context.label;
-                        const stationData = summaries.find(s => s.name === stationName);
-                        
+                        const stationData = summaries[context.dataIndex];
                         let label = context.dataset.label || '';
                         const value = context.parsed.y;
-                        
                         if (stationData) {
-                            if (context.dataset.label.includes('Achievement')) {
-                                return `${label}: ${value}% (${stationData.completedUnits} units)`;
-                            } else if (context.dataset.label.includes('Defect')) {
-                                return `${label}: ${value}% (${stationData.ngUnits} units)`;
-                            }
+                            const unitCount = context.datasetIndex === 0 
+                                ? stationData.completedUnits 
+                                : stationData.ngUnits;
+                            return `${label}: ${value}% (${unitCount} units)`;
                         }
                         return `${label}: ${value}%`;
-                    },
-                    afterBody: (tooltipItem) => {
-                        const stationName = tooltipItem[0].label;
-                        const stationData = summaries.find(s => s.name === stationName);
-                        
-                        if (stationData) {
-                            return [
-                                `---`,
-                                `Total Output (Units): ${stationData.totalUnits}`,
-                            ];
-                        }
-                        return null;
                     }
                 }
             },
         },
     };
 
-    // Note: Ginamit ko ang 'totalOutput === 0' para i-handle ang case na walang recorded units.
-    // Kapag may units na, gagamitin na ang chart.
     return (
         <div className="w-100 h-100 position-relative" style={{ minHeight: '400px' }}>
             {summaries.length === 0 ? (
-                // Only show this if there are literally no stations configured (unlikely, but for safety)
                 <div className="d-flex flex-column align-items-center justify-content-center h-100 text-muted">
-                    <div className="bg-light rounded-circle p-4 mb-3">
-                        <i className="bi bi-bar-chart-line fs-1 text-secondary opacity-50"></i>
-                    </div>
                     <h6 className="fw-bold text-dark">No Stations Configured</h6>
-                    <p className="small m-0 text-secondary">Please ensure stations data is loaded.</p>
                 </div>
             ) : (
                 <Bar ref={chartRef} data={chartData} options={options} />
