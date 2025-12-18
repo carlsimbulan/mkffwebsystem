@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
 
@@ -9,28 +9,25 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
     const [gradientSuccess, setGradientSuccess] = useState(null);
     const [gradientDanger, setGradientDanger] = useState(null);
 
-    const liveLogs = logs.filter(l => l.status !== 'Pending Approval');
-
-    const summaries = stations.map(station => {
-        const metrics = calculateMetrics(station.id, liveLogs) || { completedUnits: 0, ngUnits: 0 };
-        const completed = metrics.completedUnits || 0;
-        const ng = metrics.ngUnits || 0;
-        const total = completed + ng;
-        
-        const achievementPercent = total > 0 ? (completed / total) * 100 : 0;
-        const defectPercent = total > 0 ? (ng / total) * 100 : 0;
-        
-        return {
-            name: station.name,
-            completedUnits: completed, 
-            ngUnits: ng,
-            totalUnits: total,
-            achievementPercent: parseFloat(achievementPercent.toFixed(1)), 
-            defectPercent: parseFloat(defectPercent.toFixed(1)),          
-        };
-    });
-
-    const totalOutput = summaries.reduce((sum, s) => sum + s.totalUnits, 0);
+    // UseMemo to prevent recalculating summaries on every render unless logs/stations change
+    const summaries = useMemo(() => {
+        const liveLogs = logs.filter(l => l.status !== 'Pending Approval');
+        return stations.map(station => {
+            const metrics = calculateMetrics(station.id, liveLogs) || { completedUnits: 0, ngUnits: 0 };
+            const completed = metrics.completedUnits || 0;
+            const ng = metrics.ngUnits || 0;
+            const total = completed + ng;
+            
+            return {
+                name: station.name,
+                completedUnits: completed, 
+                ngUnits: ng,
+                totalUnits: total,
+                achievementPercent: total > 0 ? parseFloat(((completed / total) * 100).toFixed(1)) : 0, 
+                defectPercent: total > 0 ? parseFloat(((ng / total) * 100).toFixed(1)) : 0,          
+            };
+        });
+    }, [logs, stations, calculateMetrics]);
 
     useEffect(() => {
         const chart = chartRef.current;
@@ -38,19 +35,17 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
 
         const ctx = chart.ctx;
         
-        // Success Gradient
+        // Only create gradients if they don't exist to save resources
         const gradSuccess = ctx.createLinearGradient(0, 0, 0, chart.height);
         gradSuccess.addColorStop(0, '#34d399'); 
         gradSuccess.addColorStop(1, '#10b981'); 
         setGradientSuccess(gradSuccess);
 
-        // Danger Gradient
         const gradDanger = ctx.createLinearGradient(0, 0, 0, chart.height);
         gradDanger.addColorStop(0, '#f87171'); 
         gradDanger.addColorStop(1, '#ef4444'); 
         setGradientDanger(gradDanger);
-
-    }, [totalOutput]); 
+    }, [summaries.length]); // Only re-run if station count changes
 
     const chartData = {
         labels: summaries.map(s => s.name),
@@ -77,16 +72,28 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
     const options = {
         responsive: true,
         maintainAspectRatio: false,
-        // --- DISABLE ALL ANIMATIONS ---
-        animation: false,
-        animations: {
-            colors: false,
-            x: false,
+        
+        // --- PERFORMANCE-OPTIMIZED ANIMATIONS ---
+        animation: {
+            duration: 750,          // Snappy but visible
+            easing: 'easeOutQuart', // Smooth deceleration
+            delay: (context) => {
+                // Staggered delay: prevents CPU spikes by not animating all bars at once
+                let delay = 0;
+                if (context.type === 'data' && context.mode === 'default') {
+                    delay = context.dataIndex * 100 + context.datasetIndex * 100;
+                }
+                return delay;
+            }
         },
+        // Hover interactions stay instant to prevent "laggy" feeling mouse movement
         transitions: {
-            active: { animation: { duration: 0 } }
+            active: {
+                animation: { duration: 0 }
+            }
         },
-        // ------------------------------
+        // ----------------------------------------
+        
         indexAxis: 'x',
         scales: {
             x: {
@@ -94,7 +101,7 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
                 grid: { display: false },
                 ticks: {
                     color: '#475569',
-                    font: { size: 13, weight: '700' }, 
+                    font: { size: 12, weight: '600' }, 
                     autoSkip: false,
                 },
             },
@@ -120,26 +127,26 @@ export const StationBarChart = ({ logs, stations, calculateMetrics }) => {
                 labels: {
                     usePointStyle: true,
                     boxWidth: 8,
-                    padding: 25,
+                    padding: 20,
                     color: '#64748b',
                 }
             },
             tooltip: {
-                // Pinanatili ang tooltip pero inalis ang animations nito
                 enabled: true,
-                animation: false,
-                backgroundColor: 'rgba(30, 41, 59, 1)', // Solid para bawas process sa opacity
+                animation: { duration: 150 }, // Slight fade for tooltips
+                backgroundColor: '#1e293b',
+                padding: 12,
+                cornerRadius: 8,
                 callbacks: {
                     label: (context) => {
-                        const stationData = summaries.find(s => s.name === context.label);
+                        const stationData = summaries[context.dataIndex];
                         let label = context.dataset.label || '';
                         const value = context.parsed.y;
                         if (stationData) {
-                            if (context.dataset.label.includes('Achievement')) {
-                                return `${label}: ${value}% (${stationData.completedUnits} units)`;
-                            } else {
-                                return `${label}: ${value}% (${stationData.ngUnits} units)`;
-                            }
+                            const unitCount = context.datasetIndex === 0 
+                                ? stationData.completedUnits 
+                                : stationData.ngUnits;
+                            return `${label}: ${value}% (${unitCount} units)`;
                         }
                         return `${label}: ${value}%`;
                     }

@@ -3,6 +3,25 @@ import { UnitPieChart } from './UnitPieChart';
 import { StationBarChart } from './StationBarChart'; 
 import html2canvas from 'html2canvas'; 
 
+// --- CONFIGURATION: Time thresholds per station (in minutes) ---
+const DELAY_THRESHOLDS_MINUTES = {
+    'Station1': 6, 'Station 1': 6,
+    'Station2': 8, 'Station 2': 8,
+    'Station3': 3, 'Station 3': 3,
+    'Station4': 12, 'Station 4': 12,
+    'Station5': 15, 'Station 5': 15,
+    'Station6': 15, 'Station 6': 15,
+    'Station7': 3, 'Station 7': 3,
+    'Station8': 0, 'Station 8': 0,
+    'Station9': 480, 'Station 9': 480,
+    'Station10': 8, 'Station 10': 8,
+    'Station11': 22, 'Station 11': 22,
+    'Station12': 5, 'Station 12': 5,
+    'Station13': 10, 'Station 13': 10,
+    'Station14': 8, 'Station 14': 8,
+    'Station15': 5, 'Station 15': 5
+};
+
 const processStations = [
     "PCB Pairing", "Integrated Board Test", "Main Board Conformal Coating",
     "RTV Application", "Casing/Harnessing", "Complete Unit Test/Calibration",
@@ -19,6 +38,14 @@ const getStatusBadgeClass = (status) => {
     if (statusText.includes('in progress')) return 'bg-yellow-subtle text-warning border border-yellow-subtle'; 
     if (statusText.includes('scanning')) return 'bg-info-subtle text-info border border-info-subtle';
     return 'bg-light text-secondary border';
+};
+
+const getSearchHighlightStyle = (status) => {
+    const statusText = status?.toLowerCase() || '';
+    if (statusText.includes('completed') || statusText.includes('ok')) return { borderLeft: '8px solid #10b981', backgroundColor: '#f0fdf4' };
+    if (statusText.includes('no good')) return { borderLeft: '8px solid #ef4444', backgroundColor: '#fef2f2' };
+    if (statusText.includes('in progress')) return { borderLeft: '8px solid #f59e0b', backgroundColor: '#fffbeb' };
+    return {};
 };
 
 export function Dashboard({
@@ -39,14 +66,59 @@ export function Dashboard({
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedUnit, setSelectedUnit] = useState(null);
 
-    // 1. MEMOIZED LOGS FILTERING
-    const forScanningLogs = useMemo(() => 
-        logs.filter(l => l.status === 'For Scanning'), 
+    // --- UPDATED LOGIC: BOTTLENECK AGGREGATION ---
+    const bottleneckData = useMemo(() => {
+        const activeUnits = logs.filter(l => 
+            l.status?.toLowerCase().includes('in progress') || 
+            l.status?.toLowerCase().includes('scanning') ||
+            l.status?.toLowerCase().includes('for scanning')
+        );
+
+        const groups = activeUnits.reduce((acc, unit) => {
+            // Label replacement for "For Scanning"
+            let sName = unit.station;
+            if (unit.status === 'For Scanning' || !unit.station || unit.station === 'For Scanning') {
+                sName = 'FOR SCANNING UNITS';
+            }
+
+            if (!acc[sName]) {
+                acc[sName] = { name: sName, count: 0, maxAging: 0, isSlow: false };
+            }
+
+            const lastUpdate = new Date(unit.updated_at || unit.created_at).getTime();
+            const now = new Date().getTime();
+            const minutesInStation = Math.max(0, (now - lastUpdate) / (1000 * 60));
+            const threshold = DELAY_THRESHOLDS_MINUTES[sName] || 10;
+
+            acc[sName].count += 1;
+            if (minutesInStation > acc[sName].maxAging) {
+                acc[sName].maxAging = minutesInStation;
+            }
+
+            // BOTTLENECK RULES
+            if (sName === 'FOR SCANNING UNITS') {
+                // For Scanning: Nag-s-slow base sa dami ng units (Volume)
+                if (acc[sName].count > 8) acc[sName].isSlow = true;
+            } else {
+                // Stations: Slow base sa oras (Aging) OR masyadong madaming WIP
+                if (minutesInStation > threshold || acc[sName].count > 8) {
+                    acc[sName].isSlow = true;
+                }
+            }
+
+            return acc;
+        }, {});
+
+        return Object.values(groups).sort((a, b) => {
+            if (a.isSlow !== b.isSlow) return a.isSlow ? -1 : 1;
+            return b.count - a.count;
+        });
+    }, [logs]);
+
+    const forScanningUnitsCount = useMemo(() => 
+        logs.filter(l => l.status === 'For Scanning').length, 
     [logs]);
 
-    const forScanningUnitsCount = forScanningLogs.length;
-
-    // Search Logic para sa Global Search Results
     const searchResults = useMemo(() => {
         if (!searchTerm.trim()) return [];
         return logs.filter(l => 
@@ -54,7 +126,6 @@ export function Dashboard({
         ).slice(0, 8);
     }, [logs, searchTerm]);
 
-    // 2. MEMOIZED METRICS CALCULATION (WITH PERCENTAGES)
     const stats = useMemo(() => {
         const coreProductionUnits = 
             overallMetrics.completedUnits + 
@@ -134,14 +205,10 @@ export function Dashboard({
                     transition: all 0.2s; 
                 }
                 .search-input-pro:focus { background-color: #fff; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
-                .search-item-result { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: background 0.1s; }
-                .search-item-result:hover { background-color: #f8fafc; }
+                .search-item-result { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: all 0.2s ease; }
+                .search-item-result:hover { filter: brightness(0.95); transform: translateX(5px); }
                 .fixed-scanning-table { height: 320px; overflow-y: auto; border-radius: 0 0 16px 16px; }
                 .process-step { padding: 12px 15px; border-left: 3px solid #e2e8f0; position: relative; margin-left: 15px; }
-                .process-step.done { border-left-color: #10b981; }
-                .process-step.current-progressing { border-left-color: #fbbf24; }
-                .process-step.current-ready { border-left-color: #10b981; }
-                .process-step.ng { border-left-color: #ef4444; }
                 .step-dot { position: absolute; left: -9px; top: 18px; width: 15px; height: 15px; border-radius: 50%; background: #e2e8f0; border: 2px solid white; }
                 .done .step-dot, .current-ready .step-dot { background: #10b981; }
                 .current-progressing .step-dot { background: #fbbf24; }
@@ -170,10 +237,16 @@ export function Dashboard({
                                     <div 
                                         key={unit.id} 
                                         className="search-item-result"
+                                        style={getSearchHighlightStyle(unit.status)}
                                         onClick={() => { setSelectedUnit(unit); setSearchTerm(''); }}
                                     >
-                                        <div className="fw-bold text-dark">{unit.assembly_no}</div>
-                                        <div className="text-muted" style={{fontSize: '0.75rem'}}>Model: {unit.model} • <span className="text-primary">{unit.status}</span></div>
+                                        <div className="fw-bold text-dark d-flex justify-content-between">
+                                            <span>{unit.assembly_no}</span>
+                                            <i className="bi bi-arrow-right-short"></i>
+                                        </div>
+                                        <div className="text-muted" style={{fontSize: '0.75rem'}}>
+                                            Model: {unit.model} • <span className="fw-bold text-uppercase">{unit.status}</span>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -185,7 +258,7 @@ export function Dashboard({
                 </div>
             </div>
 
-            {/* --- CARDS GRID WITH PERCENTAGES --- */}
+            {/* --- CARDS GRID --- */}
             <div className="row g-4 mb-4">
                 <div className="col-md-4">
                     <div className="stat-card-pro" style={{ borderLeftColor: '#0f172a' }}>
@@ -254,36 +327,69 @@ export function Dashboard({
                 </div>
             </div>
 
-            {/* --- TABLE: PENDING SCANNING --- */}
+            {/* --- TABLE: STATION BOTTLENECK ANALYTICS --- */}
             <div className="bg-white border rounded-4 overflow-hidden shadow-sm mb-5">
                 <div className="d-flex justify-content-between align-items-center p-3 border-bottom bg-light">
-                    <span className="label-caps m-0">Units Pending Scanning</span>
-                    <span className="badge bg-info text-dark rounded-pill">{forScanningUnitsCount} Units Total</span>
+                    <span className="label-caps m-0">Station Bottleneck Analytics</span>
+                    <span className="badge bg-dark text-white rounded-pill">{bottleneckData.length} Active Areas</span>
                 </div>
                 <div className="table-responsive fixed-scanning-table">
                     <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem' }}>
                         <thead className="table-light sticky-top">
                             <tr>
-                                <th className="py-3 ps-4">MODEL</th>
-                                <th>ASSEMBLY NO.</th>
-                                <th>STATUS</th>
-                                <th className="pe-4">TIME DATE</th>
+                                <th className="py-3 ps-4">STATION NAME</th>
+                                <th className="text-center">CURRENT LOAD</th>
+                                <th>LOAD INTENSITY</th>
+                                <th className="pe-4 text-end">FLOW STATUS</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {forScanningLogs.length === 0 ? (
-                                <tr><td colSpan="4" className="text-center py-5 text-muted">No pending units for scanning.</td></tr>
+                            {bottleneckData.length === 0 ? (
+                                <tr><td colSpan="4" className="text-center py-5 text-muted">No active units in the production line.</td></tr>
                             ) : (
-                                forScanningLogs.map(log => ( 
-                                    <tr key={log.id}>
-                                        <td className="fw-bold ps-4">{log.model}</td>
-                                        <td className="text-primary fw-bold"><code>{log.assembly_no}</code></td>
-                                        <td><span className={`badge rounded-pill px-3 py-1 ${getStatusBadgeClass(log.status)}`}>{log.status}</span></td>
-                                        <td className="text-muted small pe-4">
-                                            {new Date(log.created_at).toLocaleString()}
-                                        </td>
-                                    </tr>
-                                ))
+                                bottleneckData.map((station) => {
+                                    const maxCountAcrossLine = Math.max(...bottleneckData.map(d => d.count));
+                                    const intensityPct = (station.count / maxCountAcrossLine) * 100;
+
+                                    return (
+                                        <tr key={station.name}>
+                                            <td className="ps-4 fw-bold text-dark">
+                                                {station.isSlow ? 
+                                                    <i className="bi bi-exclamation-triangle-fill text-danger me-2"></i> : 
+                                                    <i className="bi bi-check-circle-fill text-success me-2"></i>
+                                                }
+                                                {station.name}
+                                            </td>
+                                            <td className="text-center">
+                                                <span className={`badge rounded-pill px-3 py-1 ${station.isSlow ? 'bg-danger' : 'bg-primary'}`}>
+                                                    {station.count} Units
+                                                </span>
+                                            </td>
+                                            <td style={{ width: '35%' }}>
+                                                <div className="small text-muted mb-1">
+                                                    {station.name === 'FOR SCANNING UNITS' 
+                                                        ? `Queue Density: ${station.count} units waiting` 
+                                                        : `Aging: ${Math.round(station.maxAging)} mins max`}
+                                                </div>
+                                                <div className="progress" style={{ height: '8px', borderRadius: '4px' }}>
+                                                    <div 
+                                                        className={`progress-bar ${station.isSlow ? 'bg-danger' : 'bg-success'}`} 
+                                                        style={{ width: `${intensityPct}%` }}
+                                                    ></div>
+                                                </div>
+                                            </td>
+                                            <td className="pe-4 text-end">
+                                                {station.isSlow ? (
+                                                    <span className="badge bg-danger-subtle text-danger border border-danger-subtle">
+                                                        {station.name === 'FOR SCANNING UNITS' ? 'HIGH VOLUME QUEUE' : 'SLOW / BOTTLENECK'}
+                                                    </span>
+                                                ) : (
+                                                    <span className="badge bg-success-subtle text-success border border-success-subtle">STABLE FLOW</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
@@ -312,7 +418,7 @@ export function Dashboard({
                                 const isCurrent = idx === currentStationIdx;
                                 const unitStatus = selectedUnit.status?.toLowerCase() || '';
                                 const isNG = isCurrent && unitStatus.includes('no good');
-                                const isCompletedHere = isCurrent && unitStatus.includes('completed');
+                                const isCompletedHere = isCurrent && (unitStatus.includes('completed') || unitStatus.includes('ok'));
                                 
                                 let stepClass = "";
                                 let subText = "Pending Station";
