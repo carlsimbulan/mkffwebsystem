@@ -53,15 +53,18 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 .stat-card-pro { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 22px; height: 100%; border-left: 5px solid #334155; }
                 .label-caps { font-size: 0.65rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: block; }
                 .value-bold { font-size: 2.2rem; font-weight: 900; color: #0f172a; margin: 0; line-height: 1; }
+                
+                /* Tracker Styles */
                 .process-step { padding: 12px 15px; border-left: 3px solid #e2e8f0; position: relative; margin-left: 15px; }
-                .process-step.done { border-left-color: #10b981; }
-                .process-step.current-progressing { border-left-color: #fbbf24; }
-                .process-step.current-ready { border-left-color: #10b981; }
-                .process-step.ng { border-left-color: #ef4444; }
-                .step-dot { position: absolute; left: -9px; top: 18px; width: 15px; height: 15px; border-radius: 50%; background: #e2e8f0; border: 2px solid white; }
-                .done .step-dot, .current-ready .step-dot { background: #10b981; }
-                .current-progressing .step-dot { background: #fbbf24; }
-                .ng .step-dot { background: #ef4444; }
+                .process-step.done { border-left-color: #198754; } /* Green */
+                .process-step.current-progressing { border-left-color: #ffc107; } /* Yellow */
+                .process-step.current-ready { border-left-color: #198754; } /* Green */
+                .process-step.ng { border-left-color: #dc3545; } /* Red */
+                
+                .step-dot { position: absolute; left: -9px; top: 18px; width: 15px; height: 15px; border-radius: 50%; background: #e2e8f0; border: 2px solid white; z-index: 2; }
+                .done .step-dot, .current-ready .step-dot { background: #198754; }
+                .current-progressing .step-dot { background: #ffc107; }
+                .ng .step-dot { background: #dc3545; }
             `}</style>
 
             <div className="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3 px-2">
@@ -69,7 +72,9 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                     <h3 className="fw-black text-dark mb-1 tracking-tight">{processName}</h3>
                     <p className="text-muted small mb-0">Station Insight • ID: {stationMonitorId}</p>
                 </div>
-                <button className="btn btn-outline-dark btn-sm px-4 fw-bold rounded-pill" onClick={() => setActiveTab('stations')}>BACK TO GRID</button>
+                <button className="btn btn-light border btn-sm px-3" onClick={() => setActiveTab('stations')}>
+                    <i className="bi bi-arrow-left me-1"></i> Back
+                </button>
             </div>
 
             <div className="row g-4 mb-4">
@@ -115,13 +120,17 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
             </div>
 
             {selectedUnitProcess && (
-                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(15, 23, 42, 0.8)', zIndex: 1050 }}>
-                    <div className="bg-white rounded-4 shadow-lg p-0 overflow-hidden" style={{ width: '95%', maxWidth: '500px' }}>
-                        <div className="bg-dark p-3 d-flex justify-content-between align-items-center">
-                            <h6 className="text-white mb-0 fw-bold"><i className="bi bi-cpu me-2"></i>TRACKING: {selectedUnitProcess.assembly_no}</h6>
+                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" 
+                     style={{ background: 'rgba(0, 0, 0, 0.6)', zIndex: 1050, backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
+                    <div className="bg-white rounded-4 shadow-lg p-0 overflow-hidden border-0 shadow-2xl" style={{ width: '95%', maxWidth: '500px' }}>
+                        <div className="p-3 d-flex justify-content-between align-items-center text-white" 
+                             style={{ background: 'linear-gradient(90deg, #0d6efd 0%, #0a58ca 100%)' }}>
+                            <h6 className="mb-0 fw-bold d-flex align-items-center">
+                                <i className="bi bi-cpu-fill me-2"></i>TRACKING: {selectedUnitProcess.assembly_no}
+                            </h6>
                             <button className="btn-close btn-close-white" onClick={() => setSelectedUnitProcess(null)}></button>
                         </div>
-                        <div className="p-4" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                        <div className="p-4 bg-light" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                             {processStations.map((station, idx) => {
                                 const isCurrent = idx === stationIndex;
                                 const isDoneBefore = idx < stationIndex;
@@ -136,19 +145,19 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                 if (isDoneBefore) {
                                     stepClass = "done";
                                     subText = "STATION COMPLETED";
-                                    textColor = "text-success";
+                                    textColor = "text-success"; // Green
                                 } else if (isNG) {
                                     stepClass = "ng";
                                     subText = "DEFECT DETECTED (NG)";
-                                    textColor = "text-danger";
+                                    textColor = "text-danger"; // Red
                                 } else if (isCompletedHere) {
                                     stepClass = "current-ready";
                                     subText = "READY TO GO TO NEXT STATION";
-                                    textColor = "text-success";
+                                    textColor = "text-success"; // Green
                                 } else if (isCurrent) {
                                     stepClass = "current-progressing";
                                     subText = "IN PROGRESS";
-                                    textColor = "text-warning";
+                                    textColor = "text-warning"; // Yellow
                                 }
 
                                 return (
@@ -163,14 +172,14 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                                     {subText}
                                                 </div>
                                             </div>
-                                            {isCurrent && <span className="badge bg-dark rounded-pill" style={{fontSize: '0.6rem'}}>CURRENT</span>}
+                                            {isCurrent && <span className="badge bg-primary rounded-pill shadow-sm" style={{fontSize: '0.6rem'}}>CURRENT</span>}
                                         </div>
                                     </div>
                                 );
                             })}
                         </div>
-                        <div className="p-3 bg-light border-top">
-                            <button className="btn btn-dark w-100 rounded-pill fw-bold" onClick={() => setSelectedUnitProcess(null)}>CLOSE TRACKER</button>
+                        <div className="p-3 bg-white border-top">
+                            <button className="btn btn-primary w-100 rounded-pill fw-bold shadow-sm" onClick={() => setSelectedUnitProcess(null)}>CLOSE TRACKER</button>
                         </div>
                     </div>
                 </div>
@@ -179,16 +188,13 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
     );
 };
 
-// --- MAIN EXPORT COMPONENT ---
 export function StationsOverview({
     activeTab, stations, calculateMetrics, stationMonitorId, highlightedUnitId, setActiveTab, handleMonitorStation, handleViewHistory, handleEditClick, fetchData, allLogs, 
 }) {
-    // History Filters State
     const [historySearch, setHistorySearch] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
 
-    // Optimization: Memoize filtered logs to prevent lag
     const filteredHistory = useMemo(() => {
         if (!allLogs) return [];
         return allLogs
@@ -225,10 +231,11 @@ export function StationsOverview({
                         <h4 className="fw-bold text-dark mb-0 tracking-tight">Production Registry</h4>
                         <p className="text-muted small mb-0">Total: {filteredHistory.length} records</p>
                     </div>
-                    <button className="btn btn-outline-dark btn-sm px-4 fw-bold rounded-pill" onClick={() => setActiveTab('stations')}>BACK TO GRID</button>
+                    <button className="btn btn-light border btn-sm px-3" onClick={() => setActiveTab('stations')}>
+                        <i className="bi bi-arrow-left me-1"></i> Back
+                    </button>
                 </div>
 
-                {/* SEARCH AND DATE FILTERS */}
                 <div className="filter-bar d-flex flex-wrap gap-3 align-items-end mx-2">
                     <div className="flex-grow-1">
                         <label className="fw-bold small text-muted text-uppercase mb-1 d-block" style={{fontSize: '0.7rem'}}>Assembly No.</label>
@@ -321,7 +328,7 @@ export function StationsOverview({
             `}</style>
             <div className="d-flex justify-content-between align-items-center mb-4 px-2 border-bottom pb-3">
                 <div><h4 className="fw-bold text-dark mb-0 tracking-tight">Station Control Panel</h4><p className="text-muted small mb-0">Operational status.</p></div>
-                <button className="btn btn-primary btn-sm rounded-pill px-4 fw-bold border-0" style={{background:'#107c55'}} onClick={() => setActiveTab('overall_history')}>VIEW HISTORY</button>
+                <button className="btn btn-primary btn-sm rounded-pill px-4 fw-bold border-0" style={{background:'#107c55'}} onClick={() => setActiveTab('overall_history')}>OVERALL HISTORY</button>
             </div>
             <div className="row g-4">
                 {namedStations.map((station) => {
@@ -334,6 +341,7 @@ export function StationsOverview({
                                 <h6 className="fw-black text-dark mb-1">{station.name}</h6>
                                 <div className="bg-light rounded-3 p-3 my-3 border border-light-subtle">
                                     <div className="d-flex justify-content-between small fw-bold"><span>COMPLETED</span><span>{metrics.completedUnits}</span></div>
+                                    <div className="d-flex justify-content-between small fw-bold mt-2 text-warning"><span>IN PROGRESS</span><span>{metrics.pendingUnits}</span></div>
                                     <div className="d-flex justify-content-between small fw-bold mt-2 text-danger"><span>DEFECTS (NG)</span><span>{metrics.ngUnits}</span></div>
                                 </div>
                                 <div className="d-flex gap-2 mt-auto">

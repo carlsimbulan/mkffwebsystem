@@ -30,6 +30,17 @@ const processStations = [
     "Packing", "QC Stamping"
 ];
 
+// 1. Helper para sa oras at petsa
+const formatTimestamp = (isoString) => {
+    if (!isoString) return { date: 'N/A', time: 'N/A' };
+    const date = new Date(isoString);
+    return {
+        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+    };
+};
+
+// 2. Helper para sa kulay ng status badges
 const getStatusBadgeClass = (status) => {
     const statusText = status?.toLowerCase() || '';
     if (statusText.includes('completed') || statusText.includes('ok')) return 'bg-success-subtle text-success border border-success-subtle';
@@ -66,7 +77,7 @@ export function Dashboard({
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedUnit, setSelectedUnit] = useState(null);
 
-    // --- UPDATED LOGIC: BOTTLENECK AGGREGATION ---
+    // --- BOTTLENECK AGGREGATION ---
     const bottleneckData = useMemo(() => {
         const activeUnits = logs.filter(l => 
             l.status?.toLowerCase().includes('in progress') || 
@@ -75,7 +86,6 @@ export function Dashboard({
         );
 
         const groups = activeUnits.reduce((acc, unit) => {
-            // Label replacement for "For Scanning"
             let sName = unit.station;
             if (unit.status === 'For Scanning' || !unit.station || unit.station === 'For Scanning') {
                 sName = 'FOR SCANNING UNITS';
@@ -95,12 +105,9 @@ export function Dashboard({
                 acc[sName].maxAging = minutesInStation;
             }
 
-            // BOTTLENECK RULES
             if (sName === 'FOR SCANNING UNITS') {
-                // For Scanning: Nag-s-slow base sa dami ng units (Volume)
                 if (acc[sName].count > 8) acc[sName].isSlow = true;
             } else {
-                // Stations: Slow base sa oras (Aging) OR masyadong madaming WIP
                 if (minutesInStation > threshold || acc[sName].count > 8) {
                     acc[sName].isSlow = true;
                 }
@@ -118,6 +125,26 @@ export function Dashboard({
     const forScanningUnitsCount = useMemo(() => 
         logs.filter(l => l.status === 'For Scanning').length, 
     [logs]);
+
+    // --- PRODUCTION FLOW DATA: Includes In Progress, NG, and Completed units at each station ---
+    const productionFlow = useMemo(() => {
+        const flow = [{ name: 'FOR SCANNING', count: forScanningUnitsCount }];
+        
+        processStations.forEach((stationName, idx) => {
+            const stationKey = `Station${idx + 1}`;
+            const stationKeySpaced = `Station ${idx + 1}`;
+            
+            // Count every unit currently sitting at this station
+            const unitsAtStation = logs.filter(l => 
+                (l.station === stationKey || l.station === stationKeySpaced) && 
+                l.status !== 'For Scanning'
+            ).length;
+
+            flow.push({ name: stationName, count: unitsAtStation });
+        });
+        
+        return flow;
+    }, [logs, forScanningUnitsCount]);
 
     const searchResults = useMemo(() => {
         if (!searchTerm.trim()) return [];
@@ -187,7 +214,16 @@ export function Dashboard({
                 .stat-card-pro {
                     background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;
                     padding: 22px; height: 100%; border-left: 5px solid #334155;
+                    position: relative;
                 }
+                .go-icon-link {
+                    position: absolute; top: 15px; right: 15px; width: 45px; height: 32px;
+                    background: #8b5cf6; color: white; border-radius: 16px;
+                    display: flex; align-items: center; justify-content: center;
+                    cursor: pointer; border: none; font-size: 0.7rem; font-weight: bold;
+                    transition: background 0.2s;
+                }
+                .go-icon-link:hover { background: #7c3aed; color: white; }
                 .label-caps {
                     font-size: 0.65rem; font-weight: 800; color: #64748b;
                     text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: block;
@@ -213,6 +249,20 @@ export function Dashboard({
                 .done .step-dot, .current-ready .step-dot { background: #10b981; }
                 .current-progressing .step-dot { background: #fbbf24; }
                 .ng .step-dot { background: #ef4444; }
+
+                /* Flow Tracker Styles */
+                .flow-wrapper { display: flex; overflow-x: auto; padding: 20px 0; scrollbar-width: thin; gap: 0; }
+                .flow-item { flex: 0 0 130px; position: relative; text-align: center; }
+                .flow-line-connector { position: absolute; top: 20px; left: 50%; width: 100%; height: 2px; background: #e2e8f0; z-index: 1; }
+                .flow-item:last-child .flow-line-connector { display: none; }
+                .flow-circle { 
+                    width: 40px; height: 40px; border-radius: 50%; background: white; border: 2px solid #cbd5e1;
+                    display: flex; align-items: center; justify-content: center; margin: 0 auto 10px;
+                    position: relative; z-index: 2; font-weight: 800; font-size: 0.85rem; transition: all 0.3s;
+                }
+                .flow-item.active .flow-circle { background: #3b82f6; color: white; border-color: #3b82f6; }
+                .flow-item.active .flow-line-connector { background: #3b82f6; }
+                .flow-name { font-size: 0.6rem; font-weight: 700; color: #64748b; text-transform: uppercase; display: block; padding: 0 5px; }
             `}</style>
 
             <div className="d-flex justify-content-between align-items-center mb-4 px-2">
@@ -258,7 +308,6 @@ export function Dashboard({
                 </div>
             </div>
 
-            {/* --- CARDS GRID --- */}
             <div className="row g-4 mb-4">
                 <div className="col-md-4">
                     <div className="stat-card-pro" style={{ borderLeftColor: '#0f172a' }}>
@@ -295,16 +344,41 @@ export function Dashboard({
                         <div className="badge-pct bg-danger bg-opacity-10 text-danger">{stats.pct.ng} Failure</div>
                     </div>
                 </div>
-                <div className="col-md-4" onClick={() => setActiveTab('approval')} style={{ cursor: 'pointer' }}>
+                <div className="col-md-4">
                     <div className="stat-card-pro" style={{ borderLeftColor: '#8b5cf6' }}>
+                        <button 
+                            className="go-icon-link shadow-sm" 
+                            onClick={() => setActiveTab('approval')}
+                        >
+                            GO <i className="bi bi-arrow-right-short ms-1"></i>
+                        </button>
                         <span className="label-caps" style={{ color: '#8b5cf6' }}>Pending QA Approval</span>
                         <h3 className="value-bold" style={{ color: '#8b5cf6' }}>{overallMetrics.pendingApprovalUnits}</h3>
-                        <div className="badge-pct" style={{backgroundColor: '#f5f3ff', color: '#7c3aed'}}>{stats.pct.approval} Validation</div>
+                        <div className="badge-pct" style={{backgroundColor: '#f5f3ff', color: '#7c3aed'}}>
+                            {stats.pct.approval} Validation
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* --- CHART SECTION --- */}
+            {/* --- VISUAL PRODUCTION FLOW TRACKER --- */}
+            <div className="bg-white border rounded-4 shadow-sm mb-4 overflow-hidden">
+                <div className="p-3 border-bottom bg-light">
+                    <span className="label-caps m-0">Live Station Flow Tracker (Current Unit Distribution)</span>
+                </div>
+                <div className="flow-wrapper px-3">
+                    {productionFlow.map((step, idx) => (
+                        <div key={idx} className={`flow-item ${step.count > 0 ? 'active' : ''}`}>
+                            <div className="flow-line-connector"></div>
+                            <div className="flow-circle">
+                                {step.count}
+                            </div>
+                            <span className="flow-name">{step.name}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
             <div className="bg-white border rounded-4 overflow-hidden mb-4 shadow-sm">
                 <div className="d-flex justify-content-between align-items-center p-3 border-bottom">
                     <span className="label-caps m-0">{currentChartTitle}</span>
@@ -327,7 +401,6 @@ export function Dashboard({
                 </div>
             </div>
 
-            {/* --- TABLE: STATION BOTTLENECK ANALYTICS --- */}
             <div className="bg-white border rounded-4 overflow-hidden shadow-sm mb-5">
                 <div className="d-flex justify-content-between align-items-center p-3 border-bottom bg-light">
                     <span className="label-caps m-0">Station Bottleneck Analytics</span>
@@ -396,7 +469,6 @@ export function Dashboard({
                 </div>
             </div>
 
-            {/* --- UNIT TRACKER MODAL --- */}
             {selectedUnit && (
                 <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(15, 23, 42, 0.7)', zIndex: 1200 }}>
                     <div className="bg-white rounded-4 shadow-lg overflow-hidden" style={{ width: '95%', maxWidth: '500px' }}>

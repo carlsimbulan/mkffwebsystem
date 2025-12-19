@@ -43,12 +43,12 @@ const PrivateRoute = ({ element: Element, requiredRole, user, onLogout }) => {
 };
 // ------------------------------
 
+// ... (keep helper functions and PrivateRoute as they are)
+
 function App() {
-    // Kukunin ang user session mula sa Local Storage pag-load pa lang ng App
     const [user, setUser] = useState(() => {
         try {
             const storedUser = localStorage.getItem('mkff_user');
-            // I-parse ang JSON kung may laman, kundi null
             return storedUser ? JSON.parse(storedUser) : null;
         } catch (error) {
             console.error("Error loading user from localStorage:", error);
@@ -56,7 +56,6 @@ function App() {
         }
     });
 
-    // I-update ang Local Storage tuwing magbabago ang user state
     useEffect(() => {
         if (user) {
             localStorage.setItem('mkff_user', JSON.stringify(user));
@@ -65,26 +64,27 @@ function App() {
         }
     }, [user]);
 
-
     const handleLogin = (loggedInUser) => {
-        // Sa Login, i-set ang user state
         setUser(loggedInUser);
-        // Ang router na ang bahalang mag-redirect base sa role (tingnan sa baba)
     };
 
     const handleLogout = () => {
-        // Sa Logout, i-clear ang user state (na mag-a-trigger din ng useEffect at Local Storage clear)
         setUser(null);
     };
 
-    // Dito natin ide-define ang mga URL path
     return (
         <BrowserRouter>
             <Routes>
-                {/* 1. Login Page: Accessible sa lahat, walang path (/ - root) */}
-                <Route path="/" element={<Login onLogin={handleLogin} />} />
+                {/* 1. Updated Login Path to /login */}
+                <Route path="/login" element={<Login onLogin={handleLogin} />} />
 
-                {/* 2. Admin Page: Protected, may URL path na /admin */}
+                {/* 2. Root Redirect: If someone goes to /, send them to /login or their dashboard */}
+                <Route 
+                    path="/" 
+                    element={user ? <Navigate to={getHomePathByRole(user.role)} replace /> : <Navigate to="/login" replace />} 
+                />
+
+                {/* Admin Page */}
                 <Route 
                     path="/admin" 
                     element={<PrivateRoute 
@@ -95,7 +95,7 @@ function App() {
                     />} 
                 />
 
-                {/* 3. IT Assistant Page: Protected, may URL path na /itassistant */}
+                {/* IT Assistant Page */}
                 <Route 
                     path="/itassistant" 
                     element={<PrivateRoute 
@@ -106,7 +106,7 @@ function App() {
                     />} 
                 />
 
-                {/* 4. Operator Page: Protected, may URL path na /operator */}
+                {/* Operator Page */}
                 <Route 
                     path="/operator" 
                     element={<PrivateRoute 
@@ -117,11 +117,10 @@ function App() {
                     />} 
                 />
                 
-                {/* 5. Catch-all: Kung ang URL ay hindi tugma sa itaas: */}
-                {/* Kung naka-login na, i-redirect sa tamang dashboard. Kung hindi, ibalik sa login. */}
+                {/* 3. Updated Catch-all: Redirect unknown URLs to /login if not logged in */}
                 <Route 
                     path="*" 
-                    element={user ? <Navigate to={getHomePathByRole(user.role)} replace /> : <Navigate to="/" replace />} 
+                    element={user ? <Navigate to={getHomePathByRole(user.role)} replace /> : <Navigate to="/login" replace />} 
                 />
             </Routes>
         </BrowserRouter>
