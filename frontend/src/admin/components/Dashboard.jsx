@@ -469,63 +469,87 @@ export function Dashboard({
                 </div>
             </div>
 
-            {selectedUnit && (
-                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(15, 23, 42, 0.7)', zIndex: 1200 }}>
-                    <div className="bg-white rounded-4 shadow-lg overflow-hidden" style={{ width: '95%', maxWidth: '500px' }}>
-                        <div className="bg-dark p-3 d-flex justify-content-between align-items-center">
-                            <h6 className="text-white mb-0 fw-bold"><i className="bi bi-cpu me-2"></i>TRACKING: {selectedUnit.assembly_no}</h6>
-                            <button className="btn-close btn-close-white" onClick={() => setSelectedUnit(null)}></button>
-                        </div>
-                        <div className="p-4" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
-                            <div className="bg-light p-3 rounded-3 mb-4 border small">
-                                <div className="row g-2">
-                                    <div className="col-6"><b>MODEL:</b> {selectedUnit.model}</div>
-                                    <div className="col-6"><b>STATUS:</b> <span className={`badge ${getStatusBadgeClass(selectedUnit.status)}`}>{selectedUnit.status}</span></div>
-                                </div>
-                            </div>
+{selectedUnit && (
+    <div 
+        className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" 
+        style={{ 
+            background: 'rgba(0, 0, 0, 0.5)', 
+            backdropFilter: 'blur(8px)',       // Standard blur effect
+            WebkitBackdropFilter: 'blur(8px)', 
+            zIndex: 1300 
+        }}
+    >
+        <div className="bg-white rounded-4 shadow-lg overflow-hidden border-0" style={{ width: '90%', maxWidth: '500px' }}>
+            
+            {/* Header: Standard Primary Blue */}
+            <div className="p-3 d-flex justify-content-between align-items-center bg-primary text-white">
+                <h6 className="mb-0 fw-bold">
+                    <i className="bi bi-cpu me-2"></i>TRACKING: {selectedUnit.assembly_no}
+                </h6>
+                <button className="btn-close btn-close-white" onClick={() => setSelectedUnit(null)}></button>
+            </div>
 
-                            {processStations.map((station, idx) => {
-                                const currentStationIdx = parseInt(selectedUnit.station?.replace('Station', '')) - 1;
-                                const isDoneBefore = idx < currentStationIdx;
-                                const isCurrent = idx === currentStationIdx;
-                                const unitStatus = selectedUnit.status?.toLowerCase() || '';
-                                const isNG = isCurrent && unitStatus.includes('no good');
-                                const isCompletedHere = isCurrent && (unitStatus.includes('completed') || unitStatus.includes('ok'));
+            <div className="p-4" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                {/* Info Bar */}
+                <div className="p-2 px-3 bg-light rounded-2 mb-4 border small d-flex justify-content-between">
+                    <span><b>MODEL:</b> {selectedUnit.model}</span>
+                    <span className={`badge ${getStatusBadgeClass(selectedUnit.status)}`}>{selectedUnit.status}</span>
+                </div>
+
+                <div className="process-timeline px-2">
+                    {processStations.map((station, idx) => {
+                        const currentStationIdx = parseInt(selectedUnit.station?.replace('Station', '')) - 1;
+                        const isDoneBefore = idx < currentStationIdx;
+                        const isCurrent = idx === currentStationIdx;
+                        const unitStatus = selectedUnit.status?.toLowerCase() || '';
+                        
+                        let subText = isDoneBefore ? "STATION COMPLETED" : isCurrent ? (unitStatus.includes('no good') ? "NG" : "IN PROGRESS") : "Pending";
+                        let textColor = isDoneBefore ? "text-success" : isCurrent ? "text-primary" : "text-muted";
+                        let dotColor = isDoneBefore ? "#198754" : isCurrent ? "#0d6efd" : "#dee2e6";
+
+                        return (
+                            <div key={idx} className="position-relative ps-4 mb-4" 
+                                style={{ borderLeft: idx === processStations.length - 1 ? 'none' : `2px solid ${isDoneBefore ? '#198754' : '#e9ecef'}` }}>
                                 
-                                let stepClass = "";
-                                let subText = "Pending Station";
-                                let textColor = "text-muted";
+                                {/* Timeline Dot */}
+                                <div className="position-absolute rounded-circle" 
+                                    style={{ 
+                                        width: '12px', height: '12px', 
+                                        backgroundColor: dotColor, 
+                                        left: '-7px', top: '4px',
+                                        zIndex: 2
+                                    }}>
+                                </div>
 
-                                if (isDoneBefore) { stepClass = "done"; subText = "STATION COMPLETED"; textColor = "text-success"; }
-                                else if (isNG) { stepClass = "ng"; subText = "DEFECT DETECTED (NG)"; textColor = "text-danger"; }
-                                else if (isCompletedHere) { stepClass = "current-ready"; subText = "READY TO NEXT STATION"; textColor = "text-success"; }
-                                else if (isCurrent) { stepClass = "current-progressing"; subText = "IN PROGRESS"; textColor = "text-warning"; }
-
-                                return (
-                                    <div key={idx} className={`process-step ${stepClass}`}>
-                                        <div className="step-dot"></div>
-                                        <div className="d-flex justify-content-between align-items-start">
-                                            <div>
-                                                <div className={`fw-bold mb-0 ${isCurrent || isDoneBefore ? 'text-dark' : 'text-muted opacity-50'}`} style={{fontSize: '0.85rem'}}>
-                                                    {idx + 1}. {station}
-                                                </div>
-                                                <div className={`fw-bold small ${textColor}`} style={{fontSize: '0.65rem'}}>
-                                                    {subText}
-                                                </div>
-                                            </div>
-                                            {isCurrent && <span className="badge bg-dark rounded-pill" style={{fontSize: '0.55rem'}}>CURRENT</span>}
+                                <div className="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <div className={`fw-bold mb-0 ${isCurrent || isDoneBefore ? 'text-dark' : 'text-muted opacity-50'}`} style={{fontSize: '0.85rem'}}>
+                                            {idx + 1}. {station}
+                                        </div>
+                                        <div className={`fw-bold small ${textColor}`} style={{fontSize: '0.65rem'}}>
+                                            {subText}
                                         </div>
                                     </div>
-                                );
-                            })}
-                        </div>
-                        <div className="p-3 bg-light border-top d-flex gap-2">
-                            <button className="btn btn-primary w-100 rounded-pill fw-bold" onClick={() => handleGoToStation(selectedUnit)}>GO TO UNIT LOCATION</button>
-                            <button className="btn btn-outline-dark w-100 rounded-pill fw-bold" onClick={() => setSelectedUnit(null)}>CLOSE</button>
-                        </div>
-                    </div>
+                                    {isCurrent && <span className="badge bg-primary rounded-pill" style={{fontSize: '0.55rem'}}>CURRENT</span>}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
-            )}
+            </div>
+
+            {/* Footer: Standard Buttons */}
+            <div className="p-3 bg-light border-top d-flex gap-2">
+                <button className="btn btn-primary w-100 rounded-pill fw-bold" onClick={() => handleGoToStation(selectedUnit)}>
+                    GO TO LOCATION
+                </button>
+                <button className="btn btn-outline-dark w-100 rounded-pill fw-bold" onClick={() => setSelectedUnit(null)}>
+                    CLOSE
+                </button>
+            </div>
+        </div>
+    </div>
+)}
         </div>
     );
 }

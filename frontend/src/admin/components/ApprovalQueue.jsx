@@ -31,26 +31,31 @@ export function ApprovalQueue({
             <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
                 <div className="table-responsive">
                     <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.9rem' }}>
-                        <thead className="bg-light text-secondary text-uppercase small" style={{ letterSpacing: '0.5px' }}>
-                            {/* --- REVISED HEADERS: Added Assembly No. --- */}
+                        {/* --- UPDATED: DARK BLUE HEADER (MATCHED TO IMAGE) --- */}
+                        <thead 
+                            style={{ 
+                                backgroundColor: '#1e293b', 
+                                color: '#ffffff',
+                                letterSpacing: '0.5px' 
+                            }} 
+                            className="text-uppercase small"
+                        >
                             <tr>
-                                <th className="border-0 py-3 ps-4">Assembly No.</th> {/* NEW COLUMN */}
-                                <th className="border-0 py-3">Unit Details</th>
-                                <th className="border-0 py-3">Origin Station</th>
-                                <th className="border-0 py-3 text-center">Status</th>
-                                <th className="border-0 py-3" style={{ width: '20%' }}>Remarks</th>
-                                <th className="border-0 py-3 text-end">Timestamp</th>
-                                <th className="border-0 py-3 text-center pe-4">Action</th>
+                                <th className="border-0 py-3 ps-4 text-white" style={{ backgroundColor: 'inherit' }}>Assembly No.</th>
+                                <th className="border-0 py-3 text-white" style={{ backgroundColor: 'inherit' }}>Unit Details</th>
+                                <th className="border-0 py-3 text-white" style={{ backgroundColor: 'inherit' }}>Origin Station</th>
+                                <th className="border-0 py-3 text-center text-white" style={{ backgroundColor: 'inherit' }}>Status</th>
+                                <th className="border-0 py-3 text-white" style={{ backgroundColor: 'inherit', width: '20%' }}>Remarks</th>
+                                <th className="border-0 py-3 text-end text-white" style={{ backgroundColor: 'inherit' }}>Timestamp</th>
+                                <th className="border-0 py-3 text-center pe-4 text-white" style={{ backgroundColor: 'inherit' }}>Action</th>
                             </tr>
                         </thead>
                         <tbody className="border-top-0">
                             {approvalQueueLogs.length > 0 ? approvalQueueLogs.map(log => (
                                 <tr key={log.id}>
-                                    {/* --- NEW COLUMN DATA: Assembly No. --- */}
                                     <td className="ps-4">
                                         <span className="fw-bold text-primary font-monospace">{log.assembly_no}</span>
                                     </td>
-                                    {/* --- Unit Details --- */}
                                     <td>
                                         <div className="d-flex flex-column">
                                             <span className="fw-bold text-dark">{log.model} <span className="fw-normal text-muted">({log.revision})</span></span>
@@ -81,21 +86,21 @@ export function ApprovalQueue({
                                         <div style={{ fontSize: '0.75rem' }}>{new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                                     </td>
                                     <td className="text-center pe-4">
+                                        {/* --- UPDATED: BOX STYLE BUTTON --- */}
                                         <button
-                                            className="btn btn-sm btn-success text-white fw-bold px-4 rounded-pill shadow-sm hover-scale"
+                                            className="btn btn-sm btn-success text-white fw-bold px-3 py-2 rounded-1 shadow-sm hover-scale d-inline-flex align-items-center"
                                             onClick={() => {
                                                 setSelectedLogToApprove(log);
                                                 setShowApproveModal(true);
                                             }}
-                                            style={{ transition: 'transform 0.2s' }}
+                                            style={{ transition: 'all 0.2s', minWidth: '100px', justifyContent: 'center' }}
                                         >
-                                            <i className="bi bi-check-circle me-1"></i> Approve
+                                            <i className="bi bi-check2-square me-2"></i> Approve
                                         </button>
                                     </td>
                                 </tr>
                             )) : (
                                 <tr>
-                                    {/* Updated colspan from 6 to 7 due to new column */}
                                     <td colSpan="7" className="py-5 text-center text-muted">
                                         <div className="mb-3">
                                             <i className="bi bi-clipboard-check fs-1 text-success opacity-25"></i>
@@ -120,7 +125,10 @@ export function ApprovalQueue({
             )}
 
             <style jsx>{`
-                .hover-scale:hover { transform: scale(1.05); }
+                .hover-scale:hover { 
+                    transform: translateY(-2px); 
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+                }
                 .fade-in { animation: fadeIn 0.2s ease-in-out; }
                 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
             `}</style>
