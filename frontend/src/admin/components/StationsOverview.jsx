@@ -53,7 +53,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 .btn-box { border-radius: 4px !important; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; transition: none; }
                 .btn-box:hover { opacity: 0.9; }
                 
-                .stat-card-pro { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 22px; height: 100%; border-left: 5px solid #1e293b; }
+                .stat-card-pro { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 22px; height: 100%; border-left: 5px solid #198754; }
                 
                 .table thead th { background-color: #1e293b !important; color: #ffffff !important; font-weight: 600; border: none; padding: 12px 15px; }
                 .table-hover tbody tr:hover { background-color: #f1f5f9 !important; }
@@ -79,11 +79,12 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 </button>
             </div>
 
+            {/* IBALIK ANG ORIGINAL NA MAY KULAY NA KPI CARDS DITO */}
             <div className="row g-4 mb-4">
-                <div className="col-md-6 col-xl-3"><div className="stat-card-pro"><span className="text-muted small fw-bold">COMPLETED</span><h3 className="fw-bold text-success mt-1">{monitorMetrics.completedUnits}</h3></div></div>
-                <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{borderLeftColor: '#007bff'}}><span className="text-muted small fw-bold">YIELD RATE</span><h3 className="fw-bold text-primary mt-1">{monitorMetrics.yieldRate}%</h3></div></div>
-                <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{borderLeftColor: '#ffc107'}}><span className="text-muted small fw-bold">IN PROGRESS</span><h3 className="fw-bold text-warning mt-1">{monitorMetrics.pendingUnits}</h3></div></div>
-                <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{borderLeftColor: '#dc3545'}}><span className="text-muted small fw-bold">NO GOOD (NG)</span><h3 className="fw-bold text-danger mt-1">{monitorMetrics.ngUnits}</h3></div></div>
+                <div className="col-md-6 col-xl-3"><div className="stat-card-pro"><span className="text-muted small fw-bold text-uppercase">Completed</span><h3 className="fw-bold text-success mt-1">{monitorMetrics.completedUnits}</h3></div></div>
+                <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{borderLeftColor: '#0d6efd'}}><span className="text-muted small fw-bold text-uppercase">Yield Rate</span><h3 className="fw-bold text-primary mt-1">{monitorMetrics.yieldRate}%</h3></div></div>
+                <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{borderLeftColor: '#ffc107'}}><span className="text-muted small fw-bold text-uppercase">In Progress</span><h3 className="fw-bold text-warning mt-1">{monitorMetrics.pendingUnits}</h3></div></div>
+                <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{borderLeftColor: '#dc3545'}}><span className="text-muted small fw-bold text-uppercase">No Good (NG)</span><h3 className="fw-bold text-danger mt-1">{monitorMetrics.ngUnits}</h3></div></div>
             </div>
 
             <div className="bg-white border rounded-2 overflow-hidden shadow-sm">
@@ -267,14 +268,41 @@ export function StationsOverview({
         <div className="container-fluid px-0">
             <style>{`
                 .btn-box { border-radius: 4px !important; font-weight: 700; transition: none; }
-                .station-card-flat { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; height: 100%; }
-                .station-card-flat:hover { border-color: #000000; }
-                .metric-row { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; padding: 5px 0; border-bottom: 1px dashed #e2e8f0; }
+                
+                /* Station Grid - Professional Flat Look (Binago lang yung colors dito) */
+                .station-card-flat { 
+                    background: #fff; 
+                    border: 1px solid #e2e8f0; 
+                    border-radius: 8px; 
+                    padding: 20px; 
+                    height: 100%; 
+                    transition: all 0.2s ease;
+                }
+                .station-card-flat:hover { 
+                    border-color: #94a3b8; 
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+                    transform: translateY(-2px);
+                }
+                .metric-row { 
+                    display: flex; 
+                    justify-content: space-between; 
+                    font-size: 0.75rem; 
+                    font-weight: 700; 
+                    padding: 8px 0; 
+                    border-bottom: 1px solid #f1f5f9; 
+                    color: #475569; 
+                }
                 .metric-row:last-child { border-bottom: none; }
+                .metric-value { color: #1e293b; } 
+                
+                .btn-monitor { background: #1e293b; color: #fff; border: none; }
+                .btn-monitor:hover { background: #0f172a; color: #fff; }
+                .btn-history { background: transparent; color: #475569; border: 1px solid #e2e8f0; }
+                .btn-history:hover { background: #f8fafc; border-color: #cbd5e1; }
             `}</style>
             
             <div className="d-flex justify-content-between align-items-center mb-4 px-2 border-bottom pb-3">
-                <div><h4 className="fw-bold text-dark mb-0">Station Control Panel</h4><p className="text-muted small mb-0">Real-time production monitoring.</p></div>
+                <div><h4 className="fw-bold text-dark mb-0">Station Control Panel</h4><p className="text-muted small mb-0">Operational real-time monitoring.</p></div>
                 <button className="btn btn-dark btn-sm btn-box px-4 py-2" onClick={() => setActiveTab('overall_history')}>OVERALL HISTORY</button>
             </div>
             
@@ -284,15 +312,18 @@ export function StationsOverview({
                     return (
                         <div key={station.id} className="col-md-3">
                             <div className="station-card-flat">
-                                <h6 className="fw-bold text-dark text-truncate mb-3">{station.name}</h6>
-                                <div className="bg-light p-2 rounded-1 mb-3">
-                                    <div className="metric-row text-success"><span>COMPLETED</span><span>{metrics.completedUnits}</span></div>
-                                    <div className="metric-row text-warning"><span>IN PROGRESS</span><span>{metrics.pendingUnits}</span></div>
-                                    <div className="metric-row text-danger"><span>NO GOOD (NG)</span><span>{metrics.ngUnits}</span></div>
+                                <div className="mb-3">
+                                    <span className="text-muted" style={{fontSize: '0.65rem', fontWeight: 800}}>STATION ID: {station.id}</span>
+                                    <h6 className="fw-bold text-dark text-truncate mb-0 mt-1">{station.name}</h6>
+                                </div>
+                                <div className="mb-4">
+                                    <div className="metric-row"><span>COMPLETED</span><span className="metric-value">{metrics.completedUnits}</span></div>
+                                    <div className="metric-row"><span>IN PROGRESS</span><span className="metric-value">{metrics.pendingUnits}</span></div>
+                                    <div className="metric-row"><span>NO GOOD (NG)</span><span className="metric-value">{metrics.ngUnits}</span></div>
                                 </div>
                                 <div className="d-flex gap-2">
-                                    <button className="btn btn-dark btn-sm btn-box flex-grow-1" onClick={() => handleMonitorStation(station.id)}>MONITOR</button>
-                                    <button className="btn btn-outline-dark btn-sm btn-box px-3" onClick={() => handleViewHistory(station.id)}>HISTORY</button>
+                                    <button className="btn btn-monitor btn-sm btn-box flex-grow-1" onClick={() => handleMonitorStation(station.id)}>MONITOR</button>
+                                    <button className="btn btn-history btn-sm btn-box px-3" onClick={() => handleViewHistory(station.id)}>HISTORY</button>
                                 </div>
                             </div>
                         </div>

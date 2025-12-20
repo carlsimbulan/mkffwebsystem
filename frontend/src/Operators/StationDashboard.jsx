@@ -721,114 +721,113 @@ export default function StationDashboard({ user, onLogout }) {
             <div className="d-flex flex-row min-vh-100 bg-light font-sans"> 
                 
                 {/* --- SIDEBAR: BLUE BACKGROUND (Unchanged) --- */}
-                <div className="d-flex flex-column flex-shrink-0 p-3 text-white shadow-lg" 
-                    style={{ width: '260px', position: 'sticky', top: 0, height: '100vh', backgroundColor: '#0f172a', zIndex: 1000 }}>
-                    
-                    {/* Brand / Logo (Unchanged) */}
-                    <div className="d-flex align-items-center mb-4 pb-3 border-bottom border-secondary pt-2 px-2">
-                        <img 
-                            src={logo} 
-                            alt="MKFF Logo" 
-                            className="me-2" 
-                            style={{ height: '45px', width: 'auto', objectFit: 'contain' }} 
-                        />
-                        
-                        {/* Text Description (Unchanged) */}
-                        <div>
-                            <span className="fs-5 fw-bold d-block lh-1">OPERATOR PANEL</span>
-                        </div>
-                    </div>
+  <div className="d-flex flex-column flex-shrink-0 p-3 text-white shadow-lg" 
+    style={{ width: '260px', position: 'sticky', top: 0, height: '100vh', backgroundColor: '#0f172a', zIndex: 1000 }}>
+    
+    <style>
+        {`
+            .nav-custom-btn {
+                transition: background-color 0.2s ease;
+                border-radius: 8px !important;
+                border: none !important; /* Iniiwasan ang pag-alog dahil sa border */
+                outline: none !important;
+            }
+            /* Boxed highlight para sa hover */
+            .nav-custom-btn:hover:not(.btn-primary):not(.bg-white) {
+                background-color: rgba(255, 255, 255, 0.1) !important;
+                color: #ffffff !important;
+            }
+            /* Siguraduhing hindi gagalaw ang icon sa hover */
+            .nav-custom-btn:hover i {
+                color: #ffffff !important;
+            }
+        `}
+    </style>
 
-                    {/* Navigation (Unchanged) */}
-<nav className="flex-grow-1 overflow-auto custom-scrollbar">
-    <ul className="nav nav-pills flex-column mb-auto gap-2">
-        {/* DASHBOARD */}
-        <li className="nav-item">
-            <button 
-                className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'home' ? 'btn-primary shadow' : 'text-white-50 hover-white'}`} 
-                onClick={() => setActiveTab('home')}
-                style={activeTab !== 'home' ? {background: 'transparent', border: 'none'} : {}}
-            >
-                <i className="bi bi-grid-fill me-3"></i> Dashboard
-            </button>
-        </li>
-        
-        {/* UNIT ENTRY */}
-        <li className="nav-item mt-2">
-            <button 
-                className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'input_unit' ? 'btn-primary shadow' : 'text-white-50 hover-white'}`} 
-                onClick={() => setActiveTab('input_unit')}
-                style={activeTab !== 'input_unit' ? {background: 'transparent', border: 'none'} : {}}
-            >
-                <i className="bi bi-qr-code-scan me-3"></i> Unit Entry
-            </button>
-        </li>
+    {/* Brand / Logo - Pinalit na ang text para hindi dikit sa gilid */}
+    <div className="d-flex align-items-center mb-4 pb-3 border-bottom border-secondary pt-2 px-2">
+        <img 
+            src={logo} 
+            alt="MKFF Logo" 
+            className="me-2" 
+            style={{ height: '38px', width: 'auto', objectFit: 'contain' }} 
+        />
+        <div>
+            <span className="fw-bold d-block lh-1" style={{ fontSize: '0.85rem', letterSpacing: '0.5px' }}>OPERATOR PANEL</span>
+        </div>
+    </div>
 
-        {/* MONITORING HEADING */}
-        <li className="text-uppercase small fw-bold text-secondary mt-4 mb-2 px-3" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Monitoring</li>
-        
-        {/* MONITORING LINKS */}
-        {[
-            { k: 'in_progress', i: 'bi-gear-wide-connected', l: 'In Progress', c: 'text-warning' }, 
-            { k: 'completed', i: 'bi-check-circle-fill', l: 'Completed', c: 'text-success' }, 
-            { k: 'no_good', i: 'bi-x-octagon-fill', l: 'No Good (NG)', c: 'text-danger' }, 
-            { k: 'pending', i: 'bi-clock-history', l: 'Pending', c: 'text-info' }
-        ].map(({ k, i, l, c }) => (
-            <li key={k} className="nav-item">
+    {/* Navigation */}
+    <nav className="flex-grow-1 overflow-auto custom-scrollbar">
+        <ul className="nav nav-pills flex-column mb-auto gap-1">
+            
+            {/* DASHBOARD */}
+            <li className="nav-item">
                 <button 
-                    className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === k ? 'bg-white text-dark fw-bold shadow' : 'text-white-50'}`} 
-                    onClick={() => setActiveTab(k)}
-                    style={activeTab !== k ? {background: 'transparent', border: 'none'} : {}}
+                    className={`btn w-100 text-start d-flex align-items-center px-3 py-2 nav-custom-btn ${activeTab === 'home' ? 'btn-primary shadow' : 'text-white-50'}`} 
+                    onClick={() => setActiveTab('home')}
+                    style={{ background: activeTab === 'home' ? '' : 'transparent' }}
                 >
-                    <i className={`bi ${i} me-3 ${activeTab === k ? c : ''}`}></i> {l}
+                    <i className="bi bi-grid-fill me-3"></i> Dashboard
                 </button>
             </li>
-        ))}
+            
+            {/* UNIT ENTRY */}
+            <li className="nav-item">
+                <button 
+                    className={`btn w-100 text-start d-flex align-items-center px-3 py-2 nav-custom-btn ${activeTab === 'input_unit' ? 'btn-primary shadow' : 'text-white-50'}`} 
+                    onClick={() => setActiveTab('input_unit')}
+                    style={{ background: activeTab === 'input_unit' ? '' : 'transparent' }}
+                >
+                    <i className="bi bi-qr-code-scan me-3"></i> Unit Entry
+                </button>
+            </li>
 
-        {/* REPORTS & LOGS HEADING */}
-        <li className="text-uppercase small fw-bold text-secondary mt-4 mb-2 px-3" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Reports & Logs</li>
-        
-        {/* DAILY REPORT */}
-        <li className="nav-item">
-            <button 
-                className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'daily_reports' ? 'bg-white text-dark fw-bold' : 'text-white-50'}`} 
-                onClick={() => setActiveTab('daily_reports')}
-                style={activeTab !== 'daily_reports' ? {background: 'transparent', border: 'none'} : {}}
-            >
-                <i className="bi bi-file-earmark-bar-graph me-3"></i> Daily Report
-            </button>
-        </li>
-        
-        {/* HISTORY LOGS */}
-        <li className="nav-item">
-            <button 
-                className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'account_history' ? 'bg-white text-dark fw-bold' : 'text-white-50'}`} 
-                onClick={() => setActiveTab('account_history')}
-                style={activeTab !== 'account_history' ? {background: 'transparent', border: 'none'} : {}}
-            >
-                <i className="bi bi-journals me-3"></i> History Logs
-            </button>
-        </li>
-        
-        {/* ANNOUNCEMENTS */}
-        <li className="nav-item">
-            <button 
-                className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'announcements' ? 'bg-white text-dark fw-bold' : 'text-white-50'}`} 
-                onClick={() => setActiveTab('announcements')}
-                style={activeTab !== 'announcements' ? {background: 'transparent', border: 'none'} : {}}
-            >
-                <i className="bi bi-megaphone-fill me-3"></i> Announcements
-            </button>
-        </li>
-        
-    </ul>
-</nav>
+            <li className="text-uppercase small fw-bold text-secondary mt-4 mb-2 px-3" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Monitoring</li>
+            
+            {[
+                { k: 'in_progress', i: 'bi-gear-wide-connected', l: 'In Progress', c: 'text-warning' }, 
+                { k: 'completed', i: 'bi-check-circle-fill', l: 'Completed', c: 'text-success' }, 
+                { k: 'no_good', i: 'bi-x-octagon-fill', l: 'No Good (NG)', c: 'text-danger' }, 
+                { k: 'pending', i: 'bi-clock-history', l: 'Pending', c: 'text-info' }
+            ].map(({ k, i, l, c }) => (
+                <li key={k} className="nav-item">
+                    <button 
+                        className={`btn w-100 text-start d-flex align-items-center px-3 py-2 nav-custom-btn ${activeTab === k ? 'bg-white text-dark shadow' : 'text-white-50'}`} 
+                        onClick={() => setActiveTab(k)}
+                        style={{ background: activeTab === k ? '#ffffff' : 'transparent' }}
+                    >
+                        {/* Tinanggal ang fw-bold sa active para hindi umalog */}
+                        <i className={`bi ${i} me-3 ${activeTab === k ? c : ''}`}></i> {l}
+                    </button>
+                </li>
+            ))}
 
-                    {/* Sidebar Footer (Version) (Unchanged) */}
-                    <div className="mt-auto pt-3 border-top border-secondary text-center text-white-50 small">
-                        <small>@2025 MKFF Laser Technique</small>
-                    </div>
-                </div>
+            <li className="text-uppercase small fw-bold text-secondary mt-4 mb-2 px-3" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Reports & Logs</li>
+            
+            {[
+                { k: 'daily_reports', i: 'bi-file-earmark-bar-graph', l: 'Daily Report' },
+                { k: 'account_history', i: 'bi-journals', l: 'History Logs' },
+                { k: 'announcements', i: 'bi-megaphone-fill', l: 'Announcements' }
+            ].map(({ k, i, l }) => (
+                <li key={k} className="nav-item">
+                    <button 
+                        className={`btn w-100 text-start d-flex align-items-center px-3 py-2 nav-custom-btn ${activeTab === k ? 'bg-white text-dark shadow' : 'text-white-50'}`} 
+                        onClick={() => setActiveTab(k)}
+                        style={{ background: activeTab === k ? '#ffffff' : 'transparent' }}
+                    >
+                        <i className={`bi ${i} me-3`}></i> {l}
+                    </button>
+                </li>
+            ))}
+        </ul>
+    </nav>
+
+    {/* Sidebar Footer */}
+    <div className="mt-auto pt-3 border-top border-secondary text-center text-white-50 small">
+        <small>@2025 MKFF Laser Technique</small>
+    </div>
+</div>
 
                 {/* --- MAIN CONTENT AREA (Unchanged) --- */}
                 <div className="d-flex flex-column flex-grow-1" style={{ backgroundColor: '#eeeeeeff' }}> 

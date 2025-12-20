@@ -271,41 +271,55 @@ export function Dashboard({
                     <p className="text-muted small mb-0">MKFF Dashboard • Full System Monitoring</p>
                 </div>
                 
-                <div className="d-flex gap-3 align-items-center">
-                    <div className="search-container">
-                        <i className="bi bi-search search-icon-inside"></i>
-                        <input 
-                            type="text" 
-                            className="form-control form-control-sm rounded-pill search-input-pro shadow-sm" 
-                            placeholder="Search Assembly Number..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                        {searchResults.length > 0 && (
-                            <div className="position-absolute w-100 mt-2 bg-white border rounded-4 shadow-lg overflow-hidden" style={{ zIndex: 1100 }}>
-                                {searchResults.map(unit => (
-                                    <div 
-                                        key={unit.id} 
-                                        className="search-item-result"
-                                        style={getSearchHighlightStyle(unit.status)}
-                                        onClick={() => { setSelectedUnit(unit); setSearchTerm(''); }}
-                                    >
-                                        <div className="fw-bold text-dark d-flex justify-content-between">
-                                            <span>{unit.assembly_no}</span>
-                                            <i className="bi bi-arrow-right-short"></i>
-                                        </div>
-                                        <div className="text-muted" style={{fontSize: '0.75rem'}}>
-                                            Model: {unit.model} • <span className="fw-bold text-uppercase">{unit.status}</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                    <div className="btn-ui-flat d-flex align-items-center text-dark fw-bold small">
-                        <i className="bi bi-broadcast text-success me-2"></i> SYSTEM LIVE
-                    </div>
+                        <div className="d-flex gap-3 align-items-center">
+            {/* --- REPORT INDICATOR (NEW) --- */}
+            {newReportsToday > 0 && (
+                <div 
+                    className="d-flex align-items-center bg-danger text-white px-3 py-1 rounded-pill shadow-sm animate-pulse" 
+                    style={{ cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', height: '32px' }}
+                    onClick={() => setActiveTab('reports')}
+                >
+                    <i className="bi bi-file-earmark-text-fill me-2"></i>
+                    {newReportsToday} NEW REPORT{newReportsToday > 1 ? 'S' : ''} TODAY
                 </div>
+            )}
+
+            <div className="search-container">
+                <i className="bi bi-search search-icon-inside"></i>
+                <input 
+                    type="text" 
+                    className="form-control form-control-sm rounded-pill search-input-pro shadow-sm" 
+                    placeholder="Search Assembly Number..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+                {/* ... (Dito yung existing searchResults mapping mo, wag galawin) */}
+                {searchResults.length > 0 && (
+                    <div className="position-absolute w-100 mt-2 bg-white border rounded-4 shadow-lg overflow-hidden" style={{ zIndex: 1100 }}>
+                        {searchResults.map(unit => (
+                            <div 
+                                key={unit.id} 
+                                className="search-item-result"
+                                style={getSearchHighlightStyle(unit.status)}
+                                onClick={() => { setSelectedUnit(unit); setSearchTerm(''); }}
+                            >
+                                <div className="fw-bold text-dark d-flex justify-content-between">
+                                    <span>{unit.assembly_no}</span>
+                                    <i className="bi bi-arrow-right-short"></i>
+                                </div>
+                                <div className="text-muted" style={{fontSize: '0.75rem'}}>
+                                    Model: {unit.model} • <span className="fw-bold text-uppercase">{unit.status}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+            
+            <div className="btn-ui-flat d-flex align-items-center text-dark fw-bold small">
+                <i className="bi bi-broadcast text-success me-2"></i> SYSTEM LIVE
+            </div>
+        </div>
             </div>
 
             <div className="row g-4 mb-4">

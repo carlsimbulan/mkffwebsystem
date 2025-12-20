@@ -202,86 +202,87 @@ export default function AdminPage({ user, onLogout }) {
 
 
     // --- FETCH DATA (UPDATED TO INCLUDE HISTORY LOGS AND NEW REPORT COUNT) ---
-    const fetchData = async () => {
-        const isBackgroundUpdate = logs.length > 0;
+const fetchData = async () => {
+    // 1. Mag-loading spinner lang kung ito ang kauna-unahang load at wala pang data
+    const isFirstLoad = logs.length === 0 && loading;
 
-        if (!isBackgroundUpdate) {
-            setLoading(true);
+    if (isFirstLoad) {
+        setLoading(true);
+    }
+
+    setError(null);
+    try {
+        // 1. Fetch Units/Logs
+        const unitsRes = await axios.get(UNITS_ENDPOINT);
+        const fetchedUnits = unitsRes.data || [];
+        if (JSON.stringify(fetchedUnits) !== JSON.stringify(logs)) {
+            setLogs(fetchedUnits);
         }
 
-        setError(null);
-        try {
-            // 1. Fetch Units/Logs (Current State)
-            const unitsRes = await axios.get(UNITS_ENDPOINT);
-            const fetchedUnits = unitsRes.data;
-            if (JSON.stringify(fetchedUnits) !== JSON.stringify(logs)) {
-                setLogs(fetchedUnits);
-            }
-
-            // 1.5 Fetch Unit History Logs (The full trail)
-            const historyRes = await axios.get(HISTORY_ENDPOINT);
-            // Ensure we handle different possible API response structures
-            const fetchedHistory = Array.isArray(historyRes.data) ? historyRes.data : (historyRes.data.data || []);
-            if (JSON.stringify(fetchedHistory) !== JSON.stringify(unitHistoryLogs)) {
-                setUnitHistoryLogs(fetchedHistory);
-            }
-
-            // 2. Fetch Daily Reports
-            const reportsRes = await axios.get(REPORTS_ENDPOINT);
-            const fetchedReports = Array.isArray(reportsRes.data) ? reportsRes.data : [];
-            if (JSON.stringify(fetchedReports) !== JSON.stringify(dailyReportsList)) {
-                setDailyReportsList(fetchedReports);
-            }
-
-            // --- NEW: Calculate New Reports Today ---
-            const today = getTodayDate();
-            const reportsToday = fetchedReports.filter(report => {
-                const reportDatePart = report.report_date ? report.report_date.split(' ')[0] : null;
-                return reportDatePart === today;
-            }).length;
-            setNewReportsToday(reportsToday);
-            // ---------------------------------------
-
-            // 3. Fetch User List
-            const usersRes = await axios.get(USER_MANAGEMENT_ENDPOINT);
-            const fetchedUsers = Array.isArray(usersRes.data) ? usersRes.data : [];
-            if (JSON.stringify(usersRes.data) !== JSON.stringify(userList)) {
-                setUserList(fetchedUsers);
-            }
-
-            const loggedInUserData = fetchedUsers.find(u => u.id === user.id);
-            if (loggedInUserData) {
-                user.full_name = loggedInUserData.full_name;
-                user.avatar_url = loggedInUserData.avatar_url;
-            }
-
-            // --- Fetch Announcements ---
-            const announcementsRes = await axios.get(ANNOUNCEMENTS_ENDPOINT);
-            const fetchedAnnouncements = Array.isArray(announcementsRes.data) ? announcementsRes.data : [];
-            if (JSON.stringify(fetchedAnnouncements) !== JSON.stringify(announcements)) {
-                setAnnouncements(fetchedAnnouncements);
-            }
-
-            // 4. Mock Station Data - FIXED: ID matches DB (No space), Name has space (UI)
-            const mockStations = Array.from({ length: 15 }, (_, i) => ({
-                id: `Station${i + 1}`, // NO SPACE: Matches Database "Station1"
-                name: `Station ${i + 1}`, // WITH SPACE: For Display "Station 1"
-                operator: `Operator-${100 + i}`
-            }));
-            setStations(mockStations);
-
-            // 5. Run Notification Logic
-            checkDelayedUnitsAndReports(fetchedUnits, fetchedReports);
-
-        } catch (err) {
-            console.error("Error fetching data:", err);
-            if (!isBackgroundUpdate) {
-                // setError(`Failed to fetch data. ${err.message}`);
-            }
-        } finally {
-            setLoading(false);
+        // 1.5 Fetch Unit History Logs
+        const historyRes = await axios.get(HISTORY_ENDPOINT);
+        const fetchedHistory = Array.isArray(historyRes.data) ? historyRes.data : (historyRes.data.data || []);
+        if (JSON.stringify(fetchedHistory) !== JSON.stringify(unitHistoryLogs)) {
+            setUnitHistoryLogs(fetchedHistory);
         }
-    };
+
+        // 2. Fetch Daily Reports
+        const reportsRes = await axios.get(REPORTS_ENDPOINT);
+        const fetchedReports = Array.isArray(reportsRes.data) ? reportsRes.data : [];
+        if (JSON.stringify(fetchedReports) !== JSON.stringify(dailyReportsList)) {
+            setDailyReportsList(fetchedReports);
+        }
+
+        // Calculate New Reports Today
+        const today = getTodayDate();
+        const reportsToday = fetchedReports.filter(report => {
+            const reportDatePart = report.report_date ? report.report_date.split(' ')[0] : null;
+            return reportDatePart === today;
+        }).length;
+        setNewReportsToday(reportsToday);
+
+        // 3. Fetch User List
+        const usersRes = await axios.get(USER_MANAGEMENT_ENDPOINT);
+        const fetchedUsers = Array.isArray(usersRes.data) ? usersRes.data : [];
+        if (JSON.stringify(fetchedUsers) !== JSON.stringify(userList)) {
+            setUserList(fetchedUsers);
+        }
+
+        const loggedInUserData = fetchedUsers.find(u => u.id === user.id);
+        if (loggedInUserData) {
+            user.full_name = loggedInUserData.full_name;
+            user.avatar_url = loggedInUserData.avatar_url;
+        }
+
+        // Fetch Announcements
+        const announcementsRes = await axios.get(ANNOUNCEMENTS_ENDPOINT);
+        const fetchedAnnouncements = Array.isArray(announcementsRes.data) ? announcementsRes.data : [];
+        if (JSON.stringify(fetchedAnnouncements) !== JSON.stringify(announcements)) {
+            setAnnouncements(fetchedAnnouncements);
+        }
+
+        // 4. Mock Station Data
+        const mockStations = Array.from({ length: 15 }, (_, i) => ({
+            id: `Station${i + 1}`,
+            name: `Station ${i + 1}`,
+            operator: `Operator-${100 + i}`
+        }));
+        setStations(mockStations);
+
+        // 5. Run Notification Logic
+        checkDelayedUnitsAndReports(fetchedUnits);
+
+    } catch (err) {
+        console.error("Error fetching data:", err);
+        // Ipakita lang ang error message sa screen kung talagang walang ma-display na data
+        if (logs.length === 0) {
+            setError(`Failed to fetch data. ${err.message}`);
+        }
+    } finally {
+        // Palaging i-set sa false ang loading pagkatapos ng unang attempt
+        setLoading(false);
+    }
+};
 
     const refreshAndCloseReport = () => {
         // Resetting lastSeenReportIds is not strictly necessary for this logic
@@ -576,15 +577,26 @@ const handlePostAnnouncement = async (content) => {
     const headerFullName = user.full_name || user.username || 'Admin';
 
     // --- RENDER CONTENT (UPDATED to pass newReportsToday) ---
-    const renderContent = () => {
-        if (loading && logs.length === 0) {
-            return (<div className="text-center py-5"><div className="spinner-border text-danger" role="status"></div><p className="mt-3 text-muted">Loading real-time production data...</p></div>);
-        }
-        if (error) {
-            return (<div className="alert alert-danger text-center py-5"><i className="bi bi-x-octagon-fill me-2"></i> {error}</div>);
-        }
+const renderContent = () => {
+    // LALABAS LANG ITO SA PINAKA-UNANG LOAD (Initial mount)
+    // Kapag empty ang database (logs.length === 0) pero tapos na ang loading, 
+    // itutuloy na nito ang pag-render sa Dashboard sa halip na mag-spinner.
+    if (loading && logs.length === 0) {
+        return (
+            <div className="text-center py-5">
+                <div className="spinner-border text-danger" role="status"></div>
+                <p className="mt-3 text-muted">Connecting to server...</p>
+            </div>
+        );
+    }
 
-        switch (activeTab) {
+    // Tanggalin ang error flickering kung may data na
+    if (error && logs.length === 0) {
+        return (<div className="alert alert-danger text-center py-5"><i className="bi bi-x-octagon-fill me-2"></i> {error}</div>);
+    }
+
+    switch (activeTab) {
+        // ... (keep the rest of your cases exactly as they are)
             case "dashboard":
                 return (
                     <Dashboard
@@ -733,11 +745,10 @@ return (
     // Tinanggal ang overflow-hidden sa root container, baka maging sanhi ng scrolling issue sa fixed elements
     <div className="d-flex min-vh-100 bg-light"> 
 
-        {/* --- SIDEBAR (GINAWANG FIXED WIDTH: 260px) --- */}
+{/* --- SIDEBAR (FIXED WIDTH: 260px) --- */}
         <div
             className="d-flex flex-column flex-shrink-0 p-3 text-white position-fixed"
             style={{
-                // 💡 BINAGO: Fixed width, inalis ang isSidebarOpen condition at transition
                 width: "260px", 
                 backgroundColor: "#111827",
                 height: "100vh",
@@ -746,196 +757,145 @@ return (
                 left: 0
             }}
         >
-
             {/* TOP LOGO */}
-            {/* 💡 BINAGO: Inalis ang conditional rendering ({isSidebarOpen && ...}) at inalis ang className={isSidebarOpen ? "me-3" : ""} */}
             <div className="d-flex align-items-center mb-3 text-white overflow-hidden">
                 <img
                     src={logo}
                     alt="MKFF Admin Logo"
                     style={{ height: "3rem" }}
-                    className="me-3" // Laging may margin dahil laging bukas
+                    className="me-3"
                 />
-                <span className="fs-5 fw-bold">MKFF Admin</span> {/* Laging visible */}
+                {/* BINAGO: Mula MKFF Admin naging Management */}
+                <span className="fs-5 fw-bold">Management</span> 
             </div>
 
             <hr className="border-secondary" />
 
-            {/* MENU: Naka-ayos at pinaganda ang pagkakasunod-sunod */}
+            {/* MENU SECTION */}
             <ul className="nav nav-pills flex-column mb-3">
-                {/* 1. Dashboard (Overview) */}
-                <li>
+                {/* Dashboard */}
+                <li className="nav-item">
                     <button
-                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "dashboard" ? "active bg-danger" : ""
-                            }`}
-                        onClick={() => {
-                            setActiveTab("dashboard");
-                            setStationMonitorId(null);
-                            setReportFilterStationId("All");
-                            setStationHistoryId(null);
-                            setHighlightedUnitId(null);
-                        }}
+                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "dashboard" ? "active bg-danger" : ""}`}
+                        onClick={() => setActiveTab("dashboard")}
                     >
                         <i className="bi bi-speedometer2"></i>
-                        Dashboard {/* Laging visible */}
+                        Dashboard
                     </button>
                 </li>
 
-                {/* 2. Stations (Live Monitoring) */}
-                <li>
+                {/* Stations */}
+                <li className="nav-item">
                     <button
-                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${
+                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${
                             (activeTab === "stations" || activeTab === "station_monitor" || activeTab === "overall_history") ? "active bg-danger" : "" 
-                            }`}
-                        onClick={() => {
-                            setActiveTab("stations");
-                            setStationMonitorId(null);
-                            setReportFilterStationId("All");
-                            setStationHistoryId(null);
-                            setHighlightedUnitId(null);
-                        }}
+                        }`}
+                        onClick={() => setActiveTab("stations")}
                     >
                         <i className="bi bi-grid-3x3-gap"></i>
-                        Stations {/* Laging visible */}
+                        Stations
                     </button>
                 </li>
 
+                <hr className="border-secondary my-2" />
 
-
-                <hr className="border-secondary my-2" /> {/* Separator para sa Workflow/Management */}
-
-                {/* 5. Approvals (Workflow) */}
-                <li>
+                {/* Approvals */}
+                <li className="nav-item">
                     <button
-                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "approval" ? "active bg-danger"
-                            : ""
-                            }`}
-                        onClick={() => {
-                            setActiveTab("approval");
-                            setStationHistoryId(null);
-                            setHighlightedUnitId(null);
-                        }}
+                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "approval" ? "active bg-danger" : ""}`}
+                        onClick={() => setActiveTab("approval")}
                     >
                         <i className="bi bi-check-circle"></i>
-                        Approvals {/* Laging visible */}
+                        Approvals
                     </button>
                 </li>
 
-                {/* 6. No Good List (Quality/Rework) */}
-                <li> 
+                {/* No Good List */}
+                <li className="nav-item">
                     <button
-                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "no_good_list" ? "active bg-danger"
-                            : ""
-                            }`}
-                        onClick={() => {
-                            setActiveTab("no_good_list");
-                            setStationHistoryId(null);
-                            setHighlightedUnitId(null);
-                        }}
+                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "no_good_list" ? "active bg-danger" : ""}`}
+                        onClick={() => setActiveTab("no_good_list")}
                     >
                         <i className="bi bi-x-octagon-fill"></i>
-                        No Good List {/* Laging visible */}
+                        No Good List
                     </button>
                 </li>
 
-                                {/* 3. Shipment (Operational Output) */}
-                <li> 
+                {/* Shipment */}
+                <li className="nav-item">
                     <button
-                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "shipment" ? "active bg-danger"
-                            : ""
-                            }`}
-                        onClick={() => {
-                            setActiveTab("shipment");
-                            setStationHistoryId(null);
-                            setHighlightedUnitId(null);
-                            setReportFilterStationId("All");
-                        }}
+                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "shipment" ? "active bg-danger" : ""}`}
+                        onClick={() => setActiveTab("shipment")}
                     >
                         <i className="bi bi-truck-flatbed"></i>
-                        Shipment {/* Laging visible */}
+                        Shipment
                     </button>
                 </li>
-                
-                <hr className="border-secondary my-2" /> {/* Separator para sa System/User */}
 
-                {/* 4. Reports (Historical Data) */}
-                <li>
+                <hr className="border-secondary my-2" />
+
+                {/* Reports */}
+                <li className="nav-item">
                     <button
-                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "reports" ? "active bg-danger"
-                            : ""
-                            }`}
-                        onClick={() => {
-                            setActiveTab("reports");
-                            setStationMonitorId(null);
-                            setReportFilterStationId("All");
-                            setStationHistoryId(null);
-                            setHighlightedUnitId(null);
-                        }}
+                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "reports" ? "active bg-danger" : ""}`}
+                        onClick={() => setActiveTab("reports")}
                     >
                         <i className="bi bi-file-text"></i>
-                        Reports {/* Laging visible */}
+                        Reports
                     </button>
                 </li>
 
-                {/* 7. Announcement Board (Communication) */}
-                <li>
+                {/* Announcement */}
+                <li className="nav-item">
                     <button
-                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "announcements" ? "active bg-danger"
-                            : ""
-                            }`}
-                        onClick={() => {
-                            setActiveTab("announcements");
-                            setStationMonitorId(null);
-                            setReportFilterStationId("All");
-                            setStationHistoryId(null);
-                            setHighlightedUnitId(null);
-                        }}
+                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "announcements" ? "active bg-danger" : ""}`}
+                        onClick={() => setActiveTab("announcements")}
                     >
                         <i className="bi bi-megaphone-fill"></i>
-                        Announcement Board {/* Laging visible */}
+                        Announcement Board
                     </button>
                 </li>
-                    
 
-                {/* 8. Manage Account (System Management) */}
-                <li>
+                {/* Manage Account */}
+                <li className="nav-item">
                     <button
-                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 ${activeTab === "manage_account" ? "active bg-danger"
-                            : ""
-                            }`}
-                        onClick={() => {
-                            setActiveTab("manage_account");
-                            setStationHistoryId(null);
-                            setHighlightedUnitId(null);
-                        }}
+                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "manage_account" ? "active bg-danger" : ""}`}
+                        onClick={() => setActiveTab("manage_account")}
                     >
                         <i className="bi bi-person-gear"></i>
-                        Manage Account {/* Laging visible */}
+                        Manage Account
                     </button>
                 </li>
-
-
-{/* --- SIDEBAR MENU END --- */}
-
-                {/* ------------------------------------- */}
             </ul>
 
-            {/* PUSH COPYRIGHT + LOGOUT TO BOTTOM */}
+            {/* BOTTOM SECTION */}
             <div className="mt-auto">
-                {/* LOGOUT BUTTON */}
-                <button
-                    className="btn btn-outline-light w-100"
-                    onClick={onLogout}
-                >
+                <button className="btn btn-outline-light w-100 logout-btn" onClick={onLogout}>
                     <i className="bi bi-box-arrow-left me-2"></i>
-                    Logout {/* Laging visible */}
+                    Logout
                 </button>
-
-                {/* COPYRIGHT TEXT (Now Below Logout with Separator) */}
                 <div className="text-center text-white-50 small pt-2 mt-2 border-top border-secondary">
-                    <small>©2025 MKFF Laser Technique</small> {/* Laging visible */}
+                    <small>©2025 MKFF Laser Technique</small>
                 </div>
             </div>
+
+            {/* CSS STYLES (Ilagay ito sa iyong CSS file o sa loob ng <style> tag sa component) */}
+            <style>{`
+                .sidebar-btn {
+                    border: none;
+                    background: transparent;
+                    transition: background 0.1s ease-in-out;
+                }
+                /* HOVER EFFECT: Instant mawawala pag-alis ng mouse */
+                .sidebar-btn:hover:not(.active) {
+                    background-color: rgba(255, 255, 255, 0.1) !important;
+                    color: white !important;
+                }
+                .logout-btn:hover {
+                    background-color: #dc3545 !important;
+                    border-color: #dc3545 !important;
+                }
+            `}</style>
         </div>
 
         {/* --- MAIN CONTENT CONTAINER (UPDATED FOR FIXED SIDEBAR) --- */}
@@ -953,52 +913,98 @@ return (
                 zIndex: 999,
             }}
         >
-            {/* 1. HEADER (Fixed/Sticky at the Top) */}
-            <header 
-                className="bg-white border-bottom p-3 d-flex justify-content-between align-items-center"
-                style={{ flexShrink: 0, position: 'sticky', top: 0, zIndex: 10 }} 
-            >
-                <div className="d-flex align-items-center">
-                    {/* ❌ TINANGGAL: Sidebar Toggle Button */}
-                    <h5 className="mb-0 fw-bold text-dark text-uppercase" style={{ fontSize: '1rem' }}>
-                        {activeTab === 'station_monitor' ? `${stations.find(s => s.id === stationMonitorId)?.name || 'Monitor'} Details` : activeTab.replace(/_/g, ' ')}
-                    </h5>
+           {/* --- 1. HEADER (Professional Management Approach) --- */}
+<header 
+    className="bg-white d-flex justify-content-between align-items-center px-4 py-2"
+    style={{ 
+        flexShrink: 0, 
+        position: 'sticky', 
+        top: 0, 
+        zIndex: 10,
+        height: '70px', // Fixed height para consistent ang look
+        boxShadow: '0 2px 4px rgba(0,0,0,0.05)', // Subtle shadow para mag-pop sa background
+        borderBottom: '1px solid #e5e7eb'
+    }} 
+>
+    {/* LEFT SIDE: Page Title / Breadcrumb Style */}
+    <div className="d-flex align-items-center">
+        <div className="d-flex flex-column">
+            <span className="text-muted small fw-medium" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>
+                PAGE / OVERVIEW
+            </span>
+            <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.1rem', letterSpacing: '-0.5px' }}>
+                {activeTab === 'station_monitor' 
+                    ? `${stations.find(s => s.id === stationMonitorId)?.name || 'Monitor'} Details` 
+                    : activeTab.replace(/_/g, ' ').toUpperCase()}
+            </h5>
+        </div>
+    </div>
+    
+    {/* RIGHT SIDE: NOTIFICATIONS & USER PROFILE */}
+    <div className="d-flex align-items-center gap-4">
+        
+        {/* Notification Bell Container with Hover */}
+        <div className="position-relative header-icon-wrapper">
+            <NotificationBell notifications={notifications} onClick={handleBellClick} />
+        </div>
+
+        {/* Vertical Divider */}
+        <div style={{ width: '1px', height: '30px', backgroundColor: '#e5e7eb' }}></div>
+        
+        {/* User Info and Avatar */}
+        <div className="d-flex align-items-center gap-3">
+            <div className="text-end d-none d-md-block">
+                <div 
+                    className="fw-bold text-dark" 
+                    style={{ fontSize: '0.9rem', lineHeight: 1.1 }}
+                >
+                    {headerFullName}
                 </div>
-                
-                {/* --- RIGHT SIDE: NOTIFICATIONS & USER PROFILE --- */}
-                <div className="d-flex align-items-center gap-3">
-                    
-                    {/* Notification Bell */}
-                    <NotificationBell notifications={notifications} onClick={handleBellClick} />
-                    
-                    {/* User Info and Avatar (Professional Look) */}
-                    <div className="d-flex align-items-center">
-                        
-                        {/* Text Info */}
-                        <div className="text-end me-3 d-none d-md-block">
-                            {/* Use text-dark for full name */}
-                            <div className="fw-bold text-dark" style={{ lineHeight: 1.2 }}>{headerFullName}</div>
-                            {/* Highlight Admin role */}
-                            <div className="fw-medium text-danger small" style={{ fontSize: '0.75rem' }}>ADMINISTRATOR</div> 
-                        </div>
-                        
-                        {/* Avatar (Increased size to 45px) */}
-                        <img
-                            src={headerAvatarSrc}
-                            alt="User Avatar"
-                            // 💡 BINAGO: Inalis ang 'border-danger' at pinalitan ng 'border-secondary'
-                            className="rounded-circle border border-secondary" 
-                            style={{ 
-                                width: '45px', 
-                                height: '45px', 
-                                objectFit: 'cover' 
-                            }}
-                            onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
-                        />
-                    </div>
-                    
-                </div>
-            </header>
+                <div 
+                    className="badge rounded-pill mt-1" 
+                    style={{ 
+                        fontSize: '0.65rem', 
+                        backgroundColor: '#fee2e2', 
+                        color: '#dc2626',
+                        fontWeight: '700',
+                        padding: '4px 8px'
+                    }}
+                >
+                    ADMINISTRATOR
+                </div> 
+            </div>
+            
+            {/* Avatar with Ring Effect */}
+            <div className="position-relative">
+                <img
+                    src={headerAvatarSrc}
+                    alt="User Avatar"
+                    className="rounded-circle border border-2 border-white shadow-sm" 
+                    style={{ 
+                        width: '45px', 
+                        height: '45px', 
+                        objectFit: 'cover',
+                        outline: '2px solid #e5e7eb' // Outer ring effect
+                    }}
+                    onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
+                />
+                {/* Online Status Dot */}
+                <span className="position-absolute bottom-0 end-0 p-1 bg-success border border-2 border-white rounded-circle"></span>
+            </div>
+        </div>
+    </div>
+
+    {/* Custom Styles for Hover */}
+    <style>{`
+        .header-icon-wrapper {
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        .header-icon-wrapper:hover {
+            transform: scale(1.1);
+        }
+    `}</style>
+</header>
 
             {/* 2. CONTENT AREA (Scrollable Part) */}
             <div 
