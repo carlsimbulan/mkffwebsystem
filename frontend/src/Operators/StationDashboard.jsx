@@ -31,9 +31,9 @@ const ANNOUNCEMENT_ENDPOINT = `${API_BASE_URL}/announcements.php`;
 
 // DEFINE THE STRICT STATION ORDER (Kept here as global constant)
 const STATION_ORDER = [
-    "Station 1", "Station 2", "Station 3", "Station 4", "Station 5",
-    "Station 6", "Station 7", "Station 8", "Station 9", "Station 10",
-    "Station 11", "Station 12", "Station 13", "Station 14", "Station 15"
+    "Station1", "Station2", "Station3", "Station4", "Station5",
+    "Station6", "Station7", "Station8", "Station9", "Station10",
+    "Station11", "Station12", "Station13", "Station14", "Station15"
 ];
 
 // --- UTILITY COMPONENTS ---
@@ -140,14 +140,15 @@ export default function StationDashboard({ user, onLogout }) {
 
 
     // --- HELPER FUNCTION: GET STATION NAME (Unchanged) ---
-    const getStationName = () => {
-        const rawName = (user?.station || user?.username || "").toLowerCase();
-        if (rawName.includes('station')) {
-            const num = rawName.replace(/\D/g, ''); 
-            if (num) return `Station ${num}`;
-        }
-        return rawName.charAt(0).toUpperCase() + rawName.slice(1);
-    };
+const getStationName = () => {
+    const rawName = (user?.station || user?.username || "").toLowerCase();
+    if (rawName.includes('station')) {
+        const num = rawName.replace(/\D/g, ''); 
+        // Return without space: "Station1"
+        if (num) return `Station${num}`; 
+    }
+    return rawName.charAt(0).toUpperCase() + rawName.slice(1);
+};
 
     const currentStation = getStationName();
 
