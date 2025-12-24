@@ -284,23 +284,42 @@ export function Dashboard({
                 </div>
             )}
 
-            <div className="search-container">
+            <div className="search-container" style={{ position: 'relative', width: '320px' }}>
                 <i className="bi bi-search search-icon-inside"></i>
+                
                 <input 
                     type="text" 
                     className="form-control form-control-sm rounded-pill search-input-pro shadow-sm" 
                     placeholder="Search Assembly Number..." 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
+                    style={{ paddingRight: '35px' }} // Space for the clear button
                 />
+
+                {/* Clear Button - Only shows when there is text */}
+                {searchTerm && (
+                    <i 
+                        className="bi bi-x-circle-fill position-absolute" 
+                        style={{ 
+                            right: '12px', 
+                            top: '50%', 
+                            transform: 'translateY(-50%)', 
+                            cursor: 'pointer', 
+                            color: '#94a3b8',
+                            zIndex: 5
+                        }}
+                        onClick={() => setSearchTerm('')}
+                    ></i>
+                )}
                 {/* ... (Dito yung existing searchResults mapping mo, wag galawin) */}
+            
                 {searchResults.length > 0 && (
                     <div className="position-absolute w-100 mt-2 bg-white border rounded-4 shadow-lg overflow-hidden" style={{ zIndex: 1100 }}>
                         {searchResults.map(unit => (
                             <div 
                                 key={unit.id} 
                                 className="search-item-result"
-                                style={getSearchHighlightStyle(unit.status)}
+                                /* Removed the dynamic style here */
                                 onClick={() => { setSelectedUnit(unit); setSearchTerm(''); }}
                             >
                                 <div className="fw-bold text-dark d-flex justify-content-between">
@@ -512,43 +531,81 @@ export function Dashboard({
 
                 <div className="process-timeline px-2">
                     {processStations.map((station, idx) => {
-                        const currentStationIdx = parseInt(selectedUnit.station?.replace('Station', '')) - 1;
-                        const isDoneBefore = idx < currentStationIdx;
-                        const isCurrent = idx === currentStationIdx;
-                        const unitStatus = selectedUnit.status?.toLowerCase() || '';
-                        
-                        let subText = isDoneBefore ? "STATION COMPLETED" : isCurrent ? (unitStatus.includes('no good') ? "NG" : "IN PROGRESS") : "Pending";
-                        let textColor = isDoneBefore ? "text-success" : isCurrent ? "text-primary" : "text-muted";
-                        let dotColor = isDoneBefore ? "#198754" : isCurrent ? "#0d6efd" : "#dee2e6";
+    const currentStationIdx = parseInt(selectedUnit.station?.replace('Station', '')) - 1;
+    const unitStatus = selectedUnit.status?.toLowerCase() || '';
+    
+    // Status Logic
+    const isUnitFullyDone = unitStatus.includes('completed') || unitStatus.includes('finished');
+    const isNoGood = unitStatus.includes('no good') || unitStatus === 'ng';
 
-                        return (
-                            <div key={idx} className="position-relative ps-4 mb-4" 
-                                style={{ borderLeft: idx === processStations.length - 1 ? 'none' : `2px solid ${isDoneBefore ? '#198754' : '#e9ecef'}` }}>
-                                
-                                {/* Timeline Dot */}
-                                <div className="position-absolute rounded-circle" 
-                                    style={{ 
-                                        width: '12px', height: '12px', 
-                                        backgroundColor: dotColor, 
-                                        left: '-7px', top: '4px',
-                                        zIndex: 2
-                                    }}>
-                                </div>
+    // Check kung ito ang active/last station recorded
+    const isCurrentStation = idx === currentStationIdx;
+    
+    // Ang station ay "Done" kung ito ay nakalipas na (previous) 
+    // O kung ito ang current station at ang status ay "Completed"
+    const isDone = idx < currentStationIdx || (isCurrentStation && isUnitFullyDone);
 
-                                <div className="d-flex justify-content-between align-items-start">
-                                    <div>
-                                        <div className={`fw-bold mb-0 ${isCurrent || isDoneBefore ? 'text-dark' : 'text-muted opacity-50'}`} style={{fontSize: '0.85rem'}}>
-                                            {idx + 1}. {station}
-                                        </div>
-                                        <div className={`fw-bold small ${textColor}`} style={{fontSize: '0.65rem'}}>
-                                            {subText}
-                                        </div>
-                                    </div>
-                                    {isCurrent && <span className="badge bg-primary rounded-pill" style={{fontSize: '0.55rem'}}>CURRENT</span>}
-                                </div>
-                            </div>
-                        );
-                    })}
+    let subText = "Pending";
+    let textColorClass = "text-muted";
+    let statusColor = "#dee2e6"; // Default Gray
+
+    if (isDone) {
+        subText = "STATION COMPLETED";
+        textColorClass = "text-success";
+        statusColor = "#198754"; // Green
+    } else if (isCurrentStation) {
+        if (isNoGood) {
+            subText = "NG";
+            textColorClass = "text-danger";
+            statusColor = "#dc3545"; // Red
+        } else {
+            subText = "IN PROGRESS";
+            textColorClass = "text-warning";
+            statusColor = "#ffc107"; // Yellow
+        }
+    }
+
+    // Line color logic
+    const lineBorderColor = isDone ? '#198754' : (isCurrentStation && isNoGood ? '#dc3545' : '#e9ecef');
+
+    return (
+        <div key={idx} className="position-relative ps-4 mb-4" 
+            style={{ borderLeft: idx === processStations.length - 1 ? 'none' : `2px solid ${lineBorderColor}` }}>
+            
+            {/* Timeline Dot */}
+            <div className="position-absolute rounded-circle" 
+                style={{ 
+                    width: '12px', height: '12px', 
+                    backgroundColor: statusColor, 
+                    left: '-7px', top: '4px', zIndex: 2 
+                }}>
+            </div>
+
+            <div className="d-flex justify-content-between align-items-start">
+                <div>
+                    <div className={`fw-bold mb-0 ${isDone || isCurrentStation ? 'text-dark' : 'text-muted opacity-50'}`} style={{fontSize: '0.85rem'}}>
+                        {idx + 1}. {station}
+                    </div>
+                    <div className={`fw-bold small ${textColorClass}`} style={{fontSize: '0.65rem'}}>
+                        {subText}
+                    </div>
+                </div>
+
+                {/* Badge: Laging lalabas basta ito ang currentStationIdx */}
+                {isCurrentStation && (
+                    <span className="badge rounded-pill" 
+                          style={{
+                              fontSize: '0.55rem', 
+                              backgroundColor: statusColor, // Sasunod sa kulay ng status (Green, Red, or Yellow)
+                              color: isNoGood || isUnitFullyDone ? 'white' : 'black' // White text for Green/Red, Black for Yellow
+                          }}>
+                        CURRENT
+                    </span>
+                )}
+            </div>
+        </div>
+    );
+})}
                 </div>
             </div>
 
