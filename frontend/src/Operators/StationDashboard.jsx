@@ -19,6 +19,24 @@ import { AnnouncementView } from './components/AnnouncementView';
 // REGISTER CHART COMPONENTS (Kept here for global chart setup)
 ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
+const STATION_STANDARD_TIMES = {
+    'Station1': 6, 'Station 1': 6,
+    'Station2': 8, 'Station 2': 8,
+    'Station3': 3, 'Station 3': 3,
+    'Station4': 12, 'Station 4': 12,
+    'Station5': 15, 'Station 5': 15,
+    'Station6': 15, 'Station 6': 15,
+    'Station7': 3, 'Station 7': 3,
+    'Station8': 0, 'Station 8': 0,
+    'Station9': 480, 'Station 9': 480,
+    'Station10': 8, 'Station 10': 8,
+    'Station11': 22, 'Station 11': 22,
+    'Station12': 5, 'Station 12': 5,
+    'Station13': 10, 'Station 13': 10,
+    'Station14': 8, 'Station 14': 8,
+    'Station15': 5, 'Station 15': 5,
+};
+
 // --- CONFIGURATION CONSTANTS ---
 const API_BASE_URL = "http://localhost/mkffwebsystem/backend/api";
 const AVATAR_UPLOAD_PATH = `${API_BASE_URL}/uploads/avatars/`;
@@ -188,56 +206,69 @@ const getStationName = () => {
     
     // --- HOOKED FUNCTIONS: FETCH UNIT LIST (Retained polling and ref update logic) ---
     const fetchUnits = useCallback(async (status) => { 
-        if (activeTab !== 'home') {
-            setListLoading(true); setListError(null); setUnitList([]);
-        }
-        
-        let dbStatus = status.replace(/_/g, ' ').replace(' unit', '');
-        if (dbStatus === 'in progress') dbStatus = 'In Progress';
-        if (dbStatus === 'completed') dbStatus = 'Completed';
-        if (dbStatus === 'no good') dbStatus = 'No Good (NG)';
-        if (dbStatus === 'pending') dbStatus = 'Pending Approval'; 
-        
-        if (['daily reports', 'account history', 'guide', 'home'].includes(dbStatus.toLowerCase())) {
-            dbStatus = ''; 
-        }
-        
-        try {
-            const res = await axios.get(UNITS_ENDPOINT, {
-                params: {
-                    station: currentStation, 
-                    status: dbStatus
-                }
-            });
-            const newUnitList = Array.isArray(res.data) ? res.data : [];
+    if (activeTab !== 'home') {
+        setListLoading(true); setListError(null); setUnitList([]);
+    }
+    
+    let dbStatus = status.replace(/_/g, ' ').replace(' unit', '');
+    if (dbStatus === 'in progress') dbStatus = 'In Progress';
+    if (dbStatus === 'completed') dbStatus = 'Completed';
+    if (dbStatus === 'no good') dbStatus = 'No Good (NG)';
+    if (dbStatus === 'pending') dbStatus = 'Pending Approval'; 
+    
+    if (['daily reports', 'account history', 'guide', 'home'].includes(dbStatus.toLowerCase())) {
+        dbStatus = ''; 
+    }
+    
+    try {
+        const res = await axios.get(UNITS_ENDPOINT, {
+            params: {
+                station: currentStation, 
+                status: dbStatus
+            }
+        });
+        const rawData = Array.isArray(res.data) ? res.data : [];
 
-            // 🔑 STATUS CHANGE DETECTION LOGIC:
-            const newlyApprovedUnits = newUnitList.filter(newUnit => {
-                const prevUnit = prevUnitListRef.current.find(oldUnit => oldUnit.id === newUnit.id);
-                // Check if unit was previously 'Pending Approval' AND is now 'In Progress'
-                return (
-                    prevUnit && 
-                    prevUnit.status === 'Pending Approval' && 
-                    newUnit.status === 'In Progress'
-                );
-            });
-            
-                if (newlyApprovedUnits.length > 0) {
+        // 🔑 NEW LOGIC: Calculate delay minutes for each unit
+        const newUnitList = rawData.map(unit => {
+            if (unit.status === 'In Progress') {
+                const standardMinutes = STATION_STANDARD_TIMES[currentStation] || 0;
+                
+                // Uses updated_at (time it reached the station) or created_at
+                const startTime = new Date(unit.updated_at || unit.created_at).getTime();
+                const currentTime = new Date().getTime();
+                const elapsedMinutes = Math.floor((currentTime - startTime) / 60000);
+                
+                const delay = elapsedMinutes - standardMinutes;
+                return { ...unit, delayMinutes: delay > 0 ? delay : 0 };
+            }
+            return { ...unit, delayMinutes: 0 };
+        });
+
+        // 🔑 STATUS CHANGE DETECTION LOGIC: (Retained exactly as you had it)
+        const newlyApprovedUnits = newUnitList.filter(newUnit => {
+            const prevUnit = prevUnitListRef.current.find(oldUnit => oldUnit.id === newUnit.id);
+            return (
+                prevUnit && 
+                prevUnit.status === 'Pending Approval' && 
+                newUnit.status === 'In Progress'
+            );
+        });
+        
+        if (newlyApprovedUnits.length > 0) {
             const names = newlyApprovedUnits.map(u => u.assemblyNo).join(', ');
             setUnitStatusNotification(`✅ Admin Accepted: Unit(s) ${names} are now 'In Progress'. Press X to dismiss.`);
-            // Walang setTimeout, kaya mananatili ang Toast.
         }
-            
-            // Update the list and the ref
-            setUnitList(newUnitList);
-            prevUnitListRef.current = newUnitList;
+        
+        setUnitList(newUnitList);
+        prevUnitListRef.current = newUnitList;
 
-        } catch (err) {
-            setListError(`Failed to load data: ${err.message}`);
-        } finally {
-            if (activeTab !== 'home') setListLoading(false);
-        }
-    }, [currentStation, activeTab]); 
+    } catch (err) {
+        setListError(`Failed to load data: ${err.message}`);
+    } finally {
+        if (activeTab !== 'home') setListLoading(false);
+    }
+}, [currentStation, activeTab]); 
     
     // --- HOOKED FUNCTIONS: FETCH HISTORY (Unchanged) ---
     const fetchHistory = useCallback(async () => {
