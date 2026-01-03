@@ -204,8 +204,7 @@ export default function Login({ onLogin }) {
                         
                         <div className="mt-5 text-center">
                             <p className="text-muted" style={{ fontSize: '0.7rem', opacity: '0.6' }}>
-                                © 2025 MkFF Laserteknique International Inc. <br/>
-                                <span className="text-uppercase tracking-widest">Security Protocol v1.0.4</span>
+                                © 2025 MkFF Laserteknique International Inc. <br/>       
                             </p>
                         </div>
                     </div>

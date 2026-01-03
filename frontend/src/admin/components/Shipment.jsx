@@ -229,16 +229,6 @@ export const Shipment = ({ liveUnitLogs, onMarkAsShipped }) => {
                     </table>
                 </div>
             </div>
-
-            {/* FOOTER INFO */}
-            <div className="mt-4 px-2 d-flex justify-content-between align-items-center opacity-50">
-                <div className="small fw-bold text-uppercase" style={{fontSize: '0.6rem', letterSpacing: '0.1em'}}>
-                    Security: <span className="text-success">Admin Authorization Required</span>
-                </div>
-                <div className="small fw-bold text-uppercase" style={{fontSize: '0.6rem', letterSpacing: '0.1em'}}>
-                    MKFF Logistics Handshake v2.5
-                </div>
-            </div>
         </div>
     );
 };

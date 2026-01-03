@@ -436,7 +436,7 @@ export function Dashboard({
 
             <div className="bg-white border rounded-4 overflow-hidden shadow-sm mb-5">
                 <div className="d-flex justify-content-between align-items-center p-3 border-bottom bg-light">
-                    <span className="label-caps m-0">Station Bottleneck Analytics</span>
+                    <span className="label-caps m-0">Station Delayed Analytics</span>
                     <span className="badge bg-dark text-white rounded-pill">{bottleneckData.length} Active Areas</span>
                 </div>
                 <div className="table-responsive fixed-scanning-table">
