@@ -1,229 +1,234 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import 'bootstrap-icons/font/bootstrap-icons.css';
-// 💡 Import the new Doughnut Chart component
-import { StationSingleDoughnutChart } from './StationSingleDoughnutChart'; 
-
+import { StationSingleDoughnutChart } from './StationSingleDoughnutChart';
 
 export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, announcementCount, logs, calculateMetrics }) {
     
-    // 💡 Ref to access the Chart.js instance for exporting
     const chartRef = useRef(null);
 
-    // Function to handle chart export using the exposed chart method
+    // 🔑 1. Filter logs to find only Delayed Units 
+    // Ginagamit ang assembly_no (underscore) base sa logs data
+    const delayedUnits = useMemo(() => {
+        return logs.filter(unit => unit.status === 'In Progress' && unit.delayMinutes > 0);
+    }, [logs]);
+
     const handleExportChart = () => {
         const chartInstance = chartRef.current;
         if (!chartInstance) {
              alert("Chart data not ready for export.");
              return;
         }
-        
         try {
-            // Use the method exposed via useImperativeHandle
             const imageURI = chartInstance.toBase64Image('image/png', 1);
-            
-            // Create a temporary link element to trigger the download
             const a = document.createElement('a');
             a.href = imageURI;
-            a.download = `Daily_Completion_Ratio_${currentStation}_${new Date().toISOString()}.png`;
+            a.download = `Daily_Report_${currentStation}.png`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-
         } catch (err) {
              console.error("Export failed:", err);
-             alert("Export failed due to browser security or drawing error.");
         }
     };
     
-    // 🌟 NEW: Calculate total units and percentages based on homeStats (Current Station only) 🌟
     const totalUnits = homeStats.completed + homeStats.inProgress + homeStats.ng;
     
     const calculateStationPercentage = (value) => {
-        if (totalUnits === 0) return '0%';
+        if (totalUnits === 0) return '0.0%';
         return ((value / totalUnits) * 100).toFixed(1) + '%';
     };
 
-    const completedPercentage = calculateStationPercentage(homeStats.completed);
-    const inProgressPercentage = calculateStationPercentage(homeStats.inProgress);
-    const ngPercentage = calculateStationPercentage(homeStats.ng);
-    // --------------------------------------------------------------------------------------
-    
-    // --- RENDER FUNCTION ---
-    return (
-        <div className="d-flex flex-column h-100 animate-in fade-in pb-3">
-
-            {/* Header Section (Unchanged) */}
-            <div className="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                    <h3 className="fw-bold text-dark mb-1" style={{ letterSpacing: '-0.5px' }}>{currentStation}</h3>
-                    <p className="text-muted small mb-0">Operator Control Panel</p>
+    const SimpleStatCard = ({ title, value, percentage, label, borderColor, badgeClass, icon }) => (
+        <div className="col-md-3">
+            <div className={`card border-0 shadow-sm h-100 border-top border-4 ${borderColor}`} style={{ borderRadius: '12px' }}>
+                <div className="card-body p-4">
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                        <div className="bg-light rounded-circle p-2 d-flex align-items-center justify-content-center" style={{ width: '40px', height: '40px' }}>
+                            <i className={`bi ${icon} fs-5 text-dark opacity-75`}></i>
+                        </div>
+                        <div className={`badge ${badgeClass} rounded-pill px-2 py-1`} style={{ fontSize: '0.7rem' }}>
+                            {percentage} {label}
+                        </div>
+                    </div>
+                    <div className="text-uppercase fw-bold text-secondary mb-1" style={{ fontSize: '0.65rem', letterSpacing: '0.8px' }}>
+                        {title}
+                    </div>
+                    <h2 className="fw-bold text-dark mb-0" style={{ fontSize: '2rem' }}>{value}</h2>
                 </div>
-                <div className="bg-white border px-3 py-2 rounded shadow-sm d-flex align-items-center">
-                    <span className="position-relative d-flex h-2 w-2 me-2">
-                        <span className="animate-ping position-absolute d-inline-flex h-100 w-100 rounded-circle bg-success opacity-75"></span>
-                        <span className="position-relative d-inline-flex rounded-circle h-2 w-2 bg-success" style={{ width: '8px', height: '8px' }}></span>
-                    </span>
-                    <span className="fw-bold text-dark small" style={{ fontSize: '0.8rem' }}>Station Active</span>
+            </div>
+        </div>
+    );
+    
+    return (
+        <div className="d-flex flex-column h-100 animate-in fade-in pb-4 px-2">
+
+            {/* --- HEADER SECTION --- */}
+            <div className="d-flex justify-content-between align-items-end mb-4">
+                <div>
+                    <nav aria-label="breadcrumb">
+                        <ol className="breadcrumb mb-1" style={{ fontSize: '0.75rem' }}>
+                            <li className="breadcrumb-item text-primary fw-bold">MKFF SYSTEM</li>
+                            <li className="breadcrumb-item active">{currentStation.toUpperCase()}</li>
+                        </ol>
+                    </nav>
+                    <h2 className="fw-bold text-dark mb-0" style={{ letterSpacing: '-1px' }}>Station Overview</h2>
+                </div>
+                
+                <div className="d-flex gap-2">
+                    {announcementCount > 0 && (
+                        <button className="btn btn-warning shadow-sm d-flex align-items-center gap-2 px-3 rounded-pill fw-bold" 
+                                onClick={() => setActiveTab('announcements')} style={{ fontSize: '0.8rem' }}>
+                            <i className="bi bi-megaphone-fill"></i>
+                            {announcementCount} NEW UPDATES
+                        </button>
+                    )}
+                    <button className="btn btn-primary shadow-sm d-flex align-items-center gap-2 px-4 rounded-pill fw-bold" 
+                            onClick={() => setActiveTab('input_unit')} style={{ fontSize: '0.8rem' }}>
+                        <i className="bi bi-qr-code-scan"></i> NEW ENTRY
+                    </button>
                 </div>
             </div>
 
-            {/* 🔑 ANNOUNCEMENT ALERT (Unchanged) */}
-            {announcementCount > 0 && (
-                <div className="alert alert-warning d-flex justify-content-between align-items-center shadow-sm mb-4 border-start border-4 border-warning" role="alert" style={{ borderRadius: '8px' }}>
-                    <div className="d-flex align-items-center">
-                        <i className="bi bi-megaphone-fill fs-4 me-3 text-warning"></i>
-                        <div className='d-flex flex-column'>
-                            <span className="fw-bold text-dark mb-0">
-                                NEW ANNOUNCEMENT!
-                            </span>
-                            <small className="text-muted">You have **{announcementCount}** unread message{announcementCount > 1 ? 's' : ''} from Admin.</small>
+            {/* --- STAT CARDS ROW --- */}
+            <div className="row g-3 mb-4">
+                <SimpleStatCard 
+                    title="Completed Units" value={homeStats.completed} 
+                    percentage={calculateStationPercentage(homeStats.completed)} 
+                    label="Yield" borderColor="border-success" icon="bi-check-all"
+                    badgeClass="bg-success bg-opacity-10 text-success"
+                />
+                <SimpleStatCard 
+                    title="Work in Progress" value={homeStats.inProgress} 
+                    percentage={calculateStationPercentage(homeStats.inProgress)} 
+                    label="WIP" borderColor="border-primary" icon="bi-clock-history"
+                    badgeClass="bg-primary bg-opacity-10 text-primary"
+                />
+                <SimpleStatCard 
+                    title="Rejected (NG)" value={homeStats.ng} 
+                    percentage={calculateStationPercentage(homeStats.ng)} 
+                    label="Loss" borderColor="border-danger" icon="bi-bug"
+                    badgeClass="bg-danger bg-opacity-10 text-danger"
+                />
+                <SimpleStatCard 
+                    title="Delayed Tasks" value={delayedUnits.length} 
+                    percentage={delayedUnits.length} 
+                    label="Units" borderColor="border-warning" icon="bi-exclamation-octagon"
+                    badgeClass="bg-warning bg-opacity-10 text-warning"
+                />
+            </div>
+
+            {/* --- MAIN CONTENT GRID --- */}
+            <div className="row g-4">
+                {/* 1. DELAYED UNITS TABLE */}
+                <div className={delayedUnits.length > 0 ? "col-lg-8" : "col-lg-12"}>
+                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
+                        <div className="card-header bg-white py-4 px-4 border-0">
+                            <div className="d-flex justify-content-between align-items-center">
+                                <h5 className="mb-0 fw-bold text-dark">
+                                    <i className="bi bi-list-task me-2 text-primary"></i> 
+                                    {delayedUnits.length > 0 ? 'Critical Delay Tracking' : 'Current Operations'}
+                                </h5>
+                                {delayedUnits.length > 0 && <span className="badge bg-danger rounded-pill px-3">Attention Required</span>}
+                            </div>
+                        </div>
+                        <div className="card-body p-0">
+                            {delayedUnits.length > 0 ? (
+                                <div className="table-responsive">
+                                    <table className="table table-hover align-middle mb-0">
+                                        <thead className="bg-light text-secondary" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>
+                                            <tr>
+                                                <th className="px-4">MODEL</th>
+                                                <th>ASSEMBLY NO</th>
+                                                <th>REMARKS</th>
+                                                <th>DELAY TIME</th>
+                                                <th>STATUS</th>
+                                                <th className="text-end px-4">ACTIONS</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody style={{ fontSize: '0.85rem' }}>
+                                            {delayedUnits.map((unit) => (
+                                                <tr key={unit.id}>
+                                                    {/* Binago: log.model_id o log.model depende sa source */}
+                                                    <td className="px-4 fw-bold text-dark">{unit.model || unit.model_id}</td>
+                                                    {/* 🔑 PINAKAMAHALAGA: ASSEMBLY NO FIX (underscore dapat) */}
+                                                    <td className="fw-bold text-primary">
+                                                        <code style={{fontSize: '0.9rem'}}>{unit.assembly_no || unit.assemblyNo}</code>
+                                                    </td>
+                                                    <td className="text-muted" style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {unit.remarks || <span className="opacity-50 italic">No remarks</span>}
+                                                    </td>
+                                                    <td>
+                                                        <div className="text-danger fw-bold d-flex align-items-center gap-1">
+                                                            <i className="bi bi-alarm-fill"></i> {unit.delayMinutes}m Over
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <span className="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 px-2 rounded-pill">
+                                                            IN PROGRESS
+                                                        </span>
+                                                    </td>
+                                                    <td className="text-end px-4">
+                                                        <button className="btn btn-sm btn-dark rounded-pill px-3 fw-bold" onClick={() => setActiveTab('in_progress')}>
+                                                            MANAGE
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <div className="text-center py-5">
+                                    <i className="bi bi-check2-all text-success display-4 mb-3"></i>
+                                    <h5 className="fw-bold">No Delays Detected</h5>
+                                    <p className="text-muted small">All units are currently within the standard processing time.</p>
+                                </div>
+                            )}
                         </div>
                     </div>
-                    <button 
-                        className="btn btn-warning btn-sm fw-bold px-3" 
-                        onClick={() => setActiveTab('announcements')}
-                    >
-                        View Messages
-                    </button>
                 </div>
-            )}
-            {/* 🔑 END ANNOUNCEMENT ALERT */}
 
-
-            {/* ----------------------------------------------------- */}
-            {/* --- NEW LAYOUT ROW: CHART (Left) & CARDS (Right) --- */}
-            {/* ----------------------------------------------------- */}
-            <div className="row g-4 mb-4">
-                
-                {/* 1. LEFT COLUMN (CHART) - Takes 7/12 column width */}
-                <div className="col-lg-7">
+                {/* 2. PRODUCTION ANALYTICS */}
+                {delayedUnits.length > 0 && (
+                <div className="col-lg-4">
                     <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
-                        <div className="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-3">
-                            <h5 className="mb-0 fw-bold text-dark"><i className="bi bi-pie-chart-fill me-2 text-primary"></i> Daily Completion Ratio (Total: {totalUnits})</h5>
-                            {/* Export Button */}
-                            <button 
-                                className="btn btn-outline-secondary btn-sm px-3 rounded-pill d-flex align-items-center"
-                                onClick={handleExportChart}
-                                title="Export Chart as PNG"
-                                disabled={!logs || totalUnits === 0} // Disabled if total units is zero
-                            >
-                                <i className="bi bi-download me-1"></i> Export
+                        <div className="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+                            <h5 className="mb-0 fw-bold text-dark">Yield Analysis</h5>
+                            <button className="btn btn-light btn-sm rounded-circle" onClick={handleExportChart} title="Download Chart">
+                                <i className="bi bi-download"></i>
                             </button>
                         </div>
-                        <div className="card-body p-4">
-                            {/* Render the Doughnut Chart */}
-                            <StationSingleDoughnutChart 
-                                ref={chartRef}
-                                stationId={currentStation} 
-                                logs={logs} 
-                                calculateMetrics={calculateMetrics}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* 2. RIGHT COLUMN (CARDS) - Takes 5/12 column width, stacked */}
-                <div className="col-lg-5">
-                    <div className="row g-4 h-100">
-                        {/* CARD 1: Completed Units */}
-                        <div className="col-12">
-                            <div className="card border-0 shadow-sm h-100 border-start border-4 border-success" style={{ borderRadius: '12px' }}>
-                                <div className="card-body p-4">
-                                    <div className="d-flex align-items-center justify-content-between mb-3">
-                                        <div className="bg-success bg-opacity-10 text-success rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
-                                            <i className="bi bi-box-seam-fill fs-4"></i>
-                                        </div>
-                                        {/* 🌟 PERCENTAGE DISPLAY 🌟 */}
-                                        <span className="badge bg-success text-white px-3 py-2 rounded-pill fw-bolder" style={{ fontSize: '1rem' }}>
-                                            {completedPercentage}
-                                        </span>
-                                    </div>
-                                    <h2 className="fw-bold text-dark mb-0 display-6">{homeStats.completed}</h2>
-                                    <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Completed Units</span>
-                                </div>
+                        <div className="card-body p-4 text-center">
+                            <div style={{ height: '280px' }} className="d-flex align-items-center justify-content-center">
+                                <StationSingleDoughnutChart 
+                                    ref={chartRef}
+                                    stationId={currentStation} 
+                                    logs={logs} 
+                                    calculateMetrics={calculateMetrics}
+                                />
                             </div>
-                        </div>
-
-                        {/* CARD 2: In Progress Card */}
-                        <div className="col-12">
-                            <div className="card border-0 shadow-sm h-100 border-start border-4 border-warning" style={{ borderRadius: '12px' }}>
-                                <div className="card-body p-4">
-                                    <div className="d-flex align-items-center justify-content-between mb-3">
-                                        <div className="bg-warning bg-opacity-10 text-warning rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
-                                            <i className="bi bi-hourglass-split fs-4"></i>
-                                        </div>
-                                        {/* 🌟 PERCENTAGE DISPLAY 🌟 */}
-                                        <span className="badge bg-warning text-dark px-3 py-2 rounded-pill fw-bolder" style={{ fontSize: '1rem' }}>
-                                            {inProgressPercentage}
-                                        </span>
+                            <div className="mt-4 pt-3 border-top">
+                                <div className="row g-0 text-center">
+                                    <div className="col-6 border-end">
+                                        <div className="text-muted smaller">Total Volume</div>
+                                        <div className="fw-bold h5 mb-0">{totalUnits}</div>
                                     </div>
-                                    <h2 className="fw-bold text-dark mb-0 display-6">{homeStats.inProgress}</h2>
-                                    <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>In Progress</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* CARD 3: NG Card */}
-                        <div className="col-12">
-                            <div className="card border-0 shadow-sm h-100 border-start border-4 border-danger" style={{ borderRadius: '12px' }}>
-                                <div className="card-body p-4">
-                                    <div className="d-flex align-items-center justify-content-between mb-3">
-                                        <div className="bg-danger bg-opacity-10 text-danger rounded-3 p-3 d-flex align-items-center justify-content-center" style={{ width: '50px', height: '50px' }}>
-                                            <i className="bi bi-exclamation-octagon-fill fs-4"></i>
-                                        </div>
-                                        {/* 🌟 PERCENTAGE DISPLAY 🌟 */}
-                                        <span className="badge bg-danger text-white px-3 py-2 rounded-pill fw-bolder" style={{ fontSize: '1rem' }}>
-                                            {ngPercentage}
-                                        </span>
+                                    <div className="col-6">
+                                        <div className="text-muted smaller">Efficiency</div>
+                                        <div className="fw-bold h5 mb-0 text-success">{calculateStationPercentage(homeStats.completed)}</div>
                                     </div>
-                                    <h2 className="fw-bold text-danger mb-0 display-6">{homeStats.ng}</h2>
-                                    <span className="text-muted text-uppercase small fw-bold" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>Total NG</span>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-            {/* ----------------------------------------------------- */}
-            {/* --- END LAYOUT ROW: CHART & CARDS --- */}
-            {/* ----------------------------------------------------- */}
-
-            {/* --- Start Scanning Hero Section (BELOW THE MAIN ROW) --- */}
-            <div className="card border-0 shadow-sm flex-grow-1 position-relative overflow-hidden"
-                style={{ borderRadius: '16px', background: '#fff', border: '1px solid #f1f5f9' }}>
-
-                {/* Subtle Background Element */}
-                <div className="position-absolute top-0 start-0 translate-middle rounded-circle bg-primary opacity-05" style={{ width: '300px', height: '300px', filter: 'blur(60px)' }}></div>
-
-                <div className="card-body d-flex flex-column align-items-center justify-content-center text-center p-5 z-1">
-                    <div className="mb-4">
-                        <div className="d-inline-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary rounded-circle shadow-sm" style={{ width: '80px', height: '80px' }}>
-                            <i className="bi bi-qr-code-scan fs-1"></i>
-                        </div>
-                    </div>
-                    <h3 className="fw-bold text-dark mb-2">Ready to Process?</h3>
-                    <p className="text-muted mb-4" style={{ maxWidth: '350px' }}>Scan the unit QR code to verify details and begin logging production data.</p>
-
-                    <button
-                        className="btn btn-primary px-5 py-3 rounded-pill shadow-lg d-flex align-items-center gap-2 hover-scale"
-                        onClick={() => setActiveTab('input_unit')}
-                        style={{ transition: 'all 0.3s ease' }}
-                    >
-                        <span className="fs-6 fw-bold ls-1 text-uppercase">Start Scanning</span>
-                        <i className="bi bi-arrow-right fs-5"></i>
-                    </button>
-                </div>
+                )}
             </div>
 
-            {/* Styles */}
             <style jsx>{`
-                .hover-scale:hover { transform: scale(1.03); box-shadow: 0 10px 20px rgba(13, 110, 253, 0.2) !important; }
-                .ls-1 { letter-spacing: 1px; }
-                .opacity-05 { opacity: 0.05; }
-                .animate-ping { animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite; }
-                @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
-                .animate-in { animation: fadeInUp 0.5s ease-out; }
-                @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+                .animate-in { animation: fadeInUp 0.4s ease-out; }
+                @keyframes fadeInUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+                .smaller { font-size: 0.75rem; }
             `}</style>
         </div>
     );

@@ -1,63 +1,85 @@
 import React from 'react';
 
 export function DeleteAnnouncementModal({ announcementToDelete, onClose, executeDelete }) {
-    // 1. Ensure the object exists before rendering
     if (!announcementToDelete) return null;
 
-    // Get the first 50 characters of the content for display context
-    const contentPreview = announcementToDelete.content 
-        ? announcementToDelete.content.substring(0, 50) + (announcementToDelete.content.length > 50 ? '...' : '') 
-        : 'this announcement';
-        
     return (
-        <div className="modal fade show d-block" tabIndex="-1" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-            <div className="modal-dialog modal-dialog-centered">
-                <div className="modal-content border-0 shadow-lg" style={{ borderRadius: '16px' }}>
-                    
-                    <div className="modal-header border-0 pb-0">
-                        <h5 className="modal-title fw-bold text-danger d-flex align-items-center">
-                            <i className="bi bi-exclamation-triangle-fill me-2 fs-4"></i> Confirm Deletion
-                        </h5>
-                        <button 
-                            type="button" 
-                            className="btn-close"
-                            onClick={onClose} 
-                            aria-label="Close"
-                        ></button>
-                    </div>
-                    
-                    <div className="modal-body pt-2 pb-4">
-                        {/* 💡 FIX: Removed 'announcementToDelete.id' and replaced with simplified confirmation. */}
-                        <p className="text-dark fw-medium fs-5">
-                            Are you sure you want to delete this announcement?
-                        </p>
-                        
-                        {/* Optional: Show a preview of the content for better confirmation */}
-                         <p className="text-muted small mb-3 p-2 border-start border-3 border-secondary-subtle bg-light rounded">
-                            <span className="fw-bold me-1">Content Preview:</span> "{contentPreview}"
-                        </p>
-                        
-                        <p className="text-danger small mb-0 fw-bold">
-                            Warning: This action is permanent and cannot be reversed.
-                        </p>
-                    </div>
-                    
-                    <div className="modal-footer border-0 pt-0">
-                        <button 
-                            type="button" 
-                            className="btn btn-secondary rounded-pill px-4"
-                            onClick={onClose}
-                        >
-                            Cancel
-                        </button>
-                        <button 
-                            type="button" 
-                            className="btn btn-danger rounded-pill px-4 fw-bold"
-                            onClick={executeDelete} 
-                        >
-                            <i className="bi bi-trash-fill me-2"></i> Delete Permanently
-                        </button>
-                    </div>
+        <div 
+            style={{ 
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                // Neutral grey-dark overlay with background blur
+                backgroundColor: 'rgba(0, 0, 0, 0.4)', 
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                alignItems: 'center',    // Vertical center
+                justifyContent: 'center',  // Horizontal center
+                zIndex: 9999,
+                padding: '1rem'
+            }}
+        >
+            <div 
+                style={{ 
+                    width: '100%', 
+                    maxWidth: '380px',
+                    backgroundColor: '#fff',
+                    borderRadius: '4px',           // Flat style radius
+                    border: '1px solid #dee2e6',   // Clean solid border
+                    boxShadow: 'none',             // Removed all shadow/glow
+                    overflow: 'hidden'
+                }}
+            >
+                {/* Header */}
+                <div className="p-4 pb-2 d-flex justify-content-between align-items-center">
+                    <h5 className="m-0 fw-bold text-dark" style={{ fontSize: '1.1rem' }}>
+                        Delete Announcement?
+                    </h5>
+                    <button 
+                        type="button" 
+                        className="btn-close shadow-none" 
+                        style={{ fontSize: '0.8rem' }}
+                        onClick={onClose}
+                    ></button>
+                </div>
+
+                {/* Body */}
+                <div className="px-4 pb-3">
+                    <p className="text-secondary m-0" style={{ fontSize: '0.95rem', lineHeight: '1.5' }}>
+                        Are you sure you want to remove this? This action is permanent and cannot be undone.
+                    </p>
+                </div>
+
+                {/* Footer */}
+                <div className="p-4 pt-2 d-flex gap-2">
+                    <button 
+                        type="button" 
+                        className="btn btn-light border flex-grow-1 fw-medium text-secondary shadow-none"
+                        style={{ 
+                            borderRadius: '4px', 
+                            padding: '10px',
+                            boxShadow: 'none' 
+                        }}
+                        onClick={onClose}
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        type="button" 
+                        className="btn btn-danger flex-grow-1 fw-medium shadow-none"
+                        style={{ 
+                            borderRadius: '4px', 
+                            padding: '10px',
+                            backgroundColor: '#dc3545',
+                            border: 'none',
+                            boxShadow: 'none'
+                        }}
+                        onClick={executeDelete} 
+                    >
+                        Delete
+                    </button>
                 </div>
             </div>
         </div>

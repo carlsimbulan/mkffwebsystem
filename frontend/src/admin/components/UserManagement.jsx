@@ -46,100 +46,114 @@ export function UserManagement({
                 .um-container {
                     background: #ffffff;
                     border: 1px solid #e2e8f0;
-                    border-radius: 12px;
+                    border-radius: 8px;
                     overflow: hidden;
                 }
                 .um-header {
-                    background: #f8fafc;
-                    border-bottom: 1px solid #e2e8f0;
-                    padding: 20px 25px;
+                    background: #ffffff;
+                    border-bottom: 1px solid #f1f5f9;
+                    padding: 18px 24px;
                 }
                 .um-table thead th {
                     background: #f8fafc;
                     color: #64748b;
                     text-transform: uppercase;
-                    font-size: 0.7rem;
-                    letter-spacing: 1px;
+                    font-size: 0.75rem;
+                    letter-spacing: 0.05em;
                     font-weight: 700;
-                    padding: 15px 20px;
-                    border-bottom: 2px solid #e2e8f0;
+                    padding: 14px 24px;
+                    border-bottom: 1px solid #e2e8f0;
                 }
                 .um-table tbody td {
-                    padding: 15px 20px;
+                    padding: 16px 24px;
                     border-bottom: 1px solid #f1f5f9;
                     vertical-align: middle;
                 }
                 .avatar-frame {
-                    width: 42px;
-                    height: 42px;
+                    width: 40px;
+                    height: 40px;
                     object-fit: cover;
-                    border: 2px solid #fff;
-                    outline: 1px solid #e2e8f0;
-                    border-radius: 10px;
-                }
-                .role-badge {
-                    font-size: 0.7rem;
-                    font-weight: 700;
-                    padding: 5px 12px;
-                    border-radius: 6px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                }
-                .station-badge {
-                    font-size: 0.75rem;
-                    font-weight: 600;
-                    padding: 4px 10px;
-                    background: #f1f5f9;
-                    color: #475569;
+                    border-radius: 8px;
                     border: 1px solid #e2e8f0;
-                    border-radius: 6px;
                 }
+                
+                /* CLEAN PLAIN TEXT ROLE STYLES */
+                .role-text {
+                    font-size: 0.85rem;
+                    font-weight: 600;
+                    color: #475569;
+                }
+                .role-admin { color: #dc2626; } 
+                .role-it { color: #2563eb; }    
+                
+                /* UPDATED: GREEN ADD USER BUTTON */
                 .btn-add-user {
-                    background: #107c55;
+                    background: #198754;
+                    color: white;
                     border: none;
                     font-weight: 700;
-                    font-size: 0.85rem;
+                    font-size: 0.8rem;
                     padding: 10px 20px;
-                    border-radius: 8px;
-                    transition: all 0.2s;
-                }
-                .btn-add-user:hover { background: #0d6646; }
-                
-                .btn-action {
-                    padding: 6px 12px;
-                    font-size: 0.75rem;
-                    font-weight: 600;
                     border-radius: 6px;
-                    border: 1px solid #e2e8f0;
-                    background: white;
-                    color: #475569;
                     transition: all 0.2s;
                 }
-                .btn-view:hover { border-color: #107c55; color: #107c55; background: #f0fdf4; }
-                .btn-delete:hover { border-color: #ef4444; color: #ef4444; background: #fef2f2; }
+                .btn-add-user:hover { 
+                    background: #157347; 
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 12px rgba(25, 135, 84, 0.2);
+                }
+                
+                /* VISIBLE ACTION BUTTONS */
+                .btn-action {
+                    padding: 7px 18px;
+                    font-size: 0.75rem;
+                    font-weight: 700;
+                    border-radius: 4px;
+                    border: none;
+                    transition: all 0.2s;
+                    min-width: 85px;
+                }
+                .btn-view {
+                    background: #0d6efd;
+                    color: white;
+                }
+                .btn-view:hover {
+                    background: #0b5ed7;
+                    transform: translateY(-1px);
+                }
+                .btn-delete {
+                    background: #dc3545;
+                    color: white;
+                }
+                .btn-delete:hover:not(:disabled) {
+                    background: #bb2d3b;
+                    transform: translateY(-1px);
+                }
+                .btn-delete:disabled {
+                    background: #f1f5f9;
+                    color: #cbd5e1;
+                    cursor: not-allowed;
+                }
             `}</style>
 
-            {/* HEADER SECTION */}
-            <div className="d-flex justify-content-between align-items-end mb-4 px-2">
+            <div className="d-flex justify-content-between align-items-center mb-4 px-2">
                 <div>
-                    <h4 className="fw-bold text-dark mb-0 tracking-tight">User Management</h4>
-                    <p className="text-muted small mb-0">Manage employee access, roles, and station assignments</p>
+                    <h4 className="fw-bold text-dark mb-1 tracking-tight">User Management</h4>
+                    <p className="text-muted small mb-0">System access control and registry</p>
                 </div>
+                {/* --- GREEN BUTTON --- */}
                 <button
-                    className="btn btn-primary btn-add-user d-flex align-items-center"
+                    className="btn btn-add-user d-flex align-items-center shadow-sm"
                     onClick={handleAddUser}
                 >
                     <i className="bi bi-person-plus-fill me-2"></i> ADD SYSTEM USER
                 </button>
             </div>
 
-            <div className="um-container">
-                {/* TOOLBAR */}
+            <div className="um-container shadow-sm">
                 <div className="um-header d-flex justify-content-between align-items-center">
-                    <span className="small fw-bold text-muted text-uppercase tracking-wider">Registry List</span>
-                    <span className="badge bg-dark rounded-pill px-3 py-2" style={{fontSize: '0.7rem'}}>
-                        TOTAL ACCOUNTS: {userList.length}
-                    </span>
+                    <span className="small fw-bold text-secondary text-uppercase tracking-wider">System Registry</span>
+                    <span className="text-muted small">Total Accounts: <b>{userList.length}</b></span>
                 </div>
 
                 <div className="table-responsive">
@@ -148,8 +162,8 @@ export function UserManagement({
                             <tr>
                                 <th>Account Profile</th>
                                 <th>Access Role</th>
-                                <th>Assignment</th>
-                                <th className="text-end">Registered On</th>
+                                <th>Station</th>
+                                <th className="text-end">Registered</th>
                                 <th className="text-center">Operations</th>
                             </tr>
                         </thead>
@@ -158,12 +172,12 @@ export function UserManagement({
                                 const isMe = u.id === user.id; 
                                 const isAssigned = u.station && !u.station.toLowerCase().includes('not assigned');
                                 
-                                let roleClass = u.role === 'Administrator' ? 'bg-danger-subtle text-danger border-danger' : 
-                                                u.role === 'IT Assistant' ? 'bg-info-subtle text-info border-info' : 
-                                                'bg-primary-subtle text-primary border-primary';
+                                let roleColorClass = "";
+                                if (u.role === 'Administrator') roleColorClass = "role-admin";
+                                else if (u.role === 'IT Assistant') roleColorClass = "role-it";
 
                                 return (
-                                    <tr key={u.id} className={isMe ? 'bg-light bg-opacity-50' : ''}>
+                                    <tr key={u.id}>
                                         <td>
                                             <div className="d-flex align-items-center">
                                                 <img
@@ -173,21 +187,21 @@ export function UserManagement({
                                                     onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
                                                 />
                                                 <div>
-                                                    <div className="fw-bold text-dark small">
-                                                        {u.full_name || 'No Name'} {isMe && <span className="ms-1 text-success fw-bold" style={{fontSize: '0.65rem'}}>(YOU)</span>}
+                                                    <div className="fw-bold text-dark" style={{fontSize: '0.9rem'}}>
+                                                        {u.full_name || 'No Name'} {isMe && <span className="ms-1 text-success fw-bold" style={{fontSize: '0.7rem'}}>(ME)</span>}
                                                     </div>
-                                                    <div className="text-muted" style={{fontSize: '0.7rem'}}>@{u.username}</div>
+                                                    <div className="text-muted" style={{fontSize: '0.75rem'}}>@{u.username}</div>
                                                 </div>
                                             </div>
                                         </td>
                                         <td>
-                                            <span className={`role-badge border ${roleClass}`}>
+                                            <span className={`role-text ${roleColorClass}`}>
                                                 {u.role}
                                             </span>
                                         </td>
                                         <td>
-                                            <span className="station-badge">
-                                                <i className={`bi ${isAssigned ? 'bi-geo-alt-fill text-primary' : 'bi-dash-circle'} me-1`}></i>
+                                            <span className="text-muted small fw-bold">
+                                                <i className={`bi ${isAssigned ? 'bi-geo-alt-fill text-primary' : 'bi-dash-circle'} me-2`}></i>
                                                 {u.station || 'Not Assigned'}
                                             </span>
                                         </td>
@@ -196,11 +210,11 @@ export function UserManagement({
                                         </td>
                                         <td>
                                             <div className="d-flex justify-content-center gap-2">
-                                                <button className="btn-action btn-view" onClick={() => handleViewUser(u)}>
+                                                <button className="btn-action btn-view shadow-sm" onClick={() => handleViewUser(u)}>
                                                     VIEW
                                                 </button>
                                                 <button 
-                                                    className="btn-action btn-delete" 
+                                                    className="btn-action btn-delete shadow-sm" 
                                                     onClick={() => handleConfirmDeleteUser(u)}
                                                     disabled={u.id === 1 || isMe}
                                                 >
@@ -212,10 +226,7 @@ export function UserManagement({
                                 );
                             }) : (
                                 <tr>
-                                    <td colSpan="5" className="py-5 text-center text-muted">
-                                        <i className="bi bi-people text-light display-1"></i>
-                                        <h6 className="fw-bold mt-3">No user records found</h6>
-                                    </td>
+                                    <td colSpan="5" className="py-5 text-center text-muted">No records found.</td>
                                 </tr>
                             )}
                         </tbody>

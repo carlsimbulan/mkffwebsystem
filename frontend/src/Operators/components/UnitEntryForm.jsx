@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 export function UnitEntryForm({
     scanInput,
@@ -11,61 +11,185 @@ export function UnitEntryForm({
     formData,
     setFormData,
     resetForm,
-    scannedUnitId
+    currentStation
 }) {
+    const [isScannerEnabled, setIsScannerEnabled] = useState(true);
+
+    const formattedStationForDB = currentStation ? currentStation.replace(/\s+/g, '') : '';
+
+    useEffect(() => {
+        if (isScannerEnabled && processStatus === 'idle') {
+            const focusInput = () => {
+                if (scannerInputRef.current) scannerInputRef.current.focus();
+            };
+            focusInput();
+            window.addEventListener('click', focusInput);
+            return () => window.removeEventListener('click', focusInput);
+        }
+    }, [isScannerEnabled, processStatus, scannerInputRef]);
+
     const essentialFields = [formData.model, formData.revision, formData.assemblyNo];
-    const progressPercent = Math.min((essentialFields.filter(val => val && val.trim() !== "").length / essentialFields.length) * 100, 100).toFixed(0);
+    const progressPercent = Math.min(
+        (essentialFields.filter(val => val && val.trim() !== "").length / essentialFields.length) * 100, 
+        100
+    ).toFixed(0);
 
     return (
-        <div className="row g-4 animate-in fade-in">
+        <div className="row g-3 animate-in fade-in" style={{ fontFamily: "'Inter', sans-serif", color: '#212529' }}>
+            {/* SCANNER STATUS BAR */}
             <div className="col-12">
-                <div className="card shadow-sm p-4 border-primary">
-                    <label className="form-label fw-bold text-primary small"><i className="bi bi-upc-scan me-2"></i>SCAN QR / 2D BARCODE</label>
-                    <form onSubmit={handleScan} className="d-flex gap-3">
+                <div className={`card border-0 shadow-sm ${isScannerEnabled ? 'bg-white' : 'bg-light'}`} 
+                     style={{ borderRadius: '8px', borderLeft: isScannerEnabled ? '4px solid #198754' : '4px solid #6c757d' }}>
+                    <div className="card-body py-2 px-3 d-flex justify-content-between align-items-center">
+                        <div className="d-flex align-items-center">
+                            <div className={`${isScannerEnabled ? 'bg-success' : 'bg-secondary'} rounded-circle me-3`} 
+                                 style={{ width: '10px', height: '10px', animation: isScannerEnabled ? 'pulse 2s infinite' : 'none' }}>
+                            </div>
+                            <div>
+                                <small className="text-muted d-block fw-bold" style={{ fontSize: '0.6rem', letterSpacing: '0.05rem' }}>SCANNER STATUS</small>
+                                <span className="fw-bold" style={{ fontSize: '0.8rem' }}>
+                                    {isScannerEnabled ? 'READY TO SCAN' : 'SCANNER OFF'}
+                                </span>
+                            </div>
+                            <div className="ms-4 ps-4 border-start d-none d-md-block">
+                                <small className="text-muted d-block fw-bold" style={{ fontSize: '0.6rem', letterSpacing: '0.05rem' }}>STATION ID</small>
+                                <span className="fw-bold" style={{ fontSize: '0.8rem' }}>{formattedStationForDB}</span>
+                            </div>
+                        </div>
+                        <div className="form-check form-switch">
+                            <input 
+                                className="form-check-input" 
+                                type="checkbox" 
+                                role="switch"
+                                checked={isScannerEnabled}
+                                onChange={(e) => setIsScannerEnabled(e.target.checked)}
+                                style={{ cursor: 'pointer' }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Hidden input to catch scanner data */}
+                    <form onSubmit={handleScan} className="visually-hidden">
                         <input
                             ref={scannerInputRef}
                             type="text"
-                            className="form-control form-control-lg"
-                            placeholder="Scan here..."
                             value={scanInput}
                             onChange={(e) => setScanInput(e.target.value)}
-                            disabled={processStatus !== 'idle'}
-                            autoFocus
+                            disabled={!isScannerEnabled || processStatus !== 'idle'}
                         />
-                        <button type="submit" className="btn btn-primary" disabled={processStatus !== 'idle'}>Process</button>
                     </form>
-                    {statusMessage && processStatus !== 'loading' && <p className={`mt-2 small ${processStatus === 'error' ? 'text-danger' : 'text-success'}`}>{statusMessage}</p>}
                 </div>
             </div>
+
+            {/* MAIN FORM */}
             <div className="col-12">
-                <form onSubmit={handleSubmit} className="card shadow-sm p-4 border-top border-secondary">
-                    <div className="border-bottom pb-3 mb-4"><h5 className="card-title fw-bold text-dark">Unit Data Entry</h5></div>
-                    <div className="mb-4">
-                        <label className="form-label small fw-bold text-muted">COMPLETION</label>
-                        <div className="progress" style={{ height: '15px' }}>
-                            <div className={`progress-bar ${progressPercent < 100 ? 'bg-warning' : 'bg-success'}`} style={{ width: `${progressPercent}%` }}>{progressPercent}%</div>
+                <form onSubmit={handleSubmit} className="card border-0 shadow-sm" style={{ borderRadius: '8px', overflow: 'hidden' }}>
+                    <div className="card-header bg-white border-bottom py-3 px-4">
+                        <div className="d-flex justify-content-between align-items-center">
+                            <h6 className="mb-0 fw-bold text-uppercase" style={{ fontSize: '0.85rem', letterSpacing: '0.5px' }}>Unit Data Entry</h6>
+                            <div className="text-end" style={{ width: '120px' }}>
+                                <div className="d-flex justify-content-between mb-1">
+                                    <small className="fw-bold text-muted" style={{ fontSize: '0.6rem' }}>PROGRESS</small>
+                                    <small className="fw-bold" style={{ fontSize: '0.6rem' }}>{progressPercent}%</small>
+                                </div>
+                                <div className="progress" style={{ height: '4px', borderRadius: '0', backgroundColor: '#e9ecef' }}>
+                                    <div className="progress-bar bg-success" style={{ width: `${progressPercent}%` }}></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div className="row g-3">
-                        <div className="col-md-6"><label className="form-label small text-muted">Model</label><input type="text" className="form-control form-control-sm bg-light font-monospace" value={formData.model} readOnly /></div>
-                        <div className="col-md-6"><label className="form-label small text-muted">Revision</label><input type="text" className="form-control form-control-sm bg-light font-monospace" value={formData.revision} readOnly /></div>
-                        <div className="col-12"><label className="form-label fw-bold">Assembly No. *</label><input type="text" className="form-control" value={formData.assemblyNo} onChange={(e) => setFormData({ ...formData, assemblyNo: e.target.value })} required disabled={processStatus !== 'idle'} /></div>
-                        <div className="col-12"><label className="form-label fw-bold">Device Serial No. (Opt)</label><input type="text" className="form-control" value={formData.deviceSerialNo} onChange={(e) => setFormData({ ...formData, deviceSerialNo: e.target.value })} disabled={processStatus !== 'idle'} /></div>
-                        <div className="col-12"><label className="form-label fw-bold">Accessory Kitting No. (Opt)</label><input type="text" className="form-control" value={formData.accessoryKittingNo} onChange={(e) => setFormData({ ...formData, accessoryKittingNo: e.target.value })} disabled={processStatus !== 'idle'} /></div>
-                        <div className="col-md-6">
-                            <label className="form-label fw-bold">Status *</label>
-                            <select className="form-select" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} disabled={processStatus !== 'idle'}>
-                                <option value="In Progress">In Progress</option><option value="Completed">Completed</option><option value="No Good (NG)">No Good (NG)</option><option value="Pending Approval">Pending Approval</option>
-                            </select>
+
+                    <div className="card-body p-4 bg-light-subtle">
+                        {/* READ-ONLY FIELDS (All inputs are readOnly to prevent manual typing) */}
+                        <div className="row g-3 mb-4">
+                            <div className="col-md-4">
+                                <label className="form-label text-muted fw-bold small text-uppercase mb-1" style={{ fontSize: '0.65rem' }}>Model</label>
+                                <input type="text" className="form-control form-control-sm border-0 bg-light fw-semibold" value={formData.model} readOnly placeholder="Wait for scan..." />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label text-muted fw-bold small text-uppercase mb-1" style={{ fontSize: '0.65rem' }}>Revision</label>
+                                <input type="text" className="form-control form-control-sm border-0 bg-light fw-semibold" value={formData.revision} readOnly placeholder="Wait for scan..." />
+                            </div>
+                            <div className="col-md-4">
+                                <label className="form-label text-muted fw-bold small text-uppercase mb-1" style={{ fontSize: '0.65rem' }}>Base Kitting No.</label>
+                                <input type="text" className="form-control form-control-sm border-0 bg-light fw-semibold" value={formData.baseUnitKittingNo || '-'} readOnly />
+                            </div>
                         </div>
-                        <div className="col-12"><label className="form-label fw-bold">Remarks</label><textarea className="form-control" rows="3" value={formData.remarks} onChange={(e) => setFormData({ ...formData, remarks: e.target.value })} disabled={processStatus !== 'idle'}></textarea></div>
-                        <div className="col-12 pt-3 border-top d-flex justify-content-end gap-2 mt-4">
-                            <button type="button" className="btn btn-outline-secondary" onClick={resetForm} disabled={processStatus !== 'idle'}>Clear</button>
-                            <button type="submit" className="btn btn-success" disabled={processStatus !== 'idle' || !formData.assemblyNo}>Save Unit</button>
+
+                        <div className="row g-3">
+                            <div className="col-12">
+                                <label className="form-label fw-bold small mb-1 text-uppercase" style={{ fontSize: '0.65rem' }}>Assembly No. (Auto-filled)</label>
+                                <input 
+                                    type="text" 
+                                    className="form-control form-control-sm bg-white border-secondary-subtle fw-bold" 
+                                    value={formData.assemblyNo} 
+                                    readOnly 
+                                    placeholder="SCAN QR CODE TO POPULATE"
+                                    style={{ padding: '0.5rem', borderRadius: '4px' }}
+                                />
+                            </div>
+
+                            <div className="col-md-6">
+                                <label className="form-label text-muted fw-bold small mb-1 text-uppercase" style={{ fontSize: '0.65rem' }}>Device Serial No.</label>
+                                <input type="text" className="form-control form-control-sm bg-light" value={formData.deviceSerialNo} readOnly />
+                            </div>
+                            
+                            <div className="col-md-6">
+                                <label className="form-label text-muted fw-bold small mb-1 text-uppercase" style={{ fontSize: '0.65rem' }}>Accessory Kitting No.</label>
+                                <input type="text" className="form-control form-control-sm bg-light" value={formData.accessoryKittingNo} readOnly />
+                            </div>
+
+                            <div className="col-12">
+                                <label className="form-label fw-bold small mb-1 text-uppercase" style={{ fontSize: '0.65rem' }}>Status <span className="text-danger">*</span></label>
+                                <select className="form-select form-select-sm border-secondary-subtle" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} style={{ padding: '0.5rem' }}>
+                                    <option value="In Progress">In Progress</option>
+                                    <option value="Completed">Completed</option>
+                                    <option value="No Good (NG)">No Good (NG)</option>
+                                    <option value="Pending Approval">Pending Approval</option>
+                                </select>
+                            </div>
+
+                            <div className="col-12">
+                                <label className="form-label fw-bold small mb-1 text-uppercase" style={{ fontSize: '0.65rem' }}>Remarks</label>
+                                <textarea className="form-control form-control-sm border-secondary-subtle" rows="2" placeholder="Auto-populated or optional notes" value={formData.remarks} readOnly></textarea>
+                            </div>
                         </div>
+
+                        {statusMessage && (
+                            <div className={`mt-3 p-2 border-start border-4 small fw-bold ${processStatus === 'error' ? 'border-danger text-danger' : 'border-success text-success'}`}>
+                                {statusMessage.toUpperCase()}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="card-footer bg-white border-top py-3 px-4 d-flex justify-content-end gap-2">
+                        <button type="button" className="btn btn-sm btn-outline-secondary px-4 fw-bold" onClick={resetForm} style={{ fontSize: '0.7rem' }}>
+                            CLEAR FORM
+                        </button>
+                        <button type="submit" className="btn btn-sm btn-success px-5 fw-bold shadow-sm" style={{ fontSize: '0.7rem', letterSpacing: '1px' }}>
+                            SAVE UNIT
+                        </button>
                     </div>
                 </form>
             </div>
+
+            <style>{`
+                @keyframes pulse {
+                    0% { opacity: 1; }
+                    50% { opacity: 0.4; }
+                    100% { opacity: 1; }
+                }
+                input[readonly] {
+                    background-color: #f8f9fa !important;
+                    color: #495057;
+                    cursor: not-allowed;
+                    border: 1px solid #dee2e6 !important;
+                }
+                .form-select:focus {
+                    border-color: #198754 !important;
+                    box-shadow: none !important;
+                }
+            `}</style>
         </div>
     );
 }

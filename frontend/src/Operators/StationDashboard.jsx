@@ -19,6 +19,24 @@ import { AnnouncementView } from './components/AnnouncementView';
 // REGISTER CHART COMPONENTS (Kept here for global chart setup)
 ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
+const STATION_STANDARD_TIMES = {
+    'Station1': 6, 'Station 1': 6,
+    'Station2': 8, 'Station 2': 8,
+    'Station3': 3, 'Station 3': 3,
+    'Station4': 12, 'Station 4': 12,
+    'Station5': 15, 'Station 5': 15,
+    'Station6': 15, 'Station 6': 15,
+    'Station7': 3, 'Station 7': 3,
+    'Station8': 0, 'Station 8': 0,
+    'Station9': 480, 'Station 9': 480,
+    'Station10': 8, 'Station 10': 8,
+    'Station11': 22, 'Station 11': 22,
+    'Station12': 5, 'Station 12': 5,
+    'Station13': 10, 'Station 13': 10,
+    'Station14': 8, 'Station 14': 8,
+    'Station15': 5, 'Station 15': 5,
+};
+
 // --- CONFIGURATION CONSTANTS ---
 const API_BASE_URL = "http://localhost/mkffwebsystem/backend/api";
 const AVATAR_UPLOAD_PATH = `${API_BASE_URL}/uploads/avatars/`;
@@ -31,9 +49,9 @@ const ANNOUNCEMENT_ENDPOINT = `${API_BASE_URL}/announcements.php`;
 
 // DEFINE THE STRICT STATION ORDER (Kept here as global constant)
 const STATION_ORDER = [
-    "Station 1", "Station 2", "Station 3", "Station 4", "Station 5",
-    "Station 6", "Station 7", "Station 8", "Station 9", "Station 10",
-    "Station 11", "Station 12", "Station 13", "Station 14", "Station 15"
+    "Station1", "Station2", "Station3", "Station4", "Station5",
+    "Station6", "Station7", "Station8", "Station9", "Station10",
+    "Station11", "Station12", "Station13", "Station14", "Station15"
 ];
 
 // --- UTILITY COMPONENTS ---
@@ -140,14 +158,15 @@ export default function StationDashboard({ user, onLogout }) {
 
 
     // --- HELPER FUNCTION: GET STATION NAME (Unchanged) ---
-    const getStationName = () => {
-        const rawName = (user?.station || user?.username || "").toLowerCase();
-        if (rawName.includes('station')) {
-            const num = rawName.replace(/\D/g, ''); 
-            if (num) return `Station ${num}`;
-        }
-        return rawName.charAt(0).toUpperCase() + rawName.slice(1);
-    };
+const getStationName = () => {
+    const rawName = (user?.station || user?.username || "").toLowerCase();
+    if (rawName.includes('station')) {
+        const num = rawName.replace(/\D/g, ''); 
+        // Return without space: "Station1"
+        if (num) return `Station${num}`; 
+    }
+    return rawName.charAt(0).toUpperCase() + rawName.slice(1);
+};
 
     const currentStation = getStationName();
 
@@ -187,56 +206,69 @@ export default function StationDashboard({ user, onLogout }) {
     
     // --- HOOKED FUNCTIONS: FETCH UNIT LIST (Retained polling and ref update logic) ---
     const fetchUnits = useCallback(async (status) => { 
-        if (activeTab !== 'home') {
-            setListLoading(true); setListError(null); setUnitList([]);
-        }
-        
-        let dbStatus = status.replace(/_/g, ' ').replace(' unit', '');
-        if (dbStatus === 'in progress') dbStatus = 'In Progress';
-        if (dbStatus === 'completed') dbStatus = 'Completed';
-        if (dbStatus === 'no good') dbStatus = 'No Good (NG)';
-        if (dbStatus === 'pending') dbStatus = 'Pending Approval'; 
-        
-        if (['daily reports', 'account history', 'guide', 'home'].includes(dbStatus.toLowerCase())) {
-            dbStatus = ''; 
-        }
-        
-        try {
-            const res = await axios.get(UNITS_ENDPOINT, {
-                params: {
-                    station: currentStation, 
-                    status: dbStatus
-                }
-            });
-            const newUnitList = Array.isArray(res.data) ? res.data : [];
+    if (activeTab !== 'home') {
+        setListLoading(true); setListError(null); setUnitList([]);
+    }
+    
+    let dbStatus = status.replace(/_/g, ' ').replace(' unit', '');
+    if (dbStatus === 'in progress') dbStatus = 'In Progress';
+    if (dbStatus === 'completed') dbStatus = 'Completed';
+    if (dbStatus === 'no good') dbStatus = 'No Good (NG)';
+    if (dbStatus === 'pending') dbStatus = 'Pending Approval'; 
+    
+    if (['daily reports', 'account history', 'guide', 'home'].includes(dbStatus.toLowerCase())) {
+        dbStatus = ''; 
+    }
+    
+    try {
+        const res = await axios.get(UNITS_ENDPOINT, {
+            params: {
+                station: currentStation, 
+                status: dbStatus
+            }
+        });
+        const rawData = Array.isArray(res.data) ? res.data : [];
 
-            // 🔑 STATUS CHANGE DETECTION LOGIC:
-            const newlyApprovedUnits = newUnitList.filter(newUnit => {
-                const prevUnit = prevUnitListRef.current.find(oldUnit => oldUnit.id === newUnit.id);
-                // Check if unit was previously 'Pending Approval' AND is now 'In Progress'
-                return (
-                    prevUnit && 
-                    prevUnit.status === 'Pending Approval' && 
-                    newUnit.status === 'In Progress'
-                );
-            });
-            
-                if (newlyApprovedUnits.length > 0) {
+        // 🔑 NEW LOGIC: Calculate delay minutes for each unit
+        const newUnitList = rawData.map(unit => {
+            if (unit.status === 'In Progress') {
+                const standardMinutes = STATION_STANDARD_TIMES[currentStation] || 0;
+                
+                // Uses updated_at (time it reached the station) or created_at
+                const startTime = new Date(unit.updated_at || unit.created_at).getTime();
+                const currentTime = new Date().getTime();
+                const elapsedMinutes = Math.floor((currentTime - startTime) / 60000);
+                
+                const delay = elapsedMinutes - standardMinutes;
+                return { ...unit, delayMinutes: delay > 0 ? delay : 0 };
+            }
+            return { ...unit, delayMinutes: 0 };
+        });
+
+        // 🔑 STATUS CHANGE DETECTION LOGIC: (Retained exactly as you had it)
+        const newlyApprovedUnits = newUnitList.filter(newUnit => {
+            const prevUnit = prevUnitListRef.current.find(oldUnit => oldUnit.id === newUnit.id);
+            return (
+                prevUnit && 
+                prevUnit.status === 'Pending Approval' && 
+                newUnit.status === 'In Progress'
+            );
+        });
+        
+        if (newlyApprovedUnits.length > 0) {
             const names = newlyApprovedUnits.map(u => u.assemblyNo).join(', ');
             setUnitStatusNotification(`✅ Admin Accepted: Unit(s) ${names} are now 'In Progress'. Press X to dismiss.`);
-            // Walang setTimeout, kaya mananatili ang Toast.
         }
-            
-            // Update the list and the ref
-            setUnitList(newUnitList);
-            prevUnitListRef.current = newUnitList;
+        
+        setUnitList(newUnitList);
+        prevUnitListRef.current = newUnitList;
 
-        } catch (err) {
-            setListError(`Failed to load data: ${err.message}`);
-        } finally {
-            if (activeTab !== 'home') setListLoading(false);
-        }
-    }, [currentStation, activeTab]); 
+    } catch (err) {
+        setListError(`Failed to load data: ${err.message}`);
+    } finally {
+        if (activeTab !== 'home') setListLoading(false);
+    }
+}, [currentStation, activeTab]); 
     
     // --- HOOKED FUNCTIONS: FETCH HISTORY (Unchanged) ---
     const fetchHistory = useCallback(async () => {
@@ -721,114 +753,113 @@ export default function StationDashboard({ user, onLogout }) {
             <div className="d-flex flex-row min-vh-100 bg-light font-sans"> 
                 
                 {/* --- SIDEBAR: BLUE BACKGROUND (Unchanged) --- */}
-                <div className="d-flex flex-column flex-shrink-0 p-3 text-white shadow-lg" 
-                    style={{ width: '260px', position: 'sticky', top: 0, height: '100vh', backgroundColor: '#0f172a', zIndex: 1000 }}>
-                    
-                    {/* Brand / Logo (Unchanged) */}
-                    <div className="d-flex align-items-center mb-4 pb-3 border-bottom border-secondary pt-2 px-2">
-                        <img 
-                            src={logo} 
-                            alt="MKFF Logo" 
-                            className="me-2" 
-                            style={{ height: '45px', width: 'auto', objectFit: 'contain' }} 
-                        />
-                        
-                        {/* Text Description (Unchanged) */}
-                        <div>
-                            <span className="fs-5 fw-bold d-block lh-1">OPERATOR PANEL</span>
-                        </div>
-                    </div>
+  <div className="d-flex flex-column flex-shrink-0 p-3 text-white shadow-lg" 
+    style={{ width: '260px', position: 'sticky', top: 0, height: '100vh', backgroundColor: '#0f172a', zIndex: 1000 }}>
+    
+    <style>
+        {`
+            .nav-custom-btn {
+                transition: background-color 0.2s ease;
+                border-radius: 8px !important;
+                border: none !important; /* Iniiwasan ang pag-alog dahil sa border */
+                outline: none !important;
+            }
+            /* Boxed highlight para sa hover */
+            .nav-custom-btn:hover:not(.btn-primary):not(.bg-white) {
+                background-color: rgba(255, 255, 255, 0.1) !important;
+                color: #ffffff !important;
+            }
+            /* Siguraduhing hindi gagalaw ang icon sa hover */
+            .nav-custom-btn:hover i {
+                color: #ffffff !important;
+            }
+        `}
+    </style>
 
-                    {/* Navigation (Unchanged) */}
-<nav className="flex-grow-1 overflow-auto custom-scrollbar">
-    <ul className="nav nav-pills flex-column mb-auto gap-2">
-        {/* DASHBOARD */}
-        <li className="nav-item">
-            <button 
-                className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'home' ? 'btn-primary shadow' : 'text-white-50 hover-white'}`} 
-                onClick={() => setActiveTab('home')}
-                style={activeTab !== 'home' ? {background: 'transparent', border: 'none'} : {}}
-            >
-                <i className="bi bi-grid-fill me-3"></i> Dashboard
-            </button>
-        </li>
-        
-        {/* UNIT ENTRY */}
-        <li className="nav-item mt-2">
-            <button 
-                className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'input_unit' ? 'btn-primary shadow' : 'text-white-50 hover-white'}`} 
-                onClick={() => setActiveTab('input_unit')}
-                style={activeTab !== 'input_unit' ? {background: 'transparent', border: 'none'} : {}}
-            >
-                <i className="bi bi-qr-code-scan me-3"></i> Unit Entry
-            </button>
-        </li>
+    {/* Brand / Logo - Pinalit na ang text para hindi dikit sa gilid */}
+    <div className="d-flex align-items-center mb-4 pb-3 border-bottom border-secondary pt-2 px-2">
+        <img 
+            src={logo} 
+            alt="MKFF Logo" 
+            className="me-2" 
+            style={{ height: '38px', width: 'auto', objectFit: 'contain' }} 
+        />
+        <div>
+            <span className="fw-bold d-block lh-1" style={{ fontSize: '0.85rem', letterSpacing: '0.5px' }}>OPERATOR PANEL</span>
+        </div>
+    </div>
 
-        {/* MONITORING HEADING */}
-        <li className="text-uppercase small fw-bold text-secondary mt-4 mb-2 px-3" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Monitoring</li>
-        
-        {/* MONITORING LINKS */}
-        {[
-            { k: 'in_progress', i: 'bi-gear-wide-connected', l: 'In Progress', c: 'text-warning' }, 
-            { k: 'completed', i: 'bi-check-circle-fill', l: 'Completed', c: 'text-success' }, 
-            { k: 'no_good', i: 'bi-x-octagon-fill', l: 'No Good (NG)', c: 'text-danger' }, 
-            { k: 'pending', i: 'bi-clock-history', l: 'Pending', c: 'text-info' }
-        ].map(({ k, i, l, c }) => (
-            <li key={k} className="nav-item">
+    {/* Navigation */}
+    <nav className="flex-grow-1 overflow-auto custom-scrollbar">
+        <ul className="nav nav-pills flex-column mb-auto gap-1">
+            
+            {/* DASHBOARD */}
+            <li className="nav-item">
                 <button 
-                    className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === k ? 'bg-white text-dark fw-bold shadow' : 'text-white-50'}`} 
-                    onClick={() => setActiveTab(k)}
-                    style={activeTab !== k ? {background: 'transparent', border: 'none'} : {}}
+                    className={`btn w-100 text-start d-flex align-items-center px-3 py-2 nav-custom-btn ${activeTab === 'home' ? 'btn-primary shadow' : 'text-white-50'}`} 
+                    onClick={() => setActiveTab('home')}
+                    style={{ background: activeTab === 'home' ? '' : 'transparent' }}
                 >
-                    <i className={`bi ${i} me-3 ${activeTab === k ? c : ''}`}></i> {l}
+                    <i className="bi bi-grid-fill me-3"></i> Dashboard
                 </button>
             </li>
-        ))}
+            
+            {/* UNIT ENTRY */}
+            <li className="nav-item">
+                <button 
+                    className={`btn w-100 text-start d-flex align-items-center px-3 py-2 nav-custom-btn ${activeTab === 'input_unit' ? 'btn-primary shadow' : 'text-white-50'}`} 
+                    onClick={() => setActiveTab('input_unit')}
+                    style={{ background: activeTab === 'input_unit' ? '' : 'transparent' }}
+                >
+                    <i className="bi bi-qr-code-scan me-3"></i> Unit Entry
+                </button>
+            </li>
 
-        {/* REPORTS & LOGS HEADING */}
-        <li className="text-uppercase small fw-bold text-secondary mt-4 mb-2 px-3" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Reports & Logs</li>
-        
-        {/* DAILY REPORT */}
-        <li className="nav-item">
-            <button 
-                className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'daily_reports' ? 'bg-white text-dark fw-bold' : 'text-white-50'}`} 
-                onClick={() => setActiveTab('daily_reports')}
-                style={activeTab !== 'daily_reports' ? {background: 'transparent', border: 'none'} : {}}
-            >
-                <i className="bi bi-file-earmark-bar-graph me-3"></i> Daily Report
-            </button>
-        </li>
-        
-        {/* HISTORY LOGS */}
-        <li className="nav-item">
-            <button 
-                className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'account_history' ? 'bg-white text-dark fw-bold' : 'text-white-50'}`} 
-                onClick={() => setActiveTab('account_history')}
-                style={activeTab !== 'account_history' ? {background: 'transparent', border: 'none'} : {}}
-            >
-                <i className="bi bi-journals me-3"></i> History Logs
-            </button>
-        </li>
-        
-        {/* ANNOUNCEMENTS */}
-        <li className="nav-item">
-            <button 
-                className={`btn w-100 text-start d-flex align-items-center px-3 py-2 ${activeTab === 'announcements' ? 'bg-white text-dark fw-bold' : 'text-white-50'}`} 
-                onClick={() => setActiveTab('announcements')}
-                style={activeTab !== 'announcements' ? {background: 'transparent', border: 'none'} : {}}
-            >
-                <i className="bi bi-megaphone-fill me-3"></i> Announcements
-            </button>
-        </li>
-        
-    </ul>
-</nav>
+            <li className="text-uppercase small fw-bold text-secondary mt-4 mb-2 px-3" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Monitoring</li>
+            
+            {[
+                { k: 'in_progress', i: 'bi-gear-wide-connected', l: 'In Progress', c: 'text-warning' }, 
+                { k: 'completed', i: 'bi-check-circle-fill', l: 'Completed', c: 'text-success' }, 
+                { k: 'no_good', i: 'bi-x-octagon-fill', l: 'No Good (NG)', c: 'text-danger' }, 
+                { k: 'pending', i: 'bi-clock-history', l: 'Pending', c: 'text-info' }
+            ].map(({ k, i, l, c }) => (
+                <li key={k} className="nav-item">
+                    <button 
+                        className={`btn w-100 text-start d-flex align-items-center px-3 py-2 nav-custom-btn ${activeTab === k ? 'bg-white text-dark shadow' : 'text-white-50'}`} 
+                        onClick={() => setActiveTab(k)}
+                        style={{ background: activeTab === k ? '#ffffff' : 'transparent' }}
+                    >
+                        {/* Tinanggal ang fw-bold sa active para hindi umalog */}
+                        <i className={`bi ${i} me-3 ${activeTab === k ? c : ''}`}></i> {l}
+                    </button>
+                </li>
+            ))}
 
-                    {/* Sidebar Footer (Version) (Unchanged) */}
-                    <div className="mt-auto pt-3 border-top border-secondary text-center text-white-50 small">
-                        <small>@2025 MKFF Laser Technique</small>
-                    </div>
-                </div>
+            <li className="text-uppercase small fw-bold text-secondary mt-4 mb-2 px-3" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Reports & Logs</li>
+            
+            {[
+                { k: 'daily_reports', i: 'bi-file-earmark-bar-graph', l: 'Daily Report' },
+                { k: 'account_history', i: 'bi-journals', l: 'History Logs' },
+                { k: 'announcements', i: 'bi-megaphone-fill', l: 'Announcements' }
+            ].map(({ k, i, l }) => (
+                <li key={k} className="nav-item">
+                    <button 
+                        className={`btn w-100 text-start d-flex align-items-center px-3 py-2 nav-custom-btn ${activeTab === k ? 'bg-white text-dark shadow' : 'text-white-50'}`} 
+                        onClick={() => setActiveTab(k)}
+                        style={{ background: activeTab === k ? '#ffffff' : 'transparent' }}
+                    >
+                        <i className={`bi ${i} me-3`}></i> {l}
+                    </button>
+                </li>
+            ))}
+        </ul>
+    </nav>
+
+    {/* Sidebar Footer */}
+    <div className="mt-auto pt-3 border-top border-secondary text-center text-white-50 small">
+        <small>@2025 MKFF Laser Technique</small>
+    </div>
+</div>
 
                 {/* --- MAIN CONTENT AREA (Unchanged) --- */}
                 <div className="d-flex flex-column flex-grow-1" style={{ backgroundColor: '#eeeeeeff' }}> 
