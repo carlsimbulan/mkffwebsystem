@@ -11,6 +11,9 @@ const processStations = [
 
 const allStatuses = ['All', 'In Progress', 'Completed', 'No Good (NG)', 'Pending Approval', 'For Scanning'];
 
+// Configuration for Pagination
+const ITEMS_PER_PAGE = 10;
+
 const formatTimestamp = (isoString) => {
     if (!isoString) return { date: 'N/A', time: 'N/A' };
     const date = new Date(isoString);
@@ -52,17 +55,13 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
             <style>{`
                 .btn-box { border-radius: 4px !important; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; transition: none; }
                 .btn-box:hover { opacity: 0.9; }
-                
                 .stat-card-pro { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 22px; height: 100%; border-left: 5px solid #198754; }
-                
                 .table thead th { background-color: #1e293b !important; color: #ffffff !important; font-weight: 600; border: none; padding: 12px 15px; }
                 .table-hover tbody tr:hover { background-color: #f1f5f9 !important; }
-
                 .modal-step { padding: 15px 20px; border-left: 2px solid #e9ecef; position: relative; border-radius: 0 8px 8px 0; }
                 .modal-step.done { border-left-color: #198754; }
                 .modal-step.current { border-left-color: #0d6efd; background: #f0f7ff; }
                 .modal-step.ng { border-left-color: #dc3545; background: #fff5f5; }
-                
                 .modal-dot { position: absolute; left: -7px; top: 22px; width: 12px; height: 12px; border-radius: 50%; background: #dee2e6; border: 2px solid white; z-index: 2; }
                 .done .modal-dot { background: #198754; }
                 .current .modal-dot { background: #0d6efd; }
@@ -79,7 +78,6 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 </button>
             </div>
 
-            {/* IBALIK ANG ORIGINAL NA MAY KULAY NA KPI CARDS DITO */}
             <div className="row g-4 mb-4">
                 <div className="col-md-6 col-xl-3"><div className="stat-card-pro"><span className="text-muted small fw-bold text-uppercase">Completed</span><h3 className="fw-bold text-success mt-1">{monitorMetrics.completedUnits}</h3></div></div>
                 <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{borderLeftColor: '#0d6efd'}}><span className="text-muted small fw-bold text-uppercase">Yield Rate</span><h3 className="fw-bold text-primary mt-1">{monitorMetrics.yieldRate}%</h3></div></div>
@@ -185,10 +183,14 @@ export function StationsOverview({
     const [historySearch, setHistorySearch] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+    
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
 
+    // Filter and Sort Logic
     const filteredHistory = useMemo(() => {
         if (!allLogs) return [];
-        return allLogs.filter(log => {
+        const result = allLogs.filter(log => {
             const matchesSearch = log.assembly_no?.toLowerCase().includes(historySearch.toLowerCase());
             if (!startDate && !endDate) return matchesSearch;
             const logDate = new Date(log.timestamp || log.created_at);
@@ -197,7 +199,22 @@ export function StationsOverview({
             if (start) start.setHours(0, 0, 0, 0); if (end) end.setHours(23, 59, 59, 999);
             return matchesSearch && (!start || logDate >= start) && (!end || logDate <= end);
         }).sort((a, b) => new Date(b.timestamp || b.created_at) - new Date(a.timestamp || a.created_at));
+        
+        return result;
     }, [allLogs, historySearch, startDate, endDate]);
+
+    // Calculate current slice of data for pagination
+    const paginatedHistory = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return filteredHistory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [filteredHistory, currentPage]);
+
+    const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
+
+    // Reset to page 1 when search/filters change
+    React.useEffect(() => {
+        setCurrentPage(1);
+    }, [historySearch, startDate, endDate]);
 
     if (activeTab === "station_monitor" && stationMonitorId) {
         return <StationMonitorView {...{stationMonitorId, stations, calculateMetrics, handleEditClick, highlightedUnitId, setActiveTab, fetchData}} />;
@@ -209,9 +226,15 @@ export function StationsOverview({
                 <style>{`
                     .btn-box { border-radius: 4px !important; font-weight: 600; }
                     .table thead th { background-color: #1e293b !important; color: white !important; padding: 12px; }
+                    .pagination .page-link { color: #1e293b; border: 1px solid #dee2e6; margin: 0 2px; border-radius: 4px; }
+                    .pagination .page-item.active .page-link { background-color: #1e293b; border-color: #1e293b; color: white; }
+                    .pagination .page-item.disabled .page-link { color: #6c757d; pointer-events: none; background-color: #fff; border-color: #dee2e6; }
                 `}</style>
                 <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3 px-2">
-                    <div><h4 className="fw-bold text-dark mb-0">Production History</h4><p className="text-muted small mb-0">Total Logs: {filteredHistory.length}</p></div>
+                    <div>
+                        <h4 className="fw-bold text-dark mb-0">Production History</h4>
+                        <p className="text-muted small mb-0">Showing {paginatedHistory.length} of {filteredHistory.length} Total Logs</p>
+                    </div>
                     <button className="btn btn-light border btn-sm btn-box px-3" onClick={() => setActiveTab('stations')}>BACK</button>
                 </div>
 
@@ -224,7 +247,7 @@ export function StationsOverview({
                 </div>
 
                 <div className="bg-white border rounded-2 overflow-hidden mx-2 shadow-sm">
-                    <div style={{maxHeight:'600px', overflowY:'auto'}}>
+                    <div style={{minHeight: '450px'}}>
                         <table className="table table-hover align-middle mb-0" style={{fontSize: '0.85rem'}}>
                             <thead className="sticky-top">
                                 <tr>
@@ -238,22 +261,68 @@ export function StationsOverview({
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredHistory.map(log => {
-                                    const ts = formatTimestamp(log.timestamp || log.created_at);
-                                    return (
-                                        <tr key={log.id}>
-                                            <td className="ps-4 fw-bold">{log.model || log.model_id}</td>
-                                            <td><code className="text-primary fw-bold">{log.assembly_no}</code></td>
-                                            <td className="text-muted small fw-bold">{log.action_type || 'UPDATE'}</td>
-                                            <td className="fw-semibold">{log.station_name || log.station}</td>
-                                            <td className="text-center"><span className={`badge rounded-1 px-3 ${getStatusBadgeClass(log.status_after || log.status)}`}>{log.status_after || log.status}</span></td>
-                                            <td className="small">{log.action_by || 'System'}</td>
-                                            <td className="text-end pe-4 small text-muted"><strong>{ts.date}</strong><br/>{ts.time}</td>
-                                        </tr>
-                                    );
-                                })}
+                                {paginatedHistory.length > 0 ? (
+                                    paginatedHistory.map(log => {
+                                        const ts = formatTimestamp(log.timestamp || log.created_at);
+                                        return (
+                                            <tr key={log.id}>
+                                                <td className="ps-4 fw-bold">{log.model || log.model_id}</td>
+                                                <td><code className="text-primary fw-bold">{log.assembly_no}</code></td>
+                                                <td className="text-muted small fw-bold">{log.action_type || 'UPDATE'}</td>
+                                                <td className="fw-semibold">{log.station_name || log.station}</td>
+                                                <td className="text-center"><span className={`badge rounded-1 px-3 ${getStatusBadgeClass(log.status_after || log.status)}`}>{log.status_after || log.status}</span></td>
+                                                <td className="small">{log.action_by || 'System'}</td>
+                                                <td className="text-end pe-4 small text-muted"><strong>{ts.date}</strong><br/>{ts.time}</td>
+                                            </tr>
+                                        );
+                                    })
+                                ) : (
+                                    <tr>
+                                        <td colSpan="7" className="text-center py-5 text-muted italic">No logs found matching your criteria.</td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
+                    </div>
+
+                    {/* Pagination Controls */}
+                    <div className="p-3 border-top d-flex justify-content-between align-items-center bg-light">
+                        <div className="small text-muted fw-bold">
+                            Page {currentPage} of {totalPages || 1}
+                        </div>
+                        <nav>
+                            <ul className="pagination pagination-sm mb-0">
+                                <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                                    <button className="page-link shadow-none" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}>
+                                        <i className="bi bi-chevron-left"></i>
+                                    </button>
+                                </li>
+                                
+                                {/* Simple Logic to show current, prev, and next page buttons */}
+                                {[...Array(totalPages)].map((_, index) => {
+                                    const pageNum = index + 1;
+                                    // Only show first page, last page, and 2 pages around current page
+                                    if (pageNum === 1 || pageNum === totalPages || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
+                                        return (
+                                            <li key={pageNum} className={`page-item ${currentPage === pageNum ? 'active' : ''}`}>
+                                                <button className="page-link shadow-none" onClick={() => setCurrentPage(pageNum)}>
+                                                    {pageNum}
+                                                </button>
+                                            </li>
+                                        );
+                                    } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                                        return <li key={pageNum} className="page-item disabled"><span className="page-link">...</span></li>;
+                                    }
+                                    return null;
+                                })}
+
+                                <li className={`page-item ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}`}>
+                                    <button className="page-link shadow-none" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}>
+                                        <i className="bi bi-chevron-right"></i>
+                                    </button>
+                                </li>
+                            </ul>
+                        </nav>
                     </div>
                 </div>
             </div>
@@ -268,8 +337,6 @@ export function StationsOverview({
         <div className="container-fluid px-0">
             <style>{`
                 .btn-box { border-radius: 4px !important; font-weight: 700; transition: none; }
-                
-                /* Station Grid - Professional Flat Look (Binago lang yung colors dito) */
                 .station-card-flat { 
                     background: #fff; 
                     border: 1px solid #e2e8f0; 
@@ -294,7 +361,6 @@ export function StationsOverview({
                 }
                 .metric-row:last-child { border-bottom: none; }
                 .metric-value { color: #1e293b; } 
-                
                 .btn-monitor { background: #1e293b; color: #fff; border: none; }
                 .btn-monitor:hover { background: #0f172a; color: #fff; }
                 .btn-history { background: transparent; color: #475569; border: 1px solid #e2e8f0; }

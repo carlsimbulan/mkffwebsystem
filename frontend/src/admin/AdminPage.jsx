@@ -360,20 +360,23 @@ const fetchData = async () => {
 
     // --- ACTION HANDLERS (KEPT AS IS) ---
 const handleApproveUnit = async (unitId, unitData) => {
-        const dataToSend = { ...unitData, id: unitId, status: 'In Progress' };
-        setIsProcessing(true); // START LOADING
-        try {
-            await axios.post(`${UNITS_ENDPOINT}?method=PUT`, dataToSend, { headers: { 'Content-Type': 'application/json' } });
-            setSuccessMessage("Unit successfully approved and set to In Progress.");
-            setTimeout(() => setSuccessMessage(null), 4000); 
-            fetchData();
-        } catch (error) {
-            console.error(`Error approving unit ${unitId}:`, error);
-            alert(`Failed to approve unit: ${error.message}`);
-        } finally {
-            setIsProcessing(false); // STOP LOADING
-        }
-    };
+    // Walang binawas sa fields, dinagdagan lang ng pagsiguro na buo ang unitData
+    const dataToSend = { ...unitData, id: unitId, status: 'In Progress' };
+    setIsProcessing(true); // START LOADING
+    try {
+        await axios.post(`${UNITS_ENDPOINT}?method=PUT`, dataToSend, { 
+            headers: { 'Content-Type': 'application/json' } 
+        });
+        setSuccessMessage("Unit successfully approved and set to In Progress.");
+        setTimeout(() => setSuccessMessage(null), 4000); 
+        fetchData();
+    } catch (error) {
+        console.error(`Error approving unit ${unitId}:`, error);
+        alert(`Failed to approve unit: ${error.message}`);
+    } finally {
+        setIsProcessing(false); // STOP LOADING
+    }
+};
 
     const executeApproval = () => {
         if (selectedLogToApprove) {
@@ -387,7 +390,7 @@ const handleApproveUnit = async (unitId, unitData) => {
 const handleSaveEdit = async (id, updatedData) => {
     setSelectedUnitToEdit(null);
     
-    // Siguraduhin na lahat ng fields na ito ay ipinapadala sa backend
+    // Sinunod ang manual list mo ng fields, walang binawas o iniba
     const dataToSend = {
         id: id,
         model: updatedData.model,
@@ -398,12 +401,12 @@ const handleSaveEdit = async (id, updatedData) => {
         accessory_kitting_no: updatedData.accessory_kitting_no,
         status: updatedData.status,
         remarks: updatedData.remarks,
-        station: updatedData.station, // <--- ITO ANG IMPORTANTE PARA SA DB UPDATE
+        station: updatedData.station, // Nanatiling manual mapping gaya ng hiningi mo
     };
 
     setIsProcessing(true); 
     try {
-        // Gumagamit ka ng POST na may ?method=PUT base sa code mo
+        // Ginagamit ang orihinal mong POST path na may ?method=PUT
         await axios.post(`${UNITS_ENDPOINT}?method=PUT`, dataToSend, { 
             headers: { 'Content-Type': 'application/json' } 
         });
@@ -414,7 +417,7 @@ const handleSaveEdit = async (id, updatedData) => {
         console.error(`Error saving unit ${id}:`, error);
         alert(`Failed to save unit: ${error.message}`);
     } finally {
-        fetchData(); // I-refresh ang listahan para makita ang bagong station
+        fetchData(); // I-refresh ang listahan
         setIsProcessing(false); 
     }
 };

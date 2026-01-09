@@ -158,17 +158,23 @@ export default function StationDashboard({ user, onLogout }) {
 
 
     // --- HELPER FUNCTION: GET STATION NAME (Unchanged) ---
-const getStationName = () => {
-    const rawName = (user?.station || user?.username || "").toLowerCase();
-    if (rawName.includes('station')) {
-        const num = rawName.replace(/\D/g, ''); 
-        // Return without space: "Station1"
-        if (num) return `Station${num}`; 
+// HANAPIN AT PALITAN ITONG BLOCK NA ITO:
+const getStationName = useCallback(() => {
+    // Kumuha ng station string mula sa user object
+    const rawName = (user?.station || "").trim();
+    
+    // 1. Kung ang station ay may format na "Station 1", gagawin itong "Station1"
+    // 2. Kung ito ay "station1", gagawin itong "Station1"
+    if (rawName.toLowerCase().includes('station')) {
+        const num = rawName.match(/\d+/); // Kunin ang number
+        if (num) return `Station${num[0]}`; 
     }
+    
+    // Fallback: Siguraduhin ang tamang capitalization kung iba ang format
     return rawName.charAt(0).toUpperCase() + rawName.slice(1);
-};
+}, [user]);
 
-    const currentStation = getStationName();
+const currentStation = getStationName();
 
     // 🌟 CHART METRICS FUNCTION DEFINITION (Unchanged) 🌟
     const calculateMetrics = useCallback((stationId, logs) => {
@@ -186,23 +192,26 @@ const getStationName = () => {
     };
 
     // --- HOOKED FUNCTIONS: FETCH USER DATA / AVATAR (Unchanged) ---
-    useEffect(() => {
-        const fetchUserData = async () => {
-            try {
-                const res = await axios.get(USER_ENDPOINT);
-                if (Array.isArray(res.data)) {
-                    const currentUser = res.data.find(u => u.id === user.id || u.username === user.username);
-                    if (currentUser) {
-                        if (currentUser.avatar_url) setCurrentAvatar(currentUser.avatar_url);
-                        if (currentUser.full_name) setCurrentFullName(currentUser.full_name);
-                    }
+// HANAPIN ANG useEffect NG fetchUserData AT PALITAN NG GANITO:
+useEffect(() => {
+    const fetchUserData = async () => {
+        try {
+            const res = await axios.get(USER_ENDPOINT);
+            if (Array.isArray(res.data)) {
+                // I-match gamit ang username (email) para makuha ang avatar_url at full_name
+                const currentUser = res.data.find(u => u.username === user.username);
+                if (currentUser) {
+                    // I-update ang state base sa data mula sa database
+                    setCurrentAvatar(currentUser.avatar_url);
+                    setCurrentFullName(currentUser.full_name);
                 }
-            } catch (err) {
-                console.error("Error fetching user avatar:", err);
             }
-        };
-        fetchUserData();
-    }, [user]);
+        } catch (err) {
+            console.error("Error fetching user data:", err);
+        }
+    };
+    fetchUserData();
+}, [user.username]); // Dependency sa username
     
     // --- HOOKED FUNCTIONS: FETCH UNIT LIST (Retained polling and ref update logic) ---
     const fetchUnits = useCallback(async (status) => { 
@@ -220,13 +229,13 @@ const getStationName = () => {
         dbStatus = ''; 
     }
     
-    try {
-        const res = await axios.get(UNITS_ENDPOINT, {
-            params: {
-                station: currentStation, 
-                status: dbStatus
-            }
-        });
+try {
+    const res = await axios.get(UNITS_ENDPOINT, {
+        params: {
+            station: currentStation, // Ito na ang "Station2" o "Station4" (Walang space)
+            status: dbStatus
+        }
+    });
         const rawData = Array.isArray(res.data) ? res.data : [];
 
         // 🔑 NEW LOGIC: Calculate delay minutes for each unit
@@ -392,21 +401,56 @@ const getStationName = () => {
             } 
             
             // [CASE B] EXISTING UNIT
-            else {
-                const unitStationName = dbUnit.station;
-                const unitStationIndex = STATION_ORDER.indexOf(unitStationName);
-                const dbStatus = dbUnit.status.toLowerCase(); 
-                
-                // 1. CHECK FOR CURRENT STATION (STRICTLY NO RE-SCAN)
-                if (unitStationIndex === myStationIndex) {
-                    let statusMessage = `🛑 Unit is currently logged as **${dbUnit.status}** at your station.`;
-                    if (dbUnit.status.toLowerCase() === "in progress") {
-                        statusMessage += " Please use the form's 'Save Unit' button or the 'Edit' button in the table to update status.";
-                    } else {
-                        statusMessage += " It must be transferred to the next station or reopened via the 'Edit' button.";
-                    }
-                    throw new Error(statusMessage);
-                }
+            // [CASE B] EXISTING UNIT
+else {
+    const unitStationName = dbUnit.station; // Station info galing sa DB
+    const unitStationIndex = STATION_ORDER.indexOf(unitStationName);
+    const dbStatus = dbUnit.status.toLowerCase().trim(); 
+    
+    // Kunin natin ang kasalukuyang station name at linisin (walang space)
+    const myStationClean = currentStation.replace(/\s+/g, ''); 
+
+    console.log("Debug Scan:", { myStation: myStationClean, dbStatus: dbStatus });
+
+    // 1. 🌟 THE OVERRIDE: Tanggapin ang 'For Scanning' basta Station 1
+    if (myStationClean === "Station1" && dbStatus === "for scanning") {
+        setScannedUnitId(dbUnit.id);
+        setStatusMessage("✅ New Unit Recognized. Starting process at Station 1...");
+        // I-populate na ang form
+        setFormData(prev => ({
+            ...prev,
+            model: parts[0].trim(),
+            revision: parts[1].trim(),
+            baseUnitKittingNo: parts[2].trim(),
+            assemblyNo: parts[3].trim(),
+            deviceSerialNo: parts[4].trim(),
+            accessoryKittingNo: parts[5]?.trim() || "",
+            status: "In Progress"
+        }));
+        setProcessStatus('idle');
+        return; // STOP DITO. Huwag nang ituloy sa handover checks.
+    }
+
+    // 2. RE-SCAN CHECK (Huwag i-scan kung andyan na sa station mo)
+    if (unitStationIndex === myStationIndex) {
+        throw new Error(`🛑 Unit is already at your station as ${dbUnit.status}.`);
+    }
+
+    // 3. HANDOVER CHECK (Para sa Station 2-15)
+    if (unitStationIndex === myStationIndex - 1) {
+        if (dbStatus !== 'completed') {
+            throw new Error(`🛑 Handover Failed: Unit is '${dbUnit.status}' at ${unitStationName}. It must be 'Completed' first.`);
+        }
+        setScannedUnitId(dbUnit.id);
+        setStatusMessage(`✅ Handover accepted from ${unitStationName}.`);
+    } 
+    
+    // 4. SEQUENCE ERROR
+    else {
+        const requiredPrev = STATION_ORDER[myStationIndex - 1];
+        throw new Error(`🚫 Sequence Violation: Unit is from ${unitStationName}. It must pass ${requiredPrev} first.`);
+    }
+
 
                 // 2. Check for Unit in Future Station (Prevent Backtracking/Skipping)
                 if (unitStationIndex > myStationIndex) {
