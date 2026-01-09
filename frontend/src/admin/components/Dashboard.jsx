@@ -30,6 +30,21 @@ const processStations = [
     "Packing", "QC Stamping"
 ];
 
+// Helper para i-convert ang minutes sa readable format (Days, Hours, Minutes)
+const formatAgingTime = (totalMinutes) => {
+    if (totalMinutes < 60) {
+        return `${Math.round(totalMinutes)} mins`;
+    } else if (totalMinutes < 1440) { // Less than 24 hours
+        const hours = Math.floor(totalMinutes / 60);
+        const mins = Math.round(totalMinutes % 60);
+        return `${hours}h ${mins}m`;
+    } else { // More than 24 hours
+        const days = Math.floor(totalMinutes / 1440);
+        const hours = Math.floor((totalMinutes % 1440) / 60);
+        return `${days}d ${hours}h`;
+    }
+};
+
 // 1. Helper para sa oras at petsa
 const formatTimestamp = (isoString) => {
     if (!isoString) return { date: 'N/A', time: 'N/A' };
@@ -49,14 +64,6 @@ const getStatusBadgeClass = (status) => {
     if (statusText.includes('in progress')) return 'bg-yellow-subtle text-warning border border-yellow-subtle'; 
     if (statusText.includes('scanning')) return 'bg-info-subtle text-info border border-info-subtle';
     return 'bg-light text-secondary border';
-};
-
-const getSearchHighlightStyle = (status) => {
-    const statusText = status?.toLowerCase() || '';
-    if (statusText.includes('completed') || statusText.includes('ok')) return { borderLeft: '8px solid #10b981', backgroundColor: '#f0fdf4' };
-    if (statusText.includes('no good')) return { borderLeft: '8px solid #ef4444', backgroundColor: '#fef2f2' };
-    if (statusText.includes('in progress')) return { borderLeft: '8px solid #f59e0b', backgroundColor: '#fffbeb' };
-    return {};
 };
 
 export function Dashboard({
@@ -126,7 +133,7 @@ export function Dashboard({
         logs.filter(l => l.status === 'For Scanning').length, 
     [logs]);
 
-    // --- PRODUCTION FLOW DATA: Includes In Progress, NG, and Completed units at each station ---
+    // --- PRODUCTION FLOW DATA ---
     const productionFlow = useMemo(() => {
         const flow = [{ name: 'FOR SCANNING', count: forScanningUnitsCount }];
         
@@ -134,7 +141,6 @@ export function Dashboard({
             const stationKey = `Station${idx + 1}`;
             const stationKeySpaced = `Station ${idx + 1}`;
             
-            // Count every unit currently sitting at this station
             const unitsAtStation = logs.filter(l => 
                 (l.station === stationKey || l.station === stationKeySpaced) && 
                 l.status !== 'For Scanning'
@@ -244,13 +250,7 @@ export function Dashboard({
                 .search-item-result { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: all 0.2s ease; }
                 .search-item-result:hover { filter: brightness(0.95); transform: translateX(5px); }
                 .fixed-scanning-table { height: 320px; overflow-y: auto; border-radius: 0 0 16px 16px; }
-                .process-step { padding: 12px 15px; border-left: 3px solid #e2e8f0; position: relative; margin-left: 15px; }
-                .step-dot { position: absolute; left: -9px; top: 18px; width: 15px; height: 15px; border-radius: 50%; background: #e2e8f0; border: 2px solid white; }
-                .done .step-dot, .current-ready .step-dot { background: #10b981; }
-                .current-progressing .step-dot { background: #fbbf24; }
-                .ng .step-dot { background: #ef4444; }
-
-                /* Flow Tracker Styles */
+                
                 .flow-wrapper { display: flex; overflow-x: auto; padding: 20px 0; scrollbar-width: thin; gap: 0; }
                 .flow-item { flex: 0 0 130px; position: relative; text-align: center; }
                 .flow-line-connector { position: absolute; top: 20px; left: 50%; width: 100%; height: 2px; background: #e2e8f0; z-index: 1; }
@@ -271,74 +271,54 @@ export function Dashboard({
                     <p className="text-muted small mb-0">MKFF Dashboard • Full System Monitoring</p>
                 </div>
                 
-                        <div className="d-flex gap-3 align-items-center">
-            {/* --- REPORT INDICATOR (NEW) --- */}
-            {newReportsToday > 0 && (
-                <div 
-                    className="d-flex align-items-center bg-danger text-white px-3 py-1 rounded-pill shadow-sm animate-pulse" 
-                    style={{ cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', height: '32px' }}
-                    onClick={() => setActiveTab('reports')}
-                >
-                    <i className="bi bi-file-earmark-text-fill me-2"></i>
-                    {newReportsToday} NEW REPORT{newReportsToday > 1 ? 'S' : ''} TODAY
-                </div>
-            )}
+                <div className="d-flex gap-3 align-items-center">
+                    {newReportsToday > 0 && (
+                        <div 
+                            className="d-flex align-items-center bg-danger text-white px-3 py-1 rounded-pill shadow-sm animate-pulse" 
+                            style={{ cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', height: '32px' }}
+                            onClick={() => setActiveTab('reports')}
+                        >
+                            <i className="bi bi-file-earmark-text-fill me-2"></i>
+                            {newReportsToday} NEW REPORT{newReportsToday > 1 ? 'S' : ''} TODAY
+                        </div>
+                    )}
 
-            <div className="search-container" style={{ position: 'relative', width: '320px' }}>
-                <i className="bi bi-search search-icon-inside"></i>
-                
-                <input 
-                    type="text" 
-                    className="form-control form-control-sm rounded-pill search-input-pro shadow-sm" 
-                    placeholder="Search Assembly Number..." 
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    style={{ paddingRight: '35px' }} // Space for the clear button
-                />
-
-                {/* Clear Button - Only shows when there is text */}
-                {searchTerm && (
-                    <i 
-                        className="bi bi-x-circle-fill position-absolute" 
-                        style={{ 
-                            right: '12px', 
-                            top: '50%', 
-                            transform: 'translateY(-50%)', 
-                            cursor: 'pointer', 
-                            color: '#94a3b8',
-                            zIndex: 5
-                        }}
-                        onClick={() => setSearchTerm('')}
-                    ></i>
-                )}
-                {/* ... (Dito yung existing searchResults mapping mo, wag galawin) */}
-            
-                {searchResults.length > 0 && (
-                    <div className="position-absolute w-100 mt-2 bg-white border rounded-4 shadow-lg overflow-hidden" style={{ zIndex: 1100 }}>
-                        {searchResults.map(unit => (
-                            <div 
-                                key={unit.id} 
-                                className="search-item-result"
-                                /* Removed the dynamic style here */
-                                onClick={() => { setSelectedUnit(unit); setSearchTerm(''); }}
-                            >
-                                <div className="fw-bold text-dark d-flex justify-content-between">
-                                    <span>{unit.assembly_no}</span>
-                                    <i className="bi bi-arrow-right-short"></i>
-                                </div>
-                                <div className="text-muted" style={{fontSize: '0.75rem'}}>
-                                    Model: {unit.model} • <span className="fw-bold text-uppercase">{unit.status}</span>
-                                </div>
+                    <div className="search-container">
+                        <i className="bi bi-search search-icon-inside"></i>
+                        <input 
+                            type="text" 
+                            className="form-control form-control-sm rounded-pill search-input-pro shadow-sm" 
+                            placeholder="Search Assembly Number..." 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        {searchTerm && (
+                            <i className="bi bi-x-circle-fill position-absolute" 
+                               style={{ right: '12px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: '#94a3b8', zIndex: 5 }}
+                               onClick={() => setSearchTerm('')}></i>
+                        )}
+                    
+                        {searchResults.length > 0 && (
+                            <div className="position-absolute w-100 mt-2 bg-white border rounded-4 shadow-lg overflow-hidden" style={{ zIndex: 1100 }}>
+                                {searchResults.map(unit => (
+                                    <div key={unit.id} className="search-item-result" onClick={() => { setSelectedUnit(unit); setSearchTerm(''); }}>
+                                        <div className="fw-bold text-dark d-flex justify-content-between">
+                                            <span>{unit.assembly_no}</span>
+                                            <i className="bi bi-arrow-right-short"></i>
+                                        </div>
+                                        <div className="text-muted" style={{fontSize: '0.75rem'}}>
+                                            Model: {unit.model} • <span className="fw-bold text-uppercase">{unit.status}</span>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
+                        )}
                     </div>
-                )}
-            </div>
-            
-            <div className="btn-ui-flat d-flex align-items-center text-dark fw-bold small">
-                <i className="bi bi-broadcast text-success me-2"></i> SYSTEM LIVE
-            </div>
-        </div>
+                    
+                    <div className="btn-ui-flat d-flex align-items-center text-dark fw-bold small">
+                        <i className="bi bi-broadcast text-success me-2"></i> SYSTEM LIVE
+                    </div>
+                </div>
             </div>
 
             <div className="row g-4 mb-4">
@@ -379,10 +359,7 @@ export function Dashboard({
                 </div>
                 <div className="col-md-4">
                     <div className="stat-card-pro" style={{ borderLeftColor: '#8b5cf6' }}>
-                        <button 
-                            className="go-icon-link shadow-sm" 
-                            onClick={() => setActiveTab('approval')}
-                        >
+                        <button className="go-icon-link shadow-sm" onClick={() => setActiveTab('approval')}>
                             GO <i className="bi bi-arrow-right-short ms-1"></i>
                         </button>
                         <span className="label-caps" style={{ color: '#8b5cf6' }}>Pending QA Approval</span>
@@ -394,7 +371,6 @@ export function Dashboard({
                 </div>
             </div>
 
-            {/* --- VISUAL PRODUCTION FLOW TRACKER --- */}
             <div className="bg-white border rounded-4 shadow-sm mb-4 overflow-hidden">
                 <div className="p-3 border-bottom bg-light">
                     <span className="label-caps m-0">Live Station Flow Tracker (Current Unit Distribution)</span>
@@ -403,9 +379,7 @@ export function Dashboard({
                     {productionFlow.map((step, idx) => (
                         <div key={idx} className={`flow-item ${step.count > 0 ? 'active' : ''}`}>
                             <div className="flow-line-connector"></div>
-                            <div className="flow-circle">
-                                {step.count}
-                            </div>
+                            <div className="flow-circle">{step.count}</div>
                             <span className="flow-name">{step.name}</span>
                         </div>
                     ))}
@@ -475,7 +449,7 @@ export function Dashboard({
                                                 <div className="small text-muted mb-1">
                                                     {station.name === 'FOR SCANNING UNITS' 
                                                         ? `Queue Density: ${station.count} units waiting` 
-                                                        : `Aging: ${Math.round(station.maxAging)} mins max`}
+                                                        : `Delayed for: ${formatAgingTime(station.maxAging)}`}
                                                 </div>
                                                 <div className="progress" style={{ height: '8px', borderRadius: '4px' }}>
                                                     <div 
@@ -502,125 +476,88 @@ export function Dashboard({
                 </div>
             </div>
 
-{selectedUnit && (
-    <div 
-        className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" 
-        style={{ 
-            background: 'rgba(0, 0, 0, 0.5)', 
-            backdropFilter: 'blur(8px)',       // Standard blur effect
-            WebkitBackdropFilter: 'blur(8px)', 
-            zIndex: 1300 
-        }}
-    >
-        <div className="bg-white rounded-4 shadow-lg overflow-hidden border-0" style={{ width: '90%', maxWidth: '500px' }}>
-            
-            {/* Header: Standard Primary Blue */}
-            <div className="p-3 d-flex justify-content-between align-items-center bg-primary text-white">
-                <h6 className="mb-0 fw-bold">
-                    <i className="bi bi-cpu me-2"></i>TRACKING: {selectedUnit.assembly_no}
-                </h6>
-                <button className="btn-close btn-close-white" onClick={() => setSelectedUnit(null)}></button>
-            </div>
+            {selectedUnit && (
+                <div 
+                    className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" 
+                    style={{ background: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', zIndex: 1300 }}
+                >
+                    <div className="bg-white rounded-4 shadow-lg overflow-hidden border-0" style={{ width: '90%', maxWidth: '500px' }}>
+                        <div className="p-3 d-flex justify-content-between align-items-center bg-primary text-white">
+                            <h6 className="mb-0 fw-bold"><i className="bi bi-cpu me-2"></i>TRACKING: {selectedUnit.assembly_no}</h6>
+                            <button className="btn-close btn-close-white" onClick={() => setSelectedUnit(null)}></button>
+                        </div>
 
-            <div className="p-4" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                {/* Info Bar */}
-                <div className="p-2 px-3 bg-light rounded-2 mb-4 border small d-flex justify-content-between">
-                    <span><b>MODEL:</b> {selectedUnit.model}</span>
-                    <span className={`badge ${getStatusBadgeClass(selectedUnit.status)}`}>{selectedUnit.status}</span>
-                </div>
+                        <div className="p-4" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                            <div className="p-2 px-3 bg-light rounded-2 mb-4 border small d-flex justify-content-between">
+                                <span><b>MODEL:</b> {selectedUnit.model}</span>
+                                <span className={`badge ${getStatusBadgeClass(selectedUnit.status)}`}>{selectedUnit.status}</span>
+                            </div>
 
-                <div className="process-timeline px-2">
-                    {processStations.map((station, idx) => {
-    const currentStationIdx = parseInt(selectedUnit.station?.replace('Station', '')) - 1;
-    const unitStatus = selectedUnit.status?.toLowerCase() || '';
-    
-    // Status Logic
-    const isUnitFullyDone = unitStatus.includes('completed') || unitStatus.includes('finished');
-    const isNoGood = unitStatus.includes('no good') || unitStatus === 'ng';
+                            <div className="process-timeline px-2">
+                                {processStations.map((station, idx) => {
+                                    const currentStationIdx = parseInt(selectedUnit.station?.replace('Station', '')) - 1;
+                                    const unitStatus = selectedUnit.status?.toLowerCase() || '';
+                                    const isUnitFullyDone = unitStatus.includes('completed') || unitStatus.includes('finished');
+                                    const isNoGood = unitStatus.includes('no good') || unitStatus === 'ng';
+                                    const isCurrentStation = idx === currentStationIdx;
+                                    const isDone = idx < currentStationIdx || (isCurrentStation && isUnitFullyDone);
 
-    // Check kung ito ang active/last station recorded
-    const isCurrentStation = idx === currentStationIdx;
-    
-    // Ang station ay "Done" kung ito ay nakalipas na (previous) 
-    // O kung ito ang current station at ang status ay "Completed"
-    const isDone = idx < currentStationIdx || (isCurrentStation && isUnitFullyDone);
+                                    let subText = "Pending";
+                                    let textColorClass = "text-muted";
+                                    let statusColor = "#dee2e6";
 
-    let subText = "Pending";
-    let textColorClass = "text-muted";
-    let statusColor = "#dee2e6"; // Default Gray
+                                    if (isDone) {
+                                        subText = "STATION COMPLETED";
+                                        textColorClass = "text-success";
+                                        statusColor = "#198754";
+                                    } else if (isCurrentStation) {
+                                        if (isNoGood) {
+                                            subText = "NG";
+                                            textColorClass = "text-danger";
+                                            statusColor = "#dc3545";
+                                        } else {
+                                            subText = "IN PROGRESS";
+                                            textColorClass = "text-warning";
+                                            statusColor = "#ffc107";
+                                        }
+                                    }
 
-    if (isDone) {
-        subText = "STATION COMPLETED";
-        textColorClass = "text-success";
-        statusColor = "#198754"; // Green
-    } else if (isCurrentStation) {
-        if (isNoGood) {
-            subText = "NG";
-            textColorClass = "text-danger";
-            statusColor = "#dc3545"; // Red
-        } else {
-            subText = "IN PROGRESS";
-            textColorClass = "text-warning";
-            statusColor = "#ffc107"; // Yellow
-        }
-    }
+                                    const lineBorderColor = isDone ? '#198754' : (isCurrentStation && isNoGood ? '#dc3545' : '#e9ecef');
 
-    // Line color logic
-    const lineBorderColor = isDone ? '#198754' : (isCurrentStation && isNoGood ? '#dc3545' : '#e9ecef');
+                                    return (
+                                        <div key={idx} className="position-relative ps-4 mb-4" 
+                                            style={{ borderLeft: idx === processStations.length - 1 ? 'none' : `2px solid ${lineBorderColor}` }}>
+                                            <div className="position-absolute rounded-circle" 
+                                                style={{ width: '12px', height: '12px', backgroundColor: statusColor, left: '-7px', top: '4px', zIndex: 2 }}>
+                                            </div>
+                                            <div className="d-flex justify-content-between align-items-start">
+                                                <div>
+                                                    <div className={`fw-bold mb-0 ${isDone || isCurrentStation ? 'text-dark' : 'text-muted opacity-50'}`} style={{fontSize: '0.85rem'}}>
+                                                        {idx + 1}. {station}
+                                                    </div>
+                                                    <div className={`fw-bold small ${textColorClass}`} style={{fontSize: '0.65rem'}}>
+                                                        {subText}
+                                                    </div>
+                                                </div>
+                                                {isCurrentStation && (
+                                                    <span className="badge rounded-pill" style={{ fontSize: '0.55rem', backgroundColor: statusColor, color: isNoGood || isUnitFullyDone ? 'white' : 'black' }}>
+                                                        CURRENT
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
 
-    return (
-        <div key={idx} className="position-relative ps-4 mb-4" 
-            style={{ borderLeft: idx === processStations.length - 1 ? 'none' : `2px solid ${lineBorderColor}` }}>
-            
-            {/* Timeline Dot */}
-            <div className="position-absolute rounded-circle" 
-                style={{ 
-                    width: '12px', height: '12px', 
-                    backgroundColor: statusColor, 
-                    left: '-7px', top: '4px', zIndex: 2 
-                }}>
-            </div>
-
-            <div className="d-flex justify-content-between align-items-start">
-                <div>
-                    <div className={`fw-bold mb-0 ${isDone || isCurrentStation ? 'text-dark' : 'text-muted opacity-50'}`} style={{fontSize: '0.85rem'}}>
-                        {idx + 1}. {station}
-                    </div>
-                    <div className={`fw-bold small ${textColorClass}`} style={{fontSize: '0.65rem'}}>
-                        {subText}
+                        <div className="p-3 bg-light border-top d-flex gap-2">
+                            <button className="btn btn-primary w-100 rounded-pill fw-bold" onClick={() => handleGoToStation(selectedUnit)}>GO TO LOCATION</button>
+                            <button className="btn btn-outline-dark w-100 rounded-pill fw-bold" onClick={() => setSelectedUnit(null)}>CLOSE</button>
+                        </div>
                     </div>
                 </div>
-
-                {/* Badge: Laging lalabas basta ito ang currentStationIdx */}
-                {isCurrentStation && (
-                    <span className="badge rounded-pill" 
-                          style={{
-                              fontSize: '0.55rem', 
-                              backgroundColor: statusColor, // Sasunod sa kulay ng status (Green, Red, or Yellow)
-                              color: isNoGood || isUnitFullyDone ? 'white' : 'black' // White text for Green/Red, Black for Yellow
-                          }}>
-                        CURRENT
-                    </span>
-                )}
-            </div>
-        </div>
-    );
-})}
-                </div>
-            </div>
-
-            {/* Footer: Standard Buttons */}
-            <div className="p-3 bg-light border-top d-flex gap-2">
-                <button className="btn btn-primary w-100 rounded-pill fw-bold" onClick={() => handleGoToStation(selectedUnit)}>
-                    GO TO LOCATION
-                </button>
-                <button className="btn btn-outline-dark w-100 rounded-pill fw-bold" onClick={() => setSelectedUnit(null)}>
-                    CLOSE
-                </button>
-            </div>
-        </div>
-    </div>
-)}
+            )}
         </div>
     );
 }

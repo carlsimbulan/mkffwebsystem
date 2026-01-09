@@ -24,6 +24,7 @@ import { ReportsView } from './components/ReportsView';
 import { AnnouncementsView } from './components/AnnouncementsView'; 
 import { ApprovalQueue } from './components/ApprovalQueue';
 import { UserManagement } from './components/UserManagement';
+import DataAnalytics from './components/DataAnalytics';
 // NEW EMBEDDED MODALS
 import { ApproveUnitModal } from './components/ApproveUnitModal';
 import { DeleteAnnouncementModal } from './components/DeleteAnnouncementModal';
@@ -703,6 +704,15 @@ case "announcements":
                     />
                 );
 
+                case "data_analytics":
+            return (
+                <DataAnalytics 
+                    logs={logs} 
+                    unitHistoryLogs={unitHistoryLogs} 
+                    stations={stations}
+                />
+            );
+
             case "notifications":
                 return (
                     <NotificationContent
@@ -842,6 +852,17 @@ return (
                     >
                         <i className="bi bi-file-text"></i>
                         Reports
+                    </button>
+                </li>
+
+                                {/* --- EEDIT NA BAHAGI: DATA ANALYTICS SIDEBAR BUTTON --- */}
+                <li className="nav-item">
+                    <button
+                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "data_analytics" ? "active bg-danger" : ""}`}
+                        onClick={() => setActiveTab("data_analytics")}
+                    >
+                        <i className="bi bi-graph-up"></i> {/* Pwede ring bi-bar-chart-line */}
+                        Data Analytics
                     </button>
                 </li>
 
