@@ -1,4 +1,9 @@
 <?php
+// 1. Enable Error Reporting for debugging (Remove this in production)
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 // --- CORS ---
 $allowedOrigins = ["http://localhost:3000", "http://localhost:3001"];
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -15,42 +20,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 header("Content-Type: application/json");
+
+// 2. Check if db.php exists before including to prevent fatal errors
+if (!file_exists('../db.php')) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Database configuration file missing.']);
+    exit;
+}
 include '../db.php';
 
 $raw = file_get_contents("php://input");
 $data = json_decode($raw, true);
 
-// INALIS: !isset($data['role']) - Hindi na natin kailangan ito mula sa frontend
 if (!$data || !isset($data['username']) || !isset($data['password'])) {
     http_response_code(400);
     echo json_encode(['error' => 'Please fill in both username and password.']);
     exit;
 }
 
-// Kunin ang user data base sa username
-$stmt = $pdo->prepare("SELECT id, username, password, role, station FROM users WHERE username = :u");
-$stmt->execute(['u' => $data['username']]);
-$user = $stmt->fetch();
+try {
+    // 3. Database query using PDO
+    $stmt = $pdo->prepare("SELECT id, username, password, role, station FROM users WHERE username = :u");
+    $stmt->execute(['u' => $data['username']]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-// I-verify kung existing ang user at kung tama ang password
-if (!$user || $data['password'] !== $user['password']) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Invalid username or password']);
-    exit;
+    // 4. Verify user and password
+    if (!$user || $data['password'] !== $user['password']) {
+        http_response_code(401);
+        echo json_encode(['error' => 'Invalid username or password']);
+        exit;
+    }
+
+    // SUCCESS
+    echo json_encode([
+        'status' => 'ok',
+        'user' => [
+            'id' => $user['id'],
+            'username' => $user['username'],
+            'role' => $user['role'],
+            'station' => $user['station'] 
+        ]
+    ]);
+
+} catch (PDOException $e) {
+    // 5. Catch database errors specifically
+    http_response_code(500);
+    echo json_encode(['error' => 'Database error: ' . $e->getMessage()]);
 }
-
-// INALIS: STRICT ROLE CHECK 
-// Hindi na natin kailangang i-compare ang $data['role'] vs $user['role'] 
-// dahil si PHP na mismo ang magsasabi sa React kung ano ang role ng user.
-
-// SUCCESS: Ibalik ang lahat ng info kasama ang role at station
-echo json_encode([
-    'status' => 'ok',
-    'user' => [
-        'id' => $user['id'],
-        'username' => $user['username'],
-        'role' => $user['role'],    // Automatic na itong ipapadala sa React
-        'station' => $user['station'] 
-    ]
-]);
 ?>
