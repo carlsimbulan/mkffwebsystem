@@ -12,7 +12,7 @@ import { UnitEntryForm } from './components/UnitEntryForm';
 import { DailyReportForm } from './components/DailyReportForm';
 import { UnitHistoryLog } from './components/UnitHistoryLog';
 import { UnitListTable } from './components/UnitListTable';
-import { EditUnitModal } from './components/EditUnitModal';
+import { EditUnitModal } from './modals/EditUnitModal';
 import { AnnouncementView } from './components/AnnouncementView';
 
 

@@ -7,16 +7,16 @@ import logo from '../logo.png';
 
 // 2. IMPORT SEPARATED COMPONENTS (Updated List)
 // Existing Modals and Utilities
-import { EditUnitModal } from './components/EditUnitModal';
-import { ReportDetailModal } from './components/ReportDetailModal';
-import { ManageUserModal } from './components/ManageUserModal';
-import { DeleteUserModal } from './components/DeleteUserModal';
-import { SubmitReportModal } from './components/SubmitReportModal';
-import { StationHistoryModal } from './components/StationHistoryModal';
+import { EditUnitModal } from './modals/EditUnitModal';
+import { ReportDetailModal } from './modals/ReportDetailModal';
+import { ManageUserModal } from './modals/ManageUserModal';
+import { DeleteUserModal } from './modals/DeleteUserModal';
+import { SubmitReportModal } from './modals/SubmitReportModal';
+import { StationHistoryModal } from './modals/StationHistoryModal';
 import { NotificationBell } from './components/NotificationBell';
 import { NotificationContent } from './components/NotificationContent';
-import { ViewUserModal } from './components/ViewUserModal';
-import { AnnouncementModal } from './components/AnnouncementModal';
+import { ViewUserModal } from './modals/ViewUserModal';
+import { AnnouncementModal } from './modals/AnnouncementModal';
 // NEW VIEW COMPONENTS
 import { Dashboard } from './components/Dashboard';
 import { StationsOverview } from './components/StationsOverview';
@@ -26,8 +26,8 @@ import { ApprovalQueue } from './components/ApprovalQueue';
 import { UserManagement } from './components/UserManagement';
 import DataAnalytics from './components/DataAnalytics';
 // NEW EMBEDDED MODALS
-import { ApproveUnitModal } from './components/ApproveUnitModal';
-import { DeleteAnnouncementModal } from './components/DeleteAnnouncementModal';
+import { ApproveUnitModal } from './modals/ApproveUnitModal';
+import { DeleteAnnouncementModal } from './modals/DeleteAnnouncementModal';
 
 import { Shipment } from './components/Shipment';
 

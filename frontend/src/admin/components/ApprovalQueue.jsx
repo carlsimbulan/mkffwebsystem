@@ -1,5 +1,5 @@
 import React from 'react';
-import { ApproveUnitModal } from './ApproveUnitModal'; // New Modal Import
+import { ApproveUnitModal } from '../modals/ApproveUnitModal'; // New Modal Import
 
 export function ApprovalQueue({
     logs,

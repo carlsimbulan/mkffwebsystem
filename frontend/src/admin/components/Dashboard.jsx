@@ -30,22 +30,21 @@ const processStations = [
     "Packing", "QC Stamping"
 ];
 
-// Helper para i-convert ang minutes sa readable format (Days, Hours, Minutes)
+// Helper para i-convert ang minutes sa readable format
 const formatAgingTime = (totalMinutes) => {
     if (totalMinutes < 60) {
         return `${Math.round(totalMinutes)} mins`;
-    } else if (totalMinutes < 1440) { // Less than 24 hours
+    } else if (totalMinutes < 1440) { 
         const hours = Math.floor(totalMinutes / 60);
         const mins = Math.round(totalMinutes % 60);
         return `${hours}h ${mins}m`;
-    } else { // More than 24 hours
+    } else { 
         const days = Math.floor(totalMinutes / 1440);
         const hours = Math.floor((totalMinutes % 1440) / 60);
         return `${days}d ${hours}h`;
     }
 };
 
-// 1. Helper para sa oras at petsa
 const formatTimestamp = (isoString) => {
     if (!isoString) return { date: 'N/A', time: 'N/A' };
     const date = new Date(isoString);
@@ -55,7 +54,6 @@ const formatTimestamp = (isoString) => {
     };
 };
 
-// 2. Helper para sa kulay ng status badges
 const getStatusBadgeClass = (status) => {
     const statusText = status?.toLowerCase() || '';
     if (statusText.includes('completed') || statusText.includes('ok')) return 'bg-success-subtle text-success border border-success-subtle';
@@ -82,7 +80,28 @@ export function Dashboard({
     
     const chartRef = useRef(null); 
     const [searchTerm, setSearchTerm] = useState('');
+    const [qrValue, setQrValue] = useState(''); 
     const [selectedUnit, setSelectedUnit] = useState(null);
+
+    // --- LOGIC PARA SA QR SCAN AUTOMATIC MODAL ---
+    const handleQrInput = (val) => {
+        setQrValue(val);
+        // Hatiin ang string gamit ang pipe (|) base sa QR format niyo
+        const parts = val.split(/[|]+/); 
+        // Kunin ang assembly number (halimbawa: ASSY-00002)
+        const assemblyFromQR = parts.find(p => p.trim().toUpperCase().startsWith('ASSY-'))?.trim();
+
+        if (assemblyFromQR) {
+            const matchedUnit = logs.find(l => 
+                l.assembly_no?.toLowerCase() === assemblyFromQR.toLowerCase()
+            );
+
+            if (matchedUnit) {
+                setSelectedUnit(matchedUnit); // Automatic show modal details
+                setQrValue(''); // Reset scan field para sa susunod na scan
+            }
+        }
+    };
 
     // --- BOTTLENECK AGGREGATION ---
     const bottleneckData = useMemo(() => {
@@ -240,13 +259,18 @@ export function Dashboard({
                 .badge-pct {
                     font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; display: inline-block; margin-top: 8px;
                 }
-                .search-container { position: relative; width: 320px; }
+                .search-container { position: relative; width: 300px; }
+                .qr-container { position: relative; width: 180px; }
                 .search-icon-inside { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #64748b; }
                 .search-input-pro { 
                     padding-left: 38px !important; background-color: #f1f5f9; border: 1px solid transparent; 
                     transition: all 0.2s; 
                 }
-                .search-input-pro:focus { background-color: #fff; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+                .qr-input-pro { 
+                    padding-left: 38px !important; background-color: #eef2ff; border: 2px solid #8b5cf6; 
+                    transition: all 0.2s; 
+                }
+                .search-input-pro:focus, .qr-input-pro:focus { background-color: #fff; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
                 .search-item-result { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: all 0.2s ease; }
                 .search-item-result:hover { filter: brightness(0.95); transform: translateX(5px); }
                 .fixed-scanning-table { height: 320px; overflow-y: auto; border-radius: 0 0 16px 16px; }
@@ -279,16 +303,29 @@ export function Dashboard({
                             onClick={() => setActiveTab('reports')}
                         >
                             <i className="bi bi-file-earmark-text-fill me-2"></i>
-                            {newReportsToday} NEW REPORT{newReportsToday > 1 ? 'S' : ''} TODAY
+                            {newReportsToday} NEW REPORT TODAY
                         </div>
                     )}
 
+                    {/* --- DEDICATED QR SCAN INPUT (MAGKATABI SILA NG SEARCH) --- */}
+                    <div className="qr-container">
+                        <i className="bi bi-qr-code-scan search-icon-inside text-primary"></i>
+                        <input 
+                            type="text" 
+                            className="form-control form-control-sm rounded-pill qr-input-pro shadow-sm" 
+                            placeholder="Scan QR Tracker..." 
+                            value={qrValue}
+                            onChange={(e) => handleQrInput(e.target.value)}
+                        />
+                    </div>
+
+                    {/* --- MANUAL SEARCH INPUT --- */}
                     <div className="search-container">
                         <i className="bi bi-search search-icon-inside"></i>
                         <input 
                             type="text" 
                             className="form-control form-control-sm rounded-pill search-input-pro shadow-sm" 
-                            placeholder="Search Assembly Number..." 
+                            placeholder="Manual Search..." 
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />

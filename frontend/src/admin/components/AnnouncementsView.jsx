@@ -1,5 +1,5 @@
 import React from 'react';
-import { DeleteAnnouncementModal } from './DeleteAnnouncementModal';
+import { DeleteAnnouncementModal } from '../modals/DeleteAnnouncementModal';
 
 const getTodayDate = () => {
     const today = new Date();
