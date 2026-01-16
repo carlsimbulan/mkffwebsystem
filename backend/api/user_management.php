@@ -2,19 +2,15 @@
 // backend/api/user_management.php
 
 require_once '../cors.php'; // Handle CORS headers
-require_once '../db.php'; // Database connection
+require_once '../db.php';   // Database connection ($pdo)
 
 // --- CONFIGURATION ---
-// Define the directory where avatars will be saved (relative to this PHP script)
+// Define the directory where avatars will be saved
 $AVATAR_UPLOAD_DIR = __DIR__ . '/uploads/avatars/'; 
 // ---------------------
 
 /**
  * Handles file upload, renaming, and returns the new filename.
- * @param array $file The $_FILES['avatar'] array.
- * @param int $userId The ID of the user (used for unique naming).
- * @return string The unique filename saved to disk.
- * @throws Exception if upload or directory check fails.
  */
 function handleFileUpload($file, $userId) {
     global $AVATAR_UPLOAD_DIR;
@@ -24,11 +20,10 @@ function handleFileUpload($file, $userId) {
     }
 
     if (!is_dir($AVATAR_UPLOAD_DIR) || !is_writable($AVATAR_UPLOAD_DIR)) {
-         throw new Exception("Upload directory is missing or not writable: " . $AVATAR_UPLOAD_DIR);
+         throw new Exception("Upload directory is missing or not writable.");
     }
     
     $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-    // Create a secure, unique filename using the user ID and timestamp
     $unique_filename = "avatar_" . $userId . "_" . time() . "." . $extension;
     $target_path = $AVATAR_UPLOAD_DIR . $unique_filename;
 
@@ -43,28 +38,87 @@ function handleFileUpload($file, $userId) {
  */
 function deleteOldAvatar($oldAvatarUrl) {
     global $AVATAR_UPLOAD_DIR;
-    $filePath = $AVATAR_UPLOAD_DIR . $oldAvatarUrl;
-    if ($oldAvatarUrl && file_exists($filePath)) {
-        unlink($filePath);
+    if ($oldAvatarUrl) {
+        $filePath = $AVATAR_UPLOAD_DIR . $oldAvatarUrl;
+        if (file_exists($filePath)) {
+            unlink($filePath);
+        }
     }
 }
 
+/**
+ * Handles profile updates from the Operator Modal (Verification logic).
+ */
+function handleProfileUpdate($pdo, $data, $file) {
+    // 1. Check if required fields are present
+    if (empty($data['username']) || empty($data['old_password'])) {
+        http_response_code(400);
+        echo json_encode(["status" => "error", "message" => "Username and Old Password are required."]);
+        return;
+    }
 
-// Function to fetch all users (Updated to select avatar_url)
+    try {
+        // 2. Fetch the current user data
+        $stmt = $pdo->prepare("SELECT id, password, avatar_url FROM users WHERE username = ?");
+        $stmt->execute([$data['username']]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user) {
+            http_response_code(404);
+            echo json_encode(["status" => "error", "message" => "User not found."]);
+            return;
+        }
+
+        // 3. Direct String Comparison (Because your DB stores plain text)
+        // We compare the 'old_password' sent from React to the 'password' in the DB
+        if ($data['old_password'] !== $user['password']) {
+            http_response_code(400);
+            echo json_encode(["status" => "error", "message" => "Incorrect current password. Verification failed."]);
+            return;
+        }
+
+        $userId = $user['id'];
+        $final_avatar_url = $user['avatar_url'];
+        $new_email = !empty($data['email']) ? $data['email'] : $data['username'];
+        
+        // Use new password if provided, otherwise keep the old one
+        $new_password = !empty($data['password']) ? $data['password'] : $user['password'];
+
+        // 4. Handle Avatar Upload
+        if ($file) {
+            deleteOldAvatar($user['avatar_url']);
+            $final_avatar_url = handleFileUpload($file, $userId);
+        }
+
+        // 5. Update Record
+        $updateStmt = $pdo->prepare("UPDATE users SET username = ?, password = ?, avatar_url = ? WHERE id = ?");
+        $updateStmt->execute([$new_email, $new_password, $final_avatar_url, $userId]);
+
+        echo json_encode([
+            "status" => "success", 
+            "message" => "Profile updated successfully!", 
+            "avatar_url" => $final_avatar_url
+        ]);
+
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(["status" => "error", "message" => "Update error: " . $e->getMessage()]);
+    }
+}
+
+// --- STANDARD CRUD FUNCTIONS ---
+
 function getUsers($pdo) {
     try {
-        // NOTE: avatar_url is now included in the select statement
         $stmt = $pdo->prepare("SELECT id, username, password, role, full_name, station, avatar_url, created_at FROM users ORDER BY id ASC");
         $stmt->execute();
-        $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        echo json_encode($users);
+        echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
     } catch (PDOException $e) {
         http_response_code(500);
         echo json_encode(["message" => "Database error: " . $e->getMessage()]);
     }
 }
 
-// Function to add a new user (Updated for avatar_url and file handling)
 function addUser($pdo, $data, $file = null) {
     if (empty($data['username']) || empty($data['password']) || empty($data['role']) || empty($data['full_name'])) {
         http_response_code(400);
@@ -73,44 +127,26 @@ function addUser($pdo, $data, $file = null) {
     }
 
     try {
-        // 1. Insert user data without the final avatar URL (since we don't have the ID yet)
-        $stmt = $pdo->prepare("INSERT INTO users (username, password, role, full_name, station, created_at) 
-                               VALUES (?, ?, ?, ?, ?, NOW())");
-        
-        $stmt->execute([
-            $data['username'],
-            $data['password'],
-            $data['role'],
-            $data['full_name'],
-            $data['station'] ?? null 
-        ]);
+        $stmt = $pdo->prepare("INSERT INTO users (username, password, role, full_name, station, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+        $stmt->execute([$data['username'], $data['password'], $data['role'], $data['full_name'], $data['station'] ?? null]);
         
         $newId = $pdo->lastInsertId();
         $final_avatar_url = null;
 
-        // 2. If a file was uploaded, process it and update the record
         if ($file && $newId) {
             $final_avatar_url = handleFileUpload($file, $newId);
-            
-            // Update the user record with the actual saved filename
             $updateStmt = $pdo->prepare("UPDATE users SET avatar_url = ? WHERE id = ?");
             $updateStmt->execute([$final_avatar_url, $newId]);
         }
 
-        http_response_code(201); // Created
+        http_response_code(201);
         echo json_encode(["message" => "User added successfully.", "id" => $newId, "avatar_url" => $final_avatar_url]);
     } catch (Exception $e) {
         http_response_code(500);
-        if ($e instanceof PDOException && $e->getCode() === '23000') {
-             http_response_code(409); // Conflict
-             echo json_encode(["message" => "User with that username already exists."]);
-        } else {
-            echo json_encode(["message" => "Error adding user: " . $e->getMessage()]);
-        }
+        echo json_encode(["message" => "Error adding user: " . $e->getMessage()]);
     }
 }
 
-// Function to update an existing user (Updated for avatar_url and file handling)
 function updateUser($pdo, $data, $file = null) {
     if (empty($data['id']) || empty($data['username']) || empty($data['password']) || empty($data['role']) || empty($data['full_name'])) {
         http_response_code(400);
@@ -119,80 +155,51 @@ function updateUser($pdo, $data, $file = null) {
     }
     
     $userId = (int)$data['id'];
-    $final_avatar_url = $data['avatar_url'] ?? null; // Assumes existing or null avatar_url is passed via React
+    $final_avatar_url = $data['avatar_url'] ?? null;
 
     try {
-        // 1. Fetch current avatar URL to manage old file
         $oldUserStmt = $pdo->prepare("SELECT avatar_url FROM users WHERE id = ?");
         $oldUserStmt->execute([$userId]);
         $oldAvatarUrl = $oldUserStmt->fetchColumn();
 
-        // 2. If a new file was uploaded, handle it, delete old one
         if ($file) {
-            deleteOldAvatar($oldAvatarUrl); // Clean up old file
-            $final_avatar_url = handleFileUpload($file, $userId); // Save new file
+            deleteOldAvatar($oldAvatarUrl);
+            $final_avatar_url = handleFileUpload($file, $userId);
         }
         
-        // 3. Update database record
         $stmt = $pdo->prepare("UPDATE users SET username = ?, password = ?, role = ?, full_name = ?, station = ?, avatar_url = ? WHERE id = ?");
-        $stmt->execute([
-            $data['username'],
-            $data['password'],
-            $data['role'],
-            $data['full_name'],
-            $data['station'] ?? null,
-            $final_avatar_url, // Use the new, retained, or null filename
-            $userId
-        ]);
+        $stmt->execute([$data['username'], $data['password'], $data['role'], $data['full_name'], $data['station'] ?? null, $final_avatar_url, $userId]);
 
-        if ($stmt->rowCount() > 0) {
-            http_response_code(200);
-            echo json_encode(["message" => "User updated successfully.", "avatar_url" => $final_avatar_url]);
-        } else {
-            http_response_code(404);
-            echo json_encode(["message" => "User not found or no changes made."]);
-        }
+        http_response_code(200);
+        echo json_encode(["message" => "User updated successfully.", "avatar_url" => $final_avatar_url]);
     } catch (Exception $e) {
         http_response_code(500);
-        if (isset($e) && $e->getCode() === '23000') {
-             http_response_code(409); // Conflict
-             echo json_encode(["message" => "User with that username already exists."]);
-        } else {
-            echo json_encode(["message" => "Error updating user: " . $e->getMessage()]);
-        }
+        echo json_encode(["message" => "Error updating user: " . $e->getMessage()]);
     }
 }
 
-// Function to delete a user (Updated to clean up avatar file)
 function deleteUser($pdo, $data) {
     if (empty($data['id'])) {
         http_response_code(400);
         echo json_encode(["message" => "Missing user ID."]);
         return;
     }
-    
     $userId = (int)$data['id'];
-
-    // Safety check: Prevent deleting the primary admin (ID 1)
     if ($userId === 1) {
         http_response_code(403);
-        echo json_encode(["message" => "Cannot delete the primary system administrator (ID 1)."]);
+        echo json_encode(["message" => "Cannot delete primary admin."]);
         return;
     }
-
     try {
-        // 1. Retrieve avatar URL before deleting the record
         $oldUserStmt = $pdo->prepare("SELECT avatar_url FROM users WHERE id = ?");
         $oldUserStmt->execute([$userId]);
         $oldAvatarUrl = $oldUserStmt->fetchColumn();
         
-        // 2. Delete the database record
         $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
         $stmt->execute([$userId]);
 
         if ($stmt->rowCount() > 0) {
-            deleteOldAvatar($oldAvatarUrl); // 3. Clean up the file
-            http_response_code(200);
+            deleteOldAvatar($oldAvatarUrl);
             echo json_encode(["message" => "User deleted successfully."]);
         } else {
             http_response_code(404);
@@ -204,41 +211,45 @@ function deleteUser($pdo, $data) {
     }
 }
 
+// --- MAIN REQUEST HANDLER ---
 
-// --- Main Request Handler ---
 $method = $_SERVER['REQUEST_METHOD'];
 $file = null;
+$data = [];
 
-// 1. Check for method override (e.g., POST?method=PUT)
+// Override method if POST?method=PUT is used
 if ($method === 'POST' && isset($_GET['method'])) {
     $method = strtoupper($_GET['method']);
 }
 
-// 2. Determine input source (JSON vs. Multipart)
+// Capture Multipart Data or JSON
 if ($method === 'POST' || $method === 'PUT') {
     if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === UPLOAD_ERR_OK) {
-        // Case A: File is uploaded (using $_FILES and $_POST)
         $data = $_POST;
         $file = $_FILES['avatar'];
     } else {
-        // Case B: No file uploaded, read JSON body (regular updates)
         $input = file_get_contents('php://input');
         $data = $input ? json_decode($input, true) : [];
+        // Support regular POST fields if JSON is empty
+        if (empty($data)) { $data = $_POST; }
     }
 } else {
-    // Case C: GET/DELETE requests (read JSON input if available, though typically empty)
     $input = file_get_contents('php://input');
     $data = $input ? json_decode($input, true) : [];
 }
 
-
-// 3. Route the request
+// ROUTING
 switch ($method) {
     case 'GET':
         getUsers($pdo);
         break;
     case 'POST':
-        addUser($pdo, $data, $file);
+        // Check if this is a Profile Update from the Operator Modal
+        if (isset($data['action']) && $data['action'] === 'update_profile') {
+            handleProfileUpdate($pdo, $data, $file);
+        } else {
+            addUser($pdo, $data, $file);
+        }
         break;
     case 'PUT':
         updateUser($pdo, $data, $file);
@@ -247,7 +258,7 @@ switch ($method) {
         deleteUser($pdo, $data);
         break;
     default:
-        http_response_code(405); // Method Not Allowed
+        http_response_code(405);
         echo json_encode(["message" => "Method not supported."]);
         break;
 }

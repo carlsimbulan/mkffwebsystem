@@ -10,6 +10,7 @@ import StationHistoryModal from './modals/StationHistoryModal';
 import UnscannedUnitsTable from './components/UnscannedUnitsTable';
 import LiveMonitoringTable from './components/LiveMonitoringTable';
 import GeneratedQRList from './components/GeneratedQRList';
+import { UserProfileModal } from './modals/UserProfileModal';
 
 // --- 🛠️ CONFIGURATION ---
 const API_BASE_URL = "http://localhost/mkffwebsystem/backend/api";
@@ -46,12 +47,17 @@ export default function ITAssistantPage({ user, onLogout }) {
     const [unitLogs, setUnitLogs] = useState([]);
     const [stations, setStations] = useState([]);
     const [nextAssemblyNo, setNextAssemblyNo] = useState(1);
+    
+    // Process Status for the "Ganda" Success Animation
+    const [processStatus, setProcessStatus] = useState('idle'); 
+    const [statusMessage, setStatusMessage] = useState("");
+
     const [showModal, setShowModal] = useState(false);
     const [modalConfig, setModalConfig] = useState({});
-    const [loading, setLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [activeMonitorStationId, setActiveMonitorStationId] = useState(null);
     const [activeHistoryStation, setActiveHistoryStation] = useState(null);
+    const [showProfileModal, setShowProfileModal] = useState(false);
 
     // --- 📡 DATA SYNC ---
     useEffect(() => {
@@ -71,7 +77,10 @@ export default function ITAssistantPage({ user, onLogout }) {
     }, [user.username]);
 
     const fetchUnitData = useCallback(async (isInitial = false) => {
-        if (isInitial) setLoading(true);
+        if (isInitial) {
+            setProcessStatus('loading');
+            setStatusMessage("Fetching initial data...");
+        }
         try {
             const unitsRes = await axios.get(UNITS_ENDPOINT);
             const fetchedUnits = Array.isArray(unitsRes.data) ? unitsRes.data : [];
@@ -85,8 +94,11 @@ export default function ITAssistantPage({ user, onLogout }) {
                 });
                 setNextAssemblyNo(maxAssembly + 1);
             }
-        } catch (err) { console.error("Failed to sync units."); } 
-        finally { if (isInitial) setLoading(false); }
+            if (isInitial) setProcessStatus('idle');
+        } catch (err) { 
+            console.error("Failed to sync units."); 
+            if (isInitial) setProcessStatus('idle');
+        } 
     }, []);
 
     useEffect(() => {
@@ -100,6 +112,36 @@ export default function ITAssistantPage({ user, onLogout }) {
         return () => clearInterval(interval);
     }, [fetchUnitData]);
 
+    // 🔑 Magandang Success Animation Logic for Profile Update
+    const handleUpdateProfile = async (formData) => {
+        setProcessStatus('loading');
+        setStatusMessage("Updating your account details...");
+        try {
+            const res = await axios.post(USER_ENDPOINT, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            if (res.data.status === 'success') {
+                // 🌟 SHOW GREEN SUCCESS SCREEN
+                setProcessStatus('success');
+                setStatusMessage("Profile updated successfully!");
+                setShowProfileModal(false);
+
+                // Wait for user to see the success before reload
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                setProcessStatus('error');
+                setStatusMessage(res.data.message || "Update Failed");
+                setTimeout(() => setProcessStatus('idle'), 3000);
+            }
+        } catch (err) {
+            setProcessStatus('error');
+            setStatusMessage("An error occurred during update.");
+            setTimeout(() => setProcessStatus('idle'), 3000);
+        }
+    };
+
     const calculateMetrics = (logs) => {
         const counts = { forScanning: 0, completed: 0, inProgress: 0, noGood: 0, totalTracked: 0, pendingApproval: 0 };
         logs.forEach(log => {
@@ -111,9 +153,7 @@ export default function ITAssistantPage({ user, onLogout }) {
             else if (s === 'No Good (NG)') counts.noGood++;
             else if (s === 'Pending Approval') counts.pendingApproval++;
         });
-
         const calcPct = (val) => logs.length > 0 ? ((val / logs.length) * 100).toFixed(1) : 0;
-
         return { 
             ...counts, 
             total: logs.length,
@@ -132,7 +172,6 @@ export default function ITAssistantPage({ user, onLogout }) {
         return { completed, inProgress, noGood };
     };
 
-    // --- EVENT HANDLERS ---
     const handleGenerateQR = (e) => {
         e.preventDefault();
         const quantity = parseInt(qrFormData.quantity, 10);
@@ -154,15 +193,20 @@ export default function ITAssistantPage({ user, onLogout }) {
     };
 
     const handleSaveToDB = async () => {
-        setIsSaving(true);
+        setProcessStatus('loading');
+        setStatusMessage("Saving QR Batch to database...");
         try {
             await Promise.all(generatedQRList.map(unit => axios.post(UNITS_ENDPOINT, { ...unit, action: 'create', username: user.username, station: 'N/A' })));
-            setModalConfig({ title: "Success", message: "Batch saved to DB.", type: "success" });
-            setShowModal(true); setGeneratedQRList([]); fetchUnitData(false);
+            setProcessStatus('success');
+            setStatusMessage("Batch saved successfully!");
+            setGeneratedQRList([]); 
+            fetchUnitData(false);
+            setTimeout(() => setProcessStatus('idle'), 2000);
         } catch (error) {
-            setModalConfig({ title: "Error", message: "Save failed.", type: "error" });
-            setShowModal(true);
-        } finally { setIsSaving(false); }
+            setProcessStatus('error');
+            setStatusMessage("Failed to save batch.");
+            setTimeout(() => setProcessStatus('idle'), 3000);
+        }
     };
 
     const renderContent = () => {
@@ -171,7 +215,6 @@ export default function ITAssistantPage({ user, onLogout }) {
                 const m = calculateMetrics(unitLogs);
                 return (
                     <div>
-                        {/* ROW 1: PRIMARY METRICS */}
                         <div className="row g-3 mb-3">
                             <div className="col-md-4">
                                 <div className="card border-0 border-start border-4 border-dark shadow-sm p-3 bg-white">
@@ -196,7 +239,6 @@ export default function ITAssistantPage({ user, onLogout }) {
                             </div>
                         </div>
 
-                        {/* ROW 2: QUALITY & ACTION METRICS */}
                         <div className="row g-3 mb-4">
                             <div className="col-md-4">
                                 <div className="card border-0 border-start border-4 border-success shadow-sm p-3 bg-white">
@@ -212,7 +254,6 @@ export default function ITAssistantPage({ user, onLogout }) {
                                     <div className="badge bg-danger bg-opacity-10 text-danger p-2" style={{ fontSize: '0.7rem', width: 'fit-content' }}>{m.pctNoGood}% Failure</div>
                                 </div>
                             </div>
-                            {/* PENDING APPROVAL CONTAINER WITH GO BUTTON */}
                             <div className="col-md-4">
                                 <div className="card border-0 border-start border-4 border-primary shadow-sm p-3 bg-white h-100">
                                     <div className="d-flex justify-content-between align-items-start">
@@ -221,13 +262,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                                             <h2 className="fw-bold my-2">{m.pendingApproval}</h2>
                                             <div className="badge bg-primary bg-opacity-10 text-primary p-2" style={{ fontSize: '0.7rem', width: 'fit-content' }}>{m.pctPending}% Units</div>
                                         </div>
-                                        <button 
-                                            className="btn btn-primary btn-sm rounded-pill px-3 fw-bold shadow-sm" 
-                                            style={{ fontSize: '0.7rem' }}
-                                            onClick={() => setActiveTab('approvals')}
-                                        >
-                                            GO <i className="bi bi-chevron-right ms-1"></i>
-                                        </button>
+                                        <button className="btn btn-primary btn-sm rounded-pill px-3 fw-bold shadow-sm" style={{ fontSize: '0.7rem' }} onClick={() => setActiveTab('approvals')}>GO <i className="bi bi-chevron-right ms-1"></i></button>
                                     </div>
                                 </div>
                             </div>
@@ -323,37 +358,13 @@ export default function ITAssistantPage({ user, onLogout }) {
     return (
         <div className="d-flex min-vh-100 bg-light">
             <style>{`
-                .sidebar-link { 
-                    border-radius: 0; 
-                    padding: 14px 20px; 
-                    border: none; 
-                    background: transparent; 
-                    color: #9ca3af; 
-                    width: 100%; 
-                    text-align: left; 
-                    font-weight: 600; 
-                    font-size: 0.8rem;
-                    letter-spacing: 0.5px;
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    border-left: 4px solid transparent;
-                }
+                .sidebar-link { border-radius: 0; padding: 14px 20px; border: none; background: transparent; color: #9ca3af; width: 100%; text-align: left; font-weight: 600; font-size: 0.8rem; letter-spacing: 0.5px; display: flex; align-items: center; gap: 12px; border-left: 4px solid transparent; }
                 .sidebar-link i { font-size: 1.1rem; }
                 .sidebar-link:hover { background: #1f2937; color: #fff; }
-                .sidebar-link.active { 
-                    background: #1f2937; 
-                    color: #fff; 
-                    border-left-color: #ef4444; 
-                }
+                .sidebar-link.active { background: #1f2937; color: #fff; border-left-color: #ef4444; }
+                .sidebar-label { font-size: 0.65rem; font-weight: 800; color: #4b5563; padding: 20px 20px 10px; letter-spacing: 1px; }
+                .avatar-clickable:hover { opacity: 0.8; cursor: pointer; transform: scale(1.05); transition: 0.2s; }
                 .uppercase { text-transform: uppercase; }
-                .sidebar-label {
-                    font-size: 0.65rem;
-                    font-weight: 800;
-                    color: #4b5563;
-                    padding: 20px 20px 10px;
-                    letter-spacing: 1px;
-                }
             `}</style>
 
             {/* SIDEBAR */}
@@ -362,33 +373,17 @@ export default function ITAssistantPage({ user, onLogout }) {
                     <img src={logo} alt="Logo" style={{ width: '30px', marginRight: '12px' }} />
                     <span className="fs-6 fw-bold letter-spacing-1">IT Assistant</span>
                 </div>
-                
                 <div className="nav flex-column">
                     <div className="sidebar-label">MAIN NAVIGATION</div>
-                    <button className={`sidebar-link ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}>
-                        <i className="bi bi-grid-fill"></i> OVERVIEW
-                    </button>
-                    <button className={`sidebar-link ${activeTab === 'qr_generator' ? 'active' : ''}`} onClick={() => setActiveTab('qr_generator')}>
-                        <i className="bi bi-qr-code-scan"></i> QR GENERATOR
-                    </button>
-                    <button className={`sidebar-link ${activeTab.includes('station') ? 'active' : ''}`} onClick={() => setActiveTab('station_monitor')}>
-                        <i className="bi bi-cpu-fill"></i> STATION MONITOR
-                    </button>
-                    <button className={`sidebar-link ${activeTab === 'approvals' ? 'active' : ''}`} onClick={() => setActiveTab('approvals')}>
-                        <i className="bi bi-check-circle-fill"></i> APPROVALS
-                    </button>
-
+                    <button className={`sidebar-link ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}><i className="bi bi-grid-fill"></i> OVERVIEW</button>
+                    <button className={`sidebar-link ${activeTab === 'qr_generator' ? 'active' : ''}`} onClick={() => setActiveTab('qr_generator')}><i className="bi bi-qr-code-scan"></i> QR GENERATOR</button>
+                    <button className={`sidebar-link ${activeTab.includes('station') ? 'active' : ''}`} onClick={() => setActiveTab('station_monitor')}><i className="bi bi-cpu-fill"></i> STATION MONITOR</button>
+                    <button className={`sidebar-link ${activeTab === 'approvals' ? 'active' : ''}`} onClick={() => setActiveTab('approvals')}><i className="bi bi-check-circle-fill"></i> APPROVALS</button>
                     <div className="sidebar-label">SYSTEM</div>
-                    <button onClick={onLogout} className="sidebar-link text-danger">
-                        <i className="bi bi-power"></i> LOGOUT SESSION
-                    </button>
+                    <button onClick={onLogout} className="sidebar-link text-danger"><i className="bi bi-power"></i> LOGOUT SESSION</button>
                 </div>
-
-{/* UPDATED SIDEBAR FOOTER */}
                 <div className="mt-auto p-3 border-top border-secondary bg-dark bg-opacity-25">
-                    <div className="d-flex align-items-center gap-2">
-                        <span className="text-white fw-bold" style={{ fontSize: '0.65rem' }}>©2025 MKFF LASER TECHNIQUE</span>
-                    </div>
+                    <span className="text-white fw-bold" style={{ fontSize: '0.65rem' }}>©2025 MKFF LASER TECHNIQUE</span>
                 </div>
             </div>
 
@@ -403,20 +398,33 @@ export default function ITAssistantPage({ user, onLogout }) {
                         </div>
                         <img 
                             src={currentAvatar ? `${AVATAR_UPLOAD_PATH}${currentAvatar}` : DEFAULT_AVATAR_PATH} 
-                            alt="Profile" className="rounded-circle border"
+                            alt="Profile" className="rounded-circle border avatar-clickable"
                             style={{ width: '40px', height: '40px', objectFit: 'cover' }} 
+                            onClick={() => setShowProfileModal(true)}
                         />
                     </div>
                 </header>
-
                 <div className="p-4" style={{ height: 'calc(100vh - 70px)', overflowY: 'auto' }}>
                     {renderContent()}
                 </div>
             </div>
 
+            {/* 🔑 USER PROFILE MODAL */}
+            {showProfileModal && (
+                <UserProfileModal 
+                    user={user} 
+                    currentAvatar={currentAvatar ? `${AVATAR_UPLOAD_PATH}${currentAvatar}` : DEFAULT_AVATAR_PATH}
+                    currentFullName={currentFullName}
+                    onClose={() => setShowProfileModal(false)}
+                    onSave={handleUpdateProfile}
+                />
+            )}
+
+            {/* 🔑 MAGANDANG OVERLAY (Loading, Success, Error) */}
+            <LoadingOverlay status={processStatus} message={statusMessage} />
+
             {showModal && <CustomMessageModal title={modalConfig.title} message={modalConfig.message} type={modalConfig.type} onClose={() => setShowModal(false)} />}
             {activeHistoryStation && <StationHistoryModal stationId={activeHistoryStation} onClose={() => setActiveHistoryStation(null)} user={user} />}
-            {loading && <LoadingOverlay status="loading" message="Fetching..." />}
         </div>
     );
 }

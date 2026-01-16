@@ -14,6 +14,7 @@ import { UnitHistoryLog } from './components/UnitHistoryLog';
 import { UnitListTable } from './components/UnitListTable';
 import { EditUnitModal } from './modals/EditUnitModal';
 import { AnnouncementView } from './components/AnnouncementView';
+import { UserProfileModal } from './modals/UserProfileModal'; // <--- DAGDAG
 
 
 // REGISTER CHART COMPONENTS (Kept here for global chart setup)
@@ -121,6 +122,7 @@ export default function StationDashboard({ user, onLogout }) {
     const [announcements, setAnnouncements] = useState([]); 
     const [announcementLoading, setAnnouncementLoading] = useState(false);
     const [announcementError, setAnnouncementError] = useState(null);
+    const [showProfileModal, setShowProfileModal] = useState(false); // <--- DAGDAG
     
     const [lastReadId, setLastReadId] = useState(() => {
         // Initialize state from Local Storage on mount
@@ -320,6 +322,31 @@ try {
             localStorage.setItem(ANNOUNCEMENT_READ_KEY, numericNewestId); // Update Local Storage
         }
     }, [lastReadId, ANNOUNCEMENT_READ_KEY]);
+
+    // 🔑 Profile Update logic (New)
+    const handleUpdateProfile = async (formData) => {
+        setProcessStatus('loading');
+        setStatusMessage("Validating and Updating Profile...");
+        try {
+            const res = await axios.post(USER_ENDPOINT, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            if (res.data.status === 'success') {
+                setProcessStatus('success');
+                setStatusMessage("Profile updated! Refreshing...");
+                setShowProfileModal(false);
+                setTimeout(() => window.location.reload(), 2000);
+            } else {
+                setProcessStatus('error');
+                setStatusMessage(res.data.message || "Update Failed");
+                setTimeout(() => setProcessStatus('idle'), 3000);
+            }
+        } catch (err) {
+            setProcessStatus('error');
+            setStatusMessage(`Error: ${err.message}`);
+            setTimeout(() => setProcessStatus('idle'), 4000);
+        }
+    };
 
     // --- 🔑 POLLING EFFECT FOR ANNOUNCEMENTS (1 second) ---
     useEffect(() => {
@@ -786,6 +813,17 @@ else {
             {/* Render Modal globally */}
             {unitToEdit && <EditUnitModal unit={unitToEdit} onClose={() => setUnitToEdit(null)} onSave={handleSaveEdit} />}
             
+            {/* PROFILE MODAL (New) */}
+            {showProfileModal && (
+                <UserProfileModal 
+                    user={user} 
+                    currentAvatar={headerAvatarSrc}
+                    currentFullName={currentFullName}
+                    onClose={() => setShowProfileModal(false)}
+                    onSave={handleUpdateProfile}
+                />
+            )}
+
             {/* 🔑 Unit Status Change Toast (Still active) */}
             <StatusChangeToast 
                 message={unitStatusNotification} 
@@ -933,12 +971,12 @@ else {
                                     <div className="text-muted" style={{fontSize: '0.7rem'}}>Authorized Operator</div>
                                 </div>
 
-                                {/* Avatar (Unchanged) */}
-                                <div className="position-relative">
+                                {/* Avatar (Clickable) */}
+                                <div className="position-relative" style={{ cursor: 'pointer' }} onClick={() => setShowProfileModal(true)}>
                                     <img 
                                         src={headerAvatarSrc} 
                                         alt="User" 
-                                        className="rounded-circle border border-gray-300"
+                                        className="rounded-circle border border-gray-300 avatar-hover"
                                         style={{ width: '42px', height: '42px', objectFit: 'cover' }} 
                                         onError={(e) => { 
                                             e.target.onerror = null; 
@@ -974,6 +1012,7 @@ else {
             <style jsx>{`
                 .hover-white:hover { color: white !important; background: rgba(255,255,255,0.1) !important; }
                 .fade-in-up { animation: fadeInUp 0.5s ease-out; }
+                .avatar-hover:hover { opacity: 0.8; transform: scale(1.05); transition: 0.2s; }
                 @keyframes fadeInUp {
                     from { opacity: 0; transform: translateY(20px); }
                     to { opacity: 1; transform: translateY(0); }
@@ -1011,8 +1050,6 @@ else {
                 }
                 
             `}</style>
-            
-            {/* CSS Helper para sa Hover effects ng Sidebar (Redundant style block removed) */}
         </>
     )
 };
