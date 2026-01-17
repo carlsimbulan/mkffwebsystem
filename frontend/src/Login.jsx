@@ -66,9 +66,9 @@ export default function Login({ onLogin }) {
                 setStatusMessage(`Identity verified. Redirecting to ${res.data.user.role} workspace...`);
                 setTimeout(() => {
                     onLogin(res.data.user);
-                    if (res.data.user.role === 'Administrator') navigate('/admin');
-                    else if (res.data.user.role === 'IT Assistant') navigate('/itassistant');
-                    else navigate('/operator');
+                    if (res.data.user.role === 'Administrator') navigate('/admin/dashboard');
+                    else if (res.data.user.role === 'IT Assistant') navigate('/itassistant/overview');
+                    else navigate('/operator/home');
                 }, 1800); 
             } else {
                 setLoginStatus('error');

@@ -32,6 +32,8 @@ import { DeleteAnnouncementModal } from './modals/DeleteAnnouncementModal';
 import { Shipment } from './components/Shipment';
 
 import NoGoodUnits from './components/NoGoodUnits';
+// Palitan ang lumang import ng:
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 
 // REGISTER CHART COMPONENTS GLOBALLY
 ChartJS.register(
@@ -78,7 +80,16 @@ const getTodayDate = () => {
 };
 
 export default function AdminPage({ user, onLogout }) {
-    const [activeTab, setActiveTab] = useState("dashboard");
+    const navigate = useNavigate();
+const location = useLocation();
+
+// Kinukuha ang huling part ng URL (e.g., /admin/dashboard -> "dashboard")
+const activeTab = location.pathname.split('/').pop() || "dashboard";
+
+// Function para sa paglipat ng tab gamit ang URL
+const handleTabChange = (tabName) => {
+    navigate(`/admin/${tabName}`);
+};
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [filterStartDate, setFilterStartDate] = useState('');
     const [filterEndDate, setFilterEndDate] = useState(getTodayDate());
@@ -317,15 +328,15 @@ const fetchData = async () => {
     };
 
     // --- NOTIFICATION HANDLERS (KEPT AS IS) ---
-    const handleBellClick = () => { setActiveTab('notifications'); };
-    const handleDismissAllNotifications = () => { setNotifications([]); setActiveTab('dashboard'); };
+    const handleBellClick = () => { handleTabChange('notifications'); };
+    const handleDismissAllNotifications = () => { setNotifications([]); handleTabChange('dashboard'); };
     const handleClearNewReports = () => { setNotifications(prev => prev.filter(n => n.type !== 'NewReport')); };
     const handleClearDelayedUnits = () => { setNotifications(prev => prev.filter(n => n.type !== 'DelayedUnit')); };
 
     const handleNotificationClick = (notification) => {
         if (notification.type === 'NewReport') {
             setHighlightedUnitId(null);
-            setActiveTab('reports');
+            handleTabChange('reports');
             const report = dailyReportsList.find(r => r.id === notification.reportId);
             if (report) {
                 setReportDate(report.report_date.split(' ')[0]);
@@ -333,7 +344,7 @@ const fetchData = async () => {
                 setSelectedReportToView(report);
             }
         } else if (notification.type === 'DelayedUnit') {
-            setActiveTab('station_monitor');
+            handleTabChange('station_monitor');
             // Normalize station ID match for notification click
             const targetStation = stations.find(s => s.id.replace(/\s/g, '') === notification.stationId.replace(/\s/g, ''));
             if (targetStation) {
@@ -349,7 +360,7 @@ const fetchData = async () => {
     // --- UNIT HANDLERS (KEPT AS IS) ---
     const handleMonitorStation = (stationId) => {
         setStationMonitorId(stationId);
-        setActiveTab('station_monitor');
+        handleTabChange('station_monitor');
         setHighlightedUnitId(null);
     };
     const handleEditClick = (log) => { setSelectedUnitToEdit(log); };
@@ -608,7 +619,7 @@ const renderContent = () => {
                         stations={stations}
                         calculateMetrics={calculateStationMetrics}
                         overallMetrics={overallMetrics}
-                        setActiveTab={setActiveTab}
+                        handleTabChange={handleTabChange}
                         dashboardView={dashboardView}
                         nextChart={nextChart}
                         prevChart={prevChart}
@@ -627,7 +638,7 @@ const renderContent = () => {
                         calculateMetrics={calculateStationMetrics}
                         stationMonitorId={stationMonitorId}
                         highlightedUnitId={highlightedUnitId}
-                        setActiveTab={setActiveTab}
+                        handleTabChange={handleTabChange}
                         handleMonitorStation={handleMonitorStation}
                         handleViewHistory={handleViewHistory}
                         handleEditClick={handleEditClick}
@@ -720,7 +731,7 @@ case "announcements":
                 return (
                     <NotificationContent
                         notifications={notifications}
-                        onDismissAll={() => { handleDismissAllNotifications(); setActiveTab('dashboard'); }}
+                        onDismissAll={() => { handleDismissAllNotifications(); handleTabChange('dashboard'); }}
                         onClearReports={handleClearNewReports}
                         onClearDelayed={handleClearDelayedUnits}
                         onNotificationClick={(n) => { handleNotificationClick(n); }}
@@ -790,7 +801,7 @@ return (
                 <li className="nav-item">
                     <button
                         className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "dashboard" ? "active bg-danger" : ""}`}
-                        onClick={() => setActiveTab("dashboard")}
+                        onClick={() => handleTabChange("dashboard")}
                     >
                         <i className="bi bi-speedometer2"></i>
                         Dashboard
@@ -803,7 +814,7 @@ return (
                         className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${
                             (activeTab === "stations" || activeTab === "station_monitor" || activeTab === "overall_history") ? "active bg-danger" : "" 
                         }`}
-                        onClick={() => setActiveTab("stations")}
+                        onClick={() => handleTabChange("stations")}
                     >
                         <i className="bi bi-grid-3x3-gap"></i>
                         Stations
@@ -816,7 +827,7 @@ return (
                 <li className="nav-item">
                     <button
                         className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "approval" ? "active bg-danger" : ""}`}
-                        onClick={() => setActiveTab("approval")}
+                        onClick={() => handleTabChange("approval")}
                     >
                         <i className="bi bi-check-circle"></i>
                         Approvals
@@ -827,7 +838,7 @@ return (
                 <li className="nav-item">
                     <button
                         className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "no_good_list" ? "active bg-danger" : ""}`}
-                        onClick={() => setActiveTab("no_good_list")}
+                        onClick={() => handleTabChange("no_good_list")}
                     >
                         <i className="bi bi-x-octagon-fill"></i>
                         No Good List
@@ -838,7 +849,7 @@ return (
                 <li className="nav-item">
                     <button
                         className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "shipment" ? "active bg-danger" : ""}`}
-                        onClick={() => setActiveTab("shipment")}
+                        onClick={() => handleTabChange("shipment")}
                     >
                         <i className="bi bi-truck-flatbed"></i>
                         Shipment
@@ -851,7 +862,7 @@ return (
                 <li className="nav-item">
                     <button
                         className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "reports" ? "active bg-danger" : ""}`}
-                        onClick={() => setActiveTab("reports")}
+                        onClick={() => handleTabChange("reports")}
                     >
                         <i className="bi bi-file-text"></i>
                         Reports
@@ -862,7 +873,7 @@ return (
                 <li className="nav-item">
                     <button
                         className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "data_analytics" ? "active bg-danger" : ""}`}
-                        onClick={() => setActiveTab("data_analytics")}
+                        onClick={() => handleTabChange("data_analytics")}
                     >
                         <i className="bi bi-graph-up"></i> {/* Pwede ring bi-bar-chart-line */}
                         Data Analytics
@@ -873,7 +884,7 @@ return (
                 <li className="nav-item">
                     <button
                         className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "announcements" ? "active bg-danger" : ""}`}
-                        onClick={() => setActiveTab("announcements")}
+                        onClick={() => handleTabChange("announcements")}
                     >
                         <i className="bi bi-megaphone-fill"></i>
                         Announcement Board
@@ -884,7 +895,7 @@ return (
                 <li className="nav-item">
                     <button
                         className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "manage_account" ? "active bg-danger" : ""}`}
-                        onClick={() => setActiveTab("manage_account")}
+                        onClick={() => handleTabChange("manage_account")}
                     >
                         <i className="bi bi-person-gear"></i>
                         Manage Account

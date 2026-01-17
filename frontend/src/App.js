@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
-// Import ang mga kailangan mula sa React Router
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import Login from "./Login"; // Dapat naka-wrap sa withRouter ang Login component
+import Login from "./Login"; 
 import AdminPage from "./admin/AdminPage";
 import StationDashboard from "./Operators/StationDashboard";
 import ITAssistantPage from "./qrgenpage/ITAssistantPage";
@@ -10,40 +9,31 @@ import ITAssistantPage from "./qrgenpage/ITAssistantPage";
 const getHomePathByRole = (role) => {
     switch (role) {
         case 'Administrator':
-            return '/admin';
+            return '/admin/dashboard';
         case 'IT Assistant':
-            return '/itassistant';
+            return '/itassistant/overview';
         case 'Operator':
-            return '/operator';
+            return '/operator/dashboard'; // <--- BINAGO: Default sa dashboard sub-route
         default:
-            return '/'; // Fallback to login
+            return '/login';
     }
 };
 
 // --- PRIVATE ROUTE COMPONENT ---
-// Ito ang magche-check kung may session at tamang role bago mag-render ng page.
 const PrivateRoute = ({ element: Element, requiredRole, user, onLogout }) => {
-    // Check 1: May user data ba sa state (galing sa App.js)?
     const isLoggedIn = !!user;
 
     if (!isLoggedIn) {
-        // Kapag walang user sa state (kahit sa refresh), ibalik sa Login page
-        return <Navigate to="/" replace />;
+        return <Navigate to="/login" replace />;
     }
     
-    // Check 2: Kung may user, tama ba ang role?
     if (requiredRole && user.role !== requiredRole) {
-        // Kung hindi tumugma ang role sa requiredRole, i-redirect sa HOME DASHBOARD ng user
         const homePath = getHomePathByRole(user.role);
         return <Navigate to={homePath} replace />;
     }
 
-    // I-render ang Component kasama ang props
     return <Element user={user} onLogout={onLogout} />;
 };
-// ------------------------------
-
-// ... (keep helper functions and PrivateRoute as they are)
 
 function App() {
     const [user, setUser] = useState(() => {
@@ -75,18 +65,18 @@ function App() {
     return (
         <BrowserRouter>
             <Routes>
-                {/* 1. Updated Login Path to /login */}
+                {/* 1. Login Path */}
                 <Route path="/login" element={<Login onLogin={handleLogin} />} />
 
-                {/* 2. Root Redirect: If someone goes to /, send them to /login or their dashboard */}
+                {/* 2. Root Redirect */}
                 <Route 
                     path="/" 
                     element={user ? <Navigate to={getHomePathByRole(user.role)} replace /> : <Navigate to="/login" replace />} 
                 />
 
-                {/* Admin Page */}
+                {/* 3. Admin Page */}
                 <Route 
-                    path="/admin" 
+                    path="/admin/*" 
                     element={<PrivateRoute 
                         element={AdminPage} 
                         requiredRole="Administrator" 
@@ -95,9 +85,9 @@ function App() {
                     />} 
                 />
 
-                {/* IT Assistant Page */}
+                {/* 4. IT Assistant Page */}
                 <Route 
-                    path="/itassistant" 
+                    path="/itassistant/*" 
                     element={<PrivateRoute 
                         element={ITAssistantPage} 
                         requiredRole="IT Assistant" 
@@ -106,9 +96,9 @@ function App() {
                     />} 
                 />
 
-                {/* Operator Page */}
+                {/* 5. Operator Page - NILAGYAN NG /* PARA SA SUB-ROUTES */}
                 <Route 
-                    path="/operator" 
+                    path="/operator/*" 
                     element={<PrivateRoute 
                         element={StationDashboard} 
                         requiredRole="Operator" 
@@ -117,7 +107,7 @@ function App() {
                     />} 
                 />
                 
-                {/* 3. Updated Catch-all: Redirect unknown URLs to /login if not logged in */}
+                {/* 6. Catch-all Redirect */}
                 <Route 
                     path="*" 
                     element={user ? <Navigate to={getHomePathByRole(user.role)} replace /> : <Navigate to="/login" replace />} 

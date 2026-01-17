@@ -11,6 +11,7 @@ import UnscannedUnitsTable from './components/UnscannedUnitsTable';
 import LiveMonitoringTable from './components/LiveMonitoringTable';
 import GeneratedQRList from './components/GeneratedQRList';
 import { UserProfileModal } from './modals/UserProfileModal';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 
 // --- 🛠️ CONFIGURATION ---
 const API_BASE_URL = "http://localhost/mkffwebsystem/backend/api";
@@ -37,7 +38,16 @@ const safeParseSerial = (serialStr, prefix) => {
 };
 
 export default function ITAssistantPage({ user, onLogout }) {
-    const [activeTab, setActiveTab] = useState("overview");
+    const navigate = useNavigate();
+const location = useLocation();
+
+// Kunin ang huling bahagi ng URL (e.g., /itassistant/overview -> overview)
+const activeTab = location.pathname.split('/').pop() || "overview";
+
+// Helper function para sa paglipat ng page/tab
+const setActiveTab = (tab) => {
+    navigate(`/itassistant/${tab}`);
+};
     const [currentAvatar, setCurrentAvatar] = useState(user?.avatar_url || null);
     const [currentFullName, setCurrentFullName] = useState(user?.full_name || user?.username);
 

@@ -15,6 +15,7 @@ import { UnitListTable } from './components/UnitListTable';
 import { EditUnitModal } from './modals/EditUnitModal';
 import { AnnouncementView } from './components/AnnouncementView';
 import { UserProfileModal } from './modals/UserProfileModal'; // <--- DAGDAG
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 
 
 // REGISTER CHART COMPONENTS (Kept here for global chart setup)
@@ -118,7 +119,16 @@ export default function StationDashboard({ user, onLogout }) {
     const ANNOUNCEMENT_READ_KEY = `lastReadAnnouncementId_${user.username}`;
     
     // --- HOOKS DEFINITIONS ---
-    const [activeTab, setActiveTab] = useState("home"); 
+    const navigate = useNavigate();
+const location = useLocation();
+
+// This extracts the last part of the URL (e.g., /operator/input_unit -> input_unit)
+const activeTab = location.pathname.split('/').pop() || "dashboard";
+
+// Helper function to change tabs
+const setActiveTab = (tab) => {
+    navigate(`/operator/${tab}`);
+}; 
     const [announcements, setAnnouncements] = useState([]); 
     const [announcementLoading, setAnnouncementLoading] = useState(false);
     const [announcementError, setAnnouncementError] = useState(null);
