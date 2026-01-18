@@ -73,9 +73,12 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                     <h3 className="fw-bold text-dark mb-1">{processName}</h3>
                     <p className="text-muted small mb-0">Operational View • ID: {stationMonitorId}</p>
                 </div>
-                <button className="btn btn-light border btn-sm btn-box px-3" onClick={() => setActiveTab('stations')}>
-                    <i className="bi bi-arrow-left me-1"></i> BACK
-                </button>
+<button 
+    className="btn btn-light border btn-sm btn-box px-3" 
+    onClick={() => setActiveTab && typeof setActiveTab === 'function' ? setActiveTab('stations') : console.warn('setActiveTab not found')}
+>
+    <i className="bi bi-arrow-left me-1"></i> BACK
+</button>
             </div>
 
             <div className="row g-4 mb-4">

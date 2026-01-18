@@ -637,6 +637,7 @@ const renderContent = () => {
                         stations={stations}
                         calculateMetrics={calculateStationMetrics}
                         stationMonitorId={stationMonitorId}
+                        setActiveTab={handleTabChange}
                         highlightedUnitId={highlightedUnitId}
                         handleTabChange={handleTabChange}
                         handleMonitorStation={handleMonitorStation}
