@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import 'bootstrap-icons/font/bootstrap-icons.css';
-import logo from './logo.png'; 
+import logo from './icon.ico'; 
 import { useNavigate } from 'react-router-dom';
 
 const API_BASE_URL = "http://localhost/mkffwebsystem/backend/api";
@@ -114,7 +114,7 @@ export default function Login({ onLogin }) {
                 <div className="col-lg-6 d-flex flex-column justify-content-center align-items-center left-panel p-5 text-center">
                     <img src={logo} alt="Logo" className="mb-4" style={{ height: "130px", width: "auto" }} />
                     
-                    <h1 className="fw-bold mb-1 h2 tracking-tight">Edge Sensor Assembly MKFF</h1>
+                    <h1 className="fw-bold mb-1 h2 tracking-tight">Edge Sensor Assembly Process</h1>
                     <p className="text-secondary small opacity-75">Precision Management & Monitoring</p>
                     
                     <div className="scroller-container">

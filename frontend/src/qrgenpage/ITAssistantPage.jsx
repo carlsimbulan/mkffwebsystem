@@ -377,64 +377,182 @@ const setActiveTab = (tab) => {
                 .uppercase { text-transform: uppercase; }
             `}</style>
 
-            {/* SIDEBAR */}
-            <div className="d-flex flex-column text-white" style={{ width: "260px", backgroundColor: "#111827", height: '100vh', position: 'fixed', zIndex: 1000 }}>
-                <div className="p-4 border-bottom border-secondary d-flex align-items-center mb-2">
-                    <img src={logo} alt="Logo" style={{ width: '30px', marginRight: '12px' }} />
-                    <span className="fs-6 fw-bold letter-spacing-1">IT Assistant</span>
-                </div>
-                <div className="nav flex-column">
-                    <div className="sidebar-label">MAIN NAVIGATION</div>
-                    <button className={`sidebar-link ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => setActiveTab('overview')}><i className="bi bi-grid-fill"></i> OVERVIEW</button>
-                    <button className={`sidebar-link ${activeTab === 'qr_generator' ? 'active' : ''}`} onClick={() => setActiveTab('qr_generator')}><i className="bi bi-qr-code-scan"></i> QR GENERATOR</button>
-                    <button className={`sidebar-link ${activeTab.includes('station') ? 'active' : ''}`} onClick={() => setActiveTab('station_monitor')}><i className="bi bi-cpu-fill"></i> STATION MONITOR</button>
-                    <button className={`sidebar-link ${activeTab === 'approvals' ? 'active' : ''}`} onClick={() => setActiveTab('approvals')}><i className="bi bi-check-circle-fill"></i> APPROVALS</button>
-                    <div className="sidebar-label">SYSTEM</div>
-                    <button onClick={onLogout} className="sidebar-link text-danger"><i className="bi bi-power"></i> LOGOUT SESSION</button>
-                </div>
-                <div className="mt-auto p-3 border-top border-secondary bg-dark bg-opacity-25">
-                    <span className="text-white fw-bold" style={{ fontSize: '0.65rem' }}>©2025 MKFF LASER TECHNIQUE</span>
-                </div>
+           {/* --- SIDEBAR: IT ASSISTANT GLASS DESIGN --- */}
+<div className="d-flex flex-column flex-shrink-0 p-3 text-white position-fixed" 
+    style={{ 
+        width: "260px", 
+        backgroundColor: "#0f172a", 
+        height: '100vh', 
+        zIndex: 1000, 
+        top: 0, 
+        left: 0,
+        borderRight: "1px solid rgba(255,255,255,0.05)" 
+    }}>
+    
+    <style>
+        {`
+            .sidebar-link {
+                width: 100%;
+                text-align: left;
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                padding: 0.6rem 1rem;
+                background: transparent;
+                border: 1px solid transparent;
+                border-radius: 8px;
+                color: #94a3b8;
+                font-size: 0.85rem;
+                font-weight: 400;
+                transition: all 0.2s ease;
+                margin-bottom: 0.25rem;
+                outline: none !important;
+            }
+
+            .active-glass {
+                background: rgba(255, 255, 255, 0.1) !important;
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.05) !important;
+                color: white !important;
+            }
+
+            .sidebar-link:hover:not(.active-glass) {
+                background-color: rgba(255, 255, 255, 0.03);
+                color: white;
+            }
+
+            .sidebar-label {
+                font-size: 0.6rem;
+                letter-spacing: 1px;
+                color: #64748b;
+                font-weight: 600;
+                padding: 1rem 1rem 0.5rem;
+                text-transform: uppercase;
+            }
+
+            .avatar-hover:hover {
+                transform: scale(1.05);
+                transition: 0.2s;
+                filter: brightness(1.1);
+            }
+
+            .fade-in { animation: fadeIn 0.4s ease-out; }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+        `}
+    </style>
+
+    {/* PROFILE SECTION */}
+    <div className="d-flex align-items-center mb-3 mt-1 px-1">
+        <div className="position-relative flex-shrink-0" style={{ cursor: 'pointer' }} onClick={() => setShowProfileModal(true)}>
+            <img 
+                src={currentAvatar ? `${AVATAR_UPLOAD_PATH}${currentAvatar}` : DEFAULT_AVATAR_PATH} 
+                alt="Profile" 
+                className="rounded-circle avatar-hover"
+                style={{ 
+                    width: '42px', 
+                    height: '42px', 
+                    objectFit: 'cover',
+                    border: '1px solid rgba(255,255,255,0.1)'
+                }} 
+            />
+            <span className="position-absolute bottom-0 end-0 bg-success border border-dark rounded-circle" style={{ width: '10px', height: '10px' }}></span>
+        </div>
+        
+        <div className="ms-3 overflow-hidden" style={{ cursor: 'pointer' }} onClick={() => setShowProfileModal(true)}>
+            <div className="text-white text-truncate" style={{ fontSize: '0.85rem', fontWeight: '400' }}>
+                {currentFullName}
             </div>
-
-            {/* MAIN CONTENT AREA */}
-            <div className="flex-grow-1" style={{ marginLeft: "260px", backgroundColor: "#eeeeeeff", height: '100vh', overflow: 'hidden' }}>
-                <header className="bg-white p-3 d-flex justify-content-between align-items-center border-bottom sticky-top" style={{ height: '70px' }}>
-                    <h5 className="fw-bold mb-0 text-dark uppercase">{activeTab.replace('_', ' ')}</h5>
-                    <div className="d-flex align-items-center gap-3 pe-2">
-                        <div className="text-end d-none d-md-block">
-                            <div className="fw-bold text-dark small">{currentFullName}</div>
-                            <div className="text-muted uppercase" style={{ fontSize: '0.6rem' }}>Authorized IT Assistant</div>
-                        </div>
-                        <img 
-                            src={currentAvatar ? `${AVATAR_UPLOAD_PATH}${currentAvatar}` : DEFAULT_AVATAR_PATH} 
-                            alt="Profile" className="rounded-circle border avatar-clickable"
-                            style={{ width: '40px', height: '40px', objectFit: 'cover' }} 
-                            onClick={() => setShowProfileModal(true)}
-                        />
-                    </div>
-                </header>
-                <div className="p-4" style={{ height: 'calc(100vh - 70px)', overflowY: 'auto' }}>
-                    {renderContent()}
-                </div>
+            <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '1px', letterSpacing: '0.3px' }}>
+                Authorized IT Assistant
             </div>
+        </div>
+    </div>
 
-            {/* 🔑 USER PROFILE MODAL */}
-            {showProfileModal && (
-                <UserProfileModal 
-                    user={user} 
-                    currentAvatar={currentAvatar ? `${AVATAR_UPLOAD_PATH}${currentAvatar}` : DEFAULT_AVATAR_PATH}
-                    currentFullName={currentFullName}
-                    onClose={() => setShowProfileModal(false)}
-                    onSave={handleUpdateProfile}
-                />
-            )}
+    <hr className="border-secondary opacity-25 mt-2" />
 
-            {/* 🔑 MAGANDANG OVERLAY (Loading, Success, Error) */}
-            <LoadingOverlay status={processStatus} message={statusMessage} />
+    {/* NAVIGATION LINKS */}
+    <div className="nav flex-column flex-grow-1 overflow-auto custom-scrollbar">
+        <div className="sidebar-label">Main Navigation</div>
+        <button className={`sidebar-link ${activeTab === 'overview' ? 'active-glass' : ''}`} onClick={() => setActiveTab('overview')}>
+            <i className="bi bi-grid-1x2"></i> OVERVIEW
+        </button>
+        <button className={`sidebar-link ${activeTab === 'qr_generator' ? 'active-glass' : ''}`} onClick={() => setActiveTab('qr_generator')}>
+            <i className="bi bi-qr-code-scan"></i> QR GENERATOR
+        </button>
+        <button className={`sidebar-link ${activeTab.includes('station') ? 'active-glass' : ''}`} onClick={() => setActiveTab('station_monitor')}>
+            <i className="bi bi-layers-half"></i> STATION MONITOR
+        </button>
+        <button className={`sidebar-link ${activeTab === 'approvals' ? 'active-glass' : ''}`} onClick={() => setActiveTab('approvals')}>
+            <i className="bi bi-check-circle"></i> APPROVALS
+        </button>
+        
+        <div className="sidebar-label">System</div>
+        <button onClick={onLogout} className="sidebar-link" style={{ color: '#ef4444' }}>
+            <i className="bi bi-power"></i> LOGOUT SESSION
+        </button>
+    </div>
+    
+    {/* FOOTER */}
+    <div className="mt-auto p-3 border-top border-secondary text-center text-white-50 opacity-25" style={{ fontSize: '0.65rem' }}>
+        <span>©2025 MKFF LASER TECHNIQUE</span>
+    </div>
+</div>
 
-            {showModal && <CustomMessageModal title={modalConfig.title} message={modalConfig.message} type={modalConfig.type} onClose={() => setShowModal(false)} />}
-            {activeHistoryStation && <StationHistoryModal stationId={activeHistoryStation} onClose={() => setActiveHistoryStation(null)} user={user} />}
+{/* --- MAIN CONTENT AREA --- */}
+<div className="flex-grow-1 d-flex flex-column" 
+    style={{ 
+        marginLeft: "260px", 
+        backgroundColor: "#f3f4f6", 
+        height: '100vh', 
+        overflow: 'hidden' 
+    }}>
+    
+    {/* CLEAN HEADER */}
+    <header className="bg-white d-flex justify-content-between align-items-center px-4 shadow-sm sticky-top z-2" 
+        style={{ height: '70px', borderBottom: '1px solid #e5e7eb' }}>
+        
+        <div>
+            <h6 className="mb-0 fw-bold text-dark text-uppercase" style={{ letterSpacing: '0.5px' }}>
+                {activeTab.replace('_', ' ')}
+            </h6>
+            <small className="text-muted d-none d-sm-block" style={{ fontSize: '0.65rem' }}>
+                {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
+            </small>
+        </div>
+        
+        <div className="d-flex align-items-center gap-3">
+            <div className="badge rounded-pill bg-light text-secondary border px-3 py-2" style={{ fontSize: '0.65rem', fontWeight: '500' }}>
+                <i className="bi bi-shield-check me-1"></i> SECURE SESSION
+            </div>
+        </div>
+    </header>
+
+    {/* SCROLLABLE CONTENT */}
+    <div className="p-4 flex-grow-1" style={{ overflowY: 'auto' }}>
+        <div className="fade-in">
+            {renderContent()}
+        </div>
+    </div>
+
+    {/* MODALS AND OVERLAYS */}
+    {showProfileModal && (
+        <UserProfileModal 
+            user={user} 
+            currentAvatar={currentAvatar ? `${AVATAR_UPLOAD_PATH}${currentAvatar}` : DEFAULT_AVATAR_PATH}
+            currentFullName={currentFullName}
+            onClose={() => setShowProfileModal(false)}
+            onSave={handleUpdateProfile}
+        />
+    )}
+
+    <LoadingOverlay status={processStatus} message={statusMessage} />
+    {showModal && <CustomMessageModal title={modalConfig.title} message={modalConfig.message} type={modalConfig.type} onClose={() => setShowModal(false)} />}
+    {activeHistoryStation && <StationHistoryModal stationId={activeHistoryStation} onClose={() => setActiveHistoryStation(null)} user={user} />}
+</div>
         </div>
     );
 }

@@ -619,6 +619,7 @@ const renderContent = () => {
                         stations={stations}
                         calculateMetrics={calculateStationMetrics}
                         overallMetrics={overallMetrics}
+                        setActiveTab={handleTabChange}
                         handleTabChange={handleTabChange}
                         dashboardView={dashboardView}
                         nextChart={nextChart}
@@ -771,276 +772,253 @@ return (
     <div className="d-flex min-vh-100 bg-light"> 
 
 {/* --- SIDEBAR (FIXED WIDTH: 260px) --- */}
-        <div
-            className="d-flex flex-column flex-shrink-0 p-3 text-white position-fixed"
-            style={{
-                width: "260px", 
-                backgroundColor: "#111827",
-                height: "100vh",
-                zIndex: 1000,
-                top: 0,
-                left: 0
-            }}
-        >
-            {/* TOP LOGO */}
-            <div className="d-flex align-items-center mb-3 text-white overflow-hidden">
-                <img
-                    src={logo}
-                    alt="MKFF Admin Logo"
-                    style={{ height: "3rem" }}
-                    className="me-3"
-                />
-                {/* BINAGO: Mula MKFF Admin naging Management */}
-                <span className="fs-5 fw-bold">Management</span> 
-            </div>
-
-            <hr className="border-secondary" />
-
-            {/* MENU SECTION */}
-            <ul className="nav nav-pills flex-column mb-3">
-                {/* Dashboard */}
-                <li className="nav-item">
-                    <button
-                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "dashboard" ? "active bg-danger" : ""}`}
-                        onClick={() => handleTabChange("dashboard")}
-                    >
-                        <i className="bi bi-speedometer2"></i>
-                        Dashboard
-                    </button>
-                </li>
-
-                {/* Stations */}
-                <li className="nav-item">
-                    <button
-                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${
-                            (activeTab === "stations" || activeTab === "station_monitor" || activeTab === "overall_history") ? "active bg-danger" : "" 
-                        }`}
-                        onClick={() => handleTabChange("stations")}
-                    >
-                        <i className="bi bi-grid-3x3-gap"></i>
-                        Stations
-                    </button>
-                </li>
-
-                <hr className="border-secondary my-2" />
-
-                {/* Approvals */}
-                <li className="nav-item">
-                    <button
-                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "approval" ? "active bg-danger" : ""}`}
-                        onClick={() => handleTabChange("approval")}
-                    >
-                        <i className="bi bi-check-circle"></i>
-                        Approvals
-                    </button>
-                </li>
-
-                {/* No Good List */}
-                <li className="nav-item">
-                    <button
-                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "no_good_list" ? "active bg-danger" : ""}`}
-                        onClick={() => handleTabChange("no_good_list")}
-                    >
-                        <i className="bi bi-x-octagon-fill"></i>
-                        No Good List
-                    </button>
-                </li>
-
-                {/* Shipment */}
-                <li className="nav-item">
-                    <button
-                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "shipment" ? "active bg-danger" : ""}`}
-                        onClick={() => handleTabChange("shipment")}
-                    >
-                        <i className="bi bi-truck-flatbed"></i>
-                        Shipment
-                    </button>
-                </li>
-
-                <hr className="border-secondary my-2" />
-
-                {/* Reports */}
-                <li className="nav-item">
-                    <button
-                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "reports" ? "active bg-danger" : ""}`}
-                        onClick={() => handleTabChange("reports")}
-                    >
-                        <i className="bi bi-file-text"></i>
-                        Reports
-                    </button>
-                </li>
-
-                                {/* --- EEDIT NA BAHAGI: DATA ANALYTICS SIDEBAR BUTTON --- */}
-                <li className="nav-item">
-                    <button
-                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "data_analytics" ? "active bg-danger" : ""}`}
-                        onClick={() => handleTabChange("data_analytics")}
-                    >
-                        <i className="bi bi-graph-up"></i> {/* Pwede ring bi-bar-chart-line */}
-                        Data Analytics
-                    </button>
-                </li>
-
-                {/* Announcement */}
-                <li className="nav-item">
-                    <button
-                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "announcements" ? "active bg-danger" : ""}`}
-                        onClick={() => handleTabChange("announcements")}
-                    >
-                        <i className="bi bi-megaphone-fill"></i>
-                        Announcement Board
-                    </button>
-                </li>
-
-                {/* Manage Account */}
-                <li className="nav-item">
-                    <button
-                        className={`nav-link text-white w-100 d-flex align-items-center gap-4 sidebar-btn ${activeTab === "manage_account" ? "active bg-danger" : ""}`}
-                        onClick={() => handleTabChange("manage_account")}
-                    >
-                        <i className="bi bi-person-gear"></i>
-                        Manage Account
-                    </button>
-                </li>
-            </ul>
-
-            {/* BOTTOM SECTION */}
-            <div className="mt-auto">
-                <button className="btn btn-outline-light w-100 logout-btn" onClick={onLogout}>
-                    <i className="bi bi-box-arrow-left me-2"></i>
-                    Logout
-                </button>
-                <div className="text-center text-white-50 small pt-2 mt-2 border-top border-secondary">
-                    <small>©2025 MKFF Laser Technique</small>
-                </div>
-            </div>
-
-            {/* CSS STYLES (Ilagay ito sa iyong CSS file o sa loob ng <style> tag sa component) */}
-            <style>{`
-                .sidebar-btn {
-                    border: none;
-                    background: transparent;
-                    transition: background 0.1s ease-in-out;
-                }
-                /* HOVER EFFECT: Instant mawawala pag-alis ng mouse */
-                .sidebar-btn:hover:not(.active) {
-                    background-color: rgba(255, 255, 255, 0.1) !important;
-                    color: white !important;
-                }
-                .logout-btn:hover {
-                    background-color: #dc3545 !important;
-                    border-color: #dc3545 !important;
-                }
-            `}</style>
-        </div>
-
-        {/* --- MAIN CONTENT CONTAINER (UPDATED FOR FIXED SIDEBAR) --- */}
-        <div
-            className="flex-grow-1 d-flex flex-column"
-            style={{
-                position: 'fixed',
-                top: 0,
-                bottom: 0,
-                right: 0,
-                // 💡 BINAGO: Fixed left margin, inalis ang isSidebarOpen condition at transition
-                left: "260px", 
-                overflowX: 'hidden',
-                backgroundColor: '#eeeeeeff',
-                zIndex: 999,
-            }}
-        >
-           {/* --- 1. HEADER (Professional Management Approach) --- */}
-<header 
-    className="bg-white d-flex justify-content-between align-items-center px-4 py-2"
-    style={{ 
-        flexShrink: 0, 
-        position: 'sticky', 
-        top: 0, 
-        zIndex: 10,
-        height: '70px', // Fixed height para consistent ang look
-        boxShadow: '0 2px 4px rgba(0,0,0,0.05)', // Subtle shadow para mag-pop sa background
-        borderBottom: '1px solid #e5e7eb'
-    }} 
+{/* --- SIDEBAR (FIXED WIDTH: 260px) --- */}
+<div
+    className="d-flex flex-column flex-shrink-0 p-3 text-white position-fixed"
+    style={{
+        width: "260px",
+        backgroundColor: "#0f172a", 
+        height: "100vh",
+        zIndex: 1000,
+        top: 0,
+        left: 0,
+        borderRight: "1px solid rgba(255,255,255,0.05)"
+    }}
 >
-    {/* LEFT SIDE: Page Title / Breadcrumb Style */}
-    <div className="d-flex align-items-center">
-        <div className="d-flex flex-column">
-            <span className="text-muted small fw-medium" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>
-                PAGE / OVERVIEW
-            </span>
-            <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.1rem', letterSpacing: '-0.5px' }}>
-                {activeTab === 'station_monitor' 
-                    ? `${stations.find(s => s.id === stationMonitorId)?.name || 'Monitor'} Details` 
-                    : activeTab.replace(/_/g, ' ').toUpperCase()}
-            </h5>
+    {/* COMPACT PROFILE SECTION */}
+    <div className="d-flex align-items-center mb-3 mt-1 px-1">
+        <div className="position-relative flex-shrink-0">
+            <img
+                src={headerAvatarSrc}
+                alt="User Avatar"
+                className="rounded-circle"
+                style={{ 
+                    width: '42px', 
+                    height: '42px', 
+                    objectFit: 'cover',
+                    border: '1px solid rgba(255,255,255,0.1)'
+                }}
+                onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
+            />
         </div>
-    </div>
-    
-    {/* RIGHT SIDE: NOTIFICATIONS & USER PROFILE */}
-    <div className="d-flex align-items-center gap-4">
-        
-        {/* Notification Bell Container with Hover */}
-        <div className="position-relative header-icon-wrapper">
-            <NotificationBell notifications={notifications} onClick={handleBellClick} />
-        </div>
-
-        {/* Vertical Divider */}
-        <div style={{ width: '1px', height: '30px', backgroundColor: '#e5e7eb' }}></div>
-        
-        {/* User Info and Avatar */}
-        <div className="d-flex align-items-center gap-3">
-            <div className="text-end d-none d-md-block">
-                <div 
-                    className="fw-bold text-dark" 
-                    style={{ fontSize: '0.9rem', lineHeight: 1.1 }}
-                >
-                    {headerFullName}
-                </div>
-                <div 
-                    className="badge rounded-pill mt-1" 
-                    style={{ 
-                        fontSize: '0.65rem', 
-                        backgroundColor: '#fee2e2', 
-                        color: '#dc2626',
-                        fontWeight: '700',
-                        padding: '4px 8px'
-                    }}
-                >
-                    ADMINISTRATOR
-                </div> 
+        <div className="ms-3 overflow-hidden">
+            <div 
+                className="text-white text-truncate" 
+                style={{ fontSize: '0.85rem', fontWeight: '400' }}
+            >
+                {headerFullName}
             </div>
-            
-            {/* Avatar with Ring Effect */}
-            <div className="position-relative">
-                <img
-                    src={headerAvatarSrc}
-                    alt="User Avatar"
-                    className="rounded-circle border border-2 border-white shadow-sm" 
-                    style={{ 
-                        width: '45px', 
-                        height: '45px', 
-                        objectFit: 'cover',
-                        outline: '2px solid #e5e7eb' // Outer ring effect
-                    }}
-                    onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
-                />
-                {/* Online Status Dot */}
-                <span className="position-absolute bottom-0 end-0 p-1 bg-success border border-2 border-white rounded-circle"></span>
-            </div>
+            <div 
+                style={{ 
+                    fontSize: '0.7rem', 
+                    color: '#94a3b8', 
+                    marginTop: '1px',
+                    letterSpacing: '0.3px'
+                }}
+            >
+                Administrator
+            </div> 
         </div>
     </div>
 
-    {/* Custom Styles for Hover */}
+    <hr className="border-secondary opacity-25 mt-2" />
+
+    {/* MENU SECTION */}
+    <ul className="nav nav-pills flex-column mb-auto gap-1">
+        <li className="nav-item">
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${activeTab === "dashboard" ? "active-glass" : ""}`}
+                onClick={() => handleTabChange("dashboard")}
+            >
+                <i className="bi bi-grid-1x2"></i>
+                <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Dashboard</span>
+            </button>
+        </li>
+
+        <li className="nav-item">
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${(activeTab === "stations" || activeTab === "station_monitor" || activeTab === "overall_history") ? "active-glass" : ""}`}
+                onClick={() => handleTabChange("stations")}
+            >
+                <i className="bi bi-grid-3x3-gap"></i>
+                <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Stations</span>
+            </button>
+        </li>
+
+        <hr className="border-secondary my-2 opacity-25" />
+
+        <li className="nav-item">
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${activeTab === "approval" ? "active-glass" : ""}`}
+                onClick={() => handleTabChange("approval")}
+            >
+                <i className="bi bi-check-circle"></i>
+                <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Approvals</span>
+            </button>
+        </li>
+
+        <li className="nav-item">
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${activeTab === "no_good_list" ? "active-glass" : ""}`}
+                onClick={() => handleTabChange("no_good_list")}
+            >
+                <i className="bi bi-x-octagon"></i>
+                <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>No Good List</span>
+            </button>
+        </li>
+
+        <li className="nav-item">
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${activeTab === "shipment" ? "active-glass" : ""}`}
+                onClick={() => handleTabChange("shipment")}
+            >
+                <i className="bi bi-truck-flatbed"></i>
+                <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Shipment</span>
+            </button>
+        </li>
+
+        <hr className="border-secondary my-2 opacity-25" />
+
+        <li className="nav-item">
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${activeTab === "reports" ? "active-glass" : ""}`}
+                onClick={() => handleTabChange("reports")}
+            >
+                <i className="bi bi-file-text"></i>
+                <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Reports</span>
+            </button>
+        </li>
+
+        <li className="nav-item">
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${activeTab === "data_analytics" ? "active-glass" : ""}`}
+                onClick={() => handleTabChange("data_analytics")}
+            >
+                <i className="bi bi-graph-up"></i>
+                <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Data Analytics</span>
+            </button>
+        </li>
+
+        <li className="nav-item">
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${activeTab === "announcements" ? "active-glass" : ""}`}
+                onClick={() => handleTabChange("announcements")}
+            >
+                <i className="bi bi-megaphone"></i>
+                <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Announcements</span>
+            </button>
+        </li>
+
+        <li className="nav-item">
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${activeTab === "manage_account" ? "active-glass" : ""}`}
+                onClick={() => handleTabChange("manage_account")}
+            >
+                <i className="bi bi-person-gear"></i>
+                <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Manage Account</span>
+            </button>
+        </li>
+    </ul>
+
+    {/* BOTTOM SECTION */}
+    <div className="mt-auto">
+        <button 
+            className="btn text-white-50 btn-sm w-100 logout-btn d-flex align-items-center justify-content-center gap-2 py-2" 
+            onClick={onLogout}
+            style={{ fontSize: '0.8rem', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px' }}
+        >
+            <i className="bi bi-box-arrow-left"></i>
+            Logout
+        </button>
+        <div className="text-center text-white-50 small pt-3 mt-2 border-top border-secondary opacity-25" style={{ fontSize: '0.65rem' }}>
+            <span>©2025 MKFF Laser Technique</span>
+        </div>
+    </div>
+
     <style>{`
-        .header-icon-wrapper {
-            cursor: pointer;
-            transition: transform 0.2s ease;
+        .active-glass {
+            background: rgba(255, 255, 255, 0.1) !important;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05) !important;
+            color: white !important;
         }
-        .header-icon-wrapper:hover {
-            transform: scale(1.1);
+
+        .sidebar-btn {
+            border: 1px solid transparent;
+            background: transparent;
+            transition: all 0.2s ease;
+            color: #94a3b8 !important;
+            border-radius: 8px;
+        }
+
+        .sidebar-btn:hover:not(.active-glass) {
+            background-color: rgba(255, 255, 255, 0.03) !important;
+            color: white !important;
+        }
+
+        .active-glass i, .active-glass span {
+            color: white !important;
+        }
+
+        .logout-btn:hover {
+            background-color: rgba(239, 68, 68, 0.1) !important;
+            color: #ef4444 !important;
+            border-color: rgba(239, 68, 68, 0.2) !important;
         }
     `}</style>
-</header>
+</div>
+
+{/* --- MAIN CONTENT CONTAINER --- */}
+<div
+    className="flex-grow-1 d-flex flex-column"
+    style={{
+        position: 'fixed',
+        top: 0,
+        bottom: 0,
+        right: 0,
+        left: "260px", 
+        overflowX: 'hidden',
+        backgroundColor: '#f3f4f6',
+        zIndex: 999,
+    }}
+>
+    {/* --- HEADER --- */}
+{/* --- PINATABA NA HEADER (80px height) --- */}
+    <header 
+        className="bg-white d-flex justify-content-between align-items-center px-5"
+        style={{ 
+            flexShrink: 0, 
+            position: 'sticky', 
+            top: 0, 
+            zIndex: 10,
+            height: '80px', // Pinataba mula 60px
+            boxShadow: '0 2px 10px rgba(0,0,0,0.05)', // Mas ramdam na shadow
+            borderBottom: '1px solid #e5e7eb'
+        }} 
+    >
+        <div className="d-flex align-items-center">
+            <div className="d-flex flex-column">
+                <span className="text-danger fw-bold mb-1" style={{ fontSize: '0.75rem', letterSpacing: '1.2px', textTransform: 'uppercase' }}>
+                    Management System
+                </span>
+                <h4 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.4rem', letterSpacing: '-0.5px' }}>
+                    {activeTab === 'station_monitor' 
+                        ? `${stations.find(s => s.id === stationMonitorId)?.name || 'Monitor'} Details` 
+                        : activeTab.replace(/_/g, ' ').toUpperCase()}
+                </h4>
+            </div>
+        </div>
+        
+<div className="d-flex align-items-center">
+            <div className="header-icon-wrapper">
+                <NotificationBell notifications={notifications} onClick={handleBellClick} />
+            </div>
+        </div>
+
+    </header>
+
+
 
             {/* 2. CONTENT AREA (Scrollable Part) */}
             <div 

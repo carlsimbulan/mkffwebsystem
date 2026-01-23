@@ -722,7 +722,14 @@ else {
     };
     
     // 🔑 CALCULATE UNREAD COUNT based on lastReadId from Local Storage
-    const unreadCount = announcements.filter(a => parseInt(a.id) > parseInt(lastReadId)).length;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+const todayAnnouncementsCount = announcements.filter(a => {
+    // Siguraduhin na may created_at ang announcement object
+    if (!a.created_at) return false;
+    const announcementDate = new Date(a.created_at).toISOString().split('T')[0];
+    return announcementDate === todayStr;
+}).length
 
 
     // --- CONTENT RENDERER (Unchanged) ---
@@ -734,7 +741,7 @@ else {
                         currentStation={currentStation}
                         homeStats={homeStats}
                         setActiveTab={setActiveTab}
-                        announcementCount={unreadCount} 
+                        announcementCount={todayAnnouncementsCount} 
                         logs={unitList} 
                         calculateMetrics={calculateMetrics} 
                         // Pass minimal station info, required by the chart component's original design
@@ -844,101 +851,145 @@ else {
             
             <div className="d-flex flex-row min-vh-100 bg-light font-sans"> 
                 
-                {/* --- SIDEBAR: BLUE BACKGROUND (Unchanged) --- */}
-  <div className="d-flex flex-column flex-shrink-0 p-3 text-white shadow-lg" 
-    style={{ width: '260px', position: 'sticky', top: 0, height: '100vh', backgroundColor: '#0f172a', zIndex: 1000 }}>
+{/* --- SIDEBAR: BLUE BACKGROUND (GLASS DESIGN) --- */}
+<div className="d-flex flex-column flex-shrink-0 p-3 text-white shadow-lg" 
+    style={{ 
+        width: '260px', 
+        position: 'fixed', // Ginawang fixed para hindi sumasama sa scroll ng content
+        top: 0, 
+        left: 0,
+        height: '100vh', 
+        backgroundColor: '#0f172a', 
+        zIndex: 1000,
+        borderRight: "1px solid rgba(255,255,255,0.05)"
+    }}>
     
     <style>
         {`
             .nav-custom-btn {
-                transition: background-color 0.2s ease;
+                transition: all 0.2s ease;
                 border-radius: 8px !important;
-                border: none !important; /* Iniiwasan ang pag-alog dahil sa border */
+                border: 1px solid transparent !important;
                 outline: none !important;
+                color: #94a3b8 !important; /* Muted text */
+                font-weight: 400 !important;
+                font-size: 0.85rem !important;
             }
-            /* Boxed highlight para sa hover */
-            .nav-custom-btn:hover:not(.btn-primary):not(.bg-white) {
-                background-color: rgba(255, 255, 255, 0.1) !important;
-                color: #ffffff !important;
+            
+            /* Glassmorphism Effect para sa Active Tab */
+            .active-glass {
+                background: rgba(255, 255, 255, 0.1) !important;
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                border: 1px solid rgba(255, 255, 255, 0.05) !important;
+                color: white !important;
             }
-            /* Siguraduhing hindi gagalaw ang icon sa hover */
-            .nav-custom-btn:hover i {
-                color: #ffffff !important;
+
+            .nav-custom-btn:hover:not(.active-glass) {
+                background-color: rgba(255, 255, 255, 0.03) !important;
+                color: white !important;
+            }
+
+            .active-glass i {
+                color: white !important;
+                opacity: 1 !important;
+            }
+
+            .avatar-clickable:hover {
+                transform: scale(1.05);
+                transition: 0.2s;
+                filter: brightness(1.1);
             }
         `}
     </style>
 
-    {/* Brand / Logo - Pinalit na ang text para hindi dikit sa gilid */}
-    <div className="d-flex align-items-center mb-4 pb-3 border-bottom border-secondary pt-2 px-2">
-        <img 
-            src={logo} 
-            alt="MKFF Logo" 
-            className="me-2" 
-            style={{ height: '38px', width: 'auto', objectFit: 'contain' }} 
-        />
-        <div>
-            <span className="fw-bold d-block lh-1" style={{ fontSize: '0.85rem', letterSpacing: '0.5px' }}>OPERATOR PANEL</span>
+    {/* PROFILE SECTION */}
+    <div className="d-flex align-items-center mb-3 mt-1 px-1">
+        <div className="position-relative flex-shrink-0" style={{ cursor: 'pointer' }} onClick={() => setShowProfileModal(true)}>
+            <img 
+                src={headerAvatarSrc} 
+                alt="User" 
+                className="rounded-circle avatar-clickable"
+                style={{ 
+                    width: '42px', 
+                    height: '42px', 
+                    objectFit: 'cover',
+                    border: '1px solid rgba(255,255,255,0.1)'
+                }} 
+                onError={(e) => { 
+                    e.target.onerror = null; 
+                    e.target.src = DEFAULT_AVATAR_PATH; 
+                }} 
+            />
+            <span className="position-absolute bottom-0 end-0 bg-success border border-dark rounded-circle" style={{width: '10px', height: '10px'}}></span>
+        </div>
+        <div className="ms-3 overflow-hidden">
+            <div className="text-white text-truncate" style={{ fontSize: '0.85rem', fontWeight: '400' }}>
+                {currentFullName}
+            </div>
+            <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '1px', letterSpacing: '0.3px' }}>
+                Authorized Operator
+            </div>
         </div>
     </div>
 
+    <hr className="border-secondary opacity-25 mt-2" />
+
     {/* Navigation */}
-    <nav className="flex-grow-1 overflow-auto custom-scrollbar">
+    <nav className="flex-grow-1 overflow-auto custom-scrollbar pt-2">
         <ul className="nav nav-pills flex-column mb-auto gap-1">
             
             {/* DASHBOARD */}
             <li className="nav-item">
                 <button 
-                    className={`btn w-100 text-start d-flex align-items-center px-3 py-2 nav-custom-btn ${activeTab === 'home' ? 'btn-primary shadow' : 'text-white-50'}`} 
+                    className={`btn w-100 text-start d-flex align-items-center px-3 py-2 nav-custom-btn ${activeTab === 'home' ? 'active-glass' : ''}`} 
                     onClick={() => setActiveTab('home')}
-                    style={{ background: activeTab === 'home' ? '' : 'transparent' }}
                 >
-                    <i className="bi bi-grid-fill me-3"></i> Dashboard
+                    <i className="bi bi-grid-1x2 me-3"></i> Dashboard
                 </button>
             </li>
             
             {/* UNIT ENTRY */}
             <li className="nav-item">
                 <button 
-                    className={`btn w-100 text-start d-flex align-items-center px-3 py-2 nav-custom-btn ${activeTab === 'input_unit' ? 'btn-primary shadow' : 'text-white-50'}`} 
+                    className={`btn w-100 text-start d-flex align-items-center px-3 py-2 nav-custom-btn ${activeTab === 'input_unit' ? 'active-glass' : ''}`} 
                     onClick={() => setActiveTab('input_unit')}
-                    style={{ background: activeTab === 'input_unit' ? '' : 'transparent' }}
                 >
                     <i className="bi bi-qr-code-scan me-3"></i> Unit Entry
                 </button>
             </li>
 
-            <li className="text-uppercase small fw-bold text-secondary mt-4 mb-2 px-3" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Monitoring</li>
+            <hr className="border-secondary my-2 opacity-25" />
+            <li className="text-uppercase small text-secondary mb-1 px-3" style={{fontSize: '0.6rem', letterSpacing: '1px', fontWeight: '500'}}>Monitoring</li>
             
             {[
-                { k: 'in_progress', i: 'bi-gear-wide-connected', l: 'In Progress', c: 'text-warning' }, 
-                { k: 'completed', i: 'bi-check-circle-fill', l: 'Completed', c: 'text-success' }, 
-                { k: 'no_good', i: 'bi-x-octagon-fill', l: 'No Good (NG)', c: 'text-danger' }, 
-                { k: 'pending', i: 'bi-clock-history', l: 'Pending', c: 'text-info' }
-            ].map(({ k, i, l, c }) => (
+                { k: 'in_progress', i: 'bi-gear-wide-connected', l: 'In Progress' }, 
+                { k: 'completed', i: 'bi-check-circle', l: 'Completed' }, 
+                { k: 'no_good', i: 'bi-x-octagon', l: 'No Good (NG)' }, 
+                { k: 'pending', i: 'bi-clock-history', l: 'Pending' }
+            ].map(({ k, i, l }) => (
                 <li key={k} className="nav-item">
                     <button 
-                        className={`btn w-100 text-start d-flex align-items-center px-3 py-2 nav-custom-btn ${activeTab === k ? 'bg-white text-dark shadow' : 'text-white-50'}`} 
+                        className={`btn w-100 text-start d-flex align-items-center px-3 py-2 nav-custom-btn ${activeTab === k ? 'active-glass' : ''}`} 
                         onClick={() => setActiveTab(k)}
-                        style={{ background: activeTab === k ? '#ffffff' : 'transparent' }}
                     >
-                        {/* Tinanggal ang fw-bold sa active para hindi umalog */}
-                        <i className={`bi ${i} me-3 ${activeTab === k ? c : ''}`}></i> {l}
+                        <i className={`bi ${i} me-3`}></i> {l}
                     </button>
                 </li>
             ))}
 
-            <li className="text-uppercase small fw-bold text-secondary mt-4 mb-2 px-3" style={{fontSize: '0.7rem', letterSpacing: '1px'}}>Reports & Logs</li>
+            <hr className="border-secondary my-2 opacity-25" />
+            <li className="text-uppercase small text-secondary mb-1 px-3" style={{fontSize: '0.6rem', letterSpacing: '1px', fontWeight: '500'}}>Reports & Logs</li>
             
             {[
-                { k: 'daily_reports', i: 'bi-file-earmark-bar-graph', l: 'Daily Report' },
+                { k: 'daily_reports', i: 'bi-file-text', l: 'Daily Report' },
                 { k: 'account_history', i: 'bi-journals', l: 'History Logs' },
-                { k: 'announcements', i: 'bi-megaphone-fill', l: 'Announcements' }
+                { k: 'announcements', i: 'bi-megaphone', l: 'Announcements' }
             ].map(({ k, i, l }) => (
                 <li key={k} className="nav-item">
                     <button 
-                        className={`btn w-100 text-start d-flex align-items-center px-3 py-2 nav-custom-btn ${activeTab === k ? 'bg-white text-dark shadow' : 'text-white-50'}`} 
+                        className={`btn w-100 text-start d-flex align-items-center px-3 py-2 nav-custom-btn ${activeTab === k ? 'active-glass' : ''}`} 
                         onClick={() => setActiveTab(k)}
-                        style={{ background: activeTab === k ? '#ffffff' : 'transparent' }}
                     >
                         <i className={`bi ${i} me-3`}></i> {l}
                     </button>
@@ -948,118 +999,67 @@ else {
     </nav>
 
     {/* Sidebar Footer */}
-    <div className="mt-auto pt-3 border-top border-secondary text-center text-white-50 small">
-        <small>@2025 MKFF Laser Technique</small>
+    <div className="mt-auto pt-3 border-top border-secondary text-center text-white-50 opacity-25" style={{ fontSize: '0.65rem' }}>
+        <span>©2025 MKFF Laser Technique</span>
     </div>
 </div>
 
-                {/* --- MAIN CONTENT AREA (Unchanged) --- */}
-                <div className="d-flex flex-column flex-grow-1" style={{ backgroundColor: '#eeeeeeff' }}> 
-                    
-                    {/* --- HEADER: WHITE BACKGROUND (Unchanged) --- */}
-                    <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm px-4 py-3 sticky-top z-2">
-                        <div className="container-fluid p-0">
-                            {/* Left: Station Name (Unchanged) */}
-                            <div className="d-flex align-items-center">
-                                <div className="bg-primary text-white rounded p-2 me-3 d-flex align-items-center justify-content-center" style={{width: '40px', height: '40px'}}>
-                                    <i className="bi bi-layers-fill fs-5"></i>
-                                </div>
-                                <div>
-                                    <h5 className="mb-0 fw-bold text-dark">{currentStation}</h5>
-                                    <small className="text-muted">Production Floor</small>
-                                </div>
-                            </div>
-
-                            {/* Right: User Profile & Logout (Unchanged) */}
-                            <div className="d-flex align-items-center gap-3">
-                                {/* Divider (Unchanged) */}
-                                <div className="border-start mx-2" style={{height: '30px'}}></div>
-
-                                {/* User Info (Unchanged) */}
-                                <div className="text-end d-none d-md-block">
-                                    <div className="fw-bold text-dark small">{currentFullName}</div>
-                                    <div className="text-muted" style={{fontSize: '0.7rem'}}>Authorized Operator</div>
-                                </div>
-
-                                {/* Avatar (Clickable) */}
-                                <div className="position-relative" style={{ cursor: 'pointer' }} onClick={() => setShowProfileModal(true)}>
-                                    <img 
-                                        src={headerAvatarSrc} 
-                                        alt="User" 
-                                        className="rounded-circle border border-gray-300 avatar-hover"
-                                        style={{ width: '42px', height: '42px', objectFit: 'cover' }} 
-                                        onError={(e) => { 
-                                            e.target.onerror = null; 
-                                            e.target.src = DEFAULT_AVATAR_PATH; 
-                                        }} 
-                                    />
-                                    {/* Online Status Dot (Unchanged) */}
-                                    <span className="position-absolute bottom-0 end-0 bg-success border border-white rounded-circle" style={{width: '12px', height: '12px'}}></span>
-                                </div>
-
-                                {/* Logout Button (Unchanged) */}
-                                <button 
-                                    className="btn btn-outline-danger btn-sm ms-2 d-flex align-items-center px-3 rounded-pill" 
-                                    onClick={onLogout}
-                                    title="Sign Out"
-                                >
-                                    <i className="bi bi-box-arrow-right me-2"></i> Logout
-                                </button>
-                            </div>
-                        </div>
-                    </nav>
-
-                    {/* --- DYNAMIC CONTENT (Unchanged) --- */}
-                    <div className="container-fluid p-4 flex-grow-1 overflow-auto">
-                        <div className="fade-in-up">
-                            {renderContent()}
-                        </div>
-                    </div>
-                </div>
+{/* --- MAIN CONTENT AREA --- */}
+<div className="d-flex flex-column flex-grow-1" style={{ marginLeft: '260px', backgroundColor: '#f3f4f6' }}> 
+    
+    {/* --- HEADER: WHITE BACKGROUND --- */}
+    <header className="bg-white d-flex justify-content-between align-items-center px-4 shadow-sm sticky-top z-2" 
+        style={{ height: '70px', borderBottom: '1px solid #e5e7eb' }}>
+        
+        <div className="d-flex align-items-center">
+            <div className="bg-primary bg-opacity-10 text-primary rounded p-2 me-3 d-flex align-items-center justify-content-center" style={{width: '38px', height: '38px'}}>
+                <i className="bi bi-layers-half fs-5"></i>
             </div>
+            <div>
+                <h6 className="mb-0 fw-bold text-dark" style={{ letterSpacing: '-0.3px' }}>{currentStation}</h6>
+                <small style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Production Floor</small>
+            </div>
+        </div>
 
-            {/* CSS Helper para sa Hover effects ng Sidebar (and Scrollbar) (Unchanged) */}
-            <style jsx>{`
-                .hover-white:hover { color: white !important; background: rgba(255,255,255,0.1) !important; }
-                .fade-in-up { animation: fadeInUp 0.5s ease-out; }
-                .avatar-hover:hover { opacity: 0.8; transform: scale(1.05); transition: 0.2s; }
-                @keyframes fadeInUp {
-                    from { opacity: 0; transform: translateY(20px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
+        <div className="d-flex align-items-center">
+            <button 
+                className="btn btn-sm d-flex align-items-center px-3 rounded-pill" 
+                style={{ border: '1px solid #fecaca', color: '#ef4444', fontSize: '0.8rem', fontWeight: '500' }}
+                onClick={onLogout}
+            >
+                <i className="bi bi-box-arrow-right me-2"></i> Logout
+            </button>
+        </div>
+    </header>
 
-                /* 🚨 ULTRA-THIN SCROLLBAR OVERRIDE: 1 PIXEL LAMANG */
-                
-                /* Target ang buong scrollbar area (Chrome, Safari, Edge) */
-                .custom-scrollbar::-webkit-scrollbar {
-                    width: 1px !important; 
-                    height: 1px !important;
-                }
+    {/* --- DYNAMIC CONTENT --- */}
+    <div className="container-fluid p-4 flex-grow-1">
+        <div className="fade-in-up">
+            {renderContent()}
+        </div>
+    </div>
+</div>
 
-                /* Target ang drag handle */
-                .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background-color: rgba(255, 255, 255, 0.1) !important; 
-                    border-radius: 10px !important;
-                }
-                
-                /* Target ang track (background) */
-                .custom-scrollbar::-webkit-scrollbar-track {
-                    background: transparent !important;
-                }
+<style jsx>{`
+    .fade-in-up { animation: fadeInUp 0.4s ease-out; }
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
 
-                /* Fix para sa Firefox */
-                .custom-scrollbar {
-                    scrollbar-width: none; 
-                    scrollbar-color: rgba(255, 255, 255, 0.1) transparent !important;
-                    -ms-overflow-style: none;
-                }
-                
-                /* Optional: Para sa mga nagtatago ng scrollbar kapag hindi ginagamit (Advanced look) */
-                .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-                    background-color: rgba(255, 255, 255, 0.3) !important; 
-                }
-                
-            `}</style>
+    /* 🚨 ULTRA-THIN SCROLLBAR OVERRIDE */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 1px !important; 
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: rgba(255, 255, 255, 0.1) !important; 
+    }
+    .custom-scrollbar {
+        scrollbar-width: thin; 
+        scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+    }
+`}</style>
+            </div>
         </>
-    )
-};
+    );
+}

@@ -9,8 +9,8 @@ export function AnnouncementView({
     onMarkAsRead, 
     lastReadId 
 }) {
-    const today = new Date().toISOString().split('T')[0];
-    const [selectedDate, setSelectedDate] = useState(today);
+const today = new Date().toISOString().split('T')[0];
+const [selectedDate, setSelectedDate] = useState(today); // Naka-default na ito sa "Today"
 
     useEffect(() => {
         if (announcements.length > 0 && onMarkAsRead) {

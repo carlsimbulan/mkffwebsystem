@@ -75,13 +75,14 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
                 </div>
                 
                 <div className="d-flex gap-2">
-                    {announcementCount > 0 && (
-                        <button className="btn btn-warning shadow-sm d-flex align-items-center gap-2 px-3 rounded-pill fw-bold" 
-                                onClick={() => setActiveTab('announcements')} style={{ fontSize: '0.8rem' }}>
-                            <i className="bi bi-megaphone-fill"></i>
-                            {announcementCount} NEW UPDATES
-                        </button>
-                    )}
+                   {announcementCount > 0 && (
+    <button className="btn btn-warning shadow-sm d-flex align-items-center gap-2 px-3 rounded-pill fw-bold animate-pulse" 
+            onClick={() => setActiveTab('announcements')} 
+            style={{ fontSize: '0.8rem' }}>
+        <i className="bi bi-megaphone-fill"></i>
+        {announcementCount} NEW {announcementCount === 1 ? 'UPDATE' : 'UPDATES'} TODAY
+    </button>
+)}
                     <button className="btn btn-primary shadow-sm d-flex align-items-center gap-2 px-4 rounded-pill fw-bold" 
                             onClick={() => setActiveTab('input_unit')} style={{ fontSize: '0.8rem' }}>
                         <i className="bi bi-qr-code-scan"></i> NEW ENTRY
