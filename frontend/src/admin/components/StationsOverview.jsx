@@ -38,6 +38,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All'); 
     const [selectedUnitProcess, setSelectedUnitProcess] = useState(null); 
+    const [expandedStepIdx, setExpandedStepIdx] = useState(null); // Para sa tracker dropdown
 
     const monitorMetrics = calculateMetrics(stationMonitorId);
 
@@ -54,11 +55,9 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
         <div className="pb-5 container-fluid px-0">
             <style>{`
                 .btn-box { border-radius: 4px !important; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; transition: none; }
-                .btn-box:hover { opacity: 0.9; }
                 .stat-card-pro { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 22px; height: 100%; border-left: 5px solid #198754; }
                 .table thead th { background-color: #1e293b !important; color: #ffffff !important; font-weight: 600; border: none; padding: 12px 15px; }
-                .table-hover tbody tr:hover { background-color: #f1f5f9 !important; }
-                .modal-step { padding: 15px 20px; border-left: 2px solid #e9ecef; position: relative; border-radius: 0 8px 8px 0; }
+                .modal-step { padding: 15px 20px; border-left: 2px solid #e9ecef; position: relative; border-radius: 0 8px 8px 0; cursor: pointer; }
                 .modal-step.done { border-left-color: #198754; }
                 .modal-step.current { border-left-color: #0d6efd; background: #f0f7ff; }
                 .modal-step.ng { border-left-color: #dc3545; background: #fff5f5; }
@@ -66,6 +65,12 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 .done .modal-dot { background: #198754; }
                 .current .modal-dot { background: #0d6efd; }
                 .ng .modal-dot { background: #dc3545; }
+
+                /* Technical Checklist Layout in Tracker */
+                .tech-tracker-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px; background: #fff; border: 1px solid #e2e8f0; padding: 15px; border-radius: 6px; }
+                .tech-t-item { font-size: 0.75rem; border-bottom: 1px solid #f8fafc; padding-bottom: 5px; }
+                .tech-t-label { color: #64748b; font-weight: 800; text-transform: uppercase; margin-right: 8px; }
+                .tech-t-val { color: #1e293b; font-weight: 700; }
             `}</style>
 
             <div className="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3 px-2">
@@ -73,12 +78,9 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                     <h3 className="fw-bold text-dark mb-1">{processName}</h3>
                     <p className="text-muted small mb-0">Operational View • ID: {stationMonitorId}</p>
                 </div>
-<button 
-    className="btn btn-light border btn-sm btn-box px-3" 
-    onClick={() => setActiveTab && typeof setActiveTab === 'function' ? setActiveTab('stations') : console.warn('setActiveTab not found')}
->
-    <i className="bi bi-arrow-left me-1"></i> BACK
-</button>
+                <button className="btn btn-light border btn-sm btn-box px-3" onClick={() => setActiveTab('stations')}>
+                    <i className="bi bi-arrow-left me-1"></i> BACK
+                </button>
             </div>
 
             <div className="row g-4 mb-4">
@@ -145,6 +147,20 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                     const unitStatus = selectedUnitProcess.status?.toLowerCase() || '';
                                     const isNG = isCurrent && unitStatus.includes('no good');
                                     const isCompletedHere = isCurrent && unitStatus.includes('completed');
+                                    const isExpanded = expandedStepIdx === idx;
+
+                                    // Mapping Checklist Data for Station 6 (Complete Unit Test)
+                                    const checklist = (idx === 5 && selectedUnitProcess.voltage) ? {
+                                        "LoRa Module": selectedUnitProcess.lora_module,
+                                        "Energy Meter": selectedUnitProcess.energy_meter,
+                                        "Voltage Reading": selectedUnitProcess.voltage + "V",
+                                        "L1 Reading": selectedUnitProcess.line1 + "V",
+                                        "L2 Reading": selectedUnitProcess.line2 + "V",
+                                        "L3 Reading": selectedUnitProcess.line3 + "V",
+                                        "Temp Reading": selectedUnitProcess.temp_reading,
+                                        "4G Status": selectedUnitProcess.led_status_4g,
+                                        "Final Verdict": selectedUnitProcess.go_no_go || selectedUnitProcess.checklist_verdict
+                                    } : null;
                                     
                                     let stepClass = ""; let subText = "Pending Station"; let textColor = "text-muted";
                                     if (isDoneBefore || isCompletedHere) { stepClass = "done"; subText = "STATION COMPLETED"; textColor = "text-success"; }
@@ -152,12 +168,13 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                     else if (isCurrent) { stepClass = "current"; subText = "IN PROGRESS"; textColor = "text-primary"; }
 
                                     return (
-                                        <div key={idx} className={`modal-step ${stepClass}`}>
+                                        <div key={idx} className={`modal-step ${stepClass}`} onClick={() => checklist && setExpandedStepIdx(isExpanded ? null : idx)}>
                                             <div className="modal-dot"></div>
                                             <div className="d-flex justify-content-between align-items-center">
                                                 <div>
                                                     <div className={`fw-bold mb-0 ${isCurrent || isDoneBefore || isCompletedHere ? 'text-dark' : 'text-muted opacity-50'}`} style={{fontSize: '0.9rem'}}>
                                                         {idx + 1}. {station}
+                                                        {checklist && <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'} ms-2 small text-muted`}></i>}
                                                     </div>
                                                     <div className={`fw-bold ${textColor}`} style={{fontSize: '0.65rem', letterSpacing: '0.3px'}}>
                                                         {subText}
@@ -165,6 +182,20 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                                 </div>
                                                 {isCurrent && <span className="badge bg-primary-subtle text-primary border border-primary-subtle rounded-1" style={{fontSize: '0.6rem'}}>CURRENT</span>}
                                             </div>
+
+                                            {/* DROPDOWN PARA SA STATION CHECKLIST */}
+                                            {isExpanded && checklist && (
+                                                <div className="tech-tracker-grid shadow-sm" onClick={(e) => e.stopPropagation()}>
+                                                    {Object.entries(checklist).map(([key, val]) => (
+                                                        <div key={key} className="tech-t-item">
+                                                            <span className="tech-t-label">{key}:</span>
+                                                            <span className={`tech-t-val ${val === 'PASS' || val === 'GO' || val === 'Detected' ? 'text-success' : val === 'FAIL' || val === 'NO GO' ? 'text-danger' : ''}`}>
+                                                                {val || 'N/A'}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
@@ -186,14 +217,11 @@ export function StationsOverview({
     const [historySearch, setHistorySearch] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
-    
-    // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
 
-    // Filter and Sort Logic
     const filteredHistory = useMemo(() => {
         if (!allLogs) return [];
-        const result = allLogs.filter(log => {
+        return allLogs.filter(log => {
             const matchesSearch = log.assembly_no?.toLowerCase().includes(historySearch.toLowerCase());
             if (!startDate && !endDate) return matchesSearch;
             const logDate = new Date(log.timestamp || log.created_at);
@@ -202,11 +230,8 @@ export function StationsOverview({
             if (start) start.setHours(0, 0, 0, 0); if (end) end.setHours(23, 59, 59, 999);
             return matchesSearch && (!start || logDate >= start) && (!end || logDate <= end);
         }).sort((a, b) => new Date(b.timestamp || b.created_at) - new Date(a.timestamp || a.created_at));
-        
-        return result;
     }, [allLogs, historySearch, startDate, endDate]);
 
-    // Calculate current slice of data for pagination
     const paginatedHistory = useMemo(() => {
         const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
         return filteredHistory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -214,10 +239,7 @@ export function StationsOverview({
 
     const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
 
-    // Reset to page 1 when search/filters change
-    React.useEffect(() => {
-        setCurrentPage(1);
-    }, [historySearch, startDate, endDate]);
+    React.useEffect(() => { setCurrentPage(1); }, [historySearch, startDate, endDate]);
 
     if (activeTab === "station_monitor" && stationMonitorId) {
         return <StationMonitorView {...{stationMonitorId, stations, calculateMetrics, handleEditClick, highlightedUnitId, setActiveTab, fetchData}} />;
@@ -227,11 +249,10 @@ export function StationsOverview({
         return (
             <div className="pb-5 container-fluid px-0">
                 <style>{`
-                    .btn-box { border-radius: 4px !important; font-weight: 600; }
+                    .btn-box { border-radius: 4px !important; font-weight: 600; transition: none; }
                     .table thead th { background-color: #1e293b !important; color: white !important; padding: 12px; }
-                    .pagination .page-link { color: #1e293b; border: 1px solid #dee2e6; margin: 0 2px; border-radius: 4px; }
+                    .pagination .page-link { color: #1e293b; border: 1px solid #dee2e6; margin: 0 2px; border-radius: 4px; transition: none; }
                     .pagination .page-item.active .page-link { background-color: #1e293b; border-color: #1e293b; color: white; }
-                    .pagination .page-item.disabled .page-link { color: #6c757d; pointer-events: none; background-color: #fff; border-color: #dee2e6; }
                 `}</style>
                 <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3 px-2">
                     <div>
@@ -250,67 +271,43 @@ export function StationsOverview({
                 </div>
 
                 <div className="bg-white border rounded-2 overflow-hidden mx-2 shadow-sm">
-                    <div style={{minHeight: '450px'}}>
-                        <table className="table table-hover align-middle mb-0" style={{fontSize: '0.85rem'}}>
-                            <thead className="sticky-top">
-                                <tr>
-                                    <th className="ps-4">MODEL</th>
-                                    <th>ASSEMBLY</th>
-                                    <th>TYPE</th>
-                                    <th>STATION</th>
-                                    <th className="text-center">STATUS</th>
-                                    <th>USER</th>
-                                    <th className="text-end pe-4">TIMESTAMP</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {paginatedHistory.length > 0 ? (
-                                    paginatedHistory.map(log => {
-                                        const ts = formatTimestamp(log.timestamp || log.created_at);
-                                        return (
-                                            <tr key={log.id}>
-                                                <td className="ps-4 fw-bold">{log.model || log.model_id}</td>
-                                                <td><code className="text-primary fw-bold">{log.assembly_no}</code></td>
-                                                <td className="text-muted small fw-bold">{log.action_type || 'UPDATE'}</td>
-                                                <td className="fw-semibold">{log.station_name || log.station}</td>
-                                                <td className="text-center"><span className={`badge rounded-1 px-3 ${getStatusBadgeClass(log.status_after || log.status)}`}>{log.status_after || log.status}</span></td>
-                                                <td className="small">{log.action_by || 'System'}</td>
-                                                <td className="text-end pe-4 small text-muted"><strong>{ts.date}</strong><br/>{ts.time}</td>
-                                            </tr>
-                                        );
-                                    })
-                                ) : (
-                                    <tr>
-                                        <td colSpan="7" className="text-center py-5 text-muted italic">No logs found matching your criteria.</td>
+                    <table className="table table-hover align-middle mb-0" style={{fontSize: '0.85rem'}}>
+                        <thead>
+                            <tr>
+                                <th className="ps-4">MODEL</th><th>ASSEMBLY</th><th>TYPE</th><th>STATION</th><th className="text-center">STATUS</th><th>USER</th><th className="text-end pe-4">TIMESTAMP</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {paginatedHistory.map(log => {
+                                const ts = formatTimestamp(log.timestamp || log.created_at);
+                                return (
+                                    <tr key={log.id}>
+                                        <td className="ps-4 fw-bold">{log.model || log.model_id}</td>
+                                        <td><code className="text-primary fw-bold">{log.assembly_no}</code></td>
+                                        <td className="text-muted small fw-bold">{log.action_type || 'UPDATE'}</td>
+                                        <td className="fw-semibold">{log.station_name || log.station}</td>
+                                        <td className="text-center"><span className={`badge rounded-1 px-3 ${getStatusBadgeClass(log.status_after || log.status)}`}>{log.status_after || log.status}</span></td>
+                                        <td className="small">{log.action_by || 'System'}</td>
+                                        <td className="text-end pe-4 small text-muted"><strong>{ts.date}</strong><br/>{ts.time}</td>
                                     </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                );
+                            })}
+                        </tbody>
+                    </table>
 
-                    {/* Pagination Controls */}
                     <div className="p-3 border-top d-flex justify-content-between align-items-center bg-light">
-                        <div className="small text-muted fw-bold">
-                            Page {currentPage} of {totalPages || 1}
-                        </div>
+                        <div className="small text-muted fw-bold">Page {currentPage} of {totalPages || 1}</div>
                         <nav>
                             <ul className="pagination pagination-sm mb-0">
                                 <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                                    <button className="page-link shadow-none" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}>
-                                        <i className="bi bi-chevron-left"></i>
-                                    </button>
+                                    <button className="page-link shadow-none" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}><i className="bi bi-chevron-left"></i></button>
                                 </li>
-                                
-                                {/* Simple Logic to show current, prev, and next page buttons */}
                                 {[...Array(totalPages)].map((_, index) => {
                                     const pageNum = index + 1;
-                                    // Only show first page, last page, and 2 pages around current page
                                     if (pageNum === 1 || pageNum === totalPages || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
                                         return (
                                             <li key={pageNum} className={`page-item ${currentPage === pageNum ? 'active' : ''}`}>
-                                                <button className="page-link shadow-none" onClick={() => setCurrentPage(pageNum)}>
-                                                    {pageNum}
-                                                </button>
+                                                <button className="page-link shadow-none" onClick={() => setCurrentPage(pageNum)}>{pageNum}</button>
                                             </li>
                                         );
                                     } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
@@ -318,11 +315,8 @@ export function StationsOverview({
                                     }
                                     return null;
                                 })}
-
                                 <li className={`page-item ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}`}>
-                                    <button className="page-link shadow-none" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}>
-                                        <i className="bi bi-chevron-right"></i>
-                                    </button>
+                                    <button className="page-link shadow-none" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}><i className="bi bi-chevron-right"></i></button>
                                 </li>
                             </ul>
                         </nav>
@@ -340,39 +334,19 @@ export function StationsOverview({
         <div className="container-fluid px-0">
             <style>{`
                 .btn-box { border-radius: 4px !important; font-weight: 700; transition: none; }
-                .station-card-flat { 
-                    background: #fff; 
-                    border: 1px solid #e2e8f0; 
-                    border-radius: 8px; 
-                    padding: 20px; 
-                    height: 100%; 
-                    transition: all 0.2s ease;
-                }
-                .station-card-flat:hover { 
-                    border-color: #94a3b8; 
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-                    transform: translateY(-2px);
-                }
-                .metric-row { 
-                    display: flex; 
-                    justify-content: space-between; 
-                    font-size: 0.75rem; 
-                    font-weight: 700; 
-                    padding: 8px 0; 
-                    border-bottom: 1px solid #f1f5f9; 
-                    color: #475569; 
-                }
+                .station-card-flat { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; height: 100%; transition: none; }
+                .metric-row { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #475569; }
                 .metric-row:last-child { border-bottom: none; }
                 .metric-value { color: #1e293b; } 
-                .btn-monitor { background: #1e293b; color: #fff; border: none; }
-                .btn-monitor:hover { background: #0f172a; color: #fff; }
-                .btn-history { background: transparent; color: #475569; border: 1px solid #e2e8f0; }
-                .btn-history:hover { background: #f8fafc; border-color: #cbd5e1; }
+                .btn-monitor { background: #1e293b; color: #fff; border: none; transition: none; }
+                .btn-monitor:hover { background: #0f172a; }
+                .btn-history { background: transparent; color: #475569; border: 1px solid #e2e8f0; transition: none; }
+                .btn-history:hover { background: #f8fafc; }
             `}</style>
             
             <div className="d-flex justify-content-between align-items-center mb-4 px-2 border-bottom pb-3">
                 <div><h4 className="fw-bold text-dark mb-0">Station Control Panel</h4><p className="text-muted small mb-0">Operational real-time monitoring.</p></div>
-                <button className="btn btn-dark btn-sm btn-box px-4 py-2" onClick={() => setActiveTab('overall_history')}>OVERALL HISTORY</button>
+                <button className="btn btn-dark btn-sm btn-box px-4 py-2 shadow-sm" onClick={() => setActiveTab('overall_history')}>OVERALL HISTORY</button>
             </div>
             
             <div className="row g-4">
@@ -380,19 +354,19 @@ export function StationsOverview({
                     const metrics = calculateMetrics(station.id);
                     return (
                         <div key={station.id} className="col-md-3">
-                            <div className="station-card-flat">
+                            <div className="station-card-flat shadow-sm">
                                 <div className="mb-3">
                                     <span className="text-muted" style={{fontSize: '0.65rem', fontWeight: 800}}>STATION ID: {station.id}</span>
                                     <h6 className="fw-bold text-dark text-truncate mb-0 mt-1">{station.name}</h6>
                                 </div>
                                 <div className="mb-4">
-                                    <div className="metric-row"><span>COMPLETED</span><span className="metric-value">{metrics.completedUnits}</span></div>
-                                    <div className="metric-row"><span>IN PROGRESS</span><span className="metric-value">{metrics.pendingUnits}</span></div>
-                                    <div className="metric-row"><span>NO GOOD (NG)</span><span className="metric-value">{metrics.ngUnits}</span></div>
+                                    <div className="metric-row"><span>COMPLETED</span><span className="metric-value text-success">{metrics.completedUnits}</span></div>
+                                    <div className="metric-row"><span>IN PROGRESS</span><span className="metric-value text-primary">{metrics.pendingUnits}</span></div>
+                                    <div className="metric-row"><span>NO GOOD (NG)</span><span className="metric-value text-danger">{metrics.ngUnits}</span></div>
                                 </div>
                                 <div className="d-flex gap-2">
-                                    <button className="btn btn-monitor btn-sm btn-box flex-grow-1" onClick={() => handleMonitorStation(station.id)}>MONITOR</button>
-                                    <button className="btn btn-history btn-sm btn-box px-3" onClick={() => handleViewHistory(station.id)}>HISTORY</button>
+                                    <button className="btn btn-monitor btn-sm btn-box flex-grow-1 shadow-sm" onClick={() => handleMonitorStation(station.id)}>MONITOR</button>
+                                    <button className="btn btn-history btn-sm btn-box px-3 shadow-sm" onClick={() => handleViewHistory(station.id)}>HISTORY</button>
                                 </div>
                             </div>
                         </div>

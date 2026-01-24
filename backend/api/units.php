@@ -11,14 +11,60 @@ require_once '../db.php';
 // --- HELPER: HISTORY LOGGING ---
 function logUnitAction($pdo, $unitId, $model, $assemblyNo, $station, $status, $actionType, $remarks = null, $actionBy = 'System') {
     try {
-        // We use IGNORE or silent catch to prevent history errors from crashing the main app
         $stmt = $pdo->prepare("INSERT INTO unit_history 
             (unit_id, model, assembly_no, station_name, status_after, action_type, remarks, action_by) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([$unitId, $model, $assemblyNo, $station, $status, $actionType, $remarks, $actionBy]);
     } catch (PDOException $e) {
-        // Log error to file but don't stop execution
         error_log("History Log Failed: " . $e->getMessage());
+    }
+}
+
+// --- HELPER: STATION 6 CHECKLIST HANDLER (FULL UPDATE) ---
+function handleStation6Checklist($pdo, $unitId, $checklistData) {
+    if (!$checklistData) return;
+
+    try {
+        // I-check kung may existing record na para sa unit na ito
+        $stmt = $pdo->prepare("SELECT id FROM station6_checklists WHERE unit_id = ?");
+        $stmt->execute([$unitId]);
+        $exists = $stmt->fetch();
+
+        // Kumpletong parameters base sa Excel at Database columns mo
+        $params = [
+            $checklistData['lora_module'] ?? 'Detected',
+            $checklistData['energy_meter'] ?? 'Detected',
+            $checklistData['power_good_test'] ?? 'Detected',
+            $checklistData['voltage'] ?? 0,
+            $checklistData['line1'] ?? 0,
+            $checklistData['line2'] ?? 0,
+            $checklistData['line3'] ?? 0,
+            $checklistData['temp_reading'] ?? 'PASS',
+            $checklistData['freq_reading'] ?? 'GO',
+            $checklistData['led_status_4g'] ?? 'GO',
+            $checklistData['led_status_fast_blink'] ?? 'GO',
+            $checklistData['go_no_go'] ?? 'GO',
+            $checklistData['test_duration'] ?? 120,
+            $unitId
+        ];
+
+        if ($exists) {
+            $sql = "UPDATE station6_checklists SET 
+                    lora_module = ?, energy_meter = ?, power_good_test = ?, 
+                    voltage = ?, line1 = ?, line2 = ?, line3 = ?, 
+                    temp_reading = ?, freq_reading = ?, led_status_4g = ?, 
+                    led_status_fast_blink = ?, go_no_go = ?, test_duration = ? 
+                    WHERE unit_id = ?";
+        } else {
+            $sql = "INSERT INTO station6_checklists 
+                    (lora_module, energy_meter, power_good_test, voltage, line1, line2, line3, 
+                     temp_reading, freq_reading, led_status_4g, led_status_fast_blink, 
+                     go_no_go, test_duration, unit_id) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        }
+        $pdo->prepare($sql)->execute($params);
+    } catch (PDOException $e) {
+        error_log("Station 6 Checklist Failed: " . $e->getMessage());
     }
 }
 
@@ -36,7 +82,6 @@ header("Content-Type: application/json");
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
 
 $method = $_SERVER['REQUEST_METHOD'];
-// Handle Method Override
 if ($method === 'POST' && isset($_GET['method']) && strtoupper($_GET['method']) === 'PUT') {
     $method = 'PUT';
 }
@@ -51,39 +96,44 @@ function getNullIfEmpty($val) {
 }
 
 // ==========================================================
-// 1. GET REQUESTS
+// 1. GET REQUESTS (UPDATED WITH JOIN FOR TRACKER MODAL)
 // ==========================================================
 if ($method === 'GET') {
     try {
-        // Search by Assembly Number
+        // Core Query with LEFT JOIN to get Station 6 technical data
+        $baseSql = "SELECT u.*, 
+                    s6.lora_module, s6.energy_meter, s6.power_good_test, s6.voltage, 
+                    s6.line1, s6.line2, s6.line3, s6.temp_reading, s6.freq_reading, 
+                    s6.led_status_4g, s6.led_status_fast_blink, s6.go_no_go as checklist_verdict,
+                    s6.test_duration
+                    FROM units u
+                    LEFT JOIN station6_checklists s6 ON u.id = s6.unit_id";
+
         if (isset($_GET['search_assembly'])) {
-            $assy = $_GET['search_assembly'];
-            $stmt = $pdo->prepare("SELECT * FROM units WHERE assembly_no = :assy ORDER BY created_at DESC LIMIT 1");
-            $stmt->execute(['assy' => $assy]);
+            $stmt = $pdo->prepare("$baseSql WHERE u.assembly_no = :assy ORDER BY u.created_at DESC LIMIT 1");
+            $stmt->execute(['assy' => $_GET['search_assembly']]);
             echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
             exit; 
         }
 
-        // Search by Serial
         if (isset($_GET['search_serial'])) {
-            $serial = $_GET['search_serial'];
-            $stmt = $pdo->prepare("SELECT * FROM units WHERE device_serial_no = :serial ORDER BY created_at DESC LIMIT 1");
-            $stmt->execute(['serial' => $serial]);
+            $stmt = $pdo->prepare("$baseSql WHERE u.device_serial_no = :serial ORDER BY u.created_at DESC LIMIT 1");
+            $stmt->execute(['serial' => $_GET['search_serial']]);
             echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
             exit; 
         }
 
         $station = $_GET['station'] ?? null;
         $status = $_GET['status'] ?? null;
-        $sql = "SELECT * FROM units";
         $conditions = [];
         $params = [];
 
-        if ($station) { $conditions[] = "station = :station"; $params['station'] = $station; }
-        if ($status) { $conditions[] = "status = :status"; $params['status'] = $status; }
+        if ($station) { $conditions[] = "u.station = :station"; $params['station'] = $station; }
+        if ($status) { $conditions[] = "u.status = :status"; $params['status'] = $status; }
         
+        $sql = $baseSql;
         if (count($conditions) > 0) $sql .= " WHERE " . implode(" AND ", $conditions);
-        $sql .= " ORDER BY created_at DESC";
+        $sql .= " ORDER BY u.created_at DESC";
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
@@ -106,28 +156,26 @@ if ($method === 'PUT') {
     try {
         $pdo->beginTransaction();
         
-        // PINALITAN: Idinagdag ang station = :station sa SQL UPDATE query
-        $stmt = $pdo->prepare("UPDATE units SET 
-                                status = :status, 
-                                remarks = :remarks, 
-                                station = :station 
-                               WHERE id = :id");
+        $stmt = $pdo->prepare("UPDATE units SET status = :status, remarks = :remarks, station = :station WHERE id = :id");
                                
         $stmt->execute([
             'id' => $data['id'],
             'status' => $data['status'],
             'remarks' => $data['remarks'] ?? '',
-            'station' => $data['station'] ?? 'N/A' // <--- Idinagdag para ma-update ang DB
+            'station' => $data['station'] ?? 'N/A'
         ]);
+
+        if (isset($data['checklist_data']) && (str_replace(' ', '', $data['station']) === 'Station6')) {
+            handleStation6Checklist($pdo, $data['id'], $data['checklist_data']);
+        }
 
         $mod = $data['model'] ?? '';
         $assy = $data['assemblyNo'] ?? $data['assembly_no'] ?? '';
         
-        // Ang history logging ay gagamit na rin ng bagong station name
         logUnitAction($pdo, $data['id'], $mod, $assy, $data['station'] ?? 'N/A', $data['status'], 'ADMIN_MANUAL_EDIT', $data['remarks'] ?? '', $data['username'] ?? 'Admin');
 
         $pdo->commit();
-        echo json_encode(["status" => "success", "message" => "Unit updated successfully."]);
+        echo json_encode(["status" => "success", "message" => "Unit and Checklist updated successfully."]);
     } catch (Exception $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         http_response_code(500); echo json_encode(['error' => $e->getMessage()]);
@@ -140,7 +188,6 @@ if ($method === 'PUT') {
 // ==========================================================
 if ($method === 'POST') {
     $action = $data['action'] ?? 'create';
-    
     $mod = $data['model'] ?? '';
     $rev = getNullIfEmpty($data['revision'] ?? '');
     $buk = getNullIfEmpty($data['baseUnitKittingNo'] ?? '');
@@ -155,8 +202,6 @@ if ($method === 'POST') {
     try {
         $pdo->beginTransaction();
 
-        // [SMART LOGIC] Check if Assembly Number already exists
-        // If it exists, we force an UPDATE, even if 'create' was requested.
         $existingUnit = null;
         if ($assy) {
             $check = $pdo->prepare("SELECT id FROM units WHERE assembly_no = ?");
@@ -165,13 +210,10 @@ if ($method === 'POST') {
         }
 
         if ($existingUnit) {
-            // --- UPDATE PATH (Handover or Fix Duplicate) ---
             $unitId = $existingUnit['id'];
-            
-            $updateFields = "status = :status, remarks = :remarks, station = :station, created_at = CURRENT_TIMESTAMP";
+            $updateFields = "status = :status, remarks = :remarks, station = :station, updated_at = CURRENT_TIMESTAMP";
             $params = ['status' => $stat, 'remarks' => $rem, 'station' => $stn, 'id' => $unitId];
 
-            // Update Serial only if provided
             if ($serial) {
                 $updateFields .= ", device_serial_no = :serial";
                 $params['serial'] = $serial;
@@ -180,36 +222,37 @@ if ($method === 'POST') {
             $stmt = $pdo->prepare("UPDATE units SET $updateFields WHERE id = :id");
             $stmt->execute($params);
 
+            if (isset($data['checklist_data']) && (str_replace(' ', '', $stn) === 'Station6')) {
+                handleStation6Checklist($pdo, $unitId, $data['checklist_data']);
+            }
+
             logUnitAction($pdo, $unitId, $mod, $assy, $stn, $stat, 'STATION_HANDOVER', "Processed at $stn", $user);
-            
             $pdo->commit();
-            echo json_encode(["status" => "success", "message" => "Unit processed successfully (Updated)."]);
+            echo json_encode(["status" => "success", "message" => "Unit processed successfully."]);
 
         } else {
-            // --- INSERT PATH (Truly New Unit) ---
-            if ($action === 'create' || !$existingUnit) {
-                $stmt = $pdo->prepare("INSERT INTO units 
-                    (model, revision, base_unit_kitting_no, assembly_no, device_serial_no, accessory_kitting_no, status, remarks, station) 
-                    VALUES 
-                    (:model, :rev, :buk, :assy, :serial, :ack, :status, :remarks, :station)");
-                
-                $stmt->execute([
-                    'model' => $mod, 'rev' => $rev, 'buk' => $buk, 'assy' => $assy,
-                    'serial' => $serial, 'ack' => $ack, 'status' => $stat, 'remarks' => $rem, 'station' => $stn
-                ]);
-                
-                $newId = $pdo->lastInsertId();
-                logUnitAction($pdo, $newId, $mod, $assy, $stn, $stat, 'UNIT_CREATED', 'New Entry', $user);
-                
-                $pdo->commit();
-                echo json_encode(["status" => "success", "message" => "Unit created successfully.", "id" => $newId]);
+            $stmt = $pdo->prepare("INSERT INTO units 
+                (model, revision, base_unit_kitting_no, assembly_no, device_serial_no, accessory_kitting_no, status, remarks, station) 
+                VALUES (:model, :rev, :buk, :assy, :serial, :ack, :status, :remarks, :station)");
+            
+            $stmt->execute([
+                'model' => $mod, 'rev' => $rev, 'buk' => $buk, 'assy' => $assy,
+                'serial' => $serial, 'ack' => $ack, 'status' => $stat, 'remarks' => $rem, 'station' => $stn
+            ]);
+            
+            $newId = $pdo->lastInsertId();
+
+            if (isset($data['checklist_data']) && (str_replace(' ', '', $stn) === 'Station6')) {
+                handleStation6Checklist($pdo, $newId, $data['checklist_data']);
             }
+
+            logUnitAction($pdo, $newId, $mod, $assy, $stn, $stat, 'UNIT_CREATED', 'New Entry', $user);
+            $pdo->commit();
+            echo json_encode(["status" => "success", "message" => "Unit created successfully.", "id" => $newId]);
         }
     } catch (Exception $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
-        // Send exact error to frontend for debugging
-        http_response_code(500);
-        echo json_encode(['error' => $e->getMessage()]);
+        http_response_code(500); echo json_encode(['error' => $e->getMessage()]);
     }
     exit;
 }
