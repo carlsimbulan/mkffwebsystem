@@ -21,7 +21,7 @@ function logUnitAction($pdo, $unitId, $model, $assemblyNo, $station, $status, $a
 }
 
 // --- HELPER: STATION 1 CHECKLIST HANDLER ---
-function handleStation1Checklist($pdo, $unitId, $checklistData) {
+function handleStation1Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
     if (!$checklistData) return;
     try {
         $stmt = $pdo->prepare("SELECT id FROM station1_checklists WHERE unit_id = ?");
@@ -29,11 +29,11 @@ function handleStation1Checklist($pdo, $unitId, $checklistData) {
         $exists = $stmt->fetch();
 
         if ($exists) {
-            $sql = "UPDATE station1_checklists SET header_seated_90_deg = ?, leads_properly_soldered = ? WHERE unit_id = ?";
-            $params = [$checklistData['header_seated_90_deg'], $checklistData['leads_properly_soldered'], $unitId];
+            $sql = "UPDATE station1_checklists SET assembly_no = ?, header_seated_90_deg = ?, leads_properly_soldered = ? WHERE unit_id = ?";
+            $params = [$assemblyNo, $checklistData['header_seated_90_deg'], $checklistData['leads_properly_soldered'], $unitId];
         } else {
-            $sql = "INSERT INTO station1_checklists (unit_id, header_seated_90_deg, leads_properly_soldered) VALUES (?, ?, ?)";
-            $params = [$unitId, $checklistData['header_seated_90_deg'], $checklistData['leads_properly_soldered']];
+            $sql = "INSERT INTO station1_checklists (unit_id, assembly_no, header_seated_90_deg, leads_properly_soldered) VALUES (?, ?, ?, ?)";
+            $params = [$unitId, $assemblyNo, $checklistData['header_seated_90_deg'], $checklistData['leads_properly_soldered']];
         }
         $pdo->prepare($sql)->execute($params);
     } catch (PDOException $e) {
@@ -41,8 +41,8 @@ function handleStation1Checklist($pdo, $unitId, $checklistData) {
     }
 }
 
-// --- HELPER: STATION 2 CHECKLIST HANDLER (NEW) ---
-function handleStation2Checklist($pdo, $unitId, $checklistData) {
+// --- HELPER: STATION 2 CHECKLIST HANDLER ---
+function handleStation2Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
     if (!$checklistData) return;
     try {
         $stmt = $pdo->prepare("SELECT id FROM station2_checklists WHERE unit_id = ?");
@@ -50,27 +50,11 @@ function handleStation2Checklist($pdo, $unitId, $checklistData) {
         $exists = $stmt->fetch();
 
         if ($exists) {
-            $sql = "UPDATE station2_checklists SET 
-                    integrated_board_level_test1 = ?, 
-                    integrated_board_level_test2 = ?, 
-                    integrated_board_level_test3 = ? 
-                    WHERE unit_id = ?";
-            $params = [
-                $checklistData['integrated_board_level_test1'], 
-                $checklistData['integrated_board_level_test2'], 
-                $checklistData['integrated_board_level_test3'], 
-                $unitId
-            ];
+            $sql = "UPDATE station2_checklists SET assembly_no = ?, integrated_board_level_test1 = ?, integrated_board_level_test2 = ?, integrated_board_level_test3 = ? WHERE unit_id = ?";
+            $params = [$assemblyNo, $checklistData['integrated_board_level_test1'], $checklistData['integrated_board_level_test2'], $checklistData['integrated_board_level_test3'], $unitId];
         } else {
-            $sql = "INSERT INTO station2_checklists 
-                    (unit_id, integrated_board_level_test1, integrated_board_level_test2, integrated_board_level_test3) 
-                    VALUES (?, ?, ?, ?)";
-            $params = [
-                $unitId, 
-                $checklistData['integrated_board_level_test1'], 
-                $checklistData['integrated_board_level_test2'], 
-                $checklistData['integrated_board_level_test3']
-            ];
+            $sql = "INSERT INTO station2_checklists (unit_id, assembly_no, integrated_board_level_test1, integrated_board_level_test2, integrated_board_level_test3) VALUES (?, ?, ?, ?, ?)";
+            $params = [$unitId, $assemblyNo, $checklistData['integrated_board_level_test1'], $checklistData['integrated_board_level_test2'], $checklistData['integrated_board_level_test3']];
         }
         $pdo->prepare($sql)->execute($params);
     } catch (PDOException $e) {
@@ -79,7 +63,7 @@ function handleStation2Checklist($pdo, $unitId, $checklistData) {
 }
 
 // --- HELPER: STATION 6 CHECKLIST HANDLER ---
-function handleStation6Checklist($pdo, $unitId, $checklistData) {
+function handleStation6Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
     if (!$checklistData) return;
     try {
         $stmt = $pdo->prepare("SELECT id FROM station6_checklists WHERE unit_id = ?");
@@ -87,6 +71,7 @@ function handleStation6Checklist($pdo, $unitId, $checklistData) {
         $exists = $stmt->fetch();
 
         $params = [
+            $assemblyNo,
             $checklistData['lora_module'] ?? 'Detected',
             $checklistData['energy_meter'] ?? 'Detected',
             $checklistData['power_good_test'] ?? 'Detected',
@@ -104,18 +89,9 @@ function handleStation6Checklist($pdo, $unitId, $checklistData) {
         ];
 
         if ($exists) {
-            $sql = "UPDATE station6_checklists SET 
-                    lora_module = ?, energy_meter = ?, power_good_test = ?, 
-                    voltage = ?, line1 = ?, line2 = ?, line3 = ?, 
-                    temp_reading = ?, freq_reading = ?, led_status_4g = ?, 
-                    led_status_fast_blink = ?, go_no_go = ?, test_duration = ? 
-                    WHERE unit_id = ?";
+            $sql = "UPDATE station6_checklists SET assembly_no = ?, lora_module = ?, energy_meter = ?, power_good_test = ?, voltage = ?, line1 = ?, line2 = ?, line3 = ?, temp_reading = ?, freq_reading = ?, led_status_4g = ?, led_status_fast_blink = ?, go_no_go = ?, test_duration = ? WHERE unit_id = ?";
         } else {
-            $sql = "INSERT INTO station6_checklists 
-                    (lora_module, energy_meter, power_good_test, voltage, line1, line2, line3, 
-                     temp_reading, freq_reading, led_status_4g, led_status_fast_blink, 
-                     go_no_go, test_duration, unit_id) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $sql = "INSERT INTO station6_checklists (assembly_no, lora_module, energy_meter, power_good_test, voltage, line1, line2, line3, temp_reading, freq_reading, led_status_4g, led_status_fast_blink, go_no_go, test_duration, unit_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         }
         $pdo->prepare($sql)->execute($params);
     } catch (PDOException $e) {
@@ -126,9 +102,7 @@ function handleStation6Checklist($pdo, $unitId, $checklistData) {
 // --- CORS ---
 $allowedOrigins = ["http://localhost:3000", "http://localhost:3001"];
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-if (in_array($origin, $allowedOrigins)) {
-    header("Access-Control-Allow-Origin: $origin");
-}
+if (in_array($origin, $allowedOrigins)) { header("Access-Control-Allow-Origin: $origin"); }
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS"); 
 header("Access-Control-Allow-Credentials: true");
@@ -137,21 +111,15 @@ header("Content-Type: application/json");
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
 
 $method = $_SERVER['REQUEST_METHOD'];
-if ($method === 'POST' && isset($_GET['method']) && strtoupper($_GET['method']) === 'PUT') {
-    $method = 'PUT';
-}
+if ($method === 'POST' && isset($_GET['method']) && strtoupper($_GET['method']) === 'PUT') { $method = 'PUT'; }
 
 $data = null;
-if ($method !== 'GET') {
-    $data = json_decode(file_get_contents("php://input"), true);
-}
+if ($method !== 'GET') { $data = json_decode(file_get_contents("php://input"), true); }
 
-function getNullIfEmpty($val) {
-    return (isset($val) && trim($val) !== '') ? trim($val) : null;
-}
+function getNullIfEmpty($val) { return (isset($val) && trim($val) !== '') ? trim($val) : null; }
 
 // ==========================================================
-// 1. GET REQUESTS
+// 1. GET REQUESTS (Joined with all checklists)
 // ==========================================================
 if ($method === 'GET') {
     try {
@@ -170,22 +138,17 @@ if ($method === 'GET') {
         if (isset($_GET['search_assembly'])) {
             $stmt = $pdo->prepare("$baseSql WHERE u.assembly_no = :assy ORDER BY u.created_at DESC LIMIT 1");
             $stmt->execute(['assy' => $_GET['search_assembly']]);
-            echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-            exit; 
+            echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)); exit; 
         }
 
         if (isset($_GET['search_serial'])) {
             $stmt = $pdo->prepare("$baseSql WHERE u.device_serial_no = :serial ORDER BY u.created_at DESC LIMIT 1");
             $stmt->execute(['serial' => $_GET['search_serial']]);
-            echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
-            exit; 
+            echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC)); exit; 
         }
 
-        $station = $_GET['station'] ?? null;
-        $status = $_GET['status'] ?? null;
-        $conditions = [];
-        $params = [];
-
+        $station = $_GET['station'] ?? null; $status = $_GET['status'] ?? null;
+        $conditions = []; $params = [];
         if ($station) { $conditions[] = "u.station = :station"; $params['station'] = $station; }
         if ($status) { $conditions[] = "u.status = :status"; $params['status'] = $status; }
         
@@ -206,36 +169,24 @@ if ($method === 'GET') {
 // 2. PUT REQUESTS (Edit Modal)
 // ==========================================================
 if ($method === 'PUT') {
-    if (!isset($data['id'])) {
-        http_response_code(400); echo json_encode(['error' => 'Missing id']); exit;
-    }
+    if (!isset($data['id'])) { http_response_code(400); echo json_encode(['error' => 'Missing id']); exit; }
 
     try {
         $pdo->beginTransaction();
-        
         $stmt = $pdo->prepare("UPDATE units SET status = :status, remarks = :remarks, station = :station WHERE id = :id");
-        $stmt->execute([
-            'id' => $data['id'],
-            'status' => $data['status'],
-            'remarks' => $data['remarks'] ?? '',
-            'station' => $data['station'] ?? 'N/A'
-        ]);
+        $stmt->execute(['id' => $data['id'], 'status' => $data['status'], 'remarks' => $data['remarks'] ?? '', 'station' => $data['station'] ?? 'N/A']);
 
-        if (isset($data['checklist_data'])) {
+        // Use assembly_no from payload
+        $assy = $data['assembly_no'] ?? $data['assemblyNo'] ?? '';
+
+        if (isset($data['checklist_data']) && $assy !== '') {
             $cleanStation = str_replace(' ', '', $data['station']);
-            if ($cleanStation === 'Station1') {
-                handleStation1Checklist($pdo, $data['id'], $data['checklist_data']);
-            } elseif ($cleanStation === 'Station2') {
-                handleStation2Checklist($pdo, $data['id'], $data['checklist_data']);
-            } elseif ($cleanStation === 'Station6') {
-                handleStation6Checklist($pdo, $data['id'], $data['checklist_data']);
-            }
+            if ($cleanStation === 'Station1') handleStation1Checklist($pdo, $data['id'], $assy, $data['checklist_data']);
+            elseif ($cleanStation === 'Station2') handleStation2Checklist($pdo, $data['id'], $assy, $data['checklist_data']);
+            elseif ($cleanStation === 'Station6') handleStation6Checklist($pdo, $data['id'], $assy, $data['checklist_data']);
         }
 
-        $mod = $data['model'] ?? '';
-        $assy = $data['assemblyNo'] ?? $data['assembly_no'] ?? '';
-        logUnitAction($pdo, $data['id'], $mod, $assy, $data['station'] ?? 'N/A', $data['status'], 'ADMIN_MANUAL_EDIT', $data['remarks'] ?? '', $data['username'] ?? 'Admin');
-
+        logUnitAction($pdo, $data['id'], $data['model'] ?? '', $assy, $data['station'] ?? 'N/A', $data['status'], 'ADMIN_MANUAL_EDIT', $data['remarks'] ?? '', $data['username'] ?? 'Admin');
         $pdo->commit();
         echo json_encode(["status" => "success", "message" => "Unit and Checklist updated successfully."]);
     } catch (Exception $e) {
@@ -256,7 +207,6 @@ if ($method === 'POST') {
 
     try {
         $pdo->beginTransaction();
-
         $check = $pdo->prepare("SELECT id FROM units WHERE assembly_no = ?");
         $check->execute([$assy]);
         $existingUnit = $check->fetch(PDO::FETCH_ASSOC);
@@ -265,44 +215,29 @@ if ($method === 'POST') {
             $unitId = $existingUnit['id'];
             $updateSql = "UPDATE units SET status = :status, remarks = :remarks, station = :station, updated_at = CURRENT_TIMESTAMP";
             if (getNullIfEmpty($data['deviceSerialNo'] ?? '')) $updateSql .= ", device_serial_no = :serial";
-            
             $params = ['status' => $stat, 'remarks' => $data['remarks'] ?? '', 'station' => $stn, 'id' => $unitId];
             if (getNullIfEmpty($data['deviceSerialNo'] ?? '')) $params['serial'] = $data['deviceSerialNo'];
-
             $pdo->prepare("$updateSql WHERE id = :id")->execute($params);
 
             if (isset($data['checklist_data'])) {
                 $cleanStation = str_replace(' ', '', $stn);
-                if ($cleanStation === 'Station1') handleStation1Checklist($pdo, $unitId, $data['checklist_data']);
-                if ($cleanStation === 'Station2') handleStation2Checklist($pdo, $unitId, $data['checklist_data']);
-                if ($cleanStation === 'Station6') handleStation6Checklist($pdo, $unitId, $data['checklist_data']);
+                if ($cleanStation === 'Station1') handleStation1Checklist($pdo, $unitId, $assy, $data['checklist_data']);
+                elseif ($cleanStation === 'Station2') handleStation2Checklist($pdo, $unitId, $assy, $data['checklist_data']);
+                elseif ($cleanStation === 'Station6') handleStation6Checklist($pdo, $unitId, $assy, $data['checklist_data']);
             }
-
             logUnitAction($pdo, $unitId, $data['model'] ?? '', $assy, $stn, $stat, 'STATION_HANDOVER', "Processed at $stn", $user);
         } else {
-            $stmt = $pdo->prepare("INSERT INTO units 
-                (model, revision, base_unit_kitting_no, assembly_no, device_serial_no, accessory_kitting_no, status, remarks, station) 
-                VALUES (:model, :rev, :buk, :assy, :serial, :ack, :status, :remarks, :station)");
-            
-            $stmt->execute([
-                'model' => $data['model'] ?? '', 'rev' => getNullIfEmpty($data['revision'] ?? ''), 
-                'buk' => getNullIfEmpty($data['baseUnitKittingNo'] ?? ''), 'assy' => $assy,
-                'serial' => getNullIfEmpty($data['deviceSerialNo'] ?? ''), 'ack' => getNullIfEmpty($data['accessoryKittingNo'] ?? ''), 
-                'status' => $stat, 'remarks' => $data['remarks'] ?? '', 'station' => $stn
-            ]);
-            
+            $stmt = $pdo->prepare("INSERT INTO units (model, revision, base_unit_kitting_no, assembly_no, device_serial_no, accessory_kitting_no, status, remarks, station) VALUES (:model, :rev, :buk, :assy, :serial, :ack, :status, :remarks, :station)");
+            $stmt->execute(['model' => $data['model'] ?? '', 'rev' => getNullIfEmpty($data['revision'] ?? ''), 'buk' => getNullIfEmpty($data['baseUnitKittingNo'] ?? ''), 'assy' => $assy, 'serial' => getNullIfEmpty($data['deviceSerialNo'] ?? ''), 'ack' => getNullIfEmpty($data['accessoryKittingNo'] ?? ''), 'status' => $stat, 'remarks' => $data['remarks'] ?? '', 'station' => $stn]);
             $newId = $pdo->lastInsertId();
-
             if (isset($data['checklist_data'])) {
                 $cleanStation = str_replace(' ', '', $stn);
-                if ($cleanStation === 'Station1') handleStation1Checklist($pdo, $newId, $data['checklist_data']);
-                if ($cleanStation === 'Station2') handleStation2Checklist($pdo, $newId, $data['checklist_data']);
-                if ($cleanStation === 'Station6') handleStation6Checklist($pdo, $newId, $data['checklist_data']);
+                if ($cleanStation === 'Station1') handleStation1Checklist($pdo, $newId, $assy, $data['checklist_data']);
+                elseif ($cleanStation === 'Station2') handleStation2Checklist($pdo, $newId, $assy, $data['checklist_data']);
+                elseif ($cleanStation === 'Station6') handleStation6Checklist($pdo, $newId, $assy, $data['checklist_data']);
             }
-
             logUnitAction($pdo, $newId, $data['model'] ?? '', $assy, $stn, $stat, 'UNIT_CREATED', 'New Entry', $user);
         }
-
         $pdo->commit();
         echo json_encode(["status" => "success", "message" => "Unit processed successfully."]);
     } catch (Exception $e) {
