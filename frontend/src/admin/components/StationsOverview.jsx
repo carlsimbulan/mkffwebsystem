@@ -38,7 +38,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All'); 
     const [selectedUnitProcess, setSelectedUnitProcess] = useState(null); 
-    const [expandedStepIdx, setExpandedStepIdx] = useState(null); // Para sa tracker dropdown
+    const [expandedStepIdx, setExpandedStepIdx] = useState(null); 
 
     const monitorMetrics = calculateMetrics(stationMonitorId);
 
@@ -54,9 +54,11 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
     return (
         <div className="pb-5 container-fluid px-0">
             <style>{`
-                .btn-box { border-radius: 4px !important; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; transition: none; }
+                * { animation: none !important; transition: none !important; }
+                .btn-box { border-radius: 4px !important; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
                 .stat-card-pro { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 22px; height: 100%; border-left: 5px solid #198754; }
                 .table thead th { background-color: #1e293b !important; color: #ffffff !important; font-weight: 600; border: none; padding: 12px 15px; }
+                .table-hover tbody tr:hover { background-color: #f1f5f9 !important; }
                 .modal-step { padding: 15px 20px; border-left: 2px solid #e9ecef; position: relative; border-radius: 0 8px 8px 0; cursor: pointer; }
                 .modal-step.done { border-left-color: #198754; }
                 .modal-step.current { border-left-color: #0d6efd; background: #f0f7ff; }
@@ -66,11 +68,36 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 .current .modal-dot { background: #0d6efd; }
                 .ng .modal-dot { background: #dc3545; }
 
-                /* Technical Checklist Layout in Tracker */
-                .tech-tracker-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 15px; background: #fff; border: 1px solid #e2e8f0; padding: 15px; border-radius: 6px; }
-                .tech-t-item { font-size: 0.75rem; border-bottom: 1px solid #f8fafc; padding-bottom: 5px; }
-                .tech-t-label { color: #64748b; font-weight: 800; text-transform: uppercase; margin-right: 8px; }
-                .tech-t-val { color: #1e293b; font-weight: 700; }
+                /* Technical Data Table in Tracker Modal */
+                .tracker-checklist-box { 
+                    background: #f8fafc; 
+                    border: 1px solid #cbd5e1; 
+                    border-radius: 6px; 
+                    margin-top: 10px; 
+                    overflow-x: auto; 
+                }
+                .tracker-table { 
+                    width: 100%; 
+                    min-width: 550px;
+                    font-size: 0.72rem; 
+                    margin-bottom: 0; 
+                }
+                .tracker-table th { 
+                    background: #f1f5f9; 
+                    color: #475569; 
+                    padding: 6px 8px; 
+                    border-bottom: 1px solid #cbd5e1; 
+                    text-transform: uppercase; 
+                    font-weight: 800;
+                    text-align: center;
+                }
+                .tracker-table td { 
+                    padding: 8px 8px; 
+                    color: #0f172a; 
+                    font-weight: 700; 
+                    border-bottom: 1px solid #e2e8f0; 
+                    text-align: center;
+                }
             `}</style>
 
             <div className="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3 px-2">
@@ -127,19 +154,19 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
 
             {selectedUnitProcess && (
                 <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.4)', zIndex: 1050 }}>
-                    <div className="bg-white rounded-3 shadow-xl p-0 overflow-hidden border-0" style={{ width: '95%', maxWidth: '500px' }}>
+                    <div className="bg-white rounded-3 shadow-xl p-0 overflow-hidden border-0" style={{ width: '95%', maxWidth: '750px' }}>
                         <div className="p-4 d-flex justify-content-between align-items-center text-white bg-primary">
                             <div>
                                 <h5 className="mb-0 fw-bold">Unit Tracker</h5>
                                 <p className="mb-0 small opacity-75">{selectedUnitProcess.assembly_no}</p>
                             </div>
-                            <button className="btn-close btn-close-white shadow-none" onClick={() => setSelectedUnitProcess(null)}></button>
+                            <button className="btn-close btn-close-white shadow-none" onClick={() => {setSelectedUnitProcess(null); setExpandedStepIdx(null);}}></button>
                         </div>
                         <div className="p-2 bg-light border-bottom d-flex justify-content-around small fw-bold text-muted">
                             <span><i className="bi bi-box-seam me-1"></i> {selectedUnitProcess.model}</span>
                             <span><i className="bi bi-hash me-1"></i> SN: {selectedUnitProcess.device_serial_no}</span>
                         </div>
-                        <div className="p-0" style={{ maxHeight: '55vh', overflowY: 'auto' }}>
+                        <div className="p-0" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
                             <div className="p-4">
                                 {processStations.map((station, idx) => {
                                     const isCurrent = idx === stationIndex;
@@ -149,18 +176,22 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                     const isCompletedHere = isCurrent && unitStatus.includes('completed');
                                     const isExpanded = expandedStepIdx === idx;
 
-                                    // Mapping Checklist Data for Station 6 (Complete Unit Test)
-                                    const checklist = (idx === 5 && selectedUnitProcess.voltage) ? {
-                                        "LoRa Module": selectedUnitProcess.lora_module,
-                                        "Energy Meter": selectedUnitProcess.energy_meter,
-                                        "Voltage Reading": selectedUnitProcess.voltage + "V",
-                                        "L1 Reading": selectedUnitProcess.line1 + "V",
-                                        "L2 Reading": selectedUnitProcess.line2 + "V",
-                                        "L3 Reading": selectedUnitProcess.line3 + "V",
-                                        "Temp Reading": selectedUnitProcess.temp_reading,
-                                        "4G Status": selectedUnitProcess.led_status_4g,
-                                        "Final Verdict": selectedUnitProcess.go_no_go || selectedUnitProcess.checklist_verdict
-                                    } : null;
+                                    // Mapping Checklist Data for History
+                                    let stationData = null;
+                                    if (idx === 0 && selectedUnitProcess.header_seated_90_deg) {
+                                        stationData = { "Header Seated": selectedUnitProcess.header_seated_90_deg, "Soldering": selectedUnitProcess.leads_properly_soldered };
+                                    }
+                                    if (idx === 1 && selectedUnitProcess.integrated_board_level_test1) {
+                                        stationData = { "Board 1": selectedUnitProcess.integrated_board_level_test1, "Board 2": selectedUnitProcess.integrated_board_level_test2, "Board 3": selectedUnitProcess.integrated_board_level_test3 };
+                                    }
+                                    if (idx === 5 && selectedUnitProcess.voltage) {
+                                        stationData = {
+                                            "LoRa": selectedUnitProcess.lora_module, "Meter": selectedUnitProcess.energy_meter, "Volt": selectedUnitProcess.voltage + "V",
+                                            "L1": selectedUnitProcess.line1 + "V", "L2": selectedUnitProcess.line2 + "V", "L3": selectedUnitProcess.line3 + "V",
+                                            "Temp": selectedUnitProcess.temp_reading, "Freq": selectedUnitProcess.freq_reading, "4G": selectedUnitProcess.led_status_4g,
+                                            "Blink": selectedUnitProcess.led_status_fast_blink, "Verdict": selectedUnitProcess.checklist_verdict || selectedUnitProcess.go_no_go
+                                        };
+                                    }
                                     
                                     let stepClass = ""; let subText = "Pending Station"; let textColor = "text-muted";
                                     if (isDoneBefore || isCompletedHere) { stepClass = "done"; subText = "STATION COMPLETED"; textColor = "text-success"; }
@@ -168,32 +199,39 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                     else if (isCurrent) { stepClass = "current"; subText = "IN PROGRESS"; textColor = "text-primary"; }
 
                                     return (
-                                        <div key={idx} className={`modal-step ${stepClass}`} onClick={() => checklist && setExpandedStepIdx(isExpanded ? null : idx)}>
+                                        <div key={idx} className={`modal-step ${stepClass}`} onClick={() => stationData && setExpandedStepIdx(isExpanded ? null : idx)}>
                                             <div className="modal-dot"></div>
                                             <div className="d-flex justify-content-between align-items-center">
                                                 <div>
                                                     <div className={`fw-bold mb-0 ${isCurrent || isDoneBefore || isCompletedHere ? 'text-dark' : 'text-muted opacity-50'}`} style={{fontSize: '0.9rem'}}>
                                                         {idx + 1}. {station}
-                                                        {checklist && <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'} ms-2 small text-muted`}></i>}
+                                                        {stationData && <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'} ms-2 small text-muted`}></i>}
                                                     </div>
-                                                    <div className={`fw-bold ${textColor}`} style={{fontSize: '0.65rem', letterSpacing: '0.3px'}}>
-                                                        {subText}
-                                                    </div>
+                                                    <div className={`fw-bold ${textColor}`} style={{fontSize: '0.65rem', letterSpacing: '0.3px'}}>{subText}</div>
                                                 </div>
-                                                {isCurrent && <span className="badge bg-primary-subtle text-primary border border-primary-subtle rounded-1" style={{fontSize: '0.6rem'}}>CURRENT</span>}
+                                                {(isCurrent || (isDoneBefore && stationData)) && <span className="badge bg-light text-dark border small" style={{fontSize: '0.6rem'}}>VIEW DATA</span>}
                                             </div>
 
-                                            {/* DROPDOWN PARA SA STATION CHECKLIST */}
-                                            {isExpanded && checklist && (
-                                                <div className="tech-tracker-grid shadow-sm" onClick={(e) => e.stopPropagation()}>
-                                                    {Object.entries(checklist).map(([key, val]) => (
-                                                        <div key={key} className="tech-t-item">
-                                                            <span className="tech-t-label">{key}:</span>
-                                                            <span className={`tech-t-val ${val === 'PASS' || val === 'GO' || val === 'Detected' ? 'text-success' : val === 'FAIL' || val === 'NO GO' ? 'text-danger' : ''}`}>
-                                                                {val || 'N/A'}
-                                                            </span>
-                                                        </div>
-                                                    ))}
+                                            {isExpanded && stationData && (
+                                                <div className="tracker-checklist-box shadow-sm" onClick={(e) => e.stopPropagation()}>
+                                                    <table className="tracker-table">
+                                                        <thead>
+                                                            <tr>
+                                                                {Object.keys(stationData).map(k => <th key={k}>{k}</th>)}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <tr>
+                                                                {Object.values(stationData).map((v, i) => (
+                                                                    <td key={i}>
+                                                                        <span className={v === 'GO' || v === 'PASS' || v === 'Detected' ? 'text-success' : v === 'NO GO' || v === 'FAIL' || v === 'Not Detected' ? 'text-danger' : ''}>
+                                                                            {v || 'N/A'}
+                                                                        </span>
+                                                                    </td>
+                                                                ))}
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
                                                 </div>
                                             )}
                                         </div>
@@ -232,6 +270,7 @@ export function StationsOverview({
         }).sort((a, b) => new Date(b.timestamp || b.created_at) - new Date(a.timestamp || a.created_at));
     }, [allLogs, historySearch, startDate, endDate]);
 
+    // Calculate current slice of data for pagination
     const paginatedHistory = useMemo(() => {
         const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
         return filteredHistory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -249,10 +288,12 @@ export function StationsOverview({
         return (
             <div className="pb-5 container-fluid px-0">
                 <style>{`
-                    .btn-box { border-radius: 4px !important; font-weight: 600; transition: none; }
+                    * { animation: none !important; transition: none !important; }
+                    .btn-box { border-radius: 4px !important; font-weight: 600; }
                     .table thead th { background-color: #1e293b !important; color: white !important; padding: 12px; }
-                    .pagination .page-link { color: #1e293b; border: 1px solid #dee2e6; margin: 0 2px; border-radius: 4px; transition: none; }
+                    .pagination .page-link { color: #1e293b; border: 1px solid #dee2e6; margin: 0 2px; border-radius: 4px; }
                     .pagination .page-item.active .page-link { background-color: #1e293b; border-color: #1e293b; color: white; }
+                    .pagination .page-item.disabled .page-link { color: #6c757d; pointer-events: none; background-color: #fff; border-color: #dee2e6; }
                 `}</style>
                 <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3 px-2">
                     <div>
@@ -262,7 +303,7 @@ export function StationsOverview({
                     <button className="btn btn-light border btn-sm btn-box px-3" onClick={() => setActiveTab('stations')}>BACK</button>
                 </div>
 
-                <div className="bg-light p-3 rounded-2 border mb-4 d-flex flex-wrap gap-3 align-items-end mx-2">
+                <div className="bg-light p-3 rounded-2 border mb-4 d-flex flex-wrap gap-3 align-items-end mx-2 shadow-sm">
                     <div className="flex-grow-1"><label className="fw-bold small text-muted mb-1 d-block">ASSEMBLY NO.</label>
                     <input type="text" className="form-control form-control-sm btn-box shadow-none" placeholder="Search..." value={historySearch} onChange={(e) => setHistorySearch(e.target.value)} /></div>
                     <div><label className="fw-bold small text-muted mb-1 d-block">START DATE</label><input type="date" className="form-control form-control-sm btn-box" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
@@ -271,36 +312,55 @@ export function StationsOverview({
                 </div>
 
                 <div className="bg-white border rounded-2 overflow-hidden mx-2 shadow-sm">
-                    <table className="table table-hover align-middle mb-0" style={{fontSize: '0.85rem'}}>
-                        <thead>
-                            <tr>
-                                <th className="ps-4">MODEL</th><th>ASSEMBLY</th><th>TYPE</th><th>STATION</th><th className="text-center">STATUS</th><th>USER</th><th className="text-end pe-4">TIMESTAMP</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {paginatedHistory.map(log => {
-                                const ts = formatTimestamp(log.timestamp || log.created_at);
-                                return (
-                                    <tr key={log.id}>
-                                        <td className="ps-4 fw-bold">{log.model || log.model_id}</td>
-                                        <td><code className="text-primary fw-bold">{log.assembly_no}</code></td>
-                                        <td className="text-muted small fw-bold">{log.action_type || 'UPDATE'}</td>
-                                        <td className="fw-semibold">{log.station_name || log.station}</td>
-                                        <td className="text-center"><span className={`badge rounded-1 px-3 ${getStatusBadgeClass(log.status_after || log.status)}`}>{log.status_after || log.status}</span></td>
-                                        <td className="small">{log.action_by || 'System'}</td>
-                                        <td className="text-end pe-4 small text-muted"><strong>{ts.date}</strong><br/>{ts.time}</td>
+                    <div style={{minHeight: '450px'}}>
+                        <table className="table table-hover align-middle mb-0" style={{fontSize: '0.85rem'}}>
+                            <thead className="sticky-top">
+                                <tr>
+                                    <th className="ps-4">MODEL</th>
+                                    <th>ASSEMBLY</th>
+                                    <th>TYPE</th>
+                                    <th>STATION</th>
+                                    <th className="text-center">STATUS</th>
+                                    <th>USER</th>
+                                    <th className="text-end pe-4">TIMESTAMP</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paginatedHistory.length > 0 ? (
+                                    paginatedHistory.map(log => {
+                                        const ts = formatTimestamp(log.timestamp || log.created_at);
+                                        return (
+                                            <tr key={log.id}>
+                                                <td className="ps-4 fw-bold">{log.model || log.model_id}</td>
+                                                <td><code className="text-primary fw-bold">{log.assembly_no}</code></td>
+                                                <td className="text-muted small fw-bold">{log.action_type || 'UPDATE'}</td>
+                                                <td className="fw-semibold">{log.station_name || log.station}</td>
+                                                <td className="text-center"><span className={`badge rounded-1 px-3 ${getStatusBadgeClass(log.status_after || log.status)}`}>{log.status_after || log.status}</span></td>
+                                                <td className="small">{log.action_by || 'System'}</td>
+                                                <td className="text-end pe-4 small text-muted"><strong>{ts.date}</strong><br/>{ts.time}</td>
+                                            </tr>
+                                        );
+                                    })
+                                ) : (
+                                    <tr>
+                                        <td colSpan="7" className="text-center py-5 text-muted italic">No logs found matching your criteria.</td>
                                     </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
 
+                    {/* Pagination Controls */}
                     <div className="p-3 border-top d-flex justify-content-between align-items-center bg-light">
-                        <div className="small text-muted fw-bold">Page {currentPage} of {totalPages || 1}</div>
+                        <div className="small text-muted fw-bold">
+                            Page {currentPage} of {totalPages || 1}
+                        </div>
                         <nav>
                             <ul className="pagination pagination-sm mb-0">
                                 <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                                    <button className="page-link shadow-none" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}><i className="bi bi-chevron-left"></i></button>
+                                    <button className="page-link shadow-none" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}>
+                                        <i className="bi bi-chevron-left"></i>
+                                    </button>
                                 </li>
                                 {[...Array(totalPages)].map((_, index) => {
                                     const pageNum = index + 1;
@@ -316,7 +376,9 @@ export function StationsOverview({
                                     return null;
                                 })}
                                 <li className={`page-item ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}`}>
-                                    <button className="page-link shadow-none" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}><i className="bi bi-chevron-right"></i></button>
+                                    <button className="page-link shadow-none" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}>
+                                        <i className="bi bi-chevron-right"></i>
+                                    </button>
                                 </li>
                             </ul>
                         </nav>
@@ -333,15 +395,35 @@ export function StationsOverview({
     return (
         <div className="container-fluid px-0">
             <style>{`
-                .btn-box { border-radius: 4px !important; font-weight: 700; transition: none; }
-                .station-card-flat { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; height: 100%; transition: none; }
-                .metric-row { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #475569; }
+                * { animation: none !important; transition: none !important; }
+                .btn-box { border-radius: 4px !important; font-weight: 700; }
+                .station-card-flat { 
+                    background: #fff; 
+                    border: 1px solid #e2e8f0; 
+                    border-radius: 8px; 
+                    padding: 20px; 
+                    height: 100%; 
+                }
+                .station-card-flat:hover { 
+                    border-color: #94a3b8; 
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+                    transform: translateY(-2px);
+                }
+                .metric-row { 
+                    display: flex; 
+                    justify-content: space-between; 
+                    font-size: 0.75rem; 
+                    font-weight: 700; 
+                    padding: 8px 0; 
+                    border-bottom: 1px solid #f1f5f9; 
+                    color: #475569; 
+                }
                 .metric-row:last-child { border-bottom: none; }
                 .metric-value { color: #1e293b; } 
-                .btn-monitor { background: #1e293b; color: #fff; border: none; transition: none; }
-                .btn-monitor:hover { background: #0f172a; }
-                .btn-history { background: transparent; color: #475569; border: 1px solid #e2e8f0; transition: none; }
-                .btn-history:hover { background: #f8fafc; }
+                .btn-monitor { background: #1e293b; color: #fff; border: none; }
+                .btn-monitor:hover { background: #0f172a; color: #fff; }
+                .btn-history { background: transparent; color: #475569; border: 1px solid #e2e8f0; }
+                .btn-history:hover { background: #f8fafc; border-color: #cbd5e1; }
             `}</style>
             
             <div className="d-flex justify-content-between align-items-center mb-4 px-2 border-bottom pb-3">
