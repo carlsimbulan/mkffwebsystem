@@ -38,7 +38,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All'); 
     const [selectedUnitProcess, setSelectedUnitProcess] = useState(null); 
-    const [expandedStepIdx, setExpandedStepIdx] = useState(null); 
+    const [expandedStepIdx, setExpandedStepIdx] = useState(null); // Para sa tracker dropdown
 
     const monitorMetrics = calculateMetrics(stationMonitorId);
 
@@ -55,11 +55,11 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
         <div className="pb-5 container-fluid px-0">
             <style>{`
                 * { animation: none !important; transition: none !important; }
-                .btn-box { border-radius: 4px !important; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+                .btn-box { border-radius: 4px !important; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; transition: none !important; }
                 .stat-card-pro { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 22px; height: 100%; border-left: 5px solid #198754; }
                 .table thead th { background-color: #1e293b !important; color: #ffffff !important; font-weight: 600; border: none; padding: 12px 15px; }
                 .table-hover tbody tr:hover { background-color: #f1f5f9 !important; }
-                .modal-step { padding: 15px 20px; border-left: 2px solid #e9ecef; position: relative; border-radius: 0 8px 8px 0; cursor: pointer; }
+                .modal-step { padding: 15px 20px; border-left: 2px solid #e9ecef; position: relative; border-radius: 0 8px 8px 0; cursor: pointer; transition: none !important; }
                 .modal-step.done { border-left-color: #198754; }
                 .modal-step.current { border-left-color: #0d6efd; background: #f0f7ff; }
                 .modal-step.ng { border-left-color: #dc3545; background: #fff5f5; }
@@ -72,13 +72,13 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 .tracker-checklist-box { 
                     background: #f8fafc; 
                     border: 1px solid #cbd5e1; 
-                    border-radius: 6px; 
+                    border-radius: 4px; 
                     margin-top: 10px; 
                     overflow-x: auto; 
                 }
                 .tracker-table { 
                     width: 100%; 
-                    min-width: 550px;
+                    min-width: 500px;
                     font-size: 0.72rem; 
                     margin-bottom: 0; 
                 }
@@ -129,25 +129,55 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 <div className="table-responsive">
                     <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem' }}>
                         <thead>
-                            <tr>
-                                <th className="ps-4">MODEL</th><th>REVISION</th><th>BASE UNIT</th><th>ASSEMBLY</th><th>DEVICE SERIAL</th><th>ACCESSORY</th><th className="text-center">STATUS</th><th>REMARKS</th><th>TIMESTAMP</th><th className="text-center">ACTIONS</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredLogs.map(log => (
-                                <tr key={log.id} className={highlightedUnitId === log.id ? 'table-danger fw-bold' : ''}>
-                                    <td className="ps-4 fw-bold">{log.model}</td><td>{log.revision}</td><td>{log.base_unit_kitting_no}</td><td><code className="text-primary fw-bold">{log.assembly_no}</code></td><td className="fw-bold">{log.device_serial_no}</td><td>{log.accessory_kitting_no}</td>
-                                    <td className="text-center"><span className={`badge rounded-1 px-3 py-1 ${getStatusBadgeClass(log.status)}`}>{log.status}</span></td>
-                                    <td className="text-muted small italic">{log.remarks || '---'}</td><td className="small text-muted">{new Date(log.created_at).toLocaleString()}</td>
-                                    <td className="text-center">
-                                        <div className="d-flex gap-1 justify-content-center">
-                                            <button className="btn btn-sm btn-primary btn-box py-1 px-3" style={{fontSize:'0.7rem'}} onClick={() => setSelectedUnitProcess(log)}>DETAILS</button>
-                                            <button className="btn btn-sm btn-danger btn-box py-1 px-3" style={{fontSize:'0.7rem'}} onClick={() => handleEditClick(log)}>EDIT</button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
+    <tr>
+        <th className="ps-4">MODEL</th>
+        <th>REVISION</th>
+        <th>BASE UNIT</th>
+        <th>ASSEMBLY</th>
+        <th>DEVICE SERIAL</th>
+        <th>ACCESSORY</th>
+        <th className="text-center">STATUS</th>
+        <th>REMARKS</th>
+        {/* 🔑 PINALITAN: Mas accurate na 'Last Movement' base sa updated_at */}
+        <th>LAST MOVEMENT</th>
+        <th className="text-center">ACTIONS</th>
+    </tr>
+</thead>
+<tbody>
+    {filteredLogs.map(log => (
+        <tr key={log.id} className={highlightedUnitId === log.id ? 'table-danger fw-bold' : ''}>
+            <td className="ps-4 fw-bold">{log.model}</td>
+            <td>{log.revision}</td>
+            <td>{log.base_unit_kitting_no}</td>
+            <td><code className="text-primary fw-bold">{log.assembly_no}</code></td>
+            <td className="fw-bold">{log.device_serial_no}</td>
+            <td>{log.accessory_kitting_no}</td>
+            <td className="text-center">
+                <span className={`badge rounded-1 px-3 py-1 ${getStatusBadgeClass(log.status)}`}>
+                    {log.status}
+                </span>
+            </td>
+            <td className="text-muted small italic">{log.remarks || '---'}</td>
+            
+            {/* 🔑 UPDATED COLUMN: Ipinapakita ang petsa at oras ng huling handover/edit */}
+            <td className="small">
+                <div className="fw-bold">
+                    {new Date(log.updated_at || log.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </div>
+                <div className="text-muted" style={{ fontSize: '0.7rem' }}>
+                    {new Date(log.updated_at || log.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                </div>
+            </td>
+
+            <td className="text-center">
+                <div className="d-flex gap-1 justify-content-center">
+                    <button className="btn btn-sm btn-primary btn-box py-1 px-3" style={{fontSize:'0.7rem'}} onClick={() => setSelectedUnitProcess(log)}>DETAILS</button>
+                    <button className="btn btn-sm btn-danger btn-box py-1 px-3" style={{fontSize:'0.7rem'}} onClick={() => handleEditClick(log)}>EDIT</button>
+                </div>
+            </td>
+        </tr>
+    ))}
+</tbody>
                     </table>
                 </div>
             </div>
@@ -176,7 +206,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                     const isCompletedHere = isCurrent && unitStatus.includes('completed');
                                     const isExpanded = expandedStepIdx === idx;
 
-                                    // Mapping Checklist Data for History
+                                    // Mapping Checklist Data para sa Tracker dropdown
                                     let stationData = null;
                                     if (idx === 0 && selectedUnitProcess.header_seated_90_deg) {
                                         stationData = { "Header Seated": selectedUnitProcess.header_seated_90_deg, "Soldering": selectedUnitProcess.leads_properly_soldered };
@@ -184,13 +214,30 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                     if (idx === 1 && selectedUnitProcess.integrated_board_level_test1) {
                                         stationData = { "Board 1": selectedUnitProcess.integrated_board_level_test1, "Board 2": selectedUnitProcess.integrated_board_level_test2, "Board 3": selectedUnitProcess.integrated_board_level_test3 };
                                     }
+                                    // STATION 6: FULL 12 CHECKLISTS
                                     if (idx === 5 && selectedUnitProcess.voltage) {
                                         stationData = {
-                                            "LoRa": selectedUnitProcess.lora_module, "Meter": selectedUnitProcess.energy_meter, "Volt": selectedUnitProcess.voltage + "V",
+                                            "LoRa": selectedUnitProcess.lora_module, "Meter": selectedUnitProcess.energy_meter, "PwrGood": selectedUnitProcess.power_good_test, "Volt": selectedUnitProcess.voltage + "V",
                                             "L1": selectedUnitProcess.line1 + "V", "L2": selectedUnitProcess.line2 + "V", "L3": selectedUnitProcess.line3 + "V",
                                             "Temp": selectedUnitProcess.temp_reading, "Freq": selectedUnitProcess.freq_reading, "4G": selectedUnitProcess.led_status_4g,
                                             "Blink": selectedUnitProcess.led_status_fast_blink, "Verdict": selectedUnitProcess.checklist_verdict || selectedUnitProcess.go_no_go
                                         };
+                                    }
+                                    // 🔑 ADDED: NEW STATIONS VIEW LOGIC (7, 8, 10, 11, 12)
+                                    if (idx === 6 && selectedUnitProcess.performed_passed) {
+                                        stationData = { "Hi-Pot Passed": selectedUnitProcess.performed_passed, "Recorded": selectedUnitProcess.result_recorded };
+                                    }
+                                    if (idx === 7 && selectedUnitProcess.burnin_completed) {
+                                        stationData = { "Burn-in Done": selectedUnitProcess.burnin_completed, "No Failure": selectedUnitProcess.no_failure_observed };
+                                    }
+                                    if (idx === 9 && selectedUnitProcess.post_performed_passed) {
+                                        stationData = { "Post Hi-Pot": selectedUnitProcess.post_performed_passed, "Post Recorded": selectedUnitProcess.post_result_recorded };
+                                    }
+                                    if (idx === 10 && selectedUnitProcess.functions_working) {
+                                        stationData = { "Functional": selectedUnitProcess.functions_working, "Connectivity": selectedUnitProcess.connectivity_passed };
+                                    }
+                                    if (idx === 11 && selectedUnitProcess.stickers_attached) {
+                                        stationData = { "Stickers": selectedUnitProcess.stickers_attached, "Readable": selectedUnitProcess.stickers_readable };
                                     }
                                     
                                     let stepClass = ""; let subText = "Pending Station"; let textColor = "text-muted";
@@ -224,7 +271,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                                             <tr>
                                                                 {Object.values(stationData).map((v, i) => (
                                                                     <td key={i}>
-                                                                        <span className={v === 'GO' || v === 'PASS' || v === 'Detected' ? 'text-success' : v === 'NO GO' || v === 'FAIL' || v === 'Not Detected' ? 'text-danger' : ''}>
+                                                                        <span className={v === 'GO' || v === 'PASS' || v === 'Detected' ? 'text-success' : (v === 'NO GO' || v === 'FAIL' || v === 'Not Detected' ? 'text-danger' : '')}>
                                                                             {v || 'N/A'}
                                                                         </span>
                                                                     </td>
@@ -270,7 +317,6 @@ export function StationsOverview({
         }).sort((a, b) => new Date(b.timestamp || b.created_at) - new Date(a.timestamp || a.created_at));
     }, [allLogs, historySearch, startDate, endDate]);
 
-    // Calculate current slice of data for pagination
     const paginatedHistory = useMemo(() => {
         const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
         return filteredHistory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -396,7 +442,7 @@ export function StationsOverview({
         <div className="container-fluid px-0">
             <style>{`
                 * { animation: none !important; transition: none !important; }
-                .btn-box { border-radius: 4px !important; font-weight: 700; }
+                .btn-box { border-radius: 4px !important; font-weight: 700; transition: none !important; }
                 .station-card-flat { 
                     background: #fff; 
                     border: 1px solid #e2e8f0; 

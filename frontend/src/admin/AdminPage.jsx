@@ -25,6 +25,7 @@ import { AnnouncementsView } from './components/AnnouncementsView';
 import { ApprovalQueue } from './components/ApprovalQueue';
 import { UserManagement } from './components/UserManagement';
 import DataAnalytics from './components/DataAnalytics';
+import { InventoryView } from './components/InventoryView';
 // NEW EMBEDDED MODALS
 import { ApproveUnitModal } from './modals/ApproveUnitModal';
 import { DeleteAnnouncementModal } from './modals/DeleteAnnouncementModal';
@@ -68,6 +69,7 @@ const USER_MANAGEMENT_ENDPOINT = `${API_BASE_URL}/user_management.php`;
 const HISTORY_ENDPOINT = `${API_BASE_URL}/unit_history.php`; 
 
 const ANNOUNCEMENTS_ENDPOINT = `${API_BASE_URL}/announcements.php`;
+const INVENTORY_ENDPOINT = `${API_BASE_URL}/inventory.php`; // Gagawa tayo nito mamaya
 
 // --- LOCAL PATHS ---
 const AVATAR_UPLOAD_PATH = `${API_BASE_URL}/uploads/avatars/`;
@@ -101,6 +103,7 @@ const handleTabChange = (tabName) => {
     const [stationMonitorId, setStationMonitorId] = useState(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false); 
     const [announcementToDelete, setAnnouncementToDelete] = useState(null);
+    const [inventoryList, setInventoryList] = useState([]);
   
     const [successMessage, setSuccessMessage] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -154,23 +157,22 @@ const handleTabChange = (tabName) => {
     };
 
     // --- CHECK DELAYED UNITS AND REPORTS (KEPT AS IS) ---
-    const checkDelayedUnitsAndReports = useCallback((allUnits) => {
-    // TANGGALIN ang allReports dependency at parameter.
+    // 🔑 FIX: Gamitin ang updated_at para sa station-specific timing
+const checkDelayedUnitsAndReports = useCallback((allUnits) => {
     const now = new Date();
     const newDelayedNotifications = [];
     const currentDelayedUnitIds = new Set();
 
-    // 1. Delayed Units Check (NO CHANGE)
     const inProgressUnits = allUnits.filter(l => l.status === 'In Progress');
 
     inProgressUnits.forEach(unit => {
         const stationId = unit.station;
-        // Flexible check for threshold
         const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationId] || DELAY_THRESHOLDS_MINUTES[stationId.replace(' ', '')] || 0;
 
         if (thresholdMinutes > 0) {
-            const createdAt = new Date(unit.created_at);
-            const elapsedMilliseconds = now.getTime() - createdAt.getTime();
+            // 🌟 PINALITAN: 'updated_at' na ang basehan para mag-reset ang timer sa bawat station
+            const startTime = new Date(unit.updated_at || unit.created_at); 
+            const elapsedMilliseconds = now.getTime() - startTime.getTime();
             const elapsedMinutes = Math.floor(elapsedMilliseconds / (1000 * 60));
 
             if (elapsedMinutes > thresholdMinutes) {
@@ -179,7 +181,8 @@ const handleTabChange = (tabName) => {
                     id: `delayed-${unit.id}`,
                     type: 'DelayedUnit',
                     title: `⚠️ Unit Delay Alert at ${stationId}`,
-                    message: `Unit ${unit.device_serial_no} has been In Progress for ${elapsedMinutes} mins (Limit: ${thresholdMinutes} mins).`,
+                    // I-update ang display message para makita ang tamang minutes sa bagong station
+                    message: `Unit ${unit.device_serial_no || unit.assembly_no} has been at this station for ${elapsedMinutes} mins (Limit: ${thresholdMinutes} mins).`,
                     timestamp: now.toISOString(),
                     unitId: unit.id,
                     stationId: stationId,
@@ -188,28 +191,10 @@ const handleTabChange = (tabName) => {
         }
     });
 
+    const existingDelayed = notifications.filter(n => n.type === 'DelayedUnit' && currentDelayedUnitIds.has(n.unitId));
+    const updatedDelayed = newDelayedNotifications.filter(newN => !existingDelayed.some(e => e.id === newN.id));
     
-
-        // 3. Merge Notifications
-       const existingDelayedNotifications = notifications.filter(n => {
-        // Tanging DelayedUnit notifications lang ang i-check
-        return n.type === 'DelayedUnit' && currentDelayedUnitIds.has(n.unitId);
-    });
-
-    const updatedDelayedNotifications = newDelayedNotifications.filter(newN =>
-        !existingDelayedNotifications.some(existingN => existingN.id === newN.id)
-    );
-    
-    // Ang final notifications array ay naglalaman lang ng Delayed Units
-    setNotifications([
-        ...existingDelayedNotifications,
-        ...updatedDelayedNotifications,
-    ]);
-
-    // TANGGALIN: lastSeenReportIds logic ay hindi na kailangan
-    // TANGGALIN: setLastSeenReportIds logic ay hindi na kailangan
-
-// TANGGALIN: Ang 'lastSeenReportIds' mula sa dependency array
+    setNotifications([...existingDelayed, ...updatedDelayed]);
 }, [notifications]);
 
 
@@ -259,6 +244,9 @@ const fetchData = async () => {
         if (JSON.stringify(fetchedUsers) !== JSON.stringify(userList)) {
             setUserList(fetchedUsers);
         }
+
+        const inventoryRes = await axios.get(INVENTORY_ENDPOINT);
+        setInventoryList(Array.isArray(inventoryRes.data) ? inventoryRes.data : []);
 
         const loggedInUserData = fetchedUsers.find(u => u.id === user.id);
         if (loggedInUserData) {
@@ -690,6 +678,10 @@ case "announcements":
                         DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH}
                     />
                 );
+                case "inventory":
+    return (
+        <InventoryView pcbaLogs={inventoryList} />
+    );
 
             case "approval":
                 return (
@@ -876,6 +868,16 @@ return (
                 <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Shipment</span>
             </button>
         </li>
+        
+        <li className="nav-item">
+    <button
+        className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${activeTab === "inventory" ? "active-glass" : ""}`}
+        onClick={() => handleTabChange("inventory")}
+    >
+        <i className="bi bi-box-seam"></i>
+        <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Inventory</span>
+    </button>
+</li>
 
         <hr className="border-secondary my-2 opacity-25" />
 
@@ -888,6 +890,8 @@ return (
                 <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Reports</span>
             </button>
         </li>
+
+        
 
         <li className="nav-item">
             <button

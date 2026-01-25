@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import 'bootstrap-icons/font/bootstrap-icons.css';
 
 // List of station names with their corresponding IDs for the database
 const processStations = [
@@ -46,7 +47,17 @@ export const EditUnitModal = ({ unit, onClose, onSave }) => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        
+        // Logic: If status is set to "For Scanning", automatically set station to "N/A"
+        if (name === 'status' && value === 'For Scanning') {
+            setFormData(prev => ({ 
+                ...prev, 
+                [name]: value,
+                station: 'N/A' 
+            }));
+        } else {
+            setFormData(prev => ({ ...prev, [name]: value }));
+        }
     };
 
     const handleSave = () => {
@@ -55,7 +66,8 @@ export const EditUnitModal = ({ unit, onClose, onSave }) => {
 
     if (!unit) return null;
 
-    const statusOptions = ["In Progress", "Completed", "No Good (NG)", "Pending Approval"];
+    // Added "For Scanning" to the status options
+    const statusOptions = ["In Progress", "Completed", "No Good (NG)", "Pending Approval", "For Scanning"];
 
     return (
         <div className="modal show d-block fade-in" style={{ backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 1050, backdropFilter: 'blur(3px)' }}>
@@ -74,7 +86,7 @@ export const EditUnitModal = ({ unit, onClose, onSave }) => {
                     <div className="modal-body p-4 bg-light">
                         <div className="row g-4">
                             
-                            {/* Left Column: Technical Details (Naka-helera lahat dito) */}
+                            {/* Left Column: Technical Details */}
                             <div className="col-lg-5">
                                 <h6 className="fw-bold text-uppercase small text-muted mb-3" style={{letterSpacing: '1px'}}>Technical Details</h6>
                                 <div className="card shadow-sm border-0 rounded-3 bg-white p-3 h-100">
@@ -102,8 +114,10 @@ export const EditUnitModal = ({ unit, onClose, onSave }) => {
                                             name="station" 
                                             value={formData.station} 
                                             onChange={handleChange}
+                                            disabled={formData.status === 'For Scanning'} // Disable selection if "For Scanning" is active
                                         >
                                             <option value="">Transfer to Station...</option>
+                                            <option value="N/A">N/A - No Station</option>
                                             {processStations.map((st) => (
                                                 <option key={st.id} value={st.id}>
                                                     {st.id} - {st.name}
@@ -139,7 +153,7 @@ export const EditUnitModal = ({ unit, onClose, onSave }) => {
                                             name="remarks" 
                                             rows="3" 
                                             value={formData.remarks || ''} 
-                                            onChange={handleChange}
+                                            onChange={handleChange} 
                                             placeholder="Indicate reason for override..."
                                         ></textarea>
                                     </div>

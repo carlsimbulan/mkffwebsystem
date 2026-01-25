@@ -158,7 +158,13 @@ const setActiveTab = (tab) => {
 
     const [formData, setFormData] = useState({
         model: "", revision: "", baseUnitKittingNo: "", assemblyNo: "",
-        deviceSerialNo: "", accessoryKittingNo: "", status: "In Progress", remarks: ""
+        deviceSerialNo: "", accessoryKittingNo: "", status: "In Progress", remarks: "",
+
+        mnbd_no: "",
+    cmbd_no: "",
+    lrbd_no: "",
+    pqbd_no: "",
+    bkbd_no: ""
     });
     
     const [dailyReportData, setDailyReportData] = useState({
@@ -198,10 +204,15 @@ const currentStation = getStationName();
     }, []); 
     
     // --- HELPER FUNCTION: RESET FORM (Unchanged) ---
-    const resetForm = () => {
-        setFormData({ model: "", revision: "", baseUnitKittingNo: "", assemblyNo: "", deviceSerialNo: "", accessoryKittingNo: "", status: "In Progress", remarks: "" });
-        setScanInput(""); setStatusMessage(""); setProcessStatus('idle'); setScannedUnitId(null);
-    };
+const resetForm = () => {
+    setFormData({ 
+        model: "", revision: "", baseUnitKittingNo: "", assemblyNo: "", 
+        deviceSerialNo: "", accessoryKittingNo: "", status: "In Progress", remarks: "",
+        // 🔑 DAGDAGAN MO NITO PARA MA-CLEAR PAGKATAPOS MAG-SAVE:
+        mnbd_no: "", cmbd_no: "", lrbd_no: "", pqbd_no: "", bkbd_no: "" 
+    });
+    setScanInput(""); setStatusMessage(""); setProcessStatus('idle'); setScannedUnitId(null);
+};
 
     // --- HOOKED FUNCTIONS: FETCH USER DATA / AVATAR (Unchanged) ---
 // HANAPIN ANG useEffect NG fetchUserData AT PALITAN NG GANITO:
@@ -545,7 +556,7 @@ else {
     };
 
     // --- HANDLE UNIT SUBMISSION / UPDATE (Omitted for brevity, unchanged) ---
-    const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
         e.preventDefault();
         if (!formData.assemblyNo) {
             setProcessStatus('error'); 
@@ -591,20 +602,28 @@ else {
                     setProcessStatus('idle'); 
                     resetForm(); 
                     scannerInputRef.current?.focus(); 
-                    // Refresh current tab data
                     if (['home', 'in_progress', 'completed', 'no_good', 'pending'].includes(activeTab)) fetchUnits(activeTab === 'home' ? '' : activeTab);
                 }, 2000);
             } else {
-                const errorMsg = res.data.error || res.data.message || JSON.stringify(res.data);
+                // Handle cases where status is not success even if request technically passed
+                const errorMsg = res.data.error || res.data.message || "Unknown Server Error";
                 setProcessStatus('error');
-                setStatusMessage(`Server Error: ${errorMsg}`);
+                setStatusMessage(errorMsg); 
                 setTimeout(() => setProcessStatus('idle'), 5000);
             }
         } catch (err) {
+            // 🔑 FIXED: Specifically targeting the 'error' key from your PHP JSON response
             setProcessStatus('error');
-            const errMsg = err.response?.data?.message || err.message;
-            setStatusMessage(`Submission Error: ${errMsg}`);
-            setTimeout(() => setProcessStatus('idle'), 4000);
+            
+            // Based on your network tab, the PHP backend sends the message under the "error" key.
+            // err.response.data.error will capture the "Error: Board serial '111111'..." message.
+            const errMsg = err.response?.data?.error || err.response?.data?.message || err.message;
+            
+            // Display the specific message directly so the operator sees the conflict details
+            setStatusMessage(errMsg); 
+            
+            // Set a longer timeout (6 seconds) so the operator has time to read the full error
+            setTimeout(() => setProcessStatus('idle'), 6000);
         }
     };
     
@@ -763,6 +782,7 @@ const todayAnnouncementsCount = announcements.filter(a => {
                         setFormData={setFormData}
                         resetForm={resetForm}
                         scannedUnitId={scannedUnitId}
+                        currentStation={currentStation}
                     />
                 );
 

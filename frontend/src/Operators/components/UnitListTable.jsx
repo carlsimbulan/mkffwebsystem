@@ -27,7 +27,8 @@ export const UnitListTable = ({ units, listStatus, loading, error, onEdit }) => 
                         <th>ACCESSORY</th>
                         <th>STATUS</th>
                         <th>REMARKS</th>
-                        <th>TIME DATE</th>
+                        {/* 🔑 PINALITAN: Mas accurate kung 'LAST UPDATE' ang label */}
+                        <th>LAST UPDATE</th> 
                         {canEdit && <th>ACTIONS</th>}
                     </tr>
                 </thead>
@@ -46,7 +47,17 @@ export const UnitListTable = ({ units, listStatus, loading, error, onEdit }) => 
                                 </span>
                             </td>
                             <td><small className="text-muted">{unit.remarks}</small></td>
-                            <td>{new Date(unit.created_at).toLocaleString()}</td>
+                            
+                            {/* 🔑 GINAMIT ANG updated_at PARA SA TIME DATE COLUMN */}
+                            <td className="text-center">
+                                <div className="fw-bold">
+                                    {new Date(unit.updated_at || unit.created_at).toLocaleDateString()}
+                                </div>
+                                <div className="text-muted" style={{ fontSize: '0.7rem' }}>
+                                    {new Date(unit.updated_at || unit.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                            </td>
+
                             {canEdit && (
                                 <td className="text-center">
                                     <button onClick={() => onEdit(unit)} className="btn btn-sm btn-outline-primary py-0 px-2" title="Edit Status">
