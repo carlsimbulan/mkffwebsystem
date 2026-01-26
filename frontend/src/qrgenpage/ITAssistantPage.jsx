@@ -11,6 +11,7 @@ import UnscannedUnitsTable from './components/UnscannedUnitsTable';
 import LiveMonitoringTable from './components/LiveMonitoringTable';
 import GeneratedQRList from './components/GeneratedQRList';
 import { UserProfileModal } from './modals/UserProfileModal';
+import ApprovalConfirmationModal from './modals/ApprovalConfirmationModal'; 
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 
 // --- 🛠️ CONFIGURATION ---
@@ -39,15 +40,15 @@ const safeParseSerial = (serialStr, prefix) => {
 
 export default function ITAssistantPage({ user, onLogout }) {
     const navigate = useNavigate();
-const location = useLocation();
+    const location = useLocation();
 
-// Kunin ang huling bahagi ng URL (e.g., /itassistant/overview -> overview)
-const activeTab = location.pathname.split('/').pop() || "overview";
+    // Kunin ang huling bahagi ng URL
+    const activeTab = location.pathname.split('/').pop() || "overview";
 
-// Helper function para sa paglipat ng page/tab
-const setActiveTab = (tab) => {
-    navigate(`/itassistant/${tab}`);
-};
+    const setActiveTab = (tab) => {
+        navigate(`/itassistant/${tab}`);
+    };
+
     const [currentAvatar, setCurrentAvatar] = useState(user?.avatar_url || null);
     const [currentFullName, setCurrentFullName] = useState(user?.full_name || user?.username);
 
@@ -57,8 +58,8 @@ const setActiveTab = (tab) => {
     const [unitLogs, setUnitLogs] = useState([]);
     const [stations, setStations] = useState([]);
     const [nextAssemblyNo, setNextAssemblyNo] = useState(1);
+    const [pendingUnit, setPendingUnit] = useState(null); 
     
-    // Process Status for the "Ganda" Success Animation
     const [processStatus, setProcessStatus] = useState('idle'); 
     const [statusMessage, setStatusMessage] = useState("");
 
@@ -122,7 +123,6 @@ const setActiveTab = (tab) => {
         return () => clearInterval(interval);
     }, [fetchUnitData]);
 
-    // 🔑 Magandang Success Animation Logic for Profile Update
     const handleUpdateProfile = async (formData) => {
         setProcessStatus('loading');
         setStatusMessage("Updating your account details...");
@@ -131,12 +131,9 @@ const setActiveTab = (tab) => {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             if (res.data.status === 'success') {
-                // 🌟 SHOW GREEN SUCCESS SCREEN
                 setProcessStatus('success');
                 setStatusMessage("Profile updated successfully!");
                 setShowProfileModal(false);
-
-                // Wait for user to see the success before reload
                 setTimeout(() => {
                     window.location.reload();
                 }, 2000);
@@ -152,21 +149,58 @@ const setActiveTab = (tab) => {
         }
     };
 
+    // 🔑 HANDLE MANUAL APPROVAL
+    const handleApproveButtonClick = (unit) => {
+        setPendingUnit(unit);
+    };
+
+    const handleConfirmApproval = async (unit) => {
+        setPendingUnit(null); 
+        setProcessStatus('loading');
+        setStatusMessage(`Approving and Returning ${unit.assembly_no} to ${unit.station}...`);
+
+        try {
+            const response = await axios.post(`${UNITS_ENDPOINT}?method=PUT`, {
+                id: unit.id,
+                assembly_no: unit.assembly_no,
+                status: 'In Progress', // BINAGO: Ibabalik sa In Progress sa station niya
+                remarks: 'Approved by IT Assistant and returned to production line',
+                station: unit.station, 
+                username: user.username
+            });
+
+            if (response.data.status === 'success') {
+                setProcessStatus('success');
+                setStatusMessage("Unit Approved and Returned to Station!");
+                fetchUnitData(false); 
+                setTimeout(() => setProcessStatus('idle'), 2000);
+            }
+        } catch (error) {
+            setProcessStatus('error');
+            setStatusMessage(error.response?.data?.error || "Failed to approve unit.");
+            setTimeout(() => setProcessStatus('idle'), 3000);
+        }
+    };
+
     const calculateMetrics = (logs) => {
         const counts = { forScanning: 0, completed: 0, inProgress: 0, noGood: 0, totalTracked: 0, pendingApproval: 0 };
         logs.forEach(log => {
-            counts.totalTracked++;
             const s = log.status?.trim();
-            if (s === 'For Scanning') counts.forScanning++;
-            else if (s === 'Completed') counts.completed++;
-            else if (s === 'In Progress') counts.inProgress++;
-            else if (s === 'No Good (NG)') counts.noGood++;
-            else if (s === 'Pending Approval') counts.pendingApproval++;
+            if (s === 'For Scanning') {
+                counts.forScanning++;
+            } else {
+                counts.totalTracked++; 
+                if (s === 'Completed') counts.completed++;
+                else if (s === 'In Progress') counts.inProgress++;
+                else if (s === 'No Good (NG)') counts.noGood++;
+                else if (s === 'Pending Approval') counts.pendingApproval++;
+            }
         });
-        const calcPct = (val) => logs.length > 0 ? ((val / logs.length) * 100).toFixed(1) : 0;
+        const totalGenerated = logs.length; 
+        const calcPct = (val) => totalGenerated > 0 ? ((val / totalGenerated) * 100).toFixed(1) : 0;
         return { 
             ...counts, 
-            total: logs.length,
+            total: totalGenerated,
             pctForScanning: calcPct(counts.forScanning),
             pctInProgress: calcPct(counts.inProgress),
             pctCompleted: calcPct(counts.completed),
@@ -176,10 +210,12 @@ const setActiveTab = (tab) => {
     };
 
     const calculateStationMetrics = (stationLogs) => {
+        const total = stationLogs.length;
         const completed = stationLogs.filter(u => u.status === 'Completed').length;
         const inProgress = stationLogs.filter(u => u.status === 'In Progress').length;
         const noGood = stationLogs.filter(u => u.status === 'No Good (NG)').length;
-        return { completed, inProgress, noGood };
+        const yieldRate = total > 0 ? ((completed / total) * 100).toFixed(2) : "0.00";
+        return { completed, inProgress, noGood, total, yieldRate };
     };
 
     const handleGenerateQR = (e) => {
@@ -339,27 +375,57 @@ const setActiveTab = (tab) => {
                 return <LiveMonitoringTable stationId={activeMonitorStationId} units={unitLogs} onBack={() => setActiveTab('station_monitor')} calculateStationMetrics={calculateStationMetrics} />;
             case "approvals":
                 return (
-                    <div className="card border">
-                        <div className="card-header bg-danger text-white fw-bold">APPROVALS QUEUE</div>
-                        <div className="card-body p-0">
-                            <div className="table-responsive">
-                                <table className="table table-bordered table-sm mb-0 uppercase" style={{ fontSize: '0.75rem' }}>
-                                    <thead className="table-dark">
-                                        <tr>
-                                            <th>MODEL</th><th>REVISION</th><th>BASE UNIT</th><th>ASSEMBLY</th><th>DEVICE SERIAL</th><th>ACCESSORY</th><th>STATUS</th><th>REMARKS</th><th>TIMESTAMP</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {unitLogs.filter(u => u.status === 'Pending Approval').map(u => (
-                                            <tr key={u.id}>
-                                                <td>{u.model}</td><td>{u.revision}</td><td>{u.base_unit_kitting_no}</td><td>{u.assembly_no}</td><td>{u.device_serial_no}</td><td>{u.accessory_kitting_no}</td><td>{u.status}</td><td>{u.remarks}</td><td>{u.created_at}</td>
+                    <>
+                        <div className="card border shadow-sm">
+                            <div className="card-header bg-danger text-white fw-bold d-flex justify-content-between align-items-center">
+                                <span>APPROVALS QUEUE</span>
+                                <span className="badge bg-white text-danger">
+                                    {unitLogs.filter(u => u.status === 'Pending Approval').length} Units
+                                </span>
+                            </div>
+                            <div className="card-body p-0">
+                                <div className="table-responsive">
+                                    <table className="table table-hover table-bordered table-sm mb-0 uppercase" style={{ fontSize: '0.75rem' }}>
+                                        <thead className="table-dark">
+                                            <tr>
+                                                <th>MODEL</th><th>REVISION</th><th>BASE UNIT</th><th>ASSEMBLY</th><th>DEVICE SERIAL</th><th>STATUS</th><th>REMARKS</th><th>TIMESTAMP</th>
+                                                <th className="text-center bg-primary">ACTIONS</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody>
+                                            {unitLogs.filter(u => u.status === 'Pending Approval').map(u => (
+                                                <tr key={u.id} className="align-middle">
+                                                    <td>{u.model}</td><td>{u.revision}</td><td>{u.base_unit_kitting_no}</td>
+                                                    <td className="fw-bold text-primary">{u.assembly_no}</td><td>{u.device_serial_no || 'N/A'}</td>
+                                                    <td><span className="badge bg-warning text-dark">{u.status}</span></td>
+                                                    <td>{u.remarks || '---'}</td>
+                                                    <td>{u.created_at}</td>
+                                                    <td className="text-center">
+                                                        <button 
+                                                            className="btn btn-success btn-sm fw-bold px-3 rounded-pill shadow-sm"
+                                                            onClick={() => handleApproveButtonClick(u)} 
+                                                        >
+                                                            <i className="bi bi-check-circle-fill me-1"></i> APPROVE
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
-                    </div>
+
+                        {/* 🔑 CUSTOM MODAL INTEGRATION */}
+                        {pendingUnit && (
+                            <ApprovalConfirmationModal 
+                                unit={pendingUnit} 
+                                onClose={() => setPendingUnit(null)} 
+                                onConfirm={handleConfirmApproval}
+                                isProcessing={processStatus === 'loading'}
+                            />
+                        )}
+                    </>
                 );
             default: return null;
         }
@@ -377,182 +443,91 @@ const setActiveTab = (tab) => {
                 .uppercase { text-transform: uppercase; }
             `}</style>
 
-           {/* --- SIDEBAR: IT ASSISTANT GLASS DESIGN --- */}
-<div className="d-flex flex-column flex-shrink-0 p-3 text-white position-fixed" 
-    style={{ 
-        width: "260px", 
-        backgroundColor: "#0f172a", 
-        height: '100vh', 
-        zIndex: 1000, 
-        top: 0, 
-        left: 0,
-        borderRight: "1px solid rgba(255,255,255,0.05)" 
-    }}>
-    
-    <style>
-        {`
-            .sidebar-link {
-                width: 100%;
-                text-align: left;
-                display: flex;
-                align-items: center;
-                gap: 1rem;
-                padding: 0.6rem 1rem;
-                background: transparent;
-                border: 1px solid transparent;
-                border-radius: 8px;
-                color: #94a3b8;
-                font-size: 0.85rem;
-                font-weight: 400;
-                transition: all 0.2s ease;
-                margin-bottom: 0.25rem;
-                outline: none !important;
-            }
-
-            .active-glass {
-                background: rgba(255, 255, 255, 0.1) !important;
-                backdrop-filter: blur(10px);
-                -webkit-backdrop-filter: blur(10px);
-                border: 1px solid rgba(255, 255, 255, 0.05) !important;
-                color: white !important;
-            }
-
-            .sidebar-link:hover:not(.active-glass) {
-                background-color: rgba(255, 255, 255, 0.03);
-                color: white;
-            }
-
-            .sidebar-label {
-                font-size: 0.6rem;
-                letter-spacing: 1px;
-                color: #64748b;
-                font-weight: 600;
-                padding: 1rem 1rem 0.5rem;
-                text-transform: uppercase;
-            }
-
-            .avatar-hover:hover {
-                transform: scale(1.05);
-                transition: 0.2s;
-                filter: brightness(1.1);
-            }
-
-            .fade-in { animation: fadeIn 0.4s ease-out; }
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-        `}
-    </style>
-
-    {/* PROFILE SECTION */}
-    <div className="d-flex align-items-center mb-3 mt-1 px-1">
-        <div className="position-relative flex-shrink-0" style={{ cursor: 'pointer' }} onClick={() => setShowProfileModal(true)}>
-            <img 
-                src={currentAvatar ? `${AVATAR_UPLOAD_PATH}${currentAvatar}` : DEFAULT_AVATAR_PATH} 
-                alt="Profile" 
-                className="rounded-circle avatar-hover"
+            <div className="d-flex flex-column flex-shrink-0 p-3 text-white position-fixed" 
                 style={{ 
-                    width: '42px', 
-                    height: '42px', 
-                    objectFit: 'cover',
-                    border: '1px solid rgba(255,255,255,0.1)'
-                }} 
-            />
-            <span className="position-absolute bottom-0 end-0 bg-success border border-dark rounded-circle" style={{ width: '10px', height: '10px' }}></span>
-        </div>
-        
-        <div className="ms-3 overflow-hidden" style={{ cursor: 'pointer' }} onClick={() => setShowProfileModal(true)}>
-            <div className="text-white text-truncate" style={{ fontSize: '0.85rem', fontWeight: '400' }}>
-                {currentFullName}
+                    width: "260px", 
+                    backgroundColor: "#0f172a", 
+                    height: '100vh', 
+                    zIndex: 1000, 
+                    top: 0, 
+                    left: 0,
+                    borderRight: "1px solid rgba(255,255,255,0.05)" 
+                }}>
+                
+                <style>
+                    {`
+                        .sidebar-link {
+                            width: 100%;
+                            text-align: left;
+                            display: flex;
+                            align-items: center;
+                            gap: 1rem;
+                            padding: 0.6rem 1rem;
+                            background: transparent;
+                            border: 1px solid transparent;
+                            border-radius: 8px;
+                            color: #94a3b8;
+                            font-size: 0.85rem;
+                            font-weight: 400;
+                            transition: all 0.2s ease;
+                            margin-bottom: 0.25rem;
+                            outline: none !important;
+                        }
+                        .active-glass {
+                            background: rgba(255, 255, 255, 0.1) !important;
+                            backdrop-filter: blur(10px);
+                            border: 1px solid rgba(255, 255, 255, 0.05) !important;
+                            color: white !important;
+                        }
+                    `}
+                </style>
+
+                {/* PROFILE SECTION */}
+                <div className="d-flex align-items-center mb-3 mt-1 px-1">
+                    <div className="position-relative flex-shrink-0" style={{ cursor: 'pointer' }} onClick={() => setShowProfileModal(true)}>
+                        <img src={currentAvatar ? `${AVATAR_UPLOAD_PATH}${currentAvatar}` : DEFAULT_AVATAR_PATH} alt="Profile" className="rounded-circle avatar-hover" style={{ width: '42px', height: '42px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
+                        <span className="position-absolute bottom-0 end-0 bg-success border border-dark rounded-circle" style={{ width: '10px', height: '10px' }}></span>
+                    </div>
+                    <div className="ms-3 overflow-hidden" style={{ cursor: 'pointer' }} onClick={() => setShowProfileModal(true)}>
+                        <div className="text-white text-truncate" style={{ fontSize: '0.85rem', fontWeight: '400' }}>{currentFullName}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '1px', letterSpacing: '0.3px' }}>Authorized IT Assistant</div>
+                    </div>
+                </div>
+
+                <hr className="border-secondary opacity-25 mt-2" />
+
+                <div className="nav flex-column flex-grow-1 overflow-auto custom-scrollbar">
+                    <div className="sidebar-label">Main Navigation</div>
+                    <button className={`sidebar-link ${activeTab === 'overview' ? 'active-glass' : ''}`} onClick={() => setActiveTab('overview')}><i className="bi bi-grid-1x2"></i> OVERVIEW</button>
+                    <button className={`sidebar-link ${activeTab === 'qr_generator' ? 'active-glass' : ''}`} onClick={() => setActiveTab('qr_generator')}><i className="bi bi-qr-code-scan"></i> QR GENERATOR</button>
+                    <button className={`sidebar-link ${activeTab.includes('station') ? 'active-glass' : ''}`} onClick={() => setActiveTab('station_monitor')}><i className="bi bi-layers-half"></i> STATION MONITOR</button>
+                    <button className={`sidebar-link ${activeTab === 'approvals' ? 'active-glass' : ''}`} onClick={() => setActiveTab('approvals')}><i className="bi bi-check-circle"></i> APPROVALS</button>
+                    <div className="sidebar-label">System</div>
+                    <button onClick={onLogout} className="sidebar-link" style={{ color: '#ef4444' }}><i className="bi bi-power"></i> LOGOUT SESSION</button>
+                </div>
             </div>
-            <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '1px', letterSpacing: '0.3px' }}>
-                Authorized IT Assistant
+
+            <div className="flex-grow-1 d-flex flex-column" style={{ marginLeft: "260px", backgroundColor: "#f3f4f6", height: '100vh', overflow: 'hidden' }}>
+                <header className="bg-white d-flex justify-content-between align-items-center px-4 shadow-sm sticky-top z-2" style={{ height: '70px', borderBottom: '1px solid #e5e7eb' }}>
+                    <div>
+                        <h6 className="mb-0 fw-bold text-dark text-uppercase">{activeTab.replace('_', ' ')}</h6>
+                        <small className="text-muted d-none d-sm-block">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</small>
+                    </div>
+                    <div className="badge rounded-pill bg-light text-secondary border px-3 py-2" style={{ fontSize: '0.65rem', fontWeight: '500' }}><i className="bi bi-shield-check me-1"></i> SECURE SESSION</div>
+                </header>
+
+                <div className="p-4 flex-grow-1" style={{ overflowY: 'auto' }}>
+                    <div className="fade-in">{renderContent()}</div>
+                </div>
+
+                {showProfileModal && (
+                    <UserProfileModal user={user} currentAvatar={currentAvatar ? `${AVATAR_UPLOAD_PATH}${currentAvatar}` : DEFAULT_AVATAR_PATH} currentFullName={currentFullName} onClose={() => setShowProfileModal(false)} onSave={handleUpdateProfile} />
+                )}
+
+                <LoadingOverlay status={processStatus} message={statusMessage} />
+                {showModal && <CustomMessageModal title={modalConfig.title} message={modalConfig.message} type={modalConfig.type} onClose={() => setShowModal(false)} />}
+                {activeHistoryStation && <StationHistoryModal stationId={activeHistoryStation} onClose={() => setActiveHistoryStation(null)} user={user} />}
             </div>
-        </div>
-    </div>
-
-    <hr className="border-secondary opacity-25 mt-2" />
-
-    {/* NAVIGATION LINKS */}
-    <div className="nav flex-column flex-grow-1 overflow-auto custom-scrollbar">
-        <div className="sidebar-label">Main Navigation</div>
-        <button className={`sidebar-link ${activeTab === 'overview' ? 'active-glass' : ''}`} onClick={() => setActiveTab('overview')}>
-            <i className="bi bi-grid-1x2"></i> OVERVIEW
-        </button>
-        <button className={`sidebar-link ${activeTab === 'qr_generator' ? 'active-glass' : ''}`} onClick={() => setActiveTab('qr_generator')}>
-            <i className="bi bi-qr-code-scan"></i> QR GENERATOR
-        </button>
-        <button className={`sidebar-link ${activeTab.includes('station') ? 'active-glass' : ''}`} onClick={() => setActiveTab('station_monitor')}>
-            <i className="bi bi-layers-half"></i> STATION MONITOR
-        </button>
-        <button className={`sidebar-link ${activeTab === 'approvals' ? 'active-glass' : ''}`} onClick={() => setActiveTab('approvals')}>
-            <i className="bi bi-check-circle"></i> APPROVALS
-        </button>
-        
-        <div className="sidebar-label">System</div>
-        <button onClick={onLogout} className="sidebar-link" style={{ color: '#ef4444' }}>
-            <i className="bi bi-power"></i> LOGOUT SESSION
-        </button>
-    </div>
-    
-    {/* FOOTER */}
-    <div className="mt-auto p-3 border-top border-secondary text-center text-white-50 opacity-25" style={{ fontSize: '0.65rem' }}>
-        <span>©2025 MKFF LASER TECHNIQUE</span>
-    </div>
-</div>
-
-{/* --- MAIN CONTENT AREA --- */}
-<div className="flex-grow-1 d-flex flex-column" 
-    style={{ 
-        marginLeft: "260px", 
-        backgroundColor: "#f3f4f6", 
-        height: '100vh', 
-        overflow: 'hidden' 
-    }}>
-    
-    {/* CLEAN HEADER */}
-    <header className="bg-white d-flex justify-content-between align-items-center px-4 shadow-sm sticky-top z-2" 
-        style={{ height: '70px', borderBottom: '1px solid #e5e7eb' }}>
-        
-        <div>
-            <h6 className="mb-0 fw-bold text-dark text-uppercase" style={{ letterSpacing: '0.5px' }}>
-                {activeTab.replace('_', ' ')}
-            </h6>
-            <small className="text-muted d-none d-sm-block" style={{ fontSize: '0.65rem' }}>
-                {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
-            </small>
-        </div>
-        
-        <div className="d-flex align-items-center gap-3">
-            <div className="badge rounded-pill bg-light text-secondary border px-3 py-2" style={{ fontSize: '0.65rem', fontWeight: '500' }}>
-                <i className="bi bi-shield-check me-1"></i> SECURE SESSION
-            </div>
-        </div>
-    </header>
-
-    {/* SCROLLABLE CONTENT */}
-    <div className="p-4 flex-grow-1" style={{ overflowY: 'auto' }}>
-        <div className="fade-in">
-            {renderContent()}
-        </div>
-    </div>
-
-    {/* MODALS AND OVERLAYS */}
-    {showProfileModal && (
-        <UserProfileModal 
-            user={user} 
-            currentAvatar={currentAvatar ? `${AVATAR_UPLOAD_PATH}${currentAvatar}` : DEFAULT_AVATAR_PATH}
-            currentFullName={currentFullName}
-            onClose={() => setShowProfileModal(false)}
-            onSave={handleUpdateProfile}
-        />
-    )}
-
-    <LoadingOverlay status={processStatus} message={statusMessage} />
-    {showModal && <CustomMessageModal title={modalConfig.title} message={modalConfig.message} type={modalConfig.type} onClose={() => setShowModal(false)} />}
-    {activeHistoryStation && <StationHistoryModal stationId={activeHistoryStation} onClose={() => setActiveHistoryStation(null)} user={user} />}
-</div>
         </div>
     );
 }

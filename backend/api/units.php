@@ -13,13 +13,9 @@ function getNullIfEmpty($val) {
     return (isset($val) && trim($val) !== '') ? trim($val) : null; 
 }
 
-// --- HELPER: HISTORY LOGGING (FIXED BASED ON YOUR DB SCREENSHOT) ---
+// --- HELPER: HISTORY LOGGING ---
 function logUnitAction($pdo, $unitId, $model, $assemblyNo, $station, $status, $actionType, $remarks = null, $actionBy = 'System') {
     try {
-        /**
-         * Base sa screenshot ng unit_history table mo, ang pagkakasunod-sunod ay:
-         * id, unit_id, model, assembly_no, action_type, station_name, status_after, remarks, action_by
-         */
         $stmt = $pdo->prepare("INSERT INTO unit_history 
             (unit_id, model, assembly_no, action_type, station_name, status_after, remarks, action_by) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
@@ -39,7 +35,9 @@ function logUnitAction($pdo, $unitId, $model, $assemblyNo, $station, $status, $a
     }
 }
 
-// --- CHECKLIST HANDLERS ---
+// ==========================================================
+// ALL CHECKLIST HANDLERS
+// ==========================================================
 
 function handleStation1Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
     if (!$checklistData) return;
@@ -216,22 +214,29 @@ if ($method === 'GET') {
 }
 
 // ==========================================================
-// 2. PUT / POST REQUEST HANDLER (Main Save Logic)
+// 2. PUT / POST REQUEST HANDLER (Main Logic)
 // ==========================================================
 
 try {
     if (!$data) throw new Exception("Walang data na natanggap.");
 
-    // 🔑 NEW VALIDATION: STRICTLY FORBID "Completed" STATUS (Must be done via handover/final station)
     $stat = $data['status'] ?? 'In Progress';
-    if ($stat === 'Completed') {
-        throw new Exception("Error: Status 'Completed' is not allowed manually.");
-    }
-
-    // 🔑 NEW VALIDATION: "No Good (NG)" REQUIRES REMARKS
+    
+    /**
+     * FIX FOR NO GOOD (NG) ERROR:
+     * If the status is NG, we check for remarks.
+     * If mnbd_no is NOT set, it means this is an ADMIN OVERRIDE.
+     * In an override, we automatically provide a default remark if empty to prevent the 400 error.
+     */
     $remarksText = trim($data['remarks'] ?? '');
     if ($stat === 'No Good (NG)' && empty($remarksText)) {
-        throw new Exception("Error: Remarks are required when status is No Good (NG).");
+        if (!isset($data['mnbd_no'])) {
+            // Admin Override context: Use default text
+            $remarksText = "Status manually overridden to NG by Administrator.";
+        } else {
+            // Production Flow context: Still require manual remarks
+            throw new Exception("Error: Remarks are required when status is No Good (NG).");
+        }
     }
 
     $pdo->beginTransaction();
@@ -242,12 +247,13 @@ try {
     $cleanStn = str_replace(' ', '', $stn);
 
     // I-check kung nage-exist na ang unit
-    $check = $pdo->prepare("SELECT id FROM units WHERE assembly_no = ?");
+    $check = $pdo->prepare("SELECT id, model FROM units WHERE assembly_no = ?");
     $check->execute([$assy]);
     $existingUnit = $check->fetch(PDO::FETCH_ASSOC);
 
     if ($existingUnit) {
         $unitId = $existingUnit['id'];
+        $modelForLog = $existingUnit['model'];
         $updateSql = "UPDATE units SET status = :status, remarks = :remarks, station = :station, updated_at = CURRENT_TIMESTAMP";
         
         $params = [
@@ -272,16 +278,17 @@ try {
         $stmt->execute([
             'model' => $data['model'] ?? '', 
             'rev' => getNullIfEmpty($data['revision'] ?? ''), 
-            'buk' => getNullIfEmpty($data['baseUnitKittingNo'] ?? ''), 
+            'buk' => getNullIfEmpty($data['baseUnitKittingNo'] ?? $data['base_unit_kitting_no'] ?? ''), 
             'assy' => $assy, 
-            'serial' => getNullIfEmpty($data['deviceSerialNo'] ?? ''), 
-            'ack' => getNullIfEmpty($data['accessoryKittingNo'] ?? ''), 
+            'serial' => getNullIfEmpty($data['deviceSerialNo'] ?? $data['device_serial_no'] ?? ''), 
+            'ack' => getNullIfEmpty($data['accessoryKittingNo'] ?? $data['accessory_kitting_no'] ?? ''), 
             'status' => $stat, 
             'remarks' => getNullIfEmpty($remarksText), 
             'station' => $stn
         ]);
         
         $unitId = $pdo->lastInsertId();
+        $modelForLog = $data['model'] ?? '';
         $action = 'UNIT_CREATED';
     }
 
@@ -298,7 +305,7 @@ try {
     }
 
     // 🔑 PCBA INVENTORY HANDLER
-    if ($cleanStn === 'Station1') {
+    if ($cleanStn === 'Station1' && isset($data['mnbd_no'])) {
         $boardMapping = [
             'mnbd_no' => 'mnbd_board_no',
             'cmbd_no' => 'cmbd_board_no',
@@ -307,10 +314,10 @@ try {
             'bkbd_no' => 'bkbd_board_no'
         ];
 
-        // 🔑 NEW LOGIC: Only process boards if status is "In Progress"
         if ($stat === 'In Progress') {
             foreach ($boardMapping as $reactKey => $dbColumn) {
                 $val = getNullIfEmpty($data[$reactKey] ?? '');
+                
                 if (!$val || strlen($val) < 6) {
                     throw new Exception("Error: All 5 PCBA serials (6 digits each) are required for In Progress units.");
                 }
@@ -343,13 +350,12 @@ try {
                 getNullIfEmpty($data['bkbd_no'] ?? '')
             ]);
         } else if ($stat === 'No Good (NG)') {
-            // 🔑 NEW LOGIC: Clear any existing board mapping if set to No Good
             $pdo->prepare("DELETE FROM unit_pcba_details WHERE unit_id = ?")->execute([$unitId]);
         }
     }
 
     // Final History Log
-    logUnitAction($pdo, $unitId, $data['model'] ?? '', $assy, $stn, $stat, $action, $remarksText, $user_name);
+    logUnitAction($pdo, $unitId, $modelForLog ?? ($data['model'] ?? ''), $assy, $stn, $stat, $action, $remarksText, $user_name);
 
     $pdo->commit();
     echo json_encode(["status" => "success", "message" => "Operation successful"]);
