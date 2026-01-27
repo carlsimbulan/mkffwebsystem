@@ -1025,7 +1025,7 @@ const todayAnnouncementsCount = announcements.filter(a => {
 </div>
 
 {/* --- MAIN CONTENT AREA --- */}
-<div className="d-flex flex-column flex-grow-1" style={{ marginLeft: '260px', backgroundColor: '#f3f4f6' }}> 
+<div className="d-flex flex-column flex-grow-1" style={{ marginLeft: '260px', backgroundColor: '#EEEEEE' }}> 
     
     {/* --- HEADER: WHITE BACKGROUND --- */}
     <header className="bg-white d-flex justify-content-between align-items-center px-4 shadow-sm sticky-top z-2" 

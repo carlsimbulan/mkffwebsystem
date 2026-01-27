@@ -507,7 +507,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                 </div>
             </div>
 
-            <div className="flex-grow-1 d-flex flex-column" style={{ marginLeft: "260px", backgroundColor: "#f3f4f6", height: '100vh', overflow: 'hidden' }}>
+            <div className="flex-grow-1 d-flex flex-column" style={{ marginLeft: "260px", backgroundColor: "#eeeeee", height: '100vh', overflow: 'hidden' }}>
                 <header className="bg-white d-flex justify-content-between align-items-center px-4 shadow-sm sticky-top z-2" style={{ height: '70px', borderBottom: '1px solid #e5e7eb' }}>
                     <div>
                         <h6 className="mb-0 fw-bold text-dark text-uppercase">{activeTab.replace('_', ' ')}</h6>

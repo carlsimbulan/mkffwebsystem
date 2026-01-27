@@ -9,9 +9,33 @@ const processStations = [
     "Packing", "QC Stamping"
 ];
 
-const allStatuses = ['All', 'In Progress', 'Completed', 'No Good (NG)', 'Pending Approval', 'For Scanning'];
+const DELAY_THRESHOLDS_MINUTES = {
+    'Station1': 6, 'Station 1': 6, 'Station2': 8, 'Station 2': 8, 'Station3': 3, 'Station 3': 3,
+    'Station4': 12, 'Station 4': 12, 'Station5': 15, 'Station 5': 15, 'Station6': 15, 'Station 6': 15,
+    'Station7': 3, 'Station 7': 3, 'Station8': 0, 'Station 8': 0, 'Station9': 480, 'Station 9': 480,
+    'Station10': 8, 'Station 10': 8, 'Station11': 22, 'Station 11': 22, 'Station12': 5, 'Station 12': 5,
+    'Station13': 10, 'Station 13': 10, 'Station14': 8, 'Station 14': 8, 'Station15': 5, 'Station 15': 5
+};
 
-// Configuration for Pagination
+const DELAY_REASONS = {
+    "PCB Pairing": { L1: "Header connector non-90° seating", L2: "PCB leads soldering rework needed", L3: "Component batch mismatch on floor" },
+    "Integrated Board Test": { L1: "Test fixture probe cleaning required", L2: "Integrated Level Test alignment issue", L3: "Physical damage on test jig pins" },
+    "Main Board Conformal Coating": { L1: "Nozzle cleaning / Air bubble clearing", L2: "Drying oven tray congestion", L3: "Material stock-out (Coating supply)" },
+    "RTV Application": { L1: "Manual application inconsistency", L2: "Extended curing due to humidity", L3: "Dispenser machine mechanical jam" },
+    "Casing/Harnessing": { L1: "Tight fitment / Casing alignment", L2: "Harness connector shortage on bin", L3: "Operator fatigue / Manpower shortage" },
+    "Complete Unit Test/Calibration": { L1: "Voltage calibration drift (Ref: 115V)", L2: "LoRa / Energy Meter physical loose contact", L3: "Reference 'Golden Unit' sample damaged" },
+    "Pre BI Hi-Pot Test": { L1: "Safety cable insulation manual checking", L2: "Leakage current threshold adjustment", L3: "High-voltage safety probe malfunction" },
+    "Burn-in Testing": { L1: "Burn-in time requirement pending", L2: "Unit flickering observation needed", L3: "Burn-in rack power socket failure" },
+    "Sealing": { L1: "Sealant pre-heating delay", L2: "Gasket misalignment during press", "L3": "Heater element physical wear-out" },
+    "Post BI Hi-Pot Test": { L1: "Residual charge discharge time", L2: "Post-burn-in connector wear", L3: "Test module isolation failure" },
+    "Final Functional/Connectivity Test": { L1: "Antenna/Connectivity pairing lag", L2: "Manual reset button responsiveness", L3: "Firmware batch inconsistency on units" },
+    "Label Sticker Attachment": { L1: "Label printer ribbon replacement", L2: "Missing mandatory warning labels", L3: "Label feeder machine mechanical jam" },
+    "FVI": { L1: "Cosmetic smudge / cleaning delay", L2: "Detailed inspection of visual defects", L3: "Missing physical QC inspector stamp" },
+    "Packing": { L1: "Manual insertion of inserts/manuals", L2: "Carton box assembly congestion", L3: "Weight scale mechanical calibration" },
+    "QC Stamping": { L1: "Final verification document delay", L2: "Minor rework sorting activity", L3: "Final Auditor shift transition delay" }
+};
+
+const allStatuses = ['All', 'In Progress', 'Completed', 'No Good (NG)', 'Pending Approval', 'For Scanning'];
 const ITEMS_PER_PAGE = 10;
 
 const formatTimestamp = (isoString) => {
@@ -33,12 +57,20 @@ const getStatusBadgeClass = (status) => {
     return 'bg-light text-secondary border';
 };
 
-// --- SUB-COMPONENT: STATION MONITOR ---
+const checkUnitDelay = (stationId, updatedAt) => {
+    const threshold = DELAY_THRESHOLDS_MINUTES[stationId] || 10;
+    const lastUpdate = new Date(updatedAt).getTime();
+    const minutesInStation = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
+    if (minutesInStation > threshold * 3) return { isDelayed: true, level: 'CRITICAL', minutes: minutesInStation };
+    if (minutesInStation > threshold) return { isDelayed: true, level: 'MODERATE', minutes: minutesInStation };
+    return { isDelayed: false, level: 'NORMAL', minutes: minutesInStation };
+};
+
 const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClick, highlightedUnitId, setActiveTab, fetchData }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All'); 
     const [selectedUnitProcess, setSelectedUnitProcess] = useState(null); 
-    const [expandedStepIdx, setExpandedStepIdx] = useState(null); // Para sa tracker dropdown
+    const [expandedStepIdx, setExpandedStepIdx] = useState(null);
 
     const monitorMetrics = calculateMetrics(stationMonitorId);
 
@@ -67,37 +99,11 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 .done .modal-dot { background: #198754; }
                 .current .modal-dot { background: #0d6efd; }
                 .ng .modal-dot { background: #dc3545; }
-
-                /* Technical Data Table in Tracker Modal */
-                .tracker-checklist-box { 
-                    background: #f8fafc; 
-                    border: 1px solid #cbd5e1; 
-                    border-radius: 4px; 
-                    margin-top: 10px; 
-                    overflow-x: auto; 
-                }
-                .tracker-table { 
-                    width: 100%; 
-                    min-width: 500px;
-                    font-size: 0.72rem; 
-                    margin-bottom: 0; 
-                }
-                .tracker-table th { 
-                    background: #f1f5f9; 
-                    color: #475569; 
-                    padding: 6px 8px; 
-                    border-bottom: 1px solid #cbd5e1; 
-                    text-transform: uppercase; 
-                    font-weight: 800;
-                    text-align: center;
-                }
-                .tracker-table td { 
-                    padding: 8px 8px; 
-                    color: #0f172a; 
-                    font-weight: 700; 
-                    border-bottom: 1px solid #e2e8f0; 
-                    text-align: center;
-                }
+                .tracker-checklist-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; margin-top: 10px; overflow-x: auto; }
+                .tracker-table { width: 100%; min-width: 500px; font-size: 0.72rem; margin-bottom: 0; }
+                .tracker-table th { background: #f1f5f9; color: #475569; padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-transform: uppercase; font-weight: 800; text-align: center; }
+                .tracker-table td { padding: 8px 8px; color: #0f172a; font-weight: 700; border-bottom: 1px solid #e2e8f0; text-align: center; }
+                .delay-row { background-color: #fff5f5 !important; }
             `}</style>
 
             <div className="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3 px-2">
@@ -129,153 +135,174 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 <div className="table-responsive">
                     <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem' }}>
                         <thead>
-    <tr>
-        <th className="ps-4">MODEL</th>
-        <th>REVISION</th>
-        <th>BASE UNIT</th>
-        <th>ASSEMBLY</th>
-        <th>DEVICE SERIAL</th>
-        <th>ACCESSORY</th>
-        <th className="text-center">STATUS</th>
-        <th>REMARKS</th>
-        {/* 🔑 PINALITAN: Mas accurate na 'Last Movement' base sa updated_at */}
-        <th>LAST MOVEMENT</th>
-        <th className="text-center">ACTIONS</th>
-    </tr>
-</thead>
-<tbody>
-    {filteredLogs.map(log => (
-        <tr key={log.id} className={highlightedUnitId === log.id ? 'table-danger fw-bold' : ''}>
-            <td className="ps-4 fw-bold">{log.model}</td>
-            <td>{log.revision}</td>
-            <td>{log.base_unit_kitting_no}</td>
-            <td><code className="text-primary fw-bold">{log.assembly_no}</code></td>
-            <td className="fw-bold">{log.device_serial_no}</td>
-            <td>{log.accessory_kitting_no}</td>
-            <td className="text-center">
-                <span className={`badge rounded-1 px-3 py-1 ${getStatusBadgeClass(log.status)}`}>
-                    {log.status}
-                </span>
-            </td>
-            <td className="text-muted small italic">{log.remarks || '---'}</td>
-            
-            {/* 🔑 UPDATED COLUMN: Ipinapakita ang petsa at oras ng huling handover/edit */}
-            <td className="small">
-                <div className="fw-bold">
-                    {new Date(log.updated_at || log.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </div>
-                <div className="text-muted" style={{ fontSize: '0.7rem' }}>
-                    {new Date(log.updated_at || log.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                </div>
-            </td>
-
-            <td className="text-center">
-                <div className="d-flex gap-1 justify-content-center">
-                    <button className="btn btn-sm btn-primary btn-box py-1 px-3" style={{fontSize:'0.7rem'}} onClick={() => setSelectedUnitProcess(log)}>DETAILS</button>
-                    <button className="btn btn-sm btn-danger btn-box py-1 px-3" style={{fontSize:'0.7rem'}} onClick={() => handleEditClick(log)}>EDIT</button>
-                </div>
-            </td>
-        </tr>
-    ))}
-</tbody>
+                            <tr>
+                                <th className="ps-4">MODEL</th>
+                                <th>REVISION</th>
+                                <th>BASE UNIT</th>
+                                <th>ASSEMBLY</th>
+                                <th>DEVICE SERIAL</th>
+                                <th>ACCESSORY</th>
+                                <th className="text-center">STATUS</th>
+                                <th>REMARKS</th>
+                                <th>LAST MOVEMENT</th>
+                                <th className="text-center">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredLogs.map(log => {
+                                const delay = log.status === 'In Progress' ? checkUnitDelay(stationMonitorId, log.updated_at || log.created_at) : { isDelayed: false };
+                                return (
+                                    <tr key={log.id} className={`${highlightedUnitId === log.id ? 'table-danger fw-bold' : ''} ${delay.isDelayed ? 'delay-row' : ''}`}>
+                                        <td className="ps-4 fw-bold">{log.model}</td>
+                                        <td>{log.revision}</td>
+                                        <td>{log.base_unit_kitting_no}</td>
+                                        <td>
+                                            <code className="text-primary fw-bold">{log.assembly_no}</code>
+                                            {delay.isDelayed && <i className="bi bi-exclamation-triangle-fill text-danger ms-2" title={`Delayed: ${delay.level}`}></i>}
+                                        </td>
+                                        <td className="fw-bold">{log.device_serial_no}</td>
+                                        <td>{log.accessory_kitting_no}</td>
+                                        <td className="text-center">
+                                            <span className={`badge rounded-1 px-3 py-1 ${getStatusBadgeClass(log.status)}`}>
+                                                {log.status}
+                                            </span>
+                                        </td>
+                                        <td className="text-muted small italic">{log.remarks || '---'}</td>
+                                        <td className="small">
+                                            <div className="fw-bold">{new Date(log.updated_at || log.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                                            <div className="text-muted" style={{ fontSize: '0.7rem' }}>{new Date(log.updated_at || log.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</div>
+                                        </td>
+                                        <td className="text-center">
+                                            <div className="d-flex gap-1 justify-content-center">
+                                                <button className={`btn btn-sm ${delay.isDelayed ? 'btn-danger' : 'btn-primary'} btn-box py-1 px-3`} style={{fontSize:'0.7rem'}} onClick={() => setSelectedUnitProcess(log)}>
+                                                    {delay.isDelayed ? 'VIEW CAUSE' : 'DETAILS'}
+                                                </button>
+                                                <button className="btn btn-sm btn-danger btn-box py-1 px-3" style={{fontSize:'0.7rem'}} onClick={() => handleEditClick(log)}>EDIT</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
                     </table>
                 </div>
             </div>
 
             {selectedUnitProcess && (
                 <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.4)', zIndex: 1050 }}>
-                    <div className="bg-white rounded-3 shadow-xl p-0 overflow-hidden border-0" style={{ width: '95%', maxWidth: '750px' }}>
+                    <div className="bg-white rounded-3 shadow-xl p-0 overflow-hidden border-0" style={{ width: '95%', maxWidth: '900px' }}>
                         <div className="p-4 d-flex justify-content-between align-items-center text-white bg-primary">
                             <div>
-                                <h5 className="mb-0 fw-bold">Unit Tracker</h5>
+                                <h5 className="mb-0 fw-bold">Unit Tracker & Analysis</h5>
                                 <p className="mb-0 small opacity-75">{selectedUnitProcess.assembly_no}</p>
                             </div>
                             <button className="btn-close btn-close-white shadow-none" onClick={() => {setSelectedUnitProcess(null); setExpandedStepIdx(null);}}></button>
                         </div>
+
                         <div className="p-2 bg-light border-bottom d-flex justify-content-around small fw-bold text-muted">
                             <span><i className="bi bi-box-seam me-1"></i> {selectedUnitProcess.model}</span>
                             <span><i className="bi bi-hash me-1"></i> SN: {selectedUnitProcess.device_serial_no}</span>
                         </div>
-                        <div className="p-0" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                            <div className="p-4">
+
+                        <div className="p-4" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                            {/* DELAY ANALYSIS SECTION */}
+                            {selectedUnitProcess.status === 'In Progress' && (() => {
+                                const delay = checkUnitDelay(stationMonitorId, selectedUnitProcess.updated_at || selectedUnitProcess.created_at);
+                                if (delay.isDelayed) {
+                                    const reasons = DELAY_REASONS[processName] || { L1: "Manual lag", L2: "Operational delay", L3: "Critical Bottleneck" };
+                                    const specificReason = delay.level === 'CRITICAL' ? reasons.L3 : (delay.level === 'MODERATE' ? reasons.L2 : reasons.L1);
+                                    return (
+                                        <div className="alert alert-danger border-0 shadow-sm mb-4 p-3">
+                                            <div className="d-flex align-items-center mb-2">
+                                                <i className="bi bi-exclamation-octagon-fill me-2 fs-5"></i>
+                                                <h6 className="mb-0 fw-bold">DELAY DETECTED: {delay.level} LEVEL</h6>
+                                            </div>
+                                            <div className="bg-white rounded p-2 border mb-2">
+                                                <div className="small fw-bold text-muted text-uppercase">Probable Cause:</div>
+                                                <div className="fw-bold text-dark">{specificReason}</div>
+                                            </div>
+                                            <div className="small italic fw-bold text-danger">
+                                                <i className="bi bi-megaphone-fill me-1"></i> ACTION REQUIRED: Please take floor action immediately.
+                                            </div>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
+
+                            <div className="process-timeline">
                                 {processStations.map((station, idx) => {
                                     const isCurrent = idx === stationIndex;
                                     const isDoneBefore = idx < stationIndex;
                                     const unitStatus = selectedUnitProcess.status?.toLowerCase() || '';
-                                    const isNG = isCurrent && unitStatus.includes('no good');
                                     const isCompletedHere = isCurrent && unitStatus.includes('completed');
+                                    const isNG = isCurrent && unitStatus.includes('no good');
                                     const isExpanded = expandedStepIdx === idx;
 
-                                    // Mapping Checklist Data para sa Tracker dropdown
                                     let stationData = null;
                                     if (idx === 0 && selectedUnitProcess.header_seated_90_deg) {
                                         stationData = { "Header Seated": selectedUnitProcess.header_seated_90_deg, "Soldering": selectedUnitProcess.leads_properly_soldered };
-                                    }
-                                    if (idx === 1 && selectedUnitProcess.integrated_board_level_test1) {
+                                    } else if (idx === 1 && selectedUnitProcess.integrated_board_level_test1) {
                                         stationData = { "Board 1": selectedUnitProcess.integrated_board_level_test1, "Board 2": selectedUnitProcess.integrated_board_level_test2, "Board 3": selectedUnitProcess.integrated_board_level_test3 };
-                                    }
-                                    // STATION 6: FULL 12 CHECKLISTS
-                                    if (idx === 5 && selectedUnitProcess.voltage) {
-                                        stationData = {
-                                            "LoRa": selectedUnitProcess.lora_module, "Meter": selectedUnitProcess.energy_meter, "PwrGood": selectedUnitProcess.power_good_test, "Volt": selectedUnitProcess.voltage + "V",
-                                            "L1": selectedUnitProcess.line1 + "V", "L2": selectedUnitProcess.line2 + "V", "L3": selectedUnitProcess.line3 + "V",
-                                            "Temp": selectedUnitProcess.temp_reading, "Freq": selectedUnitProcess.freq_reading, "4G": selectedUnitProcess.led_status_4g,
-                                            "Blink": selectedUnitProcess.led_status_fast_blink, "Verdict": selectedUnitProcess.checklist_verdict || selectedUnitProcess.go_no_go
+                                    } else if (idx === 5 && selectedUnitProcess.voltage) {
+                                        // 🔑 FULL STATION 6 COLUMNS
+                                        stationData = { 
+                                            "LoRa": selectedUnitProcess.lora_module, 
+                                            "Meter": selectedUnitProcess.energy_meter, 
+                                            "PwrGood": selectedUnitProcess.power_good_test,
+                                            "Volt": selectedUnitProcess.voltage + "V",
+                                            "L1": selectedUnitProcess.line1 + "V",
+                                            "L2": selectedUnitProcess.line2 + "V",
+                                            "L3": selectedUnitProcess.line3 + "V",
+                                            "Temp": selectedUnitProcess.temp_reading,
+                                            "Freq": selectedUnitProcess.freq_reading,
+                                            "4G": selectedUnitProcess.led_status_4g,
+                                            "Blink": selectedUnitProcess.led_status_fast_blink,
+                                            "Verdict": selectedUnitProcess.go_no_go
                                         };
-                                    }
-                                    // 🔑 ADDED: NEW STATIONS VIEW LOGIC (7, 8, 10, 11, 12)
-                                    if (idx === 6 && selectedUnitProcess.performed_passed) {
+                                    } else if (idx === 6 && selectedUnitProcess.performed_passed) {
                                         stationData = { "Hi-Pot Passed": selectedUnitProcess.performed_passed, "Recorded": selectedUnitProcess.result_recorded };
-                                    }
-                                    if (idx === 7 && selectedUnitProcess.burnin_completed) {
+                                    } else if (idx === 7 && selectedUnitProcess.burnin_completed) {
                                         stationData = { "Burn-in Done": selectedUnitProcess.burnin_completed, "No Failure": selectedUnitProcess.no_failure_observed };
-                                    }
-                                    if (idx === 9 && selectedUnitProcess.post_performed_passed) {
+                                    } else if (idx === 9 && selectedUnitProcess.post_performed_passed) {
                                         stationData = { "Post Hi-Pot": selectedUnitProcess.post_performed_passed, "Post Recorded": selectedUnitProcess.post_result_recorded };
-                                    }
-                                    if (idx === 10 && selectedUnitProcess.functions_working) {
+                                    } else if (idx === 10 && selectedUnitProcess.functions_working) {
                                         stationData = { "Functional": selectedUnitProcess.functions_working, "Connectivity": selectedUnitProcess.connectivity_passed };
-                                    }
-                                    if (idx === 11 && selectedUnitProcess.stickers_attached) {
+                                    } else if (idx === 11 && selectedUnitProcess.stickers_attached) {
                                         stationData = { "Stickers": selectedUnitProcess.stickers_attached, "Readable": selectedUnitProcess.stickers_readable };
                                     }
-                                    
-                                    let stepClass = ""; let subText = "Pending Station"; let textColor = "text-muted";
-                                    if (isDoneBefore || isCompletedHere) { stepClass = "done"; subText = "STATION COMPLETED"; textColor = "text-success"; }
-                                    else if (isNG) { stepClass = "ng"; subText = "DEFECT DETECTED (NG)"; textColor = "text-danger"; }
-                                    else if (isCurrent) { stepClass = "current"; subText = "IN PROGRESS"; textColor = "text-primary"; }
+
+                                    let stepClass = isDoneBefore || isCompletedHere ? 'done' : (isNG ? 'ng' : (isCurrent ? 'current' : ''));
+                                    let subText = isDoneBefore || isCompletedHere ? 'COMPLETED' : (isNG ? 'DEFECT DETECTED (NG)' : (isCurrent ? 'IN PROGRESS' : 'PENDING'));
 
                                     return (
                                         <div key={idx} className={`modal-step ${stepClass}`} onClick={() => stationData && setExpandedStepIdx(isExpanded ? null : idx)}>
                                             <div className="modal-dot"></div>
                                             <div className="d-flex justify-content-between align-items-center">
                                                 <div>
-                                                    <div className={`fw-bold mb-0 ${isCurrent || isDoneBefore || isCompletedHere ? 'text-dark' : 'text-muted opacity-50'}`} style={{fontSize: '0.9rem'}}>
-                                                        {idx + 1}. {station}
-                                                        {stationData && <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'} ms-2 small text-muted`}></i>}
-                                                    </div>
-                                                    <div className={`fw-bold ${textColor}`} style={{fontSize: '0.65rem', letterSpacing: '0.3px'}}>{subText}</div>
+                                                    <div className="fw-bold small">{idx + 1}. {station} {stationData && <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'} ms-1`}></i>}</div>
+                                                    <div className="text-muted fw-bold" style={{fontSize:'0.6rem'}}>{subText}</div>
                                                 </div>
-                                                {(isCurrent || (isDoneBefore && stationData)) && <span className="badge bg-light text-dark border small" style={{fontSize: '0.6rem'}}>VIEW DATA</span>}
+                                                {stationData && <span className="badge bg-light text-dark border" style={{fontSize: '0.6rem'}}>VIEW DATA</span>}
                                             </div>
-
                                             {isExpanded && stationData && (
-                                                <div className="tracker-checklist-box shadow-sm" onClick={(e) => e.stopPropagation()}>
+                                                <div className="tracker-checklist-box">
                                                     <table className="tracker-table">
-                                                        <thead>
-                                                            <tr>
-                                                                {Object.keys(stationData).map(k => <th key={k}>{k}</th>)}
-                                                            </tr>
-                                                        </thead>
+                                                        <thead><tr>{Object.keys(stationData).map(k => <th key={k}>{k}</th>)}</tr></thead>
                                                         <tbody>
                                                             <tr>
-                                                                {Object.values(stationData).map((v, i) => (
-                                                                    <td key={i}>
-                                                                        <span className={v === 'GO' || v === 'PASS' || v === 'Detected' ? 'text-success' : (v === 'NO GO' || v === 'FAIL' || v === 'Not Detected' ? 'text-danger' : '')}>
-                                                                            {v || 'N/A'}
-                                                                        </span>
-                                                                    </td>
-                                                                ))}
+                                                                {Object.values(stationData).map((v, i) => {
+                                                                    // 🔑 LOGIC TO TURN TEXT RED IF IT IS A FAILURE
+                                                                    const isLihis = ["NO GO", "FAIL", "Not Detected"].includes(v) || 
+                                                                                   (Object.keys(stationData)[i] === "Volt" && (parseFloat(v) < 113.85 || parseFloat(v) > 116.15));
+                                                                    return (
+                                                                        <td key={i}>
+                                                                            <span className={isLihis ? 'text-danger fw-bold' : 'text-success'}>
+                                                                                {v || 'N/A'}
+                                                                            </span>
+                                                                        </td>
+                                                                    );
+                                                                })}
                                                             </tr>
                                                         </tbody>
                                                     </table>
@@ -287,7 +314,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                             </div>
                         </div>
                         <div className="p-3 bg-white border-top">
-                            <button className="btn btn-primary w-100 btn-box py-2 shadow-sm" onClick={() => setSelectedUnitProcess(null)}>CLOSE TRACKER</button>
+                            <button className="btn btn-primary w-100 btn-box py-2 shadow-sm" onClick={() => setSelectedUnitProcess(null)}>CLOSE ANALYSIS</button>
                         </div>
                     </div>
                 </div>
@@ -338,8 +365,6 @@ export function StationsOverview({
                     .btn-box { border-radius: 4px !important; font-weight: 600; }
                     .table thead th { background-color: #1e293b !important; color: white !important; padding: 12px; }
                     .pagination .page-link { color: #1e293b; border: 1px solid #dee2e6; margin: 0 2px; border-radius: 4px; }
-                    .pagination .page-item.active .page-link { background-color: #1e293b; border-color: #1e293b; color: white; }
-                    .pagination .page-item.disabled .page-link { color: #6c757d; pointer-events: none; background-color: #fff; border-color: #dee2e6; }
                 `}</style>
                 <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3 px-2">
                     <div>
@@ -388,43 +413,25 @@ export function StationsOverview({
                                         );
                                     })
                                 ) : (
-                                    <tr>
-                                        <td colSpan="7" className="text-center py-5 text-muted italic">No logs found matching your criteria.</td>
-                                    </tr>
+                                    <tr><td colSpan="7" className="text-center py-5 text-muted italic">No logs found.</td></tr>
                                 )}
                             </tbody>
                         </table>
                     </div>
-
-                    {/* Pagination Controls */}
                     <div className="p-3 border-top d-flex justify-content-between align-items-center bg-light">
-                        <div className="small text-muted fw-bold">
-                            Page {currentPage} of {totalPages || 1}
-                        </div>
+                        <div className="small text-muted fw-bold">Page {currentPage} of {totalPages || 1}</div>
                         <nav>
                             <ul className="pagination pagination-sm mb-0">
                                 <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                                    <button className="page-link shadow-none" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}>
-                                        <i className="bi bi-chevron-left"></i>
-                                    </button>
+                                    <button className="page-link shadow-none" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}><i className="bi bi-chevron-left"></i></button>
                                 </li>
-                                {[...Array(totalPages)].map((_, index) => {
-                                    const pageNum = index + 1;
-                                    if (pageNum === 1 || pageNum === totalPages || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
-                                        return (
-                                            <li key={pageNum} className={`page-item ${currentPage === pageNum ? 'active' : ''}`}>
-                                                <button className="page-link shadow-none" onClick={() => setCurrentPage(pageNum)}>{pageNum}</button>
-                                            </li>
-                                        );
-                                    } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-                                        return <li key={pageNum} className="page-item disabled"><span className="page-link">...</span></li>;
-                                    }
-                                    return null;
-                                })}
+                                {[...Array(totalPages)].map((_, index) => (
+                                    <li key={index} className={`page-item ${currentPage === index + 1 ? 'active' : ''}`}>
+                                        <button className="page-link shadow-none" onClick={() => setCurrentPage(index + 1)}>{index + 1}</button>
+                                    </li>
+                                ))}
                                 <li className={`page-item ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}`}>
-                                    <button className="page-link shadow-none" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}>
-                                        <i className="bi bi-chevron-right"></i>
-                                    </button>
+                                    <button className="page-link shadow-none" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}><i className="bi bi-chevron-right"></i></button>
                                 </li>
                             </ul>
                         </nav>
@@ -441,35 +448,13 @@ export function StationsOverview({
     return (
         <div className="container-fluid px-0">
             <style>{`
-                * { animation: none !important; transition: none !important; }
-                .btn-box { border-radius: 4px !important; font-weight: 700; transition: none !important; }
-                .station-card-flat { 
-                    background: #fff; 
-                    border: 1px solid #e2e8f0; 
-                    border-radius: 8px; 
-                    padding: 20px; 
-                    height: 100%; 
-                }
-                .station-card-flat:hover { 
-                    border-color: #94a3b8; 
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-                    transform: translateY(-2px);
-                }
-                .metric-row { 
-                    display: flex; 
-                    justify-content: space-between; 
-                    font-size: 0.75rem; 
-                    font-weight: 700; 
-                    padding: 8px 0; 
-                    border-bottom: 1px solid #f1f5f9; 
-                    color: #475569; 
-                }
+                .station-card-flat { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; height: 100%; position: relative; }
+                .delay-card { border: 2px solid #dc3545 !important; background-color: #fff5f5; }
+                .delay-tag { position: absolute; top: 10px; right: 10px; color: #dc3545; font-size: 0.6rem; font-weight: 800; border: 1px solid #dc3545; padding: 1px 6px; border-radius: 4px; }
+                .metric-row { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #475569; }
                 .metric-row:last-child { border-bottom: none; }
-                .metric-value { color: #1e293b; } 
                 .btn-monitor { background: #1e293b; color: #fff; border: none; }
                 .btn-monitor:hover { background: #0f172a; color: #fff; }
-                .btn-history { background: transparent; color: #475569; border: 1px solid #e2e8f0; }
-                .btn-history:hover { background: #f8fafc; border-color: #cbd5e1; }
             `}</style>
             
             <div className="d-flex justify-content-between align-items-center mb-4 px-2 border-bottom pb-3">
@@ -480,9 +465,12 @@ export function StationsOverview({
             <div className="row g-4">
                 {namedStations.map((station) => {
                     const metrics = calculateMetrics(station.id);
+                    const hasDelay = (metrics.stationLogs || []).some(log => log.status === 'In Progress' && checkUnitDelay(station.id, log.updated_at || log.created_at).isDelayed);
+
                     return (
                         <div key={station.id} className="col-md-3">
-                            <div className="station-card-flat shadow-sm">
+                            <div className={`station-card-flat shadow-sm ${hasDelay ? 'delay-card' : ''}`}>
+                                {hasDelay && <div className="delay-tag"><i className="bi bi-exclamation-triangle-fill me-1"></i>DELAYED</div>}
                                 <div className="mb-3">
                                     <span className="text-muted" style={{fontSize: '0.65rem', fontWeight: 800}}>STATION ID: {station.id}</span>
                                     <h6 className="fw-bold text-dark text-truncate mb-0 mt-1">{station.name}</h6>

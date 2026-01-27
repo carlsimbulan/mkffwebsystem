@@ -24,7 +24,6 @@ import { ReportsView } from './components/ReportsView';
 import { AnnouncementsView } from './components/AnnouncementsView'; 
 import { ApprovalQueue } from './components/ApprovalQueue';
 import { UserManagement } from './components/UserManagement';
-import DataAnalytics from './components/DataAnalytics';
 import { InventoryView } from './components/InventoryView';
 // NEW EMBEDDED MODALS
 import { ApproveUnitModal } from './modals/ApproveUnitModal';
@@ -712,14 +711,6 @@ case "announcements":
                     />
                 );
 
-                case "data_analytics":
-            return (
-                <DataAnalytics 
-                    logs={logs} 
-                    unitHistoryLogs={unitHistoryLogs} 
-                    stations={stations}
-                />
-            );
 
             case "notifications":
                 return (
@@ -893,15 +884,6 @@ return (
 
         
 
-        <li className="nav-item">
-            <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${activeTab === "data_analytics" ? "active-glass" : ""}`}
-                onClick={() => handleTabChange("data_analytics")}
-            >
-                <i className="bi bi-graph-up"></i>
-                <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Data Analytics</span>
-            </button>
-        </li>
 
         <li className="nav-item">
             <button
@@ -983,7 +965,7 @@ return (
         right: 0,
         left: "260px", 
         overflowX: 'hidden',
-        backgroundColor: '#f3f4f6',
+        backgroundColor: '#EEEEEE',
         zIndex: 999,
     }}
 >
