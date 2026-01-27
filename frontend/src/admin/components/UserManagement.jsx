@@ -38,199 +38,201 @@ export function UserManagement({
             if (stationNumA !== stationNumB) return stationNumA - stationNumB;
             return a.id - b.id; 
         });
-    }, [userList]);
+    }, [userList, user.id]);
 
     return (
-        <div className="container-fluid px-0 py-2 animate-in fade-in">
+        <div className="container-fluid px-0 py-2">
             <style>{`
-                .um-container {
-                    background: #ffffff;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 8px;
-                    overflow: hidden;
-                }
-                .um-header {
-                    background: #ffffff;
-                    border-bottom: 1px solid #f1f5f9;
-                    padding: 18px 24px;
-                }
-                .um-table thead th {
-                    background: #f8fafc;
-                    color: #64748b;
-                    text-transform: uppercase;
-                    font-size: 0.75rem;
-                    letter-spacing: 0.05em;
-                    font-weight: 700;
-                    padding: 14px 24px;
-                    border-bottom: 1px solid #e2e8f0;
-                }
-                .um-table tbody td {
-                    padding: 16px 24px;
-                    border-bottom: 1px solid #f1f5f9;
-                    vertical-align: middle;
-                }
-                .avatar-frame {
-                    width: 40px;
-                    height: 40px;
-                    object-fit: cover;
-                    border-radius: 8px;
-                    border: 1px solid #e2e8f0;
+                .um-wrapper {
+                    padding: 10px;
                 }
                 
-                /* CLEAN PLAIN TEXT ROLE STYLES */
-                .role-text {
-                    font-size: 0.85rem;
-                    font-weight: 600;
-                    color: #475569;
-                }
-                .role-admin { color: #dc2626; } 
-                .role-it { color: #2563eb; }    
-                
-                /* UPDATED: GREEN ADD USER BUTTON */
-                .btn-add-user {
-                    background: #198754;
-                    color: white;
-                    border: none;
-                    font-weight: 700;
-                    font-size: 0.8rem;
-                    padding: 10px 20px;
-                    border-radius: 6px;
-                    transition: all 0.2s;
-                }
-                .btn-add-user:hover { 
-                    background: #157347; 
-                    transform: translateY(-1px);
-                    box-shadow: 0 4px 12px rgba(25, 135, 84, 0.2);
-                }
-                
-                /* VISIBLE ACTION BUTTONS */
-                .btn-action {
-                    padding: 7px 18px;
-                    font-size: 0.75rem;
-                    font-weight: 700;
-                    border-radius: 4px;
-                    border: none;
-                    transition: all 0.2s;
-                    min-width: 85px;
-                }
-                .btn-view {
-                    background: #0d6efd;
-                    color: white;
-                }
-                .btn-view:hover {
-                    background: #0b5ed7;
-                    transform: translateY(-1px);
-                }
-                .btn-delete {
-                    background: #dc3545;
-                    color: white;
-                }
-                .btn-delete:hover:not(:disabled) {
-                    background: #bb2d3b;
-                    transform: translateY(-1px);
-                }
-                .btn-delete:disabled {
+                .um-registry-header {
+                    display: grid;
+                    grid-template-columns: 2fr 1fr 1.2fr 1fr 1fr;
+                    padding: 15px 25px;
                     background: #f1f5f9;
-                    color: #cbd5e1;
-                    cursor: not-allowed;
+                    border-radius: 12px;
+                    margin-bottom: 15px;
+                    font-size: 0.7rem;
+                    font-weight: 800;
+                    color: #475569;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
                 }
+
+                .user-row-card {
+                    background: #ffffff;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 12px;
+                    margin-bottom: 12px;
+                    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+                    display: grid;
+                    grid-template-columns: 2fr 1fr 1.2fr 1fr 1fr;
+                    align-items: center;
+                    padding: 15px 25px;
+                    transition: all 0.2s ease;
+                }
+
+                .user-row-card:hover {
+                    background-color: rgba(255, 255, 255, 0.7);
+                    backdrop-filter: blur(8px);
+                    border-color: #cbd5e1;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+                }
+
+                /* Perfect Circle Avatar */
+                .avatar-circle {
+                    width: 44px;
+                    height: 44px;
+                    object-fit: cover;
+                    border-radius: 50%; /* Ginawang bilog */
+                    border: 2px solid #fff;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.12);
+                    background: #f1f5f9;
+                }
+
+                .role-badge {
+                    font-size: 0.75rem;
+                    font-weight: 700;
+                    padding: 4px 12px;
+                    border-radius: 20px;
+                    display: inline-block;
+                }
+                .badge-admin { background: #fef2f2; color: #dc2626; }
+                .badge-it { background: #eff6ff; color: #2563eb; }
+                .badge-operator { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
+
+                .btn-view-action {
+                    background: #2563eb;
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 8px;
+                    font-size: 0.7rem;
+                    font-weight: 800;
+                    text-transform: uppercase;
+                    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+                    outline: none;
+                }
+                .btn-view-action:active { transform: scale(0.95); background: #1d4ed8; }
+
+                .btn-delete-action {
+                    background: #ffffff;
+                    color: #dc2626;
+                    border: 1px solid #fee2e2;
+                    padding: 8px 16px;
+                    border-radius: 8px;
+                    font-size: 0.7rem;
+                    font-weight: 800;
+                    text-transform: uppercase;
+                    outline: none;
+                }
+                .btn-delete-action:active:not(:disabled) { transform: scale(0.95); background: #fef2f2; }
+                .btn-delete-action:disabled { opacity: 0.15; cursor: not-allowed; }
+
+                .add-user-btn {
+                    background: #0f172a;
+                    color: white;
+                    border: none;
+                    padding: 10px 24px;
+                    border-radius: 10px;
+                    font-weight: 800;
+                    font-size: 0.85rem;
+                    outline: none;
+                }
+                .add-user-btn:active { transform: scale(0.97); opacity: 0.9; }
             `}</style>
 
-            <div className="d-flex justify-content-between align-items-center mb-4 px-2">
+            {/* HEADER */}
+            <div className="d-flex justify-content-between align-items-center mb-4 px-3">
                 <div>
-                    <h4 className="fw-bold text-dark mb-1 tracking-tight">User Management</h4>
-                    <p className="text-muted small mb-0">System access control and registry</p>
+                    <h3 className="fw-bold text-dark mb-1 tracking-tight">User Management</h3>
+                    <p className="text-muted small mb-0 fw-bold">Personnel registry and access level administration</p>
                 </div>
-                {/* --- GREEN BUTTON --- */}
-                <button
-                    className="btn btn-add-user d-flex align-items-center shadow-sm"
-                    onClick={handleAddUser}
-                >
-                    <i className="bi bi-person-plus-fill me-2"></i> ADD SYSTEM USER
+                <button className="add-user-btn shadow-sm" onClick={handleAddUser}>
+                    <i className="bi bi-person-plus-fill me-2"></i>ADD SYSTEM USER
                 </button>
             </div>
 
-            <div className="um-container shadow-sm">
-                <div className="um-header d-flex justify-content-between align-items-center">
-                    <span className="small fw-bold text-secondary text-uppercase tracking-wider">System Registry</span>
-                    <span className="text-muted small">Total Accounts: <b>{userList.length}</b></span>
+            <div className="um-wrapper">
+                {/* GRID HEADER */}
+                <div className="um-registry-header d-none d-md-grid">
+                    <div>User Profile</div>
+                    <div>Access Level</div>
+                    <div>Floor Assignment</div>
+                    <div className="text-end">Registry Date</div>
+                    <div className="text-end">Operations</div>
                 </div>
 
-                <div className="table-responsive">
-                    <table className="table um-table table-hover mb-0">
-                        <thead>
-                            <tr>
-                                <th>Account Profile</th>
-                                <th>Access Role</th>
-                                <th>Station</th>
-                                <th className="text-end">Registered</th>
-                                <th className="text-center">Operations</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {sortedUserList.length > 0 ? sortedUserList.map(u => {
-                                const isMe = u.id === user.id; 
-                                const isAssigned = u.station && !u.station.toLowerCase().includes('not assigned');
-                                
-                                let roleColorClass = "";
-                                if (u.role === 'Administrator') roleColorClass = "role-admin";
-                                else if (u.role === 'IT Assistant') roleColorClass = "role-it";
+                {/* USER LIST (CARDS) */}
+                <div className="user-list">
+                    {sortedUserList.length > 0 ? sortedUserList.map(u => {
+                        const isMe = u.id === user.id; 
+                        const isAssigned = u.station && !u.station.toLowerCase().includes('not assigned');
+                        
+                        let badgeClass = "badge-operator";
+                        if (u.role === 'Administrator') badgeClass = "badge-admin";
+                        else if (u.role === 'IT Assistant') badgeClass = "badge-it";
 
-                                return (
-                                    <tr key={u.id}>
-                                        <td>
-                                            <div className="d-flex align-items-center">
-                                                <img
-                                                    src={u.avatar_url ? `${AVATAR_UPLOAD_PATH}${u.avatar_url}` : DEFAULT_AVATAR_PATH}
-                                                    className="avatar-frame me-3"
-                                                    alt="User"
-                                                    onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
-                                                />
-                                                <div>
-                                                    <div className="fw-bold text-dark" style={{fontSize: '0.9rem'}}>
-                                                        {u.full_name || 'No Name'} {isMe && <span className="ms-1 text-success fw-bold" style={{fontSize: '0.7rem'}}>(ME)</span>}
-                                                    </div>
-                                                    <div className="text-muted" style={{fontSize: '0.75rem'}}>@{u.username}</div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span className={`role-text ${roleColorClass}`}>
-                                                {u.role}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span className="text-muted small fw-bold">
-                                                <i className={`bi ${isAssigned ? 'bi-geo-alt-fill text-primary' : 'bi-dash-circle'} me-2`}></i>
-                                                {u.station || 'Not Assigned'}
-                                            </span>
-                                        </td>
-                                        <td className="text-end text-muted small fw-medium">
-                                            {new Date(u.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-                                        </td>
-                                        <td>
-                                            <div className="d-flex justify-content-center gap-2">
-                                                <button className="btn-action btn-view shadow-sm" onClick={() => handleViewUser(u)}>
-                                                    VIEW
-                                                </button>
-                                                <button 
-                                                    className="btn-action btn-delete shadow-sm" 
-                                                    onClick={() => handleConfirmDeleteUser(u)}
-                                                    disabled={u.id === 1 || isMe}
-                                                >
-                                                    DELETE
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            }) : (
-                                <tr>
-                                    <td colSpan="5" className="py-5 text-center text-muted">No records found.</td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                        return (
+                            <div key={u.id} className="user-row-card">
+                                {/* Circular Avatar & Profile */}
+                                <div className="d-flex align-items-center">
+                                    <img
+                                        src={u.avatar_url ? `${AVATAR_UPLOAD_PATH}${u.avatar_url}` : DEFAULT_AVATAR_PATH}
+                                        className="avatar-circle me-3"
+                                        alt="Avatar"
+                                        onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
+                                    />
+                                    <div>
+                                        <div className="fw-bold text-dark" style={{fontSize: '0.9rem'}}>
+                                            {u.full_name || 'No Name'} {isMe && <span className="ms-1 text-success fw-bold" style={{fontSize: '0.65rem'}}>(ME)</span>}
+                                        </div>
+                                        <div className="text-muted" style={{fontSize: '0.75rem'}}>@{u.username}</div>
+                                    </div>
+                                </div>
+
+                                {/* Access Level Column */}
+                                <div>
+                                    <span className={`role-badge ${badgeClass}`}>
+                                        {u.role}
+                                    </span>
+                                </div>
+
+                                {/* Station Column */}
+                                <div>
+                                    <div className="small fw-bold text-dark">
+                                        <i className={`bi ${isAssigned ? 'bi-geo-alt-fill text-primary' : 'bi-dash-circle text-muted'} me-2`}></i>
+                                        {u.station || 'Not Assigned'}
+                                    </div>
+                                </div>
+
+                                {/* Registry Date Column */}
+                                <div className="text-end text-muted fw-bold" style={{fontSize: '0.8rem'}}>
+                                    {new Date(u.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                </div>
+
+                                {/* Actions Column */}
+                                <div className="d-flex justify-content-end gap-2">
+                                    <button className="btn-view-action shadow-sm" onClick={() => handleViewUser(u)}>
+                                        Details
+                                    </button>
+                                    <button 
+                                        className="btn-delete-action" 
+                                        onClick={() => handleConfirmDeleteUser(u)}
+                                        disabled={u.id === 1 || isMe}
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    }) : (
+                        <div className="text-center py-5 border rounded-4 bg-light">
+                            <p className="mb-0 fw-bold text-muted opacity-50 uppercase tracking-widest">No matching user records</p>
+                        </div>
+                    )}
                 </div>
             </div>
 

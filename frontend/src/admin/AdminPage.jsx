@@ -388,35 +388,74 @@ const handleApproveUnit = async (unitId, unitData) => {
 const handleSaveEdit = async (id, updatedData) => {
     setSelectedUnitToEdit(null);
     
-    // Sinunod ang manual list mo ng fields, walang binawas o iniba
+    // Hanapin ang current record sa local logs para makuha ang mga existing values
+    const currentRecord = logs.find(l => l.id === id) || {};
+
     const dataToSend = {
         id: id,
         model: updatedData.model,
         revision: updatedData.revision,
-        base_unit_kitting_no: updatedData.base_unit_kitting_no,
-        assembly_no: updatedData.assembly_no,
-        device_serial_no: updatedData.device_serial_no,
-        accessory_kitting_no: updatedData.accessory_kitting_no,
+        assembly_no: updatedData.assemblyNo || updatedData.assembly_no,
         status: updatedData.status,
         remarks: updatedData.remarks,
-        station: updatedData.station, // Nanatiling manual mapping gaya ng hiningi mo
+        station: updatedData.station,
+
+        // 🔑 LOGIC: Gamitin ang updatedData (bago), 
+        // kung null, gamitin ang currentRecord (mula sa DB/Logs), 
+        // kung null pa rin, default to empty.
+        device_serial_no: updatedData.deviceSerialNo || updatedData.device_serial_no || currentRecord.device_serial_no || null,
+        accessory_kitting_no: updatedData.accessoryKittingNo || updatedData.accessory_kitting_no || currentRecord.accessory_kitting_no || null,
+        base_unit_kitting_no: updatedData.baseUnitKittingNo || updatedData.base_unit_kitting_no || currentRecord.base_unit_kitting_no || null,
+
+        // PCB serials
+        mnbd_no: updatedData.mnbd_no || currentRecord.mnbd_board_no,
+        cmbd_no: updatedData.cmbd_no || currentRecord.cmbd_board_no,
+        lrbd_no: updatedData.lrbd_no || currentRecord.lrbd_board_no,
+        pqbd_no: updatedData.pqbd_no || currentRecord.pqbd_board_no,
+        bkbd_no: updatedData.bkbd_no || currentRecord.bkbd_board_no
     };
 
     setIsProcessing(true); 
     try {
-        // Ginagamit ang orihinal mong POST path na may ?method=PUT
         await axios.post(`${UNITS_ENDPOINT}?method=PUT`, dataToSend, { 
             headers: { 'Content-Type': 'application/json' } 
         });
-        
-        setSuccessMessage(`Unit ${id} successfully updated and moved to ${updatedData.station}.`);
-        setTimeout(() => setSuccessMessage(null), 4000); 
+        setSuccessMessage(`Unit updated. Data preserved.`);
+        setTimeout(() => setSuccessMessage(null), 3000);
+        fetchData(); 
     } catch (error) {
-        console.error(`Error saving unit ${id}:`, error);
-        alert(`Failed to save unit: ${error.message}`);
+        alert("Save failed. Check console.");
     } finally {
-        fetchData(); // I-refresh ang listahan
         setIsProcessing(false); 
+    }
+};
+
+// --- SHIPMENT DISPATCH HANDLER ---
+const handleMarkAsShipped = async (unitId) => {
+    const unitToShip = logs.find(l => l.id === unitId);
+    if (!unitToShip) return;
+
+    setIsProcessing(true);
+    try {
+        // PINALITAN: Nagdagdag ng station: 'N/A' sa payload
+        const payload = { 
+            ...unitToShip, 
+            status: 'Dispatched', 
+            station: 'N/A' 
+        };
+        
+        await axios.post(`${UNITS_ENDPOINT}?method=PUT`, payload);
+        
+        setSuccessMessage(`Unit ${unitToShip.assembly_no} successfully Dispatched and cleared from Station.`);
+        setTimeout(() => setSuccessMessage(null), 4000);
+        
+        // I-refresh ang data para mawala na siya sa Station15 list
+        fetchData(); 
+    } catch (error) {
+        console.error("Dispatch Error:", error);
+        alert("Failed to authorize dispatch.");
+    } finally {
+        setIsProcessing(false);
     }
 };
 
@@ -733,12 +772,13 @@ case "announcements":
                     />
                 );
             
-                case "shipment": // <<< NEW CASE
-                return (
-                    <Shipment 
-                        liveUnitLogs={logs} // Pass the main unit logs
-                    />
-                );
+case "shipment":
+    return (
+        <Shipment 
+            liveUnitLogs={logs} 
+            onMarkAsShipped={handleMarkAsShipped} // <--- Siguraduhin na naipasa ito
+        />
+    );
 
             default:
                 return (<div className="alert alert-info text-center"><i className="bi bi-info-circle-fill me-2"></i>The module **{activeTab}** is under development.</div>);

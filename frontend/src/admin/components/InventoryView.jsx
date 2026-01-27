@@ -13,80 +13,195 @@ export const InventoryView = ({ pcbaLogs }) => {
 
     return (
         <div className="p-2">
-            <h6 className="mb-3 fw-bold text-dark text-uppercase border-bottom pb-2" style={{ fontSize: '0.8rem', letterSpacing: '0.5px' }}>
-                <i className="bi bi-cpu-fill me-2 text-primary"></i>PCBA Inventory Traceability List
-            </h6>
+            <style>{`
+                .inventory-card {
+                    background: #ffffff;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 12px;
+                    margin-bottom: 12px;
+                    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+                    overflow: hidden;
+                }
+
+                .inventory-card-header {
+                    padding: 16px 20px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    cursor: pointer;
+                    background: #ffffff;
+                }
+
+                .inventory-card-header:hover {
+                    background-color: rgba(255, 255, 255, 0.7);
+                    backdrop-filter: blur(8px);
+                }
+
+                .status-circle {
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 50%;
+                    background: #10b981;
+                    margin-right: 12px;
+                    display: inline-block;
+                }
+
+                .assembly-text {
+                    font-weight: 800;
+                    color: #0f172a;
+                    font-family: 'SFMono-Regular', Consolas, monospace;
+                    letter-spacing: -0.5px;
+                }
+
+                .date-badge {
+                    background: #f1f5f9;
+                    color: #64748b;
+                    padding: 4px 10px;
+                    border-radius: 6px;
+                    font-size: 0.7rem;
+                    font-weight: 700;
+                }
+
+                .detail-panel {
+                    border-top: 1px solid #f1f5f9;
+                    background: #f8fafc;
+                    padding: 15px;
+                }
+
+                .pcba-table {
+                    width: 100%;
+                    background: #ffffff;
+                    border-radius: 8px;
+                    border: 1px solid #e2e8f0;
+                    border-collapse: separate;
+                    border-spacing: 0;
+                    overflow: hidden;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+                }
+
+                .pcba-table th {
+                    background: #f1f5f9;
+                    color: #475569;
+                    font-size: 0.65rem;
+                    font-weight: 800;
+                    text-transform: uppercase;
+                    padding: 10px 15px;
+                    border-bottom: 1px solid #e2e8f0;
+                }
+
+                .pcba-table td {
+                    padding: 12px 15px;
+                    border-bottom: 1px solid #f1f5f9;
+                    font-size: 0.8rem;
+                }
+
+                .pcba-table tr:last-child td {
+                    border-bottom: none;
+                }
+
+                .serial-text {
+                    font-family: 'SFMono-Regular', Consolas, monospace;
+                    font-weight: 700;
+                }
+
+                .prefix-muted {
+                    color: #94a3b8;
+                    font-weight: 400;
+                }
+
+                .btn-close-panel {
+                    background: #0f172a;
+                    color: white;
+                    border: none;
+                    padding: 6px 16px;
+                    border-radius: 6px;
+                    font-size: 0.7rem;
+                    font-weight: 800;
+                    outline: none;
+                }
+                .btn-close-panel:active {
+                    transform: scale(0.95);
+                }
+            `}</style>
+
+            <div className="d-flex align-items-center justify-content-between mb-4 px-1">
+                <div>
+                    <h5 className="fw-bold text-dark mb-0">Component Traceability</h5>
+                    <p className="text-muted small mb-0 fw-bold">PCBA Serialization & Inventory Linkage</p>
+                </div>
+                <div className="text-end">
+                    <span className="text-muted small fw-bold text-uppercase">Total Units: </span>
+                    <span className="h5 fw-bold text-primary mb-0">{pcbaLogs.length}</span>
+                </div>
+            </div>
             
             {pcbaLogs.length > 0 ? pcbaLogs.map((item, idx) => (
-                <div key={idx} className="inventory-item-container mb-3">
-                    {/* Visible Main Box */}
+                <div key={idx} className="inventory-card">
+                    {/* Header Row */}
                     <div 
-                        className={`border rounded-top p-3 d-flex justify-content-between align-items-center ${expandedId === idx ? 'bg-primary text-white border-primary' : 'bg-white text-dark border-secondary-subtle'}`}
-                        style={{ cursor: 'pointer', transition: 'none' }}
+                        className="inventory-card-header"
                         onClick={() => setExpandedId(expandedId === idx ? null : idx)}
                     >
                         <div className="d-flex align-items-center">
-                            <span className="fw-bold font-monospace fs-5">{item.assembly_no}</span>
-                            <span className={`ms-3 px-2 py-1 rounded small fw-bold ${expandedId === idx ? 'bg-white text-primary' : 'bg-light text-muted border'}`} style={{ fontSize: '0.65rem' }}>
-                                {new Date(item.created_at).toLocaleDateString()}
+                            <div className="status-circle"></div>
+                            <span className="assembly-text fs-5">{item.assembly_no}</span>
+                            <span className="ms-3 date-badge">
+                                <i className="bi bi-calendar3 me-1"></i>
+                                {new Date(item.created_at).toLocaleDateString('en-GB')}
                             </span>
                         </div>
-                        <div className="d-flex align-items-center gap-2">
-                            <span className="small opacity-75 d-none d-md-inline">Click to view boards</span>
-                            <i className={`bi ${expandedId === idx ? 'bi-dash-square' : 'bi-plus-square'}`}></i>
+                        <div className="d-flex align-items-center gap-3">
+                            <span className="text-muted small fw-bold d-none d-md-inline" style={{ fontSize: '0.65rem' }}>
+                                {expandedId === idx ? 'HIDE DETAILS' : 'VIEW COMPONENTS'}
+                            </span>
+                            <i className={`bi ${expandedId === idx ? 'bi-chevron-up' : 'bi-chevron-down'} text-primary fw-bold`}></i>
                         </div>
                     </div>
 
-                    {/* Visible Detail Box (No animations) */}
+                    {/* Expandable Panel */}
                     {expandedId === idx && (
-                        <div className="border border-top-0 rounded-bottom bg-white overflow-hidden" style={{ borderColor: '#dee2e6' }}>
-                            <div className="table-responsive">
-                                <table className="table table-bordered table-sm mb-0 text-center" style={{ fontSize: '0.75rem' }}>
-                                    <thead className="table-light text-secondary">
-                                        <tr>
-                                            <th className="py-2">PCBA MODEL</th>
-                                            <th className="py-2">PARTS CODE</th>
-                                            <th className="py-2 bg-primary-subtle text-primary">PAIRED BOARD SERIAL</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {pcbaMapping.map((map, i) => (
-                                            <tr key={i}>
-                                                <td className="py-2 fw-semibold text-start ps-3">{map.model}</td>
-                                                <td className="py-2 text-muted font-monospace">{map.code}</td>
-                                                <td className="py-2 fw-bold font-monospace bg-light-subtle">
-                                                    <span className="text-secondary opacity-50">{map.prefix}</span>
+                        <div className="detail-panel">
+                            <table className="pcba-table">
+                                <thead>
+                                    <tr>
+                                        <th className="text-start">PCBA Model</th>
+                                        <th className="text-center">Parts Code</th>
+                                        <th className="text-end">Assigned Serial</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {pcbaMapping.map((map, i) => (
+                                        <tr key={i}>
+                                            <td className="fw-bold text-dark">{map.model}</td>
+                                            <td className="text-center text-muted small serial-text">{map.code}</td>
+                                            <td className="text-end">
+                                                <div className="serial-text">
+                                                    <span className="prefix-muted">{map.prefix}</span>
                                                     <span className="text-primary">{item[map.key] || '------'}</span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                             
-                            {/* Summary Footer for the Box */}
-                            <div className="p-2 bg-light d-flex justify-content-between align-items-center border-top">
-                                <small className="text-muted ps-2">System Record ID: {item.id}</small>
-                                <button className="btn btn-sm btn-secondary py-0 px-3 fw-bold" style={{ fontSize: '0.65rem' }} onClick={() => setExpandedId(null)}>
-                                    CLOSE
+                            <div className="mt-3 d-flex justify-content-between align-items-center">
+                                <small className="text-muted fw-bold" style={{ fontSize: '0.65rem' }}>
+                                    UID: {item.id} | SYSTEM DATA VALIDATED
+                                </small>
+                                <button className="btn-close-panel" onClick={() => setExpandedId(null)}>
+                                    CLOSE PANEL
                                 </button>
                             </div>
                         </div>
                     )}
                 </div>
             )) : (
-                <div className="text-center p-5 border border-secondary-subtle rounded bg-light text-muted">
-                    <i className="bi bi-folder-x fs-1 d-block mb-2"></i>
-                    <span className="fw-bold">No Records Found</span>
+                <div className="text-center py-5 border rounded-4 bg-light shadow-sm" style={{ borderStyle: 'dashed' }}>
+                    <i className="bi bi-cpu text-muted opacity-25" style={{ fontSize: '3rem' }}></i>
+                    <p className="mt-2 fw-bold text-muted uppercase tracking-widest">No Inventory Records Found</p>
                 </div>
             )}
-
-            <style>{`
-                .font-monospace { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace !important; }
-                .inventory-item-container { filter: none !important; }
-                .bg-light-subtle { background-color: #f8f9fa; }
-                .table-bordered td, .table-bordered th { border-color: #e9ecef !important; }
-            `}</style>
         </div>
     );
 };

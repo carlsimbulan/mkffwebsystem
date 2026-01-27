@@ -48,172 +48,222 @@ export function AnnouncementsView({
     return (
         <div className="container-fluid px-0 py-2">
             <style>{`
-                .announcement-card {
+                .announcements-wrapper {
+                    padding: 10px;
+                }
+
+                .archive-filter-card {
                     background: #ffffff;
                     border: 1px solid #e2e8f0;
                     border-radius: 12px;
-                    overflow: hidden;
+                    padding: 24px;
+                    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+                    margin-bottom: 25px;
                 }
-                .filter-section {
-                    background: #f8fafc;
-                    border-bottom: 1px solid #e2e8f0;
-                    padding: 15px 25px;
-                }
-                .post-item {
-                    border-bottom: 1px solid #f1f5f9;
-                    padding: 20px 25px;
-                    transition: background 0.2s;
-                }
-                .post-item:hover {
-                    background: #fcfcfc;
-                }
-                .post-content-box {
-                    background: #f8fafc;
+
+                /* Individual Announcement Card */
+                .post-row-card {
+                    background: #ffffff;
                     border: 1px solid #e2e8f0;
-                    border-radius: 8px;
-                    padding: 15px;
+                    border-radius: 12px;
+                    margin-bottom: 16px;
+                    padding: 20px 25px;
+                    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+                    transition: all 0.2s ease;
+                }
+
+                .post-row-card:hover {
+                    background-color: rgba(255, 255, 255, 0.7);
+                    backdrop-filter: blur(8px);
+                    border-color: #cbd5e1;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+                }
+
+                .post-content-inner {
+                    background: #f8fafc;
+                    border: 1px solid #f1f5f9;
+                    border-radius: 10px;
+                    padding: 18px;
+                    margin-top: 12px;
                     position: relative;
                 }
-                .post-content-box::before {
-                    content: "";
-                    position: absolute;
-                    left: -1px;
-                    top: 0;
-                    bottom: 0;
-                    width: 4px;
-                    background: #107c55; /* MKFF Green to match your system */
-                    border-radius: 8px 0 0 8px;
-                }
-                .avatar-img {
-                    width: 42px;
-                    height: 42px;
+
+                .avatar-circle {
+                    width: 44px;
+                    height: 44px;
                     object-fit: cover;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 8px; /* Squared-circle style for modern look */
+                    border-radius: 50%;
+                    border: 2px solid #fff;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
                 }
-                .btn-create-post {
-                    background: #107c55;
-                    border: none;
-                    font-weight: 600;
-                    font-size: 0.85rem;
+
+                .role-tag {
+                    font-size: 0.65rem;
+                    font-weight: 800;
+                    padding: 3px 10px;
                     border-radius: 6px;
+                    background: #f1f5f9;
+                    color: #475569;
+                    text-transform: uppercase;
+                    border: 1px solid #e2e8f0;
                 }
-                .btn-create-post:hover { background: #0d6646; }
-                
-                /* Custom Scrollbar */
-                .scroll-area::-webkit-scrollbar { width: 6px; }
-                .scroll-area::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+                .btn-create-announcement {
+                    background: #0f172a;
+                    color: white;
+                    border: none;
+                    padding: 10px 24px;
+                    border-radius: 10px;
+                    font-weight: 800;
+                    font-size: 0.85rem;
+                    outline: none;
+                }
+                .btn-create-announcement:active {
+                    transform: scale(0.97);
+                    opacity: 0.9;
+                }
+
+                .btn-trash-action {
+                    background: transparent;
+                    color: #94a3b8;
+                    border: none;
+                    transition: color 0.2s;
+                    outline: none;
+                }
+                .btn-trash-action:hover { color: #ef4444; }
+                .btn-trash-action:active { transform: scale(0.9); }
+
+                .form-input-pro {
+                    border: 1px solid #cbd5e1;
+                    font-weight: 700;
+                    font-size: 0.9rem;
+                    height: 42px;
+                    border-radius: 8px;
+                }
+
+                .label-pro {
+                    font-size: 0.65rem;
+                    font-weight: 800;
+                    color: #64748b;
+                    text-transform: uppercase;
+                    margin-bottom: 5px;
+                    display: block;
+                }
+
+                .timestamp-text {
+                    font-size: 0.75rem;
+                    font-weight: 600;
+                    color: #94a3b8;
+                }
             `}</style>
 
-            {/* HEADER SECTION */}
-            <div className="d-flex justify-content-between align-items-end mb-4 px-2">
+            {/* HEADER */}
+            <div className="d-flex justify-content-between align-items-center mb-4 px-3">
                 <div>
-                    <h4 className="fw-bold text-dark mb-0 tracking-tight">System Announcements</h4>
-                    <p className="text-muted small mb-0">Broadcast updates and notices to the assembly unit</p>
+                    <h3 className="fw-bold text-dark mb-1 tracking-tight">System Announcements</h3>
+                    <p className="text-muted small mb-0 fw-bold">Broadcast updates and operational notices</p>
                 </div>
                 {(isAdministrator || isManager) && (
-                    <button
-                        className="btn btn-primary btn-create-post px-4 py-2 d-flex align-items-center"
-                        onClick={() => setShowPostModal(true)}
-                    >
-                        <i className="bi bi-plus-lg me-2"></i> CREATE POST
+                    <button className="btn-create-announcement shadow-sm" onClick={() => setShowPostModal(true)}>
+                        <i className="bi bi-megaphone-fill me-2"></i>CREATE POST
                     </button>
                 )}
             </div>
 
-            <div className="announcement-card">
-                {/* FLAT FILTER BAR */}
-                <div className="filter-section">
-                    <div className="row align-items-center g-3">
-                        <div className="col-auto">
-                            <span className="small fw-bold text-muted text-uppercase tracking-wider">
-                                <i className="bi bi-funnel me-1"></i> Filter Date:
-                            </span>
-                        </div>
-                        <div className="col-auto d-flex align-items-center gap-2">
+            <div className="announcements-wrapper">
+                {/* FILTER SECTION */}
+                <div className="archive-filter-card">
+                    <div className="row g-3 align-items-end">
+                        <div className="col-md-3">
+                            <label className="label-pro">Start Date</label>
                             <input
                                 type="date"
-                                className="form-control form-control-sm border-0 bg-white shadow-none fw-bold"
-                                style={{ border: '1px solid #e2e8f0 !important', width: '150px' }}
+                                className="form-control form-input-pro"
                                 value={filterStartDate}
                                 onChange={(e) => setFilterStartDate(e.target.value)}
                             />
-                            <span className="text-muted small">to</span>
+                        </div>
+                        <div className="col-md-3">
+                            <label className="label-pro">End Date</label>
                             <input
                                 type="date"
-                                className="form-control form-control-sm border-0 bg-white shadow-none fw-bold"
-                                style={{ border: '1px solid #e2e8f0 !important', width: '150px' }}
+                                className="form-control form-input-pro"
                                 value={filterEndDate || todayDateString}
                                 onChange={(e) => setFilterEndDate(e.target.value)}
                                 max={todayDateString}
                             />
                         </div>
                         <div className="col-auto">
-                            <button className="btn btn-link btn-sm text-decoration-none text-muted p-0" onClick={handleResetFilter}>
-                                <i className="bi bi-arrow-counterclockwise"></i> Reset
+                            <button className="btn btn-link btn-sm text-decoration-none text-muted fw-bold p-0 mb-2" onClick={handleResetFilter}>
+                                <i className="bi bi-arrow-counterclockwise"></i> RESET
                             </button>
                         </div>
-                        <div className="col text-end text-muted small">
-                            Found: <strong>{announcementsToDisplay.length}</strong> posts
+                        <div className="col text-end">
+                            <span className="label-pro">Total Broadcasts</span>
+                            <span className="h4 fw-bold mb-0 text-dark">{announcementsToDisplay.length}</span>
                         </div>
                     </div>
                 </div>
 
-                {/* FEED AREA */}
-                <div className="scroll-area" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
+                {/* ANNOUNCEMENT LIST */}
+                <div className="scroll-area custom-scrollbar" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                     {announcementsToDisplay.length > 0 ? (
                         announcementsToDisplay.map((announcement) => {
                             const postDateTime = new Date(announcement.created_at);
-                            const postDate = postDateTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                            const postTime = postDateTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                            const postDate = postDateTime.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                            const postTime = postDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                             const posterAvatar = announcement.poster_avatar ? `${AVATAR_UPLOAD_PATH}${announcement.poster_avatar}` : DEFAULT_AVATAR_PATH;
                             const canDelete = isAdministrator || (user.id === announcement.user_id); 
 
                             return (
-                                <div key={announcement.id} className="post-item d-flex gap-3">
-                                    <img
-                                        src={posterAvatar}
-                                        className="avatar-img shadow-none"
-                                        alt="User"
-                                        onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
-                                    />
-                                    <div className="flex-grow-1">
-                                        <div className="d-flex justify-content-between align-items-center mb-2">
+                                <div key={announcement.id} className="post-row-card">
+                                    <div className="d-flex justify-content-between align-items-start">
+                                        <div className="d-flex align-items-center">
+                                            <img
+                                                src={posterAvatar}
+                                                className="avatar-circle me-3"
+                                                alt="Avatar"
+                                                onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
+                                            />
                                             <div>
-                                                <span className="fw-bold text-dark me-2">{announcement.poster_name || 'System User'}</span>
-                                                <span className="badge bg-light text-muted border fw-bold text-uppercase" style={{ fontSize: '0.65rem' }}>
-                                                    {announcement.poster_role}
-                                                </span>
-                                            </div>
-                                            <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-                                                <i className="bi bi-calendar3 me-1"></i> {postDate} • {postTime}
+                                                <div className="fw-bold text-dark" style={{fontSize: '0.95rem'}}>
+                                                    {announcement.poster_name || 'System User'}
+                                                </div>
+                                                <span className="role-tag">{announcement.poster_role}</span>
                                             </div>
                                         </div>
+                                        <div className="text-end">
+                                            <div className="timestamp-text">
+                                                <i className="bi bi-calendar3 me-1"></i> {postDate}
+                                            </div>
+                                            <div className="timestamp-text opacity-75">
+                                                <i className="bi bi-clock me-1"></i> {postTime}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="post-content-inner">
+                                        <p className="mb-0 text-dark" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', fontSize: '0.9rem' }}>
+                                            {announcement.content}
+                                        </p>
                                         
-                                        <div className="post-content-box shadow-none">
-                                            <p className="mb-0 text-dark small" style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6' }}>
-                                                {announcement.content}
-                                            </p>
-                                            
-                                            {canDelete && (
-                                                <button
-                                                    className="btn btn-sm text-danger opacity-50 hover-opacity-100 position-absolute top-0 end-0 m-2"
-                                                    onClick={() => handleConfirmDelete(announcement)}
-                                                    title="Delete Announcement"
-                                                >
-                                                    <i className="bi bi-trash3"></i>
-                                                </button>
-                                            )}
-                                        </div>
+                                        {canDelete && (
+                                            <button
+                                                className="btn-trash-action position-absolute top-0 end-0 m-2"
+                                                onClick={() => handleConfirmDelete(announcement)}
+                                                title="Remove Post"
+                                            >
+                                                <i className="bi bi-trash3-fill"></i>
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             );
                         })
                     ) : (
-                        <div className="text-center py-5">
-                            <i className="bi bi-chat-left-dots text-light display-1"></i>
-                            <h6 className="text-secondary mt-3 fw-bold">No announcements found</h6>
-                            <p className="text-muted small">Try adjusting the date range filters.</p>
+                        <div className="text-center py-5 border rounded-4 bg-light">
+                            <i className="bi bi-chat-square-dots text-muted opacity-25" style={{fontSize: '3rem'}}></i>
+                            <p className="mt-3 fw-bold text-muted opacity-50 uppercase tracking-widest">No active announcements</p>
                         </div>
                     )}
                 </div>

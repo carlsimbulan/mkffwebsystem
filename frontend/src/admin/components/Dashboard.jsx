@@ -5,24 +5,6 @@ import html2canvas from 'html2canvas';
 
 // --- CONFIGURATIONS ---
 
-const DELAY_THRESHOLDS_MINUTES = {
-    'Station1': 6, 'Station 1': 6,
-    'Station2': 8, 'Station 2': 8,
-    'Station3': 3, 'Station 3': 3,
-    'Station4': 12, 'Station 4': 12,
-    'Station5': 15, 'Station 5': 15,
-    'Station6': 15, 'Station 6': 15,
-    'Station7': 3, 'Station 7': 3,
-    'Station8': 0, 'Station 8': 0,
-    'Station9': 480, 'Station 9': 480,
-    'Station10': 8, 'Station 10': 8,
-    'Station11': 22, 'Station 11': 22,
-    'Station12': 5, 'Station 12': 5,
-    'Station13': 10, 'Station 13': 10,
-    'Station14': 8, 'Station 14': 8,
-    'Station15': 5, 'Station 15': 5
-};
-
 const processStations = [
     "PCB Pairing", "Integrated Board Test", "Main Board Conformal Coating",
     "RTV Application", "Casing/Harnessing", "Complete Unit Test/Calibration",
@@ -31,105 +13,15 @@ const processStations = [
     "Packing", "QC Stamping"
 ];
 
-const DELAY_REASONS = {
-    "PCB Pairing": {
-        L1: "Header connector non-90° seating",
-        L2: "PCB leads soldering rework needed",
-        L3: "Component batch mismatch on floor"
-    },
-    "Integrated Board Test": {
-        L1: "Test fixture probe cleaning required",
-        L2: "Integrated Level Test alignment issue",
-        L3: "Physical damage on test jig pins"
-    },
-    "Main Board Conformal Coating": {
-        L1: "Nozzle cleaning / Air bubble clearing",
-        L2: "Drying oven tray congestion",
-        L3: "Material stock-out (Coating supply)"
-    },
-    "RTV Application": {
-        L1: "Manual application inconsistency",
-        L2: "Extended curing due to humidity",
-        L3: "Dispenser machine mechanical jam"
-    },
-    "Casing/Harnessing": {
-        L1: "Tight fitment / Casing alignment",
-        L2: "Harness connector shortage on bin",
-        L3: "Operator fatigue / Manpower shortage"
-    },
-    "Complete Unit Test/Calibration": {
-        L1: "Voltage calibration drift (Ref: 115V)",
-        L2: "LoRa / Energy Meter physical loose contact",
-        L3: "Reference 'Golden Unit' sample damaged"
-    },
-    "Pre BI Hi-Pot Test": {
-        L1: "Safety cable insulation manual checking",
-        L2: "Leakage current threshold adjustment",
-        L3: "High-voltage safety probe malfunction"
-    },
-    "Burn-in Testing": {
-        L1: "Burn-in time requirement pending",
-        L2: "Unit flickering observation needed",
-        L3: "Burn-in rack power socket failure"
-    },
-    "Sealing": {
-        L1: "Sealant pre-heating delay",
-        L2: "Gasket misalignment during press",
-        L3: "Heater element physical wear-out"
-    },
-    "Post BI Hi-Pot Test": {
-        L1: "Residual charge discharge time",
-        L2: "Post-burn-in connector wear",
-        L3: "Test module isolation failure"
-    },
-    "Final Functional/Connectivity Test": {
-        L1: "Antenna/Connectivity pairing lag",
-        L2: "Manual reset button responsiveness",
-        L3: "Firmware batch inconsistency on units"
-    },
-    "Label Sticker Attachment": {
-        L1: "Label printer ribbon replacement",
-        L2: "Missing mandatory warning labels",
-        L3: "Label feeder machine mechanical jam"
-    },
-    "FVI": {
-        L1: "Cosmetic smudge / cleaning delay",
-        L2: "Detailed inspection of visual defects",
-        L3: "Missing physical QC inspector stamp"
-    },
-    "Packing": {
-        L1: "Manual insertion of inserts/manuals",
-        L2: "Carton box assembly congestion",
-        L3: "Weight scale mechanical calibration"
-    },
-    "QC Stamping": {
-        L1: "Final verification document delay",
-        L2: "Minor rework sorting activity",
-        L3: "Final Auditor shift transition delay"
-    }
-};
-
 // --- HELPERS ---
-
-const formatAgingTime = (totalMinutes) => {
-    if (totalMinutes < 60) return `${Math.round(totalMinutes)} mins`;
-    if (totalMinutes < 1440) { 
-        const hours = Math.floor(totalMinutes / 60);
-        const mins = Math.round(totalMinutes % 60);
-        return `${hours}h ${mins}m`;
-    }
-    const days = Math.floor(totalMinutes / 1440);
-    const hours = Math.floor((totalMinutes % 1440) / 60);
-    return `${days}d ${hours}h`;
-};
 
 const getStatusBadgeClass = (status) => {
     const statusText = status?.toLowerCase() || '';
-    if (statusText.includes('completed') || statusText.includes('ok')) return 'bg-success-subtle text-success border border-success-subtle';
-    if (statusText.includes('no good')) return 'bg-danger-subtle text-danger border border-danger-subtle';
-    if (statusText.includes('pending approval')) return 'bg-primary-subtle text-primary border border-primary-subtle'; 
-    if (statusText.includes('in progress')) return 'bg-yellow-subtle text-warning border border-yellow-subtle'; 
-    if (statusText.includes('scanning')) return 'bg-info-subtle text-info border border-info-subtle';
+    if (statusText.includes('completed') || statusText.includes('ok')) return 'bg-success-subtle text-success border-0';
+    if (statusText.includes('no good') || statusText.includes('ng')) return 'bg-danger-subtle text-danger border-0';
+    if (statusText.includes('pending approval')) return 'bg-primary-subtle text-primary border-0'; 
+    if (statusText.includes('in progress')) return 'bg-warning-subtle text-warning border-0'; 
+    if (statusText.includes('scanning')) return 'bg-info-subtle text-info border-0';
     return 'bg-light text-secondary border';
 };
 
@@ -151,7 +43,6 @@ export function Dashboard({
     const [searchTerm, setSearchTerm] = useState('');
     const [qrValue, setQrValue] = useState(''); 
     const [selectedUnit, setSelectedUnit] = useState(null);
-    const [selectedStationCause, setSelectedStationCause] = useState(null); // State para sa Delay Modal
 
     const handleQrInput = (val) => {
         setQrValue(val);
@@ -165,64 +56,6 @@ export function Dashboard({
             }
         }
     };
-
-    const getDelayInfo = (stationName, minutes) => {
-        let descriptiveName = stationName;
-        if (stationName.toLowerCase().startsWith('station')) {
-            const num = parseInt(stationName.replace(/\D/g, ''));
-            if (num > 0 && num <= processStations.length) {
-                descriptiveName = processStations[num - 1];
-            }
-        }
-        const reasons = DELAY_REASONS[descriptiveName] || { 
-            L1: "Floor processing lag", 
-            L2: "Station manual rework", 
-            L3: "Major production bottleneck" 
-        };
-        const threshold = DELAY_THRESHOLDS_MINUTES[stationName] || 10;
-        if (minutes > threshold * 3) return { reason: reasons.L3, level: 'CRITICAL', color: 'text-danger' };
-        if (minutes > threshold * 2) return { reason: reasons.L2, level: 'MODERATE', color: 'text-warning' };
-        if (minutes > threshold) return { reason: reasons.L1, level: 'MINOR', color: 'text-info' };
-        return { reason: "Normal Flow", level: 'STABLE', color: 'text-success' };
-    };
-
-    const bottleneckData = useMemo(() => {
-        const activeUnits = logs.filter(l => 
-            l.status?.toLowerCase().includes('in progress') || 
-            l.status?.toLowerCase().includes('scanning') ||
-            l.status?.toLowerCase().includes('for scanning')
-        );
-
-        const groups = activeUnits.reduce((acc, unit) => {
-            let sName = unit.station;
-            if (unit.status === 'For Scanning' || !unit.station || unit.station === 'For Scanning') {
-                sName = 'FOR SCANNING UNITS';
-            }
-            if (!acc[sName]) acc[sName] = { name: sName, count: 0, maxAging: 0, isSlow: false, items: [] };
-            
-            const lastUpdate = new Date(unit.updated_at || unit.created_at).getTime();
-            const now = new Date().getTime();
-            const minutesInStation = Math.max(0, (now - lastUpdate) / (1000 * 60));
-            const threshold = DELAY_THRESHOLDS_MINUTES[sName] || 10;
-            
-            acc[sName].count += 1;
-            acc[sName].items.push({ ...unit, minutesInStation });
-            
-            if (minutesInStation > acc[sName].maxAging) acc[sName].maxAging = minutesInStation;
-            
-            if (sName === 'FOR SCANNING UNITS') {
-                if (acc[sName].count > 8) acc[sName].isSlow = true;
-            } else {
-                if (minutesInStation > threshold || acc[sName].count > 8) acc[sName].isSlow = true;
-            }
-            return acc;
-        }, {});
-
-        return Object.values(groups).sort((a, b) => {
-            if (a.isSlow !== b.isSlow) return a.isSlow ? -1 : 1;
-            return b.count - a.count;
-        });
-    }, [logs]);
 
     const forScanningUnitsCount = useMemo(() => logs.filter(l => l.status === 'For Scanning').length, [logs]);
 
@@ -273,54 +106,78 @@ export function Dashboard({
         <div className="container-fluid px-0 py-2">
             <style>{`
                 .stat-card-pro {
-                    background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;
-                    padding: 22px; height: 100%; border-left: 5px solid #334155;
+                    background: #ffffff; 
+                    border: 1px solid #edf2f7; 
+                    border-radius: 16px;
+                    padding: 24px; 
+                    height: 100%; 
                     position: relative;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Stable shadow */
                 }
-                .icon-bg-box { width: 38px; height: 38px; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; font-size: 1.1rem; }
-                .go-icon-link { position: absolute; top: 15px; right: 15px; width: 45px; height: 32px; background: #8b5cf6; color: white; border-radius: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; font-size: 0.7rem; font-weight: bold; transition: background 0.2s; }
-                .label-caps { font-size: 0.65rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; display: block; }
-                .value-bold { font-size: 2rem; font-weight: 900; color: #0f172a; margin: 0; line-height: 1; }
-                .badge-pct { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; display: inline-block; margin-top: 8px; }
-                .search-container { position: relative; width: 300px; }
-                .qr-container { position: relative; width: 180px; }
-                .search-icon-inside { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #64748b; }
-                .search-input-pro { padding-left: 38px !important; background-color: #f1f5f9; border: 1px solid transparent; }
-                .qr-input-pro { padding-left: 38px !important; background-color: #eef2ff; border: 2px solid #8b5cf6; }
-                .fixed-scanning-table { height: 350px; overflow-y: auto; border-radius: 0 0 16px 16px; }
-                .btn-view-cause { font-size: 0.65rem; font-weight: bold; padding: 2px 10px; border-radius: 5px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer; transition: 0.2s; }
-                .btn-view-cause:hover { background: #f8fafc; color: #000; border-color: #cbd5e1; }
-                .modal-blur { background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); }
+                
+                .icon-bg-box { 
+                    width: 46px; height: 46px; border-radius: 12px; 
+                    display: flex; align-items: center; justify-content: center; 
+                    margin-bottom: 16px; font-size: 1.25rem; 
+                }
+                
+                .go-icon-link { position: absolute; top: 15px; right: 15px; width: 45px; height: 32px; background: #8b5cf6; color: white; border-radius: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; font-size: 0.7rem; font-weight: bold; }
+                .label-caps { font-size: 0.7rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block; }
+                .value-bold { font-size: 2.2rem; font-weight: 900; color: #0f172a; margin: 0; line-height: 1; letter-spacing: -1px; }
+                .badge-pct { font-size: 0.7rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; display: inline-block; margin-top: 10px; }
+                
+                .search-input-pro { padding-left: 38px !important; background-color: #f8fafc; border: 1px solid #e2e8f0; height: 40px; }
+                .qr-input-pro { padding-left: 38px !important; background-color: #f5f3ff; border: 1px solid #ddd6fe; height: 40px; color: #5b21b6; }
+                
+                .chart-container-pro { 
+                    background: #ffffff; 
+                    border: 1px solid #edf2f7; 
+                    border-radius: 20px; 
+                    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1); /* Visible shadow */
+                }
+                
+                .modal-blur { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); }
+                .timeline-stem { position: relative; padding-left: 35px; padding-bottom: 25px; }
+                .timeline-stem::before { content: ''; position: absolute; left: 6px; top: 22px; width: 2px; height: 100%; background: #f1f5f9; }
+                .timeline-stem:last-child::before { display: none; }
+                .timeline-dot { position: absolute; left: 0; top: 6px; width: 14px; height: 14px; border-radius: 50%; background: #e2e8f0; z-index: 2; border: 3px solid #fff; box-shadow: 0 0 0 1px #f1f5f9; }
+                .timeline-dot.active { background: #f59e0b; box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.15); }
+                .timeline-dot.completed { background: #10b981; }
+                .timeline-dot.danger { background: #ef4444; box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15); }
+                
+                .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
             `}</style>
 
             <div className="d-flex justify-content-between align-items-center mb-4 px-2">
                 <div>
-                    <h3 className="fw-bold text-dark mb-0 tracking-tight">Production Overview</h3>
-                    <p className="text-muted small mb-0">MKFF Dashboard • Full System Monitoring</p>
+                    <h3 className="fw-bold text-dark mb-0 tracking-tight">Production Intel</h3>
+                    <p className="text-muted small mb-0">Live Manufacturing Lifecycle Monitoring</p>
                 </div>
                 
                 <div className="d-flex gap-3 align-items-center">
                     {newReportsToday > 0 && (
-                        <div className="d-flex align-items-center bg-danger text-white px-3 py-1 rounded-pill shadow-sm" style={{ cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', height: '32px' }} onClick={() => setActiveTab('reports')}>
+                        <div className="d-flex align-items-center bg-danger text-white px-3 py-1 rounded-pill shadow-sm" style={{ cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', height: '36px' }} onClick={() => setActiveTab('reports')}>
                             <i className="bi bi-file-earmark-text-fill me-2"></i> {newReportsToday} NEW REPORT TODAY
                         </div>
                     )}
-                    <div className="qr-container">
-                        <i className="bi bi-qr-code-scan search-icon-inside text-primary"></i>
-                        <input type="text" className="form-control form-control-sm rounded-pill qr-input-pro shadow-sm" placeholder="Scan QR..." value={qrValue} onChange={(e) => handleQrInput(e.target.value)} />
+                    <div className="position-relative" style={{width: '180px'}}>
+                        <i className="bi bi-qr-code-scan position-absolute start-0 ms-3 top-50 translate-middle-y text-primary"></i>
+                        <input type="text" className="form-control rounded-pill qr-input-pro" placeholder="Scan QR..." value={qrValue} onChange={(e) => handleQrInput(e.target.value)} />
                     </div>
-                    <div className="search-container">
-                        <i className="bi bi-search search-icon-inside"></i>
-                        <input type="text" className="form-control form-control-sm rounded-pill search-input-pro shadow-sm" placeholder="Manual Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                    <div className="position-relative" style={{width: '280px'}}>
+                        <i className="bi bi-search position-absolute start-0 ms-3 top-50 translate-middle-y text-muted"></i>
+                        <input type="text" className="form-control rounded-pill search-input-pro" placeholder="Manual Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                         {searchResults.length > 0 && (
                             <div className="position-absolute w-100 mt-2 bg-white border rounded-4 shadow-lg overflow-hidden" style={{ zIndex: 1100 }}>
                                 {searchResults.map(unit => (
                                     <div key={unit.id} className="p-3 border-bottom" style={{cursor:'pointer'}} onClick={() => { setSelectedUnit(unit); setSearchTerm(''); }}>
                                         <div className="fw-bold text-dark d-flex justify-content-between">
                                             <span>{unit.assembly_no}</span>
-                                            <i className="bi bi-arrow-right-short"></i>
+                                            <i className="bi bi-chevron-right small text-muted"></i>
                                         </div>
-                                        <div className="text-muted" style={{fontSize: '0.75rem'}}>Model: {unit.model} • <span className="fw-bold text-uppercase">{unit.status}</span></div>
+                                        <div className="text-muted" style={{fontSize: '0.75rem'}}>{unit.model} • <span className={`fw-bold ${unit.status?.toLowerCase().includes('no good') ? 'text-danger' : 'text-primary'}`}>{unit.status}</span></div>
                                     </div>
                                 ))}
                             </div>
@@ -329,189 +186,69 @@ export function Dashboard({
                 </div>
             </div>
 
-            <div className="row g-4 mb-4">
+            <div className="row g-4 mb-5">
                 <div className="col-md-4">
-                    <div className="stat-card-pro" style={{ borderLeftColor: '#0f172a' }}>
-                        <div className="icon-bg-box bg-dark bg-opacity-10 text-dark"><i className="bi bi-cpu"></i></div>
+                    <div className="stat-card-pro">
+                        <div className="icon-bg-box" style={{ backgroundColor: '#f8fafc', color: '#334155' }}><i className="bi bi-cpu"></i></div>
                         <span className="label-caps">Total Scanned Units</span>
                         <h3 className="value-bold">{stats.coreProductionUnits}</h3>
-                        <div className="badge-pct bg-dark text-white">{stats.pct.scanned} Share</div>
+                        <div className="badge-pct" style={{ backgroundColor: '#f8fafc', color: '#64748b' }}>{stats.pct.scanned} Total</div>
                     </div>
                 </div>
                 <div className="col-md-4">
-                    <div className="stat-card-pro" style={{ borderLeftColor: '#0ea5e9' }}>
-                        <div className="icon-bg-box bg-info bg-opacity-10 text-info"><i className="bi bi-qr-code-scan"></i></div>
-                        <span className="label-caps text-info">For Scanning Queue</span>
+                    <div className="stat-card-pro">
+                        <div className="icon-bg-box" style={{ backgroundColor: '#f0f9ff', color: '#0ea5e9' }}><i className="bi bi-qr-code-scan"></i></div>
+                        <span className="label-caps" style={{color: '#0ea5e9'}}>For Scanning Queue</span>
                         <h3 className="value-bold">{forScanningUnitsCount}</h3>
-                        <div className="badge-pct bg-info bg-opacity-10 text-info">{stats.pct.forScanning} Pending</div>
+                        <div className="badge-pct" style={{ backgroundColor: '#f0f9ff', color: '#0ea5e9' }}>{stats.pct.forScanning} Pending</div>
                     </div>
                 </div>
                 <div className="col-md-4">
-                    <div className="stat-card-pro" style={{ borderLeftColor: '#fbbf24' }}>
-                        <div className="icon-bg-box bg-warning bg-opacity-10 text-warning"><i className="bi bi-clock-history"></i></div>
-                        <span className="label-caps text-warning">In Progress (WIP)</span>
+                    <div className="stat-card-pro">
+                        <div className="icon-bg-box" style={{ backgroundColor: '#fffbeb', color: '#d97706' }}><i className="bi bi-clock-history"></i></div>
+                        <span className="label-caps" style={{color: '#d97706'}}>In Progress (WIP)</span>
                         <h3 className="value-bold">{overallMetrics.pendingUnits}</h3>
-                        <div className="badge-pct bg-warning bg-opacity-10 text-warning">{stats.pct.wip} Capacity</div>
+                        <div className="badge-pct" style={{ backgroundColor: '#fffbeb', color: '#d97706' }}>{stats.pct.wip} Capacity</div>
                     </div>
                 </div>
                 <div className="col-md-4">
-                    <div className="stat-card-pro" style={{ borderLeftColor: '#10b981' }}>
-                        <div className="icon-bg-box bg-success bg-opacity-10 text-success"><i className="bi bi-check-circle"></i></div>
-                        <span className="label-caps text-success">Completed (Yield)</span>
+                    <div className="stat-card-pro">
+                        <div className="icon-bg-box" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}><i className="bi bi-check-circle"></i></div>
+                        <span className="label-caps" style={{color: '#16a34a'}}>Completed (Yield)</span>
                         <h3 className="value-bold">{overallMetrics.completedUnits}</h3>
-                        <div className="badge-pct bg-success bg-opacity-10 text-success">{stats.pct.completed} Rate</div>
+                        <div className="badge-pct" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>{stats.pct.completed} Rate</div>
                     </div>
                 </div>
                 <div className="col-md-4">
-                    <div className="stat-card-pro" style={{ borderLeftColor: '#ef4444' }}>
-                        <div className="icon-bg-box bg-danger bg-opacity-10 text-danger"><i className="bi bi-exclamation-octagon"></i></div>
-                        <span className="label-caps text-danger">Total Defects (NG)</span>
+                    <div className="stat-card-pro">
+                        <div className="icon-bg-box" style={{ backgroundColor: '#fef2f2', color: '#dc2626' }}><i className="bi bi-exclamation-octagon"></i></div>
+                        <span className="label-caps" style={{color: '#dc2626'}}>Total Defects (NG)</span>
                         <h3 className="value-bold text-danger">{overallMetrics.ngUnits}</h3>
-                        <div className="badge-pct bg-danger bg-opacity-10 text-danger">{stats.pct.ng} Failure</div>
+                        <div className="badge-pct" style={{ backgroundColor: '#fef2f2', color: '#dc2626' }}>{stats.pct.ng} Failure</div>
                     </div>
                 </div>
                 <div className="col-md-4">
-                    <div className="stat-card-pro" style={{ borderLeftColor: '#8b5cf6' }}>
-                        <button className="go-icon-link shadow-sm" onClick={() => setActiveTab('approval')}>
+                    <div className="stat-card-pro">
+                        <button className="go-icon-link" onClick={() => setActiveTab('approval')}>
                             GO <i className="bi bi-arrow-right-short ms-1"></i>
                         </button>
-                        <div className="icon-bg-box bg-primary bg-opacity-10 text-primary" style={{color: '#8b5cf6'}}><i className="bi bi-shield-check"></i></div>
-                        <span className="label-caps" style={{ color: '#8b5cf6' }}>Pending QA Approval</span>
+                        <div className="icon-bg-box" style={{ backgroundColor: '#f5f3ff', color: '#8b5cf6' }}><i className="bi bi-shield-check"></i></div>
+                        <span className="label-caps" style={{ color: '#8b5cf6' }}>Pending Approval</span>
                         <h3 className="value-bold" style={{ color: '#8b5cf6' }}>{overallMetrics.pendingApprovalUnits}</h3>
-                        <div className="badge-pct" style={{backgroundColor: '#f5f3ff', color: '#7c3aed'}}>{stats.pct.approval} Validation</div>
+                        <div className="badge-pct" style={{ backgroundColor: '#f5f3ff', color: '#8b5cf6' }}>{stats.pct.approval} Validation</div>
                     </div>
                 </div>
             </div>
-
-            {/* STATION DELAYED ANALYTICS */}
-            <div className="bg-white border rounded-4 overflow-hidden shadow-sm mb-4">
-                <div className="d-flex justify-content-between align-items-center p-3 border-bottom bg-light">
-                    <span className="label-caps m-0">Station Delayed Analytics</span>
-                    <span className="badge bg-dark text-white rounded-pill">{bottleneckData.length} Active Areas</span>
-                </div>
-                <div className="table-responsive fixed-scanning-table">
-                    <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem' }}>
-                        <thead className="table-light sticky-top">
-                            <tr>
-                                <th className="py-3 ps-4">STATION NAME</th>
-                                <th className="text-center">CURRENT LOAD</th>
-                                <th>FLOW PERFORMANCE & PROBABLE CAUSE</th>
-                                <th className="pe-4 text-end">FLOW STATUS</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {bottleneckData.length === 0 ? (
-                                <tr><td colSpan="4" className="text-center py-5 text-muted">No active units in the production line.</td></tr>
-                            ) : (
-                                bottleneckData.map((station) => {
-                                    const maxCountAcrossLine = Math.max(...bottleneckData.map(d => d.count));
-                                    const intensityPct = (station.count / maxCountAcrossLine) * 100;
-                                    const delayInfo = getDelayInfo(station.name, station.maxAging);
-
-                                    return (
-                                        <tr key={station.name}>
-                                            <td className="ps-4 fw-bold text-dark">
-                                                {station.isSlow ? <i className="bi bi-exclamation-triangle-fill text-danger me-2"></i> : <i className="bi bi-check-circle-fill text-success me-2"></i>}
-                                                {station.name}
-                                            </td>
-                                            <td className="text-center">
-                                                <span className={`badge rounded-pill px-3 py-1 ${station.isSlow ? 'bg-danger' : 'bg-primary'}`}>{station.count} Units</span>
-                                            </td>
-                                            <td style={{ width: '40%' }}>
-                                                <div className="d-flex justify-content-between small mb-1">
-                                                    <span className="text-muted">
-                                                        {station.name === 'FOR SCANNING UNITS' ? `Queue: ${station.count}` : `Max Aging: ${formatAgingTime(station.maxAging)}`}
-                                                    </span>
-                                                    {station.isSlow && (
-                                                        <div className="d-flex gap-2 align-items-center">
-                                                            <span className={`fw-bold ${delayInfo.color}`} style={{fontSize: '0.65rem'}}>LEVEL: {delayInfo.level}</span>
-                                                            <button className="btn-view-cause" onClick={() => setSelectedStationCause(station)}>
-                                                                VIEW CAUSE
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="progress mb-2" style={{ height: '6px', borderRadius: '4px' }}>
-                                                    <div className={`progress-bar ${station.isSlow ? (delayInfo.level === 'CRITICAL' ? 'bg-danger' : 'bg-warning') : 'bg-success'}`} style={{ width: `${intensityPct}%` }}></div>
-                                                </div>
-                                            </td>
-                                            <td className="pe-4 text-end">
-                                                <span className={`badge border ${station.isSlow ? 'bg-danger-subtle text-danger border-danger-subtle' : 'bg-success-subtle text-success border-success-subtle'}`}>
-                                                    {station.isSlow ? 'BOTTLENECK' : 'STABLE'}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {/* UNIT DELAY CAUSE MODAL */}
-            {selectedStationCause && (
-                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center modal-blur" style={{ zIndex: 1400 }}>
-                    <div className="bg-white rounded-4 shadow-lg overflow-hidden border-0" style={{ width: '90%', maxWidth: '650px' }}>
-                        <div className="p-3 d-flex justify-content-between align-items-center bg-dark text-white">
-                            <h6 className="mb-0 fw-bold"><i className="bi bi-search me-2 text-danger"></i>ROOT CAUSE ANALYSIS: {selectedStationCause.name}</h6>
-                            <button className="btn-close btn-close-white" onClick={() => setSelectedStationCause(null)}></button>
-                        </div>
-                        <div className="p-4" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                            <div className="alert alert-warning border-0 bg-warning-subtle d-flex align-items-start mb-4">
-                                <i className="bi bi-megaphone-fill me-2 fs-5"></i>
-                                <div>
-                                    <div className="fw-bold">ACTION REQUIRED:</div>
-                                    <div className="small">Supervisor must check the station floor for material shortages or operator assistance. Please clear aging units to maintain yield.</div>
-                                </div>
-                            </div>
-                            
-                            <div className="table-responsive">
-                                <table className="table table-sm align-middle" style={{fontSize: '0.8rem'}}>
-                                    <thead className="table-light">
-                                        <tr>
-                                            <th>ASSEMBLY NO.</th>
-                                            <th>AGING</th>
-                                            <th>LEVEL</th>
-                                            <th>PROBABLE CAUSE</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {selectedStationCause.items.map((unit, idx) => {
-                                            const unitDelay = getDelayInfo(selectedStationCause.name, unit.minutesInStation);
-                                            return (
-                                                <tr key={idx}>
-                                                    <td className="fw-bold">{unit.assembly_no}</td>
-                                                    <td>{formatAgingTime(unit.minutesInStation)}</td>
-                                                    <td>
-                                                        <span className={`badge ${unitDelay.color} bg-light border border-${unitDelay.color.replace('text-', '')}`} style={{fontSize: '0.6rem'}}>
-                                                            {unitDelay.level}
-                                                        </span>
-                                                    </td>
-                                                    <td className="text-muted" style={{fontSize: '0.75rem'}}>{unitDelay.reason}</td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                        <div className="p-3 bg-light border-top text-end">
-                            <button className="btn btn-outline-dark rounded-pill fw-bold px-4" onClick={() => setSelectedStationCause(null)}>CLOSE ANALYSIS</button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* CHARTS SECTION */}
-            <div className="bg-white border rounded-4 overflow-hidden mb-5 shadow-sm">
-                <div className="d-flex justify-content-between align-items-center p-3 border-bottom">
+            <div className="chart-container-pro overflow-hidden mb-5">
+                <div className="d-flex justify-content-between align-items-center p-3 px-4 border-bottom bg-light bg-opacity-10">
                     <span className="label-caps m-0">{currentChartTitle}</span>
                     <div className="d-flex gap-2">
-                        <button className="btn btn-sm btn-outline-secondary rounded-pill px-3" onClick={exportChartAsImage}><i className="bi bi-download me-1"></i> EXPORT</button>
+                        <button className="btn btn-sm btn-outline-secondary rounded-pill px-3 border-0 bg-light" onClick={exportChartAsImage}><i className="bi bi-download me-1"></i> EXPORT</button>
                         <div className="btn-group">
-                            <button className="btn btn-sm btn-outline-secondary" onClick={prevChart}><i className="bi bi-chevron-left"></i></button>
-                            <button className="btn btn-sm btn-outline-secondary" onClick={nextChart}><i className="bi bi-chevron-right"></i></button>
+                            <button className="btn btn-sm btn-outline-secondary border-0 bg-light" onClick={prevChart}><i className="bi bi-chevron-left"></i></button>
+                            <button className="btn btn-sm btn-outline-secondary border-0 bg-light" onClick={nextChart}><i className="bi bi-chevron-right"></i></button>
                         </div>
                     </div>
                 </div>
@@ -528,41 +265,65 @@ export function Dashboard({
 
             {/* UNIT TRACKING MODAL */}
             {selectedUnit && (
-                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(8px)', zIndex: 1300 }}>
-                    <div className="bg-white rounded-4 shadow-lg overflow-hidden border-0" style={{ width: '90%', maxWidth: '500px' }}>
-                        <div className="p-3 d-flex justify-content-between align-items-center bg-primary text-white">
-                            <h6 className="mb-0 fw-bold"><i className="bi bi-cpu me-2"></i>TRACKING: {selectedUnit.assembly_no}</h6>
+                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center modal-blur" style={{ zIndex: 1300 }}>
+                    <div className="bg-white rounded-4 shadow-lg overflow-hidden border-0" style={{ width: '90%', maxWidth: '520px' }}>
+                        <div className="p-4 d-flex justify-content-between align-items-center bg-dark text-white">
+                            <div>
+                                <h5 className="mb-0 fw-bold">Unit Live Tracking</h5>
+                                <p className="mb-0 small opacity-50">{selectedUnit.assembly_no}</p>
+                            </div>
                             <button className="btn-close btn-close-white" onClick={() => setSelectedUnit(null)}></button>
                         </div>
-                        <div className="p-4" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                            <div className="p-2 px-3 bg-light rounded-2 mb-4 border small d-flex justify-content-between">
-                                <span><b>MODEL:</b> {selectedUnit.model}</span>
-                                <span className={`badge ${getStatusBadgeClass(selectedUnit.status)}`}>{selectedUnit.status}</span>
+                        <div className="p-4 custom-scrollbar" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                            <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded-4 mb-4 border-0 shadow-sm">
+                                <div>
+                                    <div className="label-caps mb-1">Model</div>
+                                    <div className="fw-bold">{selectedUnit.model}</div>
+                                </div>
+                                <div className="text-end">
+                                    <div className="label-caps mb-1">Status</div>
+                                    <span className={`badge rounded-pill ${getStatusBadgeClass(selectedUnit.status)}`}>{selectedUnit.status}</span>
+                                </div>
                             </div>
-                            <div className="process-timeline px-2">
+                            
+                            <div className="ps-2">
                                 {processStations.map((station, idx) => {
                                     const currentStationIdx = parseInt(selectedUnit.station?.replace('Station', '')) - 1;
                                     const unitStatus = selectedUnit.status?.toLowerCase() || '';
+                                    const isNG = unitStatus.includes('no good') || unitStatus.includes('ng');
                                     const isDone = idx < currentStationIdx || (idx === currentStationIdx && (unitStatus.includes('completed') || unitStatus.includes('finished')));
                                     const isCurrent = idx === currentStationIdx;
+                                    
+                                    let dotState = "timeline-dot";
+                                    if (isDone) dotState += " completed";
+                                    else if (isCurrent) dotState += isNG ? " danger" : " active";
+
                                     return (
-                                        <div key={idx} className="position-relative ps-4 mb-4" style={{ borderLeft: idx === processStations.length - 1 ? 'none' : `2px solid ${isDone ? '#198754' : '#dee2e6'}` }}>
-                                            <div className="position-absolute rounded-circle" style={{ width: '12px', height: '12px', backgroundColor: isDone ? '#198754' : (isCurrent ? '#ffc107' : '#dee2e6'), left: '-7px', top: '4px', zIndex: 2 }}></div>
+                                        <div key={idx} className="timeline-stem">
+                                            <div className={dotState}></div>
                                             <div className="d-flex justify-content-between align-items-start">
                                                 <div>
-                                                    <div className={`fw-bold mb-0 ${isDone || isCurrent ? 'text-dark' : 'text-muted opacity-50'}`} style={{fontSize: '0.85rem'}}>{idx + 1}. {station}</div>
-                                                    <div className="small text-muted" style={{fontSize: '0.65rem'}}>{isDone ? 'STATION COMPLETED' : (isCurrent ? 'IN PROGRESS' : 'PENDING')}</div>
+                                                    <div className={`fw-bold mb-0 ${isDone || isCurrent ? 'text-dark' : 'text-muted opacity-50'}`} style={{fontSize: '0.9rem'}}>
+                                                        {idx + 1}. {station}
+                                                    </div>
+                                                    <div className="small text-muted" style={{fontSize: '0.75rem'}}>
+                                                        {isDone ? 'Station Cleared' : (isCurrent ? (isNG ? 'Defect Detected' : 'Currently Processing') : 'Waiting in Queue')}
+                                                    </div>
                                                 </div>
-                                                {isCurrent && <span className="badge bg-warning text-dark" style={{fontSize: '0.55rem'}}>CURRENT</span>}
+                                                {isCurrent && (
+                                                    <span className={`badge ${isNG ? 'bg-danger' : 'bg-warning text-dark'} rounded-pill px-2`} style={{fontSize: '0.6rem'}}>
+                                                        {isNG ? 'ALERT' : 'LIVE'}
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     );
                                 })}
                             </div>
                         </div>
-                        <div className="p-3 bg-light border-top d-flex gap-2">
-                            <button className="btn btn-primary w-100 rounded-pill fw-bold" onClick={() => handleGoToStation(selectedUnit)}>GO TO LOCATION</button>
-                            <button className="btn btn-outline-dark w-100 rounded-pill fw-bold" onClick={() => setSelectedUnit(null)}>CLOSE</button>
+                        <div className="p-4 bg-light border-top d-flex gap-2">
+                            <button className="btn btn-primary w-100 rounded-pill fw-bold py-2 shadow-sm" onClick={() => handleGoToStation(selectedUnit)}>LOCATE UNIT</button>
+                            <button className="btn btn-outline-dark w-100 rounded-pill fw-bold py-2" onClick={() => setSelectedUnit(null)}>DISMISS</button>
                         </div>
                     </div>
                 </div>

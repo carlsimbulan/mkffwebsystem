@@ -239,7 +239,7 @@ useEffect(() => {
     // --- HOOKED FUNCTIONS: FETCH UNIT LIST (Retained polling and ref update logic) ---
     const fetchUnits = useCallback(async (status) => { 
     if (activeTab !== 'home') {
-        setListLoading(true); setListError(null); setUnitList([]);
+        setListLoading(true); setListError(null);
     }
     
     let dbStatus = status.replace(/_/g, ' ').replace(' unit', '');
@@ -252,46 +252,26 @@ useEffect(() => {
         dbStatus = ''; 
     }
     
-try {
-    const res = await axios.get(UNITS_ENDPOINT, {
-        params: {
-            station: currentStation, // Ito na ang "Station2" o "Station4" (Walang space)
-            status: dbStatus
-        }
-    });
+    try {
+        const res = await axios.get(UNITS_ENDPOINT, {
+            params: {
+                station: currentStation, 
+                status: dbStatus
+            }
+        });
+        
+        // 🔑 IMPORTANTE: Siguraduhin na ang mapping dito ay tugma sa Database columns
         const rawData = Array.isArray(res.data) ? res.data : [];
 
-        // 🔑 NEW LOGIC: Calculate delay minutes for each unit
-        const newUnitList = rawData.map(unit => {
-            if (unit.status === 'In Progress') {
-                const standardMinutes = STATION_STANDARD_TIMES[currentStation] || 0;
-                
-                // Uses updated_at (time it reached the station) or created_at
-                const startTime = new Date(unit.updated_at || unit.created_at).getTime();
-                const currentTime = new Date().getTime();
-                const elapsedMinutes = Math.floor((currentTime - startTime) / 60000);
-                
-                const delay = elapsedMinutes - standardMinutes;
-                return { ...unit, delayMinutes: delay > 0 ? delay : 0 };
-            }
-            return { ...unit, delayMinutes: 0 };
-        });
+        const newUnitList = rawData.map(unit => ({
+            ...unit,
+            // I-map ang database underscore names sa camelCase names ng React state mo
+            deviceSerialNo: unit.device_serial_no,
+            accessoryKittingNo: unit.accessory_kitting_no,
+            baseUnitKittingNo: unit.base_unit_kitting_no,
+            assemblyNo: unit.assembly_no
+        }));
 
-        // 🔑 STATUS CHANGE DETECTION LOGIC: (Retained exactly as you had it)
-        const newlyApprovedUnits = newUnitList.filter(newUnit => {
-            const prevUnit = prevUnitListRef.current.find(oldUnit => oldUnit.id === newUnit.id);
-            return (
-                prevUnit && 
-                prevUnit.status === 'Pending Approval' && 
-                newUnit.status === 'In Progress'
-            );
-        });
-        
-        if (newlyApprovedUnits.length > 0) {
-            const names = newlyApprovedUnits.map(u => u.assemblyNo).join(', ');
-            setUnitStatusNotification(`✅ Admin Accepted: Unit(s) ${names} are now 'In Progress'. Press X to dismiss.`);
-        }
-        
         setUnitList(newUnitList);
         prevUnitListRef.current = newUnitList;
 
@@ -521,18 +501,19 @@ else {
                 }
             }
             
-            // SUCCESS: Populate Form 
-            setFormData(prev => ({
-                ...prev,
-                model: parts[0].trim() || "",
-                revision: parts[1].trim() || "",
-                baseUnitKittingNo: parts[2].trim() || "",
-                assemblyNo: parts[3].trim() || "",
-                deviceSerialNo: scannedSerial, 
-                accessoryKittingNo: parts[5]?.trim() || "",
-                status: "In Progress", // Default status upon successful scan/handover
-                remarks: ""
-            }));
+// SUCCESS: Populate Form 
+setFormData(prev => ({
+    ...prev,
+    model: parts[0]?.trim() || dbUnit?.model || "",
+    revision: parts[1]?.trim() || dbUnit?.revision || "",
+    // 🔑 HILAHIN ANG DATA MULA SA DATABASE (dbUnit) PARA HINDI MAG-NULL
+    baseUnitKittingNo: dbUnit?.base_unit_kitting_no || parts[2]?.trim() || "",
+    assemblyNo: dbUnit?.assembly_no || parts[3]?.trim() || "",
+    deviceSerialNo: dbUnit?.device_serial_no || parts[4]?.trim() || "", 
+    accessoryKittingNo: dbUnit?.accessory_kitting_no || parts[5]?.trim() || "",
+    status: "In Progress", 
+    remarks: dbUnit?.remarks || ""
+}));
             
             setProcessStatus('idle'); 
 
@@ -569,12 +550,16 @@ const handleSubmit = async (e) => {
         setStatusMessage("Saving unit...");
 
         try {
-            const commonData = {
-                ...formData,
-                station: currentStation, 
-                full_name: user.full_name,
-                username: user.username,
-            };
+const commonData = {
+    ...formData,
+    // 🔑 Siguraduhin na ang names ay tugma sa tinatanggap ng units.php
+    device_serial_no: formData.deviceSerialNo,
+    accessory_kitting_no: formData.accessoryKittingNo,
+    base_unit_kitting_no: formData.baseUnitKittingNo,
+    station: currentStation, 
+    full_name: user.full_name,
+    username: user.username,
+};
 
             let res;
             let finalId = scannedUnitId;

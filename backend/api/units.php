@@ -254,35 +254,45 @@ try {
     if ($existingUnit) {
         $unitId = $existingUnit['id'];
         $modelForLog = $existingUnit['model'];
-        $updateSql = "UPDATE units SET status = :status, remarks = :remarks, station = :station, updated_at = CURRENT_TIMESTAMP";
+        
+        // SQL query para isama ang mga generated numbers
+        $updateSql = "UPDATE units SET 
+                        status = :status, 
+                        remarks = :remarks, 
+                        station = :station, 
+                        device_serial_no = :serial,
+                        accessory_kitting_no = :ack,
+                        base_unit_kitting_no = :buk,
+                        updated_at = CURRENT_TIMESTAMP 
+                      WHERE id = :id";
         
         $params = [
-            'status' => $stat, 
+            'status'  => $stat, 
             'remarks' => getNullIfEmpty($remarksText), 
             'station' => $stn, 
-            'id' => $unitId
+            // Kinukuha ang generated values mula sa React formData
+            'serial'  => getNullIfEmpty($data['deviceSerialNo'] ?? $data['device_serial_no'] ?? ''),
+            'ack'     => getNullIfEmpty($data['accessoryKittingNo'] ?? $data['accessory_kitting_no'] ?? ''),
+            'buk'     => getNullIfEmpty($data['baseUnitKittingNo'] ?? $data['base_unit_kitting_no'] ?? ''),
+            'id'      => $unitId
         ];
 
-        $serial = getNullIfEmpty($data['deviceSerialNo'] ?? $data['device_serial_no'] ?? '');
-        if ($serial) {
-            $updateSql .= ", device_serial_no = :serial";
-            $params['serial'] = $serial;
-        }
-
-        $pdo->prepare("$updateSql WHERE id = :id")->execute($params);
+        $pdo->prepare($updateSql)->execute($params);
         $action = 'STATION_UPDATE';
 
     } else if ($method === 'POST') {
-        $stmt = $pdo->prepare("INSERT INTO units (model, revision, base_unit_kitting_no, assembly_no, device_serial_no, accessory_kitting_no, status, remarks, station) VALUES (:model, :rev, :buk, :assy, :serial, :ack, :status, :remarks, :station)");
+        $stmt = $pdo->prepare("INSERT INTO units 
+            (model, revision, base_unit_kitting_no, assembly_no, device_serial_no, accessory_kitting_no, status, remarks, station) 
+            VALUES (:model, :rev, :buk, :assy, :serial, :ack, :status, :remarks, :station)");
         
         $stmt->execute([
-            'model' => $data['model'] ?? '', 
-            'rev' => getNullIfEmpty($data['revision'] ?? ''), 
-            'buk' => getNullIfEmpty($data['baseUnitKittingNo'] ?? $data['base_unit_kitting_no'] ?? ''), 
-            'assy' => $assy, 
-            'serial' => getNullIfEmpty($data['deviceSerialNo'] ?? $data['device_serial_no'] ?? ''), 
-            'ack' => getNullIfEmpty($data['accessoryKittingNo'] ?? $data['accessory_kitting_no'] ?? ''), 
-            'status' => $stat, 
+            'model'   => $data['model'] ?? '', 
+            'rev'     => getNullIfEmpty($data['revision'] ?? ''), 
+            'buk'     => getNullIfEmpty($data['baseUnitKittingNo'] ?? $data['base_unit_kitting_no'] ?? ''), 
+            'assy'    => $assy, 
+            'serial'  => getNullIfEmpty($data['deviceSerialNo'] ?? $data['device_serial_no'] ?? ''), 
+            'ack'     => getNullIfEmpty($data['accessoryKittingNo'] ?? $data['accessory_kitting_no'] ?? ''), 
+            'status'  => $stat, 
             'remarks' => getNullIfEmpty($remarksText), 
             'station' => $stn
         ]);
