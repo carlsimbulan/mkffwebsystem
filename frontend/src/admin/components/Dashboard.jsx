@@ -13,6 +13,25 @@ const processStations = [
     "Packing", "QC Stamping"
 ];
 
+// 💡 FIXED: Progress Details in English
+const stationDescriptions = {
+    "PCB Pairing": "Assembling boards and pairing components.",
+    "Integrated Board Test": "Testing the compatibility of the three boards.",
+    "Main Board Conformal Coating": "Applying protective coating to the main board.",
+    "RTV Application": "Applying Room Temperature Vulcanizing sealant.",
+    "Casing/Harnessing": "Assembling the unit into the casing and wire harnessing.",
+    "Complete Unit Test/Calibration": "Calibrating and testing voltage accuracy.",
+    "Pre BI Hi-Pot Test": "High potential safety testing before burn-in.",
+    "Burn-in Testing": "Stress testing under full load conditions.",
+    "Sealing": "Final sealing of the unit enclosure.",
+    "Post BI Hi-Pot Test": "Secondary high voltage test after burn-in.",
+    "Final Functional/Connectivity Test": "Checking final functions and network connectivity.",
+    "Label Sticker Attachment": "Checking if all stickers are correctly attached.",
+    "FVI": "Final Visual Inspection for physical defects.",
+    "Packing": "Secure packaging of the unit for shipping.",
+    "QC Stamping": "Validation of unit checklist and final QC approval."
+};
+
 // --- HELPERS ---
 
 const getStatusBadgeClass = (status) => {
@@ -40,6 +59,7 @@ export function Dashboard({
 }) {
     
     const chartRef = useRef(null); 
+    const stepperRef = useRef(null); // Ref for modal scrolling
     const [searchTerm, setSearchTerm] = useState('');
     const [qrValue, setQrValue] = useState(''); 
     const [selectedUnit, setSelectedUnit] = useState(null);
@@ -54,6 +74,14 @@ export function Dashboard({
                 setSelectedUnit(matchedUnit);
                 setQrValue('');
             }
+        }
+    };
+
+    // Modal Scroll Logic
+    const scrollStepper = (direction) => {
+        if (stepperRef.current) {
+            const scrollAmount = 300;
+            stepperRef.current.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
         }
     };
 
@@ -112,7 +140,7 @@ export function Dashboard({
                     padding: 24px; 
                     height: 100%; 
                     position: relative;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Stable shadow */
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
                 }
                 
                 .icon-bg-box { 
@@ -121,7 +149,6 @@ export function Dashboard({
                     margin-bottom: 16px; font-size: 1.25rem; 
                 }
                 
-                .go-icon-link { position: absolute; top: 15px; right: 15px; width: 45px; height: 32px; background: #8b5cf6; color: white; border-radius: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; font-size: 0.7rem; font-weight: bold; }
                 .label-caps { font-size: 0.7rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block; }
                 .value-bold { font-size: 2.2rem; font-weight: 900; color: #0f172a; margin: 0; line-height: 1; letter-spacing: -1px; }
                 .badge-pct { font-size: 0.7rem; font-weight: 700; padding: 4px 10px; border-radius: 6px; display: inline-block; margin-top: 10px; }
@@ -133,17 +160,116 @@ export function Dashboard({
                     background: #ffffff; 
                     border: 1px solid #edf2f7; 
                     border-radius: 20px; 
-                    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1); /* Visible shadow */
+                    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
                 }
                 
                 .modal-blur { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); }
-                .timeline-stem { position: relative; padding-left: 35px; padding-bottom: 25px; }
-                .timeline-stem::before { content: ''; position: absolute; left: 6px; top: 22px; width: 2px; height: 100%; background: #f1f5f9; }
-                .timeline-stem:last-child::before { display: none; }
-                .timeline-dot { position: absolute; left: 0; top: 6px; width: 14px; height: 14px; border-radius: 50%; background: #e2e8f0; z-index: 2; border: 3px solid #fff; box-shadow: 0 0 0 1px #f1f5f9; }
-                .timeline-dot.active { background: #f59e0b; box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.15); }
-                .timeline-dot.completed { background: #10b981; }
-                .timeline-dot.danger { background: #ef4444; box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15); }
+
+                /* STEPPER SCROLL NAVIGATION */
+                .stepper-nav-container { position: relative; display: flex; align-items: center; }
+                .stepper-nav-btn {
+                    position: absolute; top: 30%; transform: translateY(-50%);
+                    z-index: 20; width: 32px; height: 32px; 
+                    background: #fff; border: 1px solid #e2e8f0; 
+                    border-radius: 50%; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                    display: flex; align-items: center; justify-content: center;
+                    cursor: pointer; color: #64748b; transition: all 0.2s;
+                }
+                .stepper-nav-btn:hover { background: #f8fafc; color: #0f172a; }
+                .btn-left { left: -10px; }
+                .btn-right { right: -10px; }
+
+                .stepper-wrapper {
+                    display: flex;
+                    justify-content: space-between;
+                    position: relative;
+                    margin-bottom: 40px;
+                    padding: 20px 10px;
+                    overflow-x: auto;
+                    padding-bottom: 30px;
+                    scrollbar-width: none; /* Firefox */
+                }
+                .stepper-wrapper::-webkit-scrollbar { display: none; }
+
+                .stepper-item {
+                    position: relative;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    flex: 1;
+                    min-width: 150px;
+                    z-index: 10;
+                }
+
+                .stepper-item::before {
+                    content: "";
+                    position: absolute;
+                    top: 22px;
+                    left: -50%;
+                    width: 100%;
+                    height: 4px;
+                    background: #e2e8f0;
+                    z-index: -1;
+                }
+                .stepper-item:first-child::before { content: none; }
+
+                .step-counter {
+                    width: 45px;
+                    height: 45px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: #fff;
+                    border: 4px solid #e2e8f0;
+                    border-radius: 50%;
+                    font-weight: 800;
+                    font-size: 0.9rem;
+                    color: #94a3b8;
+                    transition: all 0.3s ease;
+                    margin-bottom: 12px;
+                }
+
+                .step-name {
+                    font-size: 0.65rem;
+                    font-weight: 800;
+                    text-transform: uppercase;
+                    color: #64748b;
+                    text-align: center;
+                    max-width: 120px;
+                    line-height: 1.2;
+                }
+
+                .step-desc {
+                    font-size: 0.6rem;
+                    font-weight: 500;
+                    color: #94a3b8;
+                    text-align: center;
+                    margin-top: 4px;
+                    max-width: 130px;
+                }
+
+                .stepper-item.completed .step-counter {
+                    background: #10b981; 
+                    border-color: #10b981;
+                    color: white;
+                }
+                .stepper-item.completed::before { background: #10b981; }
+                .stepper-item.completed .step-name { color: #10b981; }
+
+                .stepper-item.active .step-counter {
+                    border-color: #f59e0b; 
+                    color: #f59e0b;
+                    box-shadow: 0 0 0 5px rgba(245, 158, 11, 0.15);
+                }
+                .stepper-item.active .step-name { color: #0f172a; }
+                .stepper-item.active .step-desc { color: #64748b; font-weight: 700; }
+
+                .stepper-item.danger .step-counter {
+                    border-color: #ef4444; 
+                    color: #ef4444;
+                    background: #fef2f2;
+                }
+                .stepper-item.danger .step-name { color: #ef4444; }
                 
                 .custom-scrollbar::-webkit-scrollbar { width: 5px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -229,9 +355,6 @@ export function Dashboard({
                 </div>
                 <div className="col-md-4">
                     <div className="stat-card-pro">
-                        <button className="go-icon-link" onClick={() => setActiveTab('approval')}>
-                            GO <i className="bi bi-arrow-right-short ms-1"></i>
-                        </button>
                         <div className="icon-bg-box" style={{ backgroundColor: '#f5f3ff', color: '#8b5cf6' }}><i className="bi bi-shield-check"></i></div>
                         <span className="label-caps" style={{ color: '#8b5cf6' }}>Pending Approval</span>
                         <h3 className="value-bold" style={{ color: '#8b5cf6' }}>{overallMetrics.pendingApprovalUnits}</h3>
@@ -240,7 +363,6 @@ export function Dashboard({
                 </div>
             </div>
 
-            {/* CHARTS SECTION */}
             <div className="chart-container-pro overflow-hidden mb-5">
                 <div className="d-flex justify-content-between align-items-center p-3 px-4 border-bottom bg-light bg-opacity-10">
                     <span className="label-caps m-0">{currentChartTitle}</span>
@@ -263,67 +385,62 @@ export function Dashboard({
                 </div>
             </div>
 
-            {/* UNIT TRACKING MODAL */}
             {selectedUnit && (
                 <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center modal-blur" style={{ zIndex: 1300 }}>
-                    <div className="bg-white rounded-4 shadow-lg overflow-hidden border-0" style={{ width: '90%', maxWidth: '520px' }}>
-                        <div className="p-4 d-flex justify-content-between align-items-center bg-dark text-white">
+                    <div className="bg-white rounded-4 shadow-2xl overflow-hidden border-0" style={{ width: '90%', maxWidth: '950px' }}>
+                        <div className="p-3 d-flex justify-content-between align-items-center bg-primary text-white">
                             <div>
-                                <h5 className="mb-0 fw-bold">Unit Live Tracking</h5>
-                                <p className="mb-0 small opacity-50">{selectedUnit.assembly_no}</p>
+                                <h6 className="mb-0 fw-bold">Unit Process Tracker</h6>
+                                <p className="mb-0" style={{fontSize: '0.7rem', opacity: 0.8}}>{selectedUnit.assembly_no} • {selectedUnit.model}</p>
                             </div>
                             <button className="btn-close btn-close-white" onClick={() => setSelectedUnit(null)}></button>
                         </div>
                         <div className="p-4 custom-scrollbar" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
                             <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded-4 mb-4 border-0 shadow-sm">
                                 <div>
-                                    <div className="label-caps mb-1">Model</div>
-                                    <div className="fw-bold">{selectedUnit.model}</div>
+                                    <div className="label-caps mb-0" style={{fontSize: '0.6rem'}}>Current Status</div>
+                                    <span className={`badge rounded-pill px-3 py-2 ${getStatusBadgeClass(selectedUnit.status)}`}>{selectedUnit.status}</span>
                                 </div>
                                 <div className="text-end">
-                                    <div className="label-caps mb-1">Status</div>
-                                    <span className={`badge rounded-pill ${getStatusBadgeClass(selectedUnit.status)}`}>{selectedUnit.status}</span>
+                                    <div className="label-caps mb-0" style={{fontSize: '0.6rem'}}>Last Station</div>
+                                    <div className="fw-bold text-primary small">{selectedUnit.station || 'Pending'}</div>
                                 </div>
                             </div>
                             
-                            <div className="ps-2">
-                                {processStations.map((station, idx) => {
-                                    const currentStationIdx = parseInt(selectedUnit.station?.replace('Station', '')) - 1;
-                                    const unitStatus = selectedUnit.status?.toLowerCase() || '';
-                                    const isNG = unitStatus.includes('no good') || unitStatus.includes('ng');
-                                    const isDone = idx < currentStationIdx || (idx === currentStationIdx && (unitStatus.includes('completed') || unitStatus.includes('finished')));
-                                    const isCurrent = idx === currentStationIdx;
-                                    
-                                    let dotState = "timeline-dot";
-                                    if (isDone) dotState += " completed";
-                                    else if (isCurrent) dotState += isNG ? " danger" : " active";
+                            {/* 💡 NEW: Stepper with Left/Right Navigation Arrows */}
+                            <div className="stepper-nav-container">
+                                <button className="stepper-nav-btn btn-left" onClick={() => scrollStepper('left')}><i className="bi bi-chevron-left"></i></button>
+                                
+                                <div className="stepper-wrapper" ref={stepperRef}>
+                                    {processStations.map((station, idx) => {
+                                        const currentStationIdx = parseInt(selectedUnit.station?.replace('Station', '')) - 1;
+                                        const unitStatus = selectedUnit.status?.toLowerCase() || '';
+                                        const isNG = unitStatus.includes('no good') || unitStatus.includes('ng');
+                                        const isDone = idx < currentStationIdx || (idx === currentStationIdx && (unitStatus.includes('completed') || unitStatus.includes('finished')));
+                                        const isCurrent = idx === currentStationIdx;
+                                        
+                                        let stepStateClass = "";
+                                        if (isDone) stepStateClass = "completed";
+                                        else if (isCurrent) stepStateClass = isNG ? "danger" : "active";
 
-                                    return (
-                                        <div key={idx} className="timeline-stem">
-                                            <div className={dotState}></div>
-                                            <div className="d-flex justify-content-between align-items-start">
-                                                <div>
-                                                    <div className={`fw-bold mb-0 ${isDone || isCurrent ? 'text-dark' : 'text-muted opacity-50'}`} style={{fontSize: '0.9rem'}}>
-                                                        {idx + 1}. {station}
-                                                    </div>
-                                                    <div className="small text-muted" style={{fontSize: '0.75rem'}}>
-                                                        {isDone ? 'Station Cleared' : (isCurrent ? (isNG ? 'Defect Detected' : 'Currently Processing') : 'Waiting in Queue')}
-                                                    </div>
+                                        return (
+                                            <div key={idx} className={`stepper-item ${stepStateClass}`}>
+                                                <div className="step-counter">
+                                                    {isDone ? <i className="bi bi-check-lg"></i> : (idx + 1)}
                                                 </div>
-                                                {isCurrent && (
-                                                    <span className={`badge ${isNG ? 'bg-danger' : 'bg-warning text-dark'} rounded-pill px-2`} style={{fontSize: '0.6rem'}}>
-                                                        {isNG ? 'ALERT' : 'LIVE'}
-                                                    </span>
-                                                )}
+                                                <div className="step-name">{station}</div>
+                                                <div className="step-desc">{stationDescriptions[station]}</div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
+                                </div>
+
+                                <button className="stepper-nav-btn btn-right" onClick={() => scrollStepper('right')}><i className="bi bi-chevron-right"></i></button>
                             </div>
                         </div>
-                        <div className="p-4 bg-light border-top d-flex gap-2">
-                            <button className="btn btn-primary w-100 rounded-pill fw-bold py-2 shadow-sm" onClick={() => handleGoToStation(selectedUnit)}>LOCATE UNIT</button>
-                            <button className="btn btn-outline-dark w-100 rounded-pill fw-bold py-2" onClick={() => setSelectedUnit(null)}>DISMISS</button>
+                        <div className="p-3 bg-light border-top d-flex gap-2">
+                            <button className="btn btn-primary w-100 rounded-pill fw-bold py-2 shadow-sm" style={{fontSize: '0.8rem'}} onClick={() => handleGoToStation(selectedUnit)}>LOCATE UNIT</button>
+                            <button className="btn btn-outline-dark w-100 rounded-pill fw-bold py-2" style={{fontSize: '0.8rem'}} onClick={() => setSelectedUnit(null)}>DISMISS</button>
                         </div>
                     </div>
                 </div>

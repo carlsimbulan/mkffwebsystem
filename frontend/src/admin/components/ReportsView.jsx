@@ -1,8 +1,13 @@
 import React from 'react';
 
+// 🔑 PINALITAN: Siguradong Philippine Time (Asia/Manila)
 const getTodayDate = () => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
+    return new Intl.DateTimeFormat('en-CA', { // format: YYYY-MM-DD
+        timeZone: 'Asia/Manila',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(new Date());
 };
 
 export function ReportsView({

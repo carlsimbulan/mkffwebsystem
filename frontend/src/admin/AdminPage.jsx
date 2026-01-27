@@ -75,11 +75,15 @@ const AVATAR_UPLOAD_PATH = `${API_BASE_URL}/uploads/avatars/`;
 const DEFAULT_AVATAR_PATH = `${API_BASE_URL}/uploads/avatars/default_avatar.png`;
 
 // Helper function to format date as YYYY-MM-DD
+// 🔑 PINALITAN: Siguradong Philippine Time (Asia/Manila)
 const getTodayDate = () => {
-    const d = new Date();
-    return d.toISOString().split('T')[0];
+    return new Intl.DateTimeFormat('en-CA', { // format: YYYY-MM-DD
+        timeZone: 'Asia/Manila',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(new Date());
 };
-
 export default function AdminPage({ user, onLogout }) {
     const navigate = useNavigate();
 const location = useLocation();
@@ -106,6 +110,12 @@ const handleTabChange = (tabName) => {
   
     const [successMessage, setSuccessMessage] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
+    // Kalkulahin ang bilang para sa No Good List at Shipment
+    const noGoodCount = logs.filter(l => l.status === 'No Good (NG)').length;
+    const shipmentCount = logs.filter(l => 
+    l.status === 'Completed' && 
+    (l.station === 'Station15' || l.station === 'Station 15')
+).length;
 
     // STATES for Reports and Editing
     const [reportDate, setReportDate] = useState(getTodayDate());
@@ -882,21 +892,35 @@ return (
 
         <li className="nav-item">
             <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${activeTab === "no_good_list" ? "active-glass" : ""}`}
+                className={`nav-link text-white w-100 d-flex align-items-center justify-content-between py-2 px-3 sidebar-btn ${activeTab === "no_good_list" ? "active-glass" : ""}`}
                 onClick={() => handleTabChange("no_good_list")}
             >
-                <i className="bi bi-x-octagon"></i>
-                <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>No Good List</span>
+                <div className="d-flex align-items-center gap-3">
+                    <i className="bi bi-x-octagon"></i>
+                    <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>No Good List</span>
+                </div>
+                {noGoodCount > 0 && (
+                    <span className="badge bg-danger rounded-pill" style={{ fontSize: '0.65rem' }}>
+                        {noGoodCount}
+                    </span>
+                )}
             </button>
         </li>
 
         <li className="nav-item">
             <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${activeTab === "shipment" ? "active-glass" : ""}`}
+                className={`nav-link text-white w-100 d-flex align-items-center justify-content-between py-2 px-3 sidebar-btn ${activeTab === "shipment" ? "active-glass" : ""}`}
                 onClick={() => handleTabChange("shipment")}
             >
-                <i className="bi bi-truck-flatbed"></i>
-                <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Shipment</span>
+                <div className="d-flex align-items-center gap-3">
+                    <i className="bi bi-truck-flatbed"></i>
+                    <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Shipment</span>
+                </div>
+                {shipmentCount > 0 && (
+                    <span className="badge bg-success rounded-pill" style={{ fontSize: '0.65rem' }}>
+                        {shipmentCount}
+                    </span>
+                )}
             </button>
         </li>
         

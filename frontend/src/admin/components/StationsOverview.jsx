@@ -61,9 +61,13 @@ const checkUnitDelay = (stationId, updatedAt) => {
     const threshold = DELAY_THRESHOLDS_MINUTES[stationId] || 10;
     const lastUpdate = new Date(updatedAt).getTime();
     const minutesInStation = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
-    if (minutesInStation > threshold * 3) return { isDelayed: true, level: 'CRITICAL', minutes: minutesInStation };
-    if (minutesInStation > threshold) return { isDelayed: true, level: 'MODERATE', minutes: minutesInStation };
-    return { isDelayed: false, level: 'NORMAL', minutes: minutesInStation };
+    
+    // 🔑 INNOVATION: SEVERITY LEVELS
+    if (minutesInStation > threshold * 3) return { isDelayed: true, level: 'LEVEL 3: ESCALATED', minutes: minutesInStation, code: 'L3' };
+    if (minutesInStation > threshold * 2) return { isDelayed: true, level: 'LEVEL 2: CRITICAL', minutes: minutesInStation, code: 'L2' };
+    if (minutesInStation > threshold) return { isDelayed: true, level: 'LEVEL 1: WARNING', minutes: minutesInStation, code: 'L1' };
+    
+    return { isDelayed: false, level: 'NORMAL', minutes: minutesInStation, code: 'NOR' };
 };
 
 const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClick, highlightedUnitId, setActiveTab, fetchData }) => {
@@ -104,6 +108,8 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 .tracker-table th { background: #f1f5f9; color: #475569; padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-transform: uppercase; font-weight: 800; text-align: center; }
                 .tracker-table td { padding: 8px 8px; color: #0f172a; font-weight: 700; border-bottom: 1px solid #e2e8f0; text-align: center; }
                 .delay-row { background-color: #fff5f5 !important; }
+                .animate-pulse { animation: pulse-bg 2s infinite !important; }
+                @keyframes pulse-bg { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
             `}</style>
 
             <div className="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3 px-2">
@@ -158,7 +164,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                         <td>{log.base_unit_kitting_no}</td>
                                         <td>
                                             <code className="text-primary fw-bold">{log.assembly_no}</code>
-                                            {delay.isDelayed && <i className="bi bi-exclamation-triangle-fill text-danger ms-2" title={`Delayed: ${delay.level}`}></i>}
+                                            {delay.isDelayed && <i className="bi bi-exclamation-triangle-fill text-danger ms-2 animate-pulse" title={`Delayed: ${delay.level}`}></i>}
                                         </td>
                                         <td className="fw-bold">{log.device_serial_no}</td>
                                         <td>{log.accessory_kitting_no}</td>
@@ -205,24 +211,33 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                         </div>
 
                         <div className="p-4" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                            {/* DELAY ANALYSIS SECTION */}
+                            {/* 🔑 INNOVATIVE DELAY DRILL-DOWN SECTION */}
                             {selectedUnitProcess.status === 'In Progress' && (() => {
                                 const delay = checkUnitDelay(stationMonitorId, selectedUnitProcess.updated_at || selectedUnitProcess.created_at);
                                 if (delay.isDelayed) {
                                     const reasons = DELAY_REASONS[processName] || { L1: "Manual lag", L2: "Operational delay", L3: "Critical Bottleneck" };
-                                    const specificReason = delay.level === 'CRITICAL' ? reasons.L3 : (delay.level === 'MODERATE' ? reasons.L2 : reasons.L1);
+                                    const specificReason = delay.code === 'L3' ? reasons.L3 : (delay.code === 'L2' ? reasons.L2 : reasons.L1);
                                     return (
-                                        <div className="alert alert-danger border-0 shadow-sm mb-4 p-3">
+                                        <div className="alert alert-danger border-0 shadow-sm mb-4 p-3 border-start border-5 border-danger">
                                             <div className="d-flex align-items-center mb-2">
                                                 <i className="bi bi-exclamation-octagon-fill me-2 fs-5"></i>
-                                                <h6 className="mb-0 fw-bold">DELAY DETECTED: {delay.level} LEVEL</h6>
+                                                <h6 className="mb-0 fw-bold">DELAY DIAGNOSTIC: {delay.level}</h6>
                                             </div>
-                                            <div className="bg-white rounded p-2 border mb-2">
-                                                <div className="small fw-bold text-muted text-uppercase">Probable Cause:</div>
-                                                <div className="fw-bold text-dark">{specificReason}</div>
+                                            <div className="bg-white rounded p-3 border mb-2">
+                                                <div className="row">
+                                                    <div className="col-md-6 border-end">
+                                                        <div className="small fw-bold text-muted text-uppercase mb-1">Time Elapsed:</div>
+                                                        <div className="h5 fw-bold text-danger mb-0">{Math.floor(delay.minutes)} mins</div>
+                                                    </div>
+                                                    <div className="col-md-6 ps-4">
+                                                        <div className="small fw-bold text-muted text-uppercase mb-1">Possible Cause:</div>
+                                                        <div className="fw-bold text-dark">{specificReason}</div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="small italic fw-bold text-danger">
-                                                <i className="bi bi-megaphone-fill me-1"></i> ACTION REQUIRED: Please take floor action immediately.
+                                            <div className="small italic fw-bold text-danger d-flex align-items-center">
+                                                <i className="bi bi-megaphone-fill me-2"></i> 
+                                                <span>SYSTEM ALERT: Intervention requested for {stationMonitorId} - {processName}.</span>
                                             </div>
                                         </div>
                                     );
@@ -245,7 +260,6 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                     } else if (idx === 1 && selectedUnitProcess.integrated_board_level_test1) {
                                         stationData = { "Board 1": selectedUnitProcess.integrated_board_level_test1, "Board 2": selectedUnitProcess.integrated_board_level_test2, "Board 3": selectedUnitProcess.integrated_board_level_test3 };
                                     } else if (idx === 5 && selectedUnitProcess.voltage) {
-                                        // 🔑 FULL STATION 6 COLUMNS
                                         stationData = { 
                                             "LoRa": selectedUnitProcess.lora_module, 
                                             "Meter": selectedUnitProcess.energy_meter, 
@@ -267,7 +281,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                     } else if (idx === 9 && selectedUnitProcess.post_performed_passed) {
                                         stationData = { "Post Hi-Pot": selectedUnitProcess.post_performed_passed, "Post Recorded": selectedUnitProcess.post_result_recorded };
                                     } else if (idx === 10 && selectedUnitProcess.functions_working) {
-                                        stationData = { "Functional": selectedUnitProcess.functions_working, "Connectivity": selectedUnitProcess.connectivity_passed };
+                                        stationData = { "Functions": selectedUnitProcess.functions_working, "Connectivity": selectedUnitProcess.connectivity_passed };
                                     } else if (idx === 11 && selectedUnitProcess.stickers_attached) {
                                         stationData = { "Stickers": selectedUnitProcess.stickers_attached, "Readable": selectedUnitProcess.stickers_readable };
                                     }
@@ -292,7 +306,6 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                                         <tbody>
                                                             <tr>
                                                                 {Object.values(stationData).map((v, i) => {
-                                                                    // 🔑 LOGIC TO TURN TEXT RED IF IT IS A FAILURE
                                                                     const isLihis = ["NO GO", "FAIL", "Not Detected"].includes(v) || 
                                                                                    (Object.keys(stationData)[i] === "Volt" && (parseFloat(v) < 113.85 || parseFloat(v) > 116.15));
                                                                     return (
@@ -455,6 +468,8 @@ export function StationsOverview({
                 .metric-row:last-child { border-bottom: none; }
                 .btn-monitor { background: #1e293b; color: #fff; border: none; }
                 .btn-monitor:hover { background: #0f172a; color: #fff; }
+                .animate-pulse { animation: pulse-red 1.5s infinite !important; }
+                @keyframes pulse-red { 0% { transform: scale(1); } 50% { transform: scale(1.05); color: #dc3545; } 100% { transform: scale(1); } }
             `}</style>
             
             <div className="d-flex justify-content-between align-items-center mb-4 px-2 border-bottom pb-3">
@@ -465,12 +480,17 @@ export function StationsOverview({
             <div className="row g-4">
                 {namedStations.map((station) => {
                     const metrics = calculateMetrics(station.id);
-                    const hasDelay = (metrics.stationLogs || []).some(log => log.status === 'In Progress' && checkUnitDelay(station.id, log.updated_at || log.created_at).isDelayed);
+                    const delayedCount = (metrics.stationLogs || []).filter(log => log.status === 'In Progress' && checkUnitDelay(station.id, log.updated_at || log.created_at).isDelayed).length;
 
                     return (
                         <div key={station.id} className="col-md-3">
-                            <div className={`station-card-flat shadow-sm ${hasDelay ? 'delay-card' : ''}`}>
-                                {hasDelay && <div className="delay-tag"><i className="bi bi-exclamation-triangle-fill me-1"></i>DELAYED</div>}
+                            <div className={`station-card-flat shadow-sm ${delayedCount > 0 ? 'delay-card' : ''}`}>
+                                {delayedCount > 0 && (
+                                    <div className="delay-tag animate-pulse">
+                                        <i className="bi bi-exclamation-triangle-fill me-1"></i>
+                                        {delayedCount} UNIT{delayedCount > 1 ? 'S' : ''} DELAYED
+                                    </div>
+                                )}
                                 <div className="mb-3">
                                     <span className="text-muted" style={{fontSize: '0.65rem', fontWeight: 800}}>STATION ID: {station.id}</span>
                                     <h6 className="fw-bold text-dark text-truncate mb-0 mt-1">{station.name}</h6>
@@ -482,7 +502,7 @@ export function StationsOverview({
                                 </div>
                                 <div className="d-flex gap-2">
                                     <button className="btn btn-monitor btn-sm btn-box flex-grow-1 shadow-sm" onClick={() => handleMonitorStation(station.id)}>MONITOR</button>
-                                    <button className="btn btn-history btn-sm btn-box px-3 shadow-sm" onClick={() => handleViewHistory(station.id)}>HISTORY</button>
+                                    <button className="btn btn-outline-secondary btn-sm btn-box px-3 shadow-sm" onClick={() => handleViewHistory(station.id)}>HISTORY</button>
                                 </div>
                             </div>
                         </div>
