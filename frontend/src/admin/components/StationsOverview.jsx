@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import axios from 'axios';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
 const processStations = [
@@ -67,31 +66,78 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
     
     const stationIndex = parseInt(stationMonitorId.replace('Station', '')) - 1;
     const processName = processStations[stationIndex] || stationMonitorId;
+    const hasGeminiKey = Boolean(process.env.REACT_APP_GEMINI_API_KEY);
 
-    // 🔑 PALITAN MO ITONG BUONG fetchAIDiagnosis FUNCTION
-const fetchAIDiagnosis = async (unit) => {
+    // Use the stable REST `v1` API directly.
+    // Your key currently returns 404 for models on `v1beta`, so we:
+    // 1) List models from `v1`
+    // 2) Pick the first model that supports `generateContent`
+    // 3) Call `generateContent` on that model
+    const GEMINI_V1_BASE = "https://generativelanguage.googleapis.com/v1";
+
+    const pickGenerativeModelName = async (apiKey) => {
+        const res = await fetch(`${GEMINI_V1_BASE}/models?key=${encodeURIComponent(apiKey)}`);
+        if (!res.ok) {
+            const body = await res.text().catch(() => "");
+            throw new Error(`ListModels failed (${res.status}): ${body || res.statusText}`);
+        }
+        const data = await res.json();
+        const models = Array.isArray(data.models) ? data.models : [];
+        const model = models.find(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"));
+        if (!model?.name) throw new Error("No available Gemini model supports generateContent for this API key.");
+        return model.name; // e.g. "models/gemini-2.0-flash"
+    };
+
+    const fetchAIDiagnosis = async (unit) => {
     setIsAiLoading(true);
     setAiAnalysis(null);
     try {
-        // Siguraduhin na tama ang URL path na ito base sa XAMPP mo
-        const response = await axios.post("http://localhost/mkffwebsystem/backend/api/gemini_diagnose.php", {
-            station: processName,
-            unit_data: unit 
-        });
-        
-        if (response.data.status === 'success') {
-            setAiAnalysis(response.data.analysis);
-        } else {
-            setAiAnalysis("Error: " + response.data.message);
+        const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
+        if (!apiKey) {
+            throw new Error("Missing REACT_APP_GEMINI_API_KEY. Add it to `frontend/.env` and restart the dev server (then hard-refresh the page).");
         }
+
+        const modelName = await pickGenerativeModelName(apiKey);
+
+        const prompt = `You are a Senior Manufacturing Engineer at MKFF. 
+        Analyze this production data: 
+        Station: ${processName}, 
+        Assembly: ${unit.assembly_no || 'N/A'}, 
+        Model: ${unit.model || 'N/A'}.
+        Identify the most probable technical root cause and a concrete corrective action. 
+        Respond in EXACTLY 2 sentences.`;
+
+        const genRes = await fetch(`${GEMINI_V1_BASE}/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+            }),
+        });
+
+        if (!genRes.ok) {
+            const body = await genRes.text().catch(() => "");
+            throw new Error(`generateContent failed (${genRes.status}): ${body || genRes.statusText}`);
+        }
+
+        const genData = await genRes.json();
+        const text =
+            genData?.candidates?.[0]?.content?.parts?.map(p => p?.text).filter(Boolean).join("") ||
+            genData?.candidates?.[0]?.output ||
+            "";
+
+        if (!text) throw new Error("Empty AI response.");
+        
+        setAiAnalysis(text);
     } catch (err) {
-        // Debugging message para malaman kung 404 o SSL error
-        setAiAnalysis("Diagnostic link failed. Please check local server connection.");
-        console.error("API Call Error:", err);
+        console.error("Gemini Error:", err);
+        // I-display ang totoong error message para malaman natin kung bakit failed
+        setAiAnalysis("AI Diagnostic failed: " + err.message);
     } finally {
         setIsAiLoading(false);
     }
 };
+
     return (
         <div className="pb-5 container-fluid px-0">
             <style>{`
@@ -182,26 +228,27 @@ const fetchAIDiagnosis = async (unit) => {
                         </div>
 
                         <div className="p-4" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
-                            
-                            {/* 🔑 MINIMALIST DIAGNOSTIC ROOT CAUSE SECTION (White/Light Theme) */}
                             <div className="diagnostic-card-minimal p-3 mb-4 shadow-sm">
                                 <div className="d-flex justify-content-between align-items-center mb-3">
-                                    <div className="fw-bold text-dark small uppercase tracking-wider">
-                                        DIAGNOSTIC ROOT CAUSE
+                                    <div>
+                                        <div className="fw-bold text-dark small uppercase tracking-wider">DIAGNOSTIC ROOT CAUSE</div>
+                                        <div className="small text-muted mt-1">
+                                            Gemini key: <span className={hasGeminiKey ? 'text-success fw-bold' : 'text-danger fw-bold'}>{hasGeminiKey ? 'DETECTED' : 'MISSING'}</span>
+                                        </div>
                                     </div>
                                     <button 
-    className="btn btn-dark btn-sm fw-bold shadow-sm px-4 rounded-pill" 
-    onClick={() => fetchAIDiagnosis(selectedUnitProcess)} 
-    disabled={isAiLoading}
->
-    {isAiLoading ? 'ANALYZING...' : 'START DIAGNOSTIC'}
-</button>
+                                        className="btn btn-dark btn-sm fw-bold shadow-sm px-4 rounded-pill" 
+                                        onClick={() => fetchAIDiagnosis(selectedUnitProcess)} 
+                                        disabled={isAiLoading}
+                                    >
+                                                                                {isAiLoading ? 'ANALYZING...' : 'START DIAGNOSTIC'}
+                                    </button>
                                 </div>
                                 <div className="p-3 bg-white rounded border text-dark small shadow-inner">
                                     {aiAnalysis ? (
                                         <div className="lh-lg"><span className="fw-bold text-primary mr-2">FINDINGS:</span> {aiAnalysis}</div>
                                     ) : (
-                                        <div className="text-muted italic text-center py-2">Click the button to run technical analysis on checklist data.</div>
+                                        <div className="text-muted italic text-center py-2">Click the button to run technical analysis.</div>
                                     )}
                                 </div>
                             </div>
@@ -271,20 +318,21 @@ export function StationsOverview({
             const logDate = new Date(log.timestamp || log.created_at);
             const start = startDate ? new Date(startDate) : null;
             const end = endDate ? new Date(endDate) : null;
-            if (start) start.setHours(0, 0, 0, 0); if (end) end.setHours(23, 59, 59, 999);
+            if (start) start.setHours(0, 0, 0, 0); 
+            if (end) end.setHours(23, 59, 59, 999);
             return matchesSearch && (!start || logDate >= start) && (!end || logDate <= end);
         }).sort((a, b) => new Date(b.timestamp || b.created_at) - new Date(a.timestamp || a.created_at));
     }, [allLogs, historySearch, startDate, endDate]);
 
+    // ✨ PAGINATION LOGIC RESTORED
+    const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
     const paginatedHistory = useMemo(() => {
         const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
         return filteredHistory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
     }, [filteredHistory, currentPage]);
 
-    const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
-
     if (activeTab === "station_monitor" && stationMonitorId) {
-        return <StationMonitorView {...{stationMonitorId, stations, calculateMetrics, handleEditClick, highlightedUnitId, setActiveTab, fetchData}} />;
+        return <StationMonitorView {...{stationMonitorId, calculateMetrics, handleEditClick, highlightedUnitId, setActiveTab, fetchData}} />;
     }
 
     if (activeTab === "overall_history") {
@@ -295,34 +343,46 @@ export function StationsOverview({
                     <button className="btn btn-light border btn-sm px-3 shadow-sm fw-bold" onClick={() => setActiveTab('stations')}>BACK</button>
                 </div>
                 <div className="bg-light p-3 rounded-2 border mb-4 d-flex flex-wrap gap-3 align-items-end mx-2 shadow-sm">
-                    <div className="flex-grow-1"><label className="fw-bold small text-muted mb-1 d-block uppercase" style={{fontSize:'0.65rem'}}>Assembly No.</label><input type="text" className="form-control form-control-sm shadow-none" placeholder="Search..." value={historySearch} onChange={(e) => setHistorySearch(e.target.value)} /></div>
-                    <div><label className="fw-bold small text-muted mb-1 d-block uppercase" style={{fontSize:'0.65rem'}}>Start</label><input type="date" className="form-control form-control-sm" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
-                    <div><label className="fw-bold small text-muted mb-1 d-block uppercase" style={{fontSize:'0.65rem'}}>End</label><input type="date" className="form-control form-control-sm" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>
-                    <button className="btn btn-danger btn-sm px-3 fw-bold shadow-sm" onClick={() => { setHistorySearch(''); setStartDate(''); setEndDate(''); }}>RESET</button>
+                    <div className="flex-grow-1"><label className="fw-bold small text-muted mb-1 d-block uppercase" style={{fontSize:'0.65rem'}}>Assembly No.</label><input type="text" className="form-control form-control-sm shadow-none" placeholder="Search..." value={historySearch} onChange={(e) => {setHistorySearch(e.target.value); setCurrentPage(1);}} /></div>
+                    <div><label className="fw-bold small text-muted mb-1 d-block uppercase" style={{fontSize:'0.65rem'}}>Start</label><input type="date" className="form-control form-control-sm" value={startDate} onChange={(e) => {setStartDate(e.target.value); setCurrentPage(1);}} /></div>
+                    <div><label className="fw-bold small text-muted mb-1 d-block uppercase" style={{fontSize:'0.65rem'}}>End</label><input type="date" className="form-control form-control-sm" value={endDate} onChange={(e) => {setEndDate(e.target.value); setCurrentPage(1);}} /></div>
+                    <button className="btn btn-danger btn-sm px-3 fw-bold shadow-sm" onClick={() => { setHistorySearch(''); setStartDate(''); setEndDate(''); setCurrentPage(1); }}>RESET</button>
                 </div>
                 <div className="bg-white border rounded-2 overflow-hidden mx-2 shadow-sm">
-                    <div style={{minHeight: '450px'}}>
-                        <table className="table table-hover align-middle mb-0" style={{fontSize: '0.85rem'}}>
-                            <thead className="table-dark">
-                                <tr><th>MODEL</th><th>ASSEMBLY</th><th>TYPE</th><th>STATION</th><th className="text-center">STATUS</th><th className="text-end pe-4">TIMESTAMP</th></tr>
-                            </thead>
-                            <tbody>
-                                {paginatedHistory.map(log => {
-                                    const ts = formatTimestamp(log.timestamp || log.created_at);
-                                    return (
-                                        <tr key={log.id}>
-                                            <td className="ps-4 fw-bold">{log.model || log.model_id}</td>
-                                            <td><code className="text-primary fw-bold">{log.assembly_no}</code></td>
-                                            <td className="small text-muted fw-bold">{log.action_type || 'UPDATE'}</td>
-                                            <td className="fw-semibold">{log.station_name || log.station}</td>
-                                            <td className="text-center"><span className={`badge rounded-1 px-3 ${getStatusBadgeClass(log.status_after || log.status)}`}>{log.status_after || log.status}</span></td>
-                                            <td className="text-end pe-4 small text-muted"><strong>{ts.date}</strong><br/>{ts.time}</td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                    <table className="table table-hover align-middle mb-0" style={{fontSize: '0.85rem'}}>
+                        <thead className="table-dark">
+                            <tr><th>MODEL</th><th>ASSEMBLY</th><th>TYPE</th><th>STATION</th><th className="text-center">STATUS</th><th className="text-end pe-4">TIMESTAMP</th></tr>
+                        </thead>
+                        <tbody>
+                            {paginatedHistory.map(log => {
+                                const ts = formatTimestamp(log.timestamp || log.created_at);
+                                return (
+                                    <tr key={log.id}>
+                                        <td className="ps-4 fw-bold">{log.model || log.model_id}</td>
+                                        <td><code className="text-primary fw-bold">{log.assembly_no}</code></td>
+                                        <td className="small text-muted fw-bold">{log.action_type || 'UPDATE'}</td>
+                                        <td className="fw-semibold">{log.station_name || log.station}</td>
+                                        <td className="text-center"><span className={`badge rounded-1 px-3 ${getStatusBadgeClass(log.status_after || log.status)}`}>{log.status_after || log.status}</span></td>
+                                        <td className="text-end pe-4 small text-muted"><strong>{ts.date}</strong><br/>{ts.time}</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                    
+                    {/* ✨ PAGINATION CONTROLS */}
+                    {totalPages > 1 && (
+                        <div className="d-flex justify-content-between align-items-center p-3 bg-light border-top">
+                            <span className="small text-muted">Page {currentPage} of {totalPages} ({filteredHistory.length} total logs)</span>
+                            <div className="btn-group shadow-sm">
+                                <button className="btn btn-white btn-sm border" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>PREV</button>
+                                {[...Array(totalPages)].map((_, i) => (
+                                    <button key={i} className={`btn btn-sm border ${currentPage === i + 1 ? 'btn-dark' : 'btn-white'}`} onClick={() => setCurrentPage(i + 1)}>{i + 1}</button>
+                                )).slice(Math.max(0, currentPage - 3), Math.min(totalPages, currentPage + 2))}
+                                <button className="btn btn-white btn-sm border" disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => prev + 1)}>NEXT</button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -340,7 +400,6 @@ export function StationsOverview({
                 .delay-tag { position: absolute; top: 10px; right: 10px; color: #dc3545; font-size: 0.6rem; font-weight: 800; border: 1px solid #dc3545; padding: 1px 6px; border-radius: 4px; }
                 .metric-row { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #475569; }
                 .animate-pulse { animation: pulse-red 1.5s infinite !important; }
-                @keyframes pulse-red { 0% { transform: scale(1); } 50% { transform: scale(1.02); color: #dc3545; } 100% { transform: scale(1); } }
             `}</style>
             
             <div className="d-flex justify-content-between align-items-center mb-4 px-2 border-bottom pb-3">
@@ -373,4 +432,4 @@ export function StationsOverview({
             </div>
         </div>
     );
-}   
+}
