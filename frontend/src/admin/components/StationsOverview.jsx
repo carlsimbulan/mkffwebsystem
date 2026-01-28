@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import axios from 'axios';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
 const processStations = [
@@ -15,24 +16,6 @@ const DELAY_THRESHOLDS_MINUTES = {
     'Station7': 3, 'Station 7': 3, 'Station8': 0, 'Station 8': 0, 'Station9': 480, 'Station 9': 480,
     'Station10': 8, 'Station 10': 8, 'Station11': 22, 'Station 11': 22, 'Station12': 5, 'Station 12': 5,
     'Station13': 10, 'Station 13': 10, 'Station14': 8, 'Station 14': 8, 'Station15': 5, 'Station 15': 5
-};
-
-const DELAY_REASONS = {
-    "PCB Pairing": { L1: "Header connector non-90° seating", L2: "PCB leads soldering rework needed", L3: "Component batch mismatch on floor" },
-    "Integrated Board Test": { L1: "Test fixture probe cleaning required", L2: "Integrated Level Test alignment issue", L3: "Physical damage on test jig pins" },
-    "Main Board Conformal Coating": { L1: "Nozzle cleaning / Air bubble clearing", L2: "Drying oven tray congestion", L3: "Material stock-out (Coating supply)" },
-    "RTV Application": { L1: "Manual application inconsistency", L2: "Extended curing due to humidity", L3: "Dispenser machine mechanical jam" },
-    "Casing/Harnessing": { L1: "Tight fitment / Casing alignment", L2: "Harness connector shortage on bin", L3: "Operator fatigue / Manpower shortage" },
-    "Complete Unit Test/Calibration": { L1: "Voltage calibration drift (Ref: 115V)", L2: "LoRa / Energy Meter physical loose contact", L3: "Reference 'Golden Unit' sample damaged" },
-    "Pre BI Hi-Pot Test": { L1: "Safety cable insulation manual checking", L2: "Leakage current threshold adjustment", L3: "High-voltage safety probe malfunction" },
-    "Burn-in Testing": { L1: "Burn-in time requirement pending", L2: "Unit flickering observation needed", L3: "Burn-in rack power socket failure" },
-    "Sealing": { L1: "Sealant pre-heating delay", L2: "Gasket misalignment during press", "L3": "Heater element physical wear-out" },
-    "Post BI Hi-Pot Test": { L1: "Residual charge discharge time", L2: "Post-burn-in connector wear", L3: "Test module isolation failure" },
-    "Final Functional/Connectivity Test": { L1: "Antenna/Connectivity pairing lag", L2: "Manual reset button responsiveness", L3: "Firmware batch inconsistency on units" },
-    "Label Sticker Attachment": { L1: "Label printer ribbon replacement", L2: "Missing mandatory warning labels", L3: "Label feeder machine mechanical jam" },
-    "FVI": { L1: "Cosmetic smudge / cleaning delay", L2: "Detailed inspection of visual defects", L3: "Missing physical QC inspector stamp" },
-    "Packing": { L1: "Manual insertion of inserts/manuals", L2: "Carton box assembly congestion", L3: "Weight scale mechanical calibration" },
-    "QC Stamping": { L1: "Final verification document delay", L2: "Minor rework sorting activity", L3: "Final Auditor shift transition delay" }
 };
 
 const allStatuses = ['All', 'In Progress', 'Completed', 'No Good (NG)', 'Pending Approval', 'For Scanning'];
@@ -61,13 +44,9 @@ const checkUnitDelay = (stationId, updatedAt) => {
     const threshold = DELAY_THRESHOLDS_MINUTES[stationId] || 10;
     const lastUpdate = new Date(updatedAt).getTime();
     const minutesInStation = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
-    
-    // 🔑 INNOVATION: SEVERITY LEVELS
-    if (minutesInStation > threshold * 3) return { isDelayed: true, level: 'LEVEL 3: ESCALATED', minutes: minutesInStation, code: 'L3' };
-    if (minutesInStation > threshold * 2) return { isDelayed: true, level: 'LEVEL 2: CRITICAL', minutes: minutesInStation, code: 'L2' };
-    if (minutesInStation > threshold) return { isDelayed: true, level: 'LEVEL 1: WARNING', minutes: minutesInStation, code: 'L1' };
-    
-    return { isDelayed: false, level: 'NORMAL', minutes: minutesInStation, code: 'NOR' };
+    if (minutesInStation > threshold * 3) return { isDelayed: true, level: 'CRITICAL', minutes: minutesInStation };
+    if (minutesInStation > threshold) return { isDelayed: true, level: 'MODERATE', minutes: minutesInStation };
+    return { isDelayed: false, level: 'NORMAL', minutes: minutesInStation };
 };
 
 const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClick, highlightedUnitId, setActiveTab, fetchData }) => {
@@ -75,6 +54,8 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
     const [statusFilter, setStatusFilter] = useState('All'); 
     const [selectedUnitProcess, setSelectedUnitProcess] = useState(null); 
     const [expandedStepIdx, setExpandedStepIdx] = useState(null);
+    const [aiAnalysis, setAiAnalysis] = useState(null);
+    const [isAiLoading, setIsAiLoading] = useState(false);
 
     const monitorMetrics = calculateMetrics(stationMonitorId);
 
@@ -87,29 +68,43 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
     const stationIndex = parseInt(stationMonitorId.replace('Station', '')) - 1;
     const processName = processStations[stationIndex] || stationMonitorId;
 
+    // 🔑 PALITAN MO ITONG BUONG fetchAIDiagnosis FUNCTION
+const fetchAIDiagnosis = async (unit) => {
+    setIsAiLoading(true);
+    setAiAnalysis(null);
+    try {
+        // Siguraduhin na tama ang URL path na ito base sa XAMPP mo
+        const response = await axios.post("http://localhost/mkffwebsystem/backend/api/gemini_diagnose.php", {
+            station: processName,
+            unit_data: unit 
+        });
+        
+        if (response.data.status === 'success') {
+            setAiAnalysis(response.data.analysis);
+        } else {
+            setAiAnalysis("Error: " + response.data.message);
+        }
+    } catch (err) {
+        // Debugging message para malaman kung 404 o SSL error
+        setAiAnalysis("Diagnostic link failed. Please check local server connection.");
+        console.error("API Call Error:", err);
+    } finally {
+        setIsAiLoading(false);
+    }
+};
     return (
         <div className="pb-5 container-fluid px-0">
             <style>{`
-                * { animation: none !important; transition: none !important; }
-                .btn-box { border-radius: 4px !important; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; transition: none !important; }
                 .stat-card-pro { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 22px; height: 100%; border-left: 5px solid #198754; }
-                .table thead th { background-color: #1e293b !important; color: #ffffff !important; font-weight: 600; border: none; padding: 12px 15px; }
-                .table-hover tbody tr:hover { background-color: #f1f5f9 !important; }
-                .modal-step { padding: 15px 20px; border-left: 2px solid #e9ecef; position: relative; border-radius: 0 8px 8px 0; cursor: pointer; transition: none !important; }
-                .modal-step.done { border-left-color: #198754; }
-                .modal-step.current { border-left-color: #0d6efd; background: #f0f7ff; }
-                .modal-step.ng { border-left-color: #dc3545; background: #fff5f5; }
+                .table thead th { background-color: #1e293b !important; color: #ffffff !important; font-weight: 600; padding: 12px 15px; }
+                .modal-step { padding: 15px 20px; border-left: 2px solid #e9ecef; position: relative; cursor: pointer; }
                 .modal-dot { position: absolute; left: -7px; top: 22px; width: 12px; height: 12px; border-radius: 50%; background: #dee2e6; border: 2px solid white; z-index: 2; }
                 .done .modal-dot { background: #198754; }
                 .current .modal-dot { background: #0d6efd; }
-                .ng .modal-dot { background: #dc3545; }
-                .tracker-checklist-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px; margin-top: 10px; overflow-x: auto; }
-                .tracker-table { width: 100%; min-width: 500px; font-size: 0.72rem; margin-bottom: 0; }
-                .tracker-table th { background: #f1f5f9; color: #475569; padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-transform: uppercase; font-weight: 800; text-align: center; }
-                .tracker-table td { padding: 8px 8px; color: #0f172a; font-weight: 700; border-bottom: 1px solid #e2e8f0; text-align: center; }
+                .tracker-table th { background: #f1f5f9; padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-transform: uppercase; font-weight: 800; text-align: center; font-size: 0.7rem; }
+                .tracker-table td { padding: 8px 8px; font-weight: 700; border-bottom: 1px solid #e2e8f0; text-align: center; font-size: 0.7rem; }
+                .diagnostic-card-minimal { background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
                 .delay-row { background-color: #fff5f5 !important; }
-                .animate-pulse { animation: pulse-bg 2s infinite !important; }
-                @keyframes pulse-bg { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
             `}</style>
 
             <div className="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3 px-2">
@@ -117,73 +112,57 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                     <h3 className="fw-bold text-dark mb-1">{processName}</h3>
                     <p className="text-muted small mb-0">Operational View • ID: {stationMonitorId}</p>
                 </div>
-                <button className="btn btn-light border btn-sm btn-box px-3" onClick={() => setActiveTab('stations')}>
-                    <i className="bi bi-arrow-left me-1"></i> BACK
-                </button>
+                <button className="btn btn-light border btn-sm px-3 shadow-sm fw-bold" onClick={() => setActiveTab('stations')}>BACK</button>
             </div>
 
             <div className="row g-4 mb-4">
-                <div className="col-md-6 col-xl-3"><div className="stat-card-pro"><span className="text-muted small fw-bold text-uppercase">Completed</span><h3 className="fw-bold text-success mt-1">{monitorMetrics.completedUnits}</h3></div></div>
-                <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{borderLeftColor: '#0d6efd'}}><span className="text-muted small fw-bold text-uppercase">Yield Rate</span><h3 className="fw-bold text-primary mt-1">{monitorMetrics.yieldRate}%</h3></div></div>
-                <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{borderLeftColor: '#ffc107'}}><span className="text-muted small fw-bold text-uppercase">In Progress</span><h3 className="fw-bold text-warning mt-1">{monitorMetrics.pendingUnits}</h3></div></div>
-                <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{borderLeftColor: '#dc3545'}}><span className="text-muted small fw-bold text-uppercase">No Good (NG)</span><h3 className="fw-bold text-danger mt-1">{monitorMetrics.ngUnits}</h3></div></div>
+                <div className="col-md-6 col-xl-3"><div className="stat-card-pro"><span className="text-muted small fw-bold uppercase">Completed</span><h3 className="fw-bold text-success mt-1">{monitorMetrics.completedUnits}</h3></div></div>
+                <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{borderLeftColor: '#0d6efd'}}><span className="text-muted small fw-bold uppercase">Yield Rate</span><h3 className="fw-bold text-primary mt-1">{monitorMetrics.yieldRate}%</h3></div></div>
+                <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{borderLeftColor: '#ffc107'}}><span className="text-muted small fw-bold uppercase">In Progress</span><h3 className="fw-bold text-warning mt-1">{monitorMetrics.pendingUnits}</h3></div></div>
+                <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{borderLeftColor: '#dc3545'}}><span className="text-muted small fw-bold uppercase">No Good (NG)</span><h3 className="fw-bold text-danger mt-1">{monitorMetrics.ngUnits}</h3></div></div>
             </div>
 
             <div className="bg-white border rounded-2 overflow-hidden shadow-sm">
                 <div className="p-3 border-bottom d-flex justify-content-between align-items-center bg-light">
-                    <span className="fw-bold small text-muted">STATION LOGS</span>
+                    <span className="fw-bold small text-muted text-uppercase">Station Logs</span>
                     <div className="d-flex gap-2">
-                        <select className="form-select form-select-sm btn-box shadow-none" style={{width:'160px'}} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>{allStatuses.map(s => <option key={s} value={s}>{s}</option>)}</select>
-                        <input type="text" className="form-control form-control-sm btn-box shadow-none" style={{width:'200px'}} placeholder="Search ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                        <button className="btn btn-secondary btn-sm btn-box px-3" onClick={() => {setSearchTerm(''); setStatusFilter('All'); fetchData();}}>RESET</button>
+                        <select className="form-select form-select-sm" style={{width:'160px'}} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>{allStatuses.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                        <input type="text" className="form-control form-control-sm" style={{width:'200px'}} placeholder="Search ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                        <button className="btn btn-secondary btn-sm px-3 fw-bold" onClick={() => {setSearchTerm(''); setStatusFilter('All'); fetchData();}}>RESET</button>
                     </div>
                 </div>
                 <div className="table-responsive">
                     <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem' }}>
                         <thead>
                             <tr>
-                                <th className="ps-4">MODEL</th>
-                                <th>REVISION</th>
-                                <th>BASE UNIT</th>
-                                <th>ASSEMBLY</th>
-                                <th>DEVICE SERIAL</th>
-                                <th>ACCESSORY</th>
-                                <th className="text-center">STATUS</th>
-                                <th>REMARKS</th>
-                                <th>LAST MOVEMENT</th>
-                                <th className="text-center">ACTIONS</th>
+                                <th className="ps-4">MODEL</th><th>REVISION</th><th>BASE UNIT</th><th>ASSEMBLY</th>
+                                <th>DEVICE SERIAL</th><th>ACCESSORY</th><th className="text-center">STATUS</th>
+                                <th>REMARKS</th><th>LAST MOVEMENT</th><th className="text-center">ACTIONS</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredLogs.map(log => {
                                 const delay = log.status === 'In Progress' ? checkUnitDelay(stationMonitorId, log.updated_at || log.created_at) : { isDelayed: false };
                                 return (
-                                    <tr key={log.id} className={`${highlightedUnitId === log.id ? 'table-danger fw-bold' : ''} ${delay.isDelayed ? 'delay-row' : ''}`}>
+                                    <tr key={log.id} className={delay.isDelayed ? 'delay-row' : ''}>
                                         <td className="ps-4 fw-bold">{log.model}</td>
                                         <td>{log.revision}</td>
                                         <td>{log.base_unit_kitting_no}</td>
                                         <td>
                                             <code className="text-primary fw-bold">{log.assembly_no}</code>
-                                            {delay.isDelayed && <i className="bi bi-exclamation-triangle-fill text-danger ms-2 animate-pulse" title={`Delayed: ${delay.level}`}></i>}
+                                            {delay.isDelayed && <i className="bi bi-exclamation-triangle-fill text-danger ms-2" title={`Delayed: ${delay.level}`}></i>}
                                         </td>
                                         <td className="fw-bold">{log.device_serial_no}</td>
                                         <td>{log.accessory_kitting_no}</td>
-                                        <td className="text-center">
-                                            <span className={`badge rounded-1 px-3 py-1 ${getStatusBadgeClass(log.status)}`}>
-                                                {log.status}
-                                            </span>
-                                        </td>
+                                        <td className="text-center"><span className={`badge rounded-1 px-3 py-1 ${getStatusBadgeClass(log.status)}`}>{log.status}</span></td>
                                         <td className="text-muted small italic">{log.remarks || '---'}</td>
-                                        <td className="small">
-                                            <div className="fw-bold">{new Date(log.updated_at || log.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                                            <div className="text-muted" style={{ fontSize: '0.7rem' }}>{new Date(log.updated_at || log.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</div>
-                                        </td>
+                                        <td className="small text-muted">{new Date(log.updated_at || log.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                                         <td className="text-center">
                                             <div className="d-flex gap-1 justify-content-center">
-                                                <button className={`btn btn-sm ${delay.isDelayed ? 'btn-danger' : 'btn-primary'} btn-box py-1 px-3`} style={{fontSize:'0.7rem'}} onClick={() => setSelectedUnitProcess(log)}>
+                                                <button className={`btn btn-sm ${delay.isDelayed ? 'btn-danger' : 'btn-primary'} px-3 fw-bold`} onClick={() => setSelectedUnitProcess(log)}>
                                                     {delay.isDelayed ? 'VIEW CAUSE' : 'DETAILS'}
                                                 </button>
-                                                <button className="btn btn-sm btn-danger btn-box py-1 px-3" style={{fontSize:'0.7rem'}} onClick={() => handleEditClick(log)}>EDIT</button>
+                                                <button className="btn btn-sm btn-danger px-3 fw-bold" onClick={() => handleEditClick(log)}>EDIT</button>
                                             </div>
                                         </td>
                                     </tr>
@@ -197,55 +176,37 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
             {selectedUnitProcess && (
                 <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.4)', zIndex: 1050 }}>
                     <div className="bg-white rounded-3 shadow-xl p-0 overflow-hidden border-0" style={{ width: '95%', maxWidth: '900px' }}>
-                        <div className="p-4 d-flex justify-content-between align-items-center text-white bg-primary">
-                            <div>
-                                <h5 className="mb-0 fw-bold">Unit Tracker & Analysis</h5>
-                                <p className="mb-0 small opacity-75">{selectedUnitProcess.assembly_no}</p>
+                        <div className="p-4 d-flex justify-content-between align-items-center text-white bg-primary shadow-sm">
+                            <div><h5 className="mb-0 fw-bold">Process Tracker & Analysis</h5><p className="mb-0 small opacity-75">{selectedUnitProcess.assembly_no}</p></div>
+                            <button className="btn-close btn-close-white shadow-none" onClick={() => {setSelectedUnitProcess(null); setAiAnalysis(null);}}></button>
+                        </div>
+
+                        <div className="p-4" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
+                            
+                            {/* 🔑 MINIMALIST DIAGNOSTIC ROOT CAUSE SECTION (White/Light Theme) */}
+                            <div className="diagnostic-card-minimal p-3 mb-4 shadow-sm">
+                                <div className="d-flex justify-content-between align-items-center mb-3">
+                                    <div className="fw-bold text-dark small uppercase tracking-wider">
+                                        DIAGNOSTIC ROOT CAUSE
+                                    </div>
+                                    <button 
+    className="btn btn-dark btn-sm fw-bold shadow-sm px-4 rounded-pill" 
+    onClick={() => fetchAIDiagnosis(selectedUnitProcess)} 
+    disabled={isAiLoading}
+>
+    {isAiLoading ? 'ANALYZING...' : 'START DIAGNOSTIC'}
+</button>
+                                </div>
+                                <div className="p-3 bg-white rounded border text-dark small shadow-inner">
+                                    {aiAnalysis ? (
+                                        <div className="lh-lg"><span className="fw-bold text-primary mr-2">FINDINGS:</span> {aiAnalysis}</div>
+                                    ) : (
+                                        <div className="text-muted italic text-center py-2">Click the button to run technical analysis on checklist data.</div>
+                                    )}
+                                </div>
                             </div>
-                            <button className="btn-close btn-close-white shadow-none" onClick={() => {setSelectedUnitProcess(null); setExpandedStepIdx(null);}}></button>
-                        </div>
 
-                        <div className="p-2 bg-light border-bottom d-flex justify-content-around small fw-bold text-muted">
-                            <span><i className="bi bi-box-seam me-1"></i> {selectedUnitProcess.model}</span>
-                            <span><i className="bi bi-hash me-1"></i> SN: {selectedUnitProcess.device_serial_no}</span>
-                        </div>
-
-                        <div className="p-4" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-                            {/* 🔑 INNOVATIVE DELAY DRILL-DOWN SECTION */}
-                            {selectedUnitProcess.status === 'In Progress' && (() => {
-                                const delay = checkUnitDelay(stationMonitorId, selectedUnitProcess.updated_at || selectedUnitProcess.created_at);
-                                if (delay.isDelayed) {
-                                    const reasons = DELAY_REASONS[processName] || { L1: "Manual lag", L2: "Operational delay", L3: "Critical Bottleneck" };
-                                    const specificReason = delay.code === 'L3' ? reasons.L3 : (delay.code === 'L2' ? reasons.L2 : reasons.L1);
-                                    return (
-                                        <div className="alert alert-danger border-0 shadow-sm mb-4 p-3 border-start border-5 border-danger">
-                                            <div className="d-flex align-items-center mb-2">
-                                                <i className="bi bi-exclamation-octagon-fill me-2 fs-5"></i>
-                                                <h6 className="mb-0 fw-bold">DELAY DIAGNOSTIC: {delay.level}</h6>
-                                            </div>
-                                            <div className="bg-white rounded p-3 border mb-2">
-                                                <div className="row">
-                                                    <div className="col-md-6 border-end">
-                                                        <div className="small fw-bold text-muted text-uppercase mb-1">Time Elapsed:</div>
-                                                        <div className="h5 fw-bold text-danger mb-0">{Math.floor(delay.minutes)} mins</div>
-                                                    </div>
-                                                    <div className="col-md-6 ps-4">
-                                                        <div className="small fw-bold text-muted text-uppercase mb-1">Possible Cause:</div>
-                                                        <div className="fw-bold text-dark">{specificReason}</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="small italic fw-bold text-danger d-flex align-items-center">
-                                                <i className="bi bi-megaphone-fill me-2"></i> 
-                                                <span>SYSTEM ALERT: Intervention requested for {stationMonitorId} - {processName}.</span>
-                                            </div>
-                                        </div>
-                                    );
-                                }
-                                return null;
-                            })()}
-
-                            <div className="process-timeline">
+                            <div className="process-timeline mt-4 ps-2">
                                 {processStations.map((station, idx) => {
                                     const isCurrent = idx === stationIndex;
                                     const isDoneBefore = idx < stationIndex;
@@ -255,68 +216,26 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                     const isExpanded = expandedStepIdx === idx;
 
                                     let stationData = null;
-                                    if (idx === 0 && selectedUnitProcess.header_seated_90_deg) {
-                                        stationData = { "Header Seated": selectedUnitProcess.header_seated_90_deg, "Soldering": selectedUnitProcess.leads_properly_soldered };
-                                    } else if (idx === 1 && selectedUnitProcess.integrated_board_level_test1) {
-                                        stationData = { "Board 1": selectedUnitProcess.integrated_board_level_test1, "Board 2": selectedUnitProcess.integrated_board_level_test2, "Board 3": selectedUnitProcess.integrated_board_level_test3 };
-                                    } else if (idx === 5 && selectedUnitProcess.voltage) {
-                                        stationData = { 
-                                            "LoRa": selectedUnitProcess.lora_module, 
-                                            "Meter": selectedUnitProcess.energy_meter, 
-                                            "PwrGood": selectedUnitProcess.power_good_test,
-                                            "Volt": selectedUnitProcess.voltage + "V",
-                                            "L1": selectedUnitProcess.line1 + "V",
-                                            "L2": selectedUnitProcess.line2 + "V",
-                                            "L3": selectedUnitProcess.line3 + "V",
-                                            "Temp": selectedUnitProcess.temp_reading,
-                                            "Freq": selectedUnitProcess.freq_reading,
-                                            "4G": selectedUnitProcess.led_status_4g,
-                                            "Blink": selectedUnitProcess.led_status_fast_blink,
-                                            "Verdict": selectedUnitProcess.go_no_go
-                                        };
-                                    } else if (idx === 6 && selectedUnitProcess.performed_passed) {
-                                        stationData = { "Hi-Pot Passed": selectedUnitProcess.performed_passed, "Recorded": selectedUnitProcess.result_recorded };
-                                    } else if (idx === 7 && selectedUnitProcess.burnin_completed) {
-                                        stationData = { "Burn-in Done": selectedUnitProcess.burnin_completed, "No Failure": selectedUnitProcess.no_failure_observed };
-                                    } else if (idx === 9 && selectedUnitProcess.post_performed_passed) {
-                                        stationData = { "Post Hi-Pot": selectedUnitProcess.post_performed_passed, "Post Recorded": selectedUnitProcess.post_result_recorded };
-                                    } else if (idx === 10 && selectedUnitProcess.functions_working) {
-                                        stationData = { "Functions": selectedUnitProcess.functions_working, "Connectivity": selectedUnitProcess.connectivity_passed };
-                                    } else if (idx === 11 && selectedUnitProcess.stickers_attached) {
-                                        stationData = { "Stickers": selectedUnitProcess.stickers_attached, "Readable": selectedUnitProcess.stickers_readable };
-                                    }
+                                    if (idx === 0 && selectedUnitProcess.header_seated_90_deg) stationData = { "Header Seated": selectedUnitProcess.header_seated_90_deg, "Soldering": selectedUnitProcess.leads_properly_soldered };
+                                    else if (idx === 1 && selectedUnitProcess.integrated_board_level_test1) stationData = { "Board 1": selectedUnitProcess.integrated_board_level_test1, "Board 2": selectedUnitProcess.integrated_board_level_test2, "Board 3": selectedUnitProcess.integrated_board_level_test3 };
+                                    else if (idx === 5 && selectedUnitProcess.voltage) stationData = { "LoRa": selectedUnitProcess.lora_module, "Volt": selectedUnitProcess.voltage + "V", "Verdict": selectedUnitProcess.go_no_go };
 
                                     let stepClass = isDoneBefore || isCompletedHere ? 'done' : (isNG ? 'ng' : (isCurrent ? 'current' : ''));
-                                    let subText = isDoneBefore || isCompletedHere ? 'COMPLETED' : (isNG ? 'DEFECT DETECTED (NG)' : (isCurrent ? 'IN PROGRESS' : 'PENDING'));
-
                                     return (
                                         <div key={idx} className={`modal-step ${stepClass}`} onClick={() => stationData && setExpandedStepIdx(isExpanded ? null : idx)}>
                                             <div className="modal-dot"></div>
                                             <div className="d-flex justify-content-between align-items-center">
-                                                <div>
-                                                    <div className="fw-bold small">{idx + 1}. {station} {stationData && <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'} ms-1`}></i>}</div>
-                                                    <div className="text-muted fw-bold" style={{fontSize:'0.6rem'}}>{subText}</div>
-                                                </div>
+                                                <div><div className="fw-bold small">{idx + 1}. {station}</div></div>
                                                 {stationData && <span className="badge bg-light text-dark border" style={{fontSize: '0.6rem'}}>VIEW DATA</span>}
                                             </div>
                                             {isExpanded && stationData && (
                                                 <div className="tracker-checklist-box">
-                                                    <table className="tracker-table">
+                                                    <table className="tracker-table table-sm">
                                                         <thead><tr>{Object.keys(stationData).map(k => <th key={k}>{k}</th>)}</tr></thead>
                                                         <tbody>
-                                                            <tr>
-                                                                {Object.values(stationData).map((v, i) => {
-                                                                    const isLihis = ["NO GO", "FAIL", "Not Detected"].includes(v) || 
-                                                                                   (Object.keys(stationData)[i] === "Volt" && (parseFloat(v) < 113.85 || parseFloat(v) > 116.15));
-                                                                    return (
-                                                                        <td key={i}>
-                                                                            <span className={isLihis ? 'text-danger fw-bold' : 'text-success'}>
-                                                                                {v || 'N/A'}
-                                                                            </span>
-                                                                        </td>
-                                                                    );
-                                                                })}
-                                                            </tr>
+                                                            <tr>{Object.values(stationData).map((v, i) => (
+                                                                <td key={i} className={["NO GO", "FAIL"].includes(v) ? 'text-danger fw-bold' : 'text-success'}>{v || 'N/A'}</td>
+                                                            ))}</tr>
                                                         </tbody>
                                                     </table>
                                                 </div>
@@ -326,8 +245,8 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                 })}
                             </div>
                         </div>
-                        <div className="p-3 bg-white border-top">
-                            <button className="btn btn-primary w-100 btn-box py-2 shadow-sm" onClick={() => setSelectedUnitProcess(null)}>CLOSE ANALYSIS</button>
+                        <div className="p-3 bg-light border-top text-end">
+                            <button className="btn btn-secondary px-5 fw-bold py-2 rounded shadow-sm" onClick={() => setSelectedUnitProcess(null)}>DISMISS</button>
                         </div>
                     </div>
                 </div>
@@ -364,8 +283,6 @@ export function StationsOverview({
 
     const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
 
-    React.useEffect(() => { setCurrentPage(1); }, [historySearch, startDate, endDate]);
-
     if (activeTab === "station_monitor" && stationMonitorId) {
         return <StationMonitorView {...{stationMonitorId, stations, calculateMetrics, handleEditClick, highlightedUnitId, setActiveTab, fetchData}} />;
     }
@@ -373,81 +290,38 @@ export function StationsOverview({
     if (activeTab === "overall_history") {
         return (
             <div className="pb-5 container-fluid px-0">
-                <style>{`
-                    * { animation: none !important; transition: none !important; }
-                    .btn-box { border-radius: 4px !important; font-weight: 600; }
-                    .table thead th { background-color: #1e293b !important; color: white !important; padding: 12px; }
-                    .pagination .page-link { color: #1e293b; border: 1px solid #dee2e6; margin: 0 2px; border-radius: 4px; }
-                `}</style>
                 <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3 px-2">
-                    <div>
-                        <h4 className="fw-bold text-dark mb-0">Production History</h4>
-                        <p className="text-muted small mb-0">Showing {paginatedHistory.length} of {filteredHistory.length} Total Logs</p>
-                    </div>
-                    <button className="btn btn-light border btn-sm btn-box px-3" onClick={() => setActiveTab('stations')}>BACK</button>
+                    <div><h4 className="fw-bold text-dark mb-0">Production History</h4></div>
+                    <button className="btn btn-light border btn-sm px-3 shadow-sm fw-bold" onClick={() => setActiveTab('stations')}>BACK</button>
                 </div>
-
                 <div className="bg-light p-3 rounded-2 border mb-4 d-flex flex-wrap gap-3 align-items-end mx-2 shadow-sm">
-                    <div className="flex-grow-1"><label className="fw-bold small text-muted mb-1 d-block">ASSEMBLY NO.</label>
-                    <input type="text" className="form-control form-control-sm btn-box shadow-none" placeholder="Search..." value={historySearch} onChange={(e) => setHistorySearch(e.target.value)} /></div>
-                    <div><label className="fw-bold small text-muted mb-1 d-block">START DATE</label><input type="date" className="form-control form-control-sm btn-box" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
-                    <div><label className="fw-bold small text-muted mb-1 d-block">END DATE</label><input type="date" className="form-control form-control-sm btn-box" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>
-                    <button className="btn btn-danger btn-sm btn-box px-3" onClick={() => { setHistorySearch(''); setStartDate(''); setEndDate(''); }}>RESET</button>
+                    <div className="flex-grow-1"><label className="fw-bold small text-muted mb-1 d-block uppercase" style={{fontSize:'0.65rem'}}>Assembly No.</label><input type="text" className="form-control form-control-sm shadow-none" placeholder="Search..." value={historySearch} onChange={(e) => setHistorySearch(e.target.value)} /></div>
+                    <div><label className="fw-bold small text-muted mb-1 d-block uppercase" style={{fontSize:'0.65rem'}}>Start</label><input type="date" className="form-control form-control-sm" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></div>
+                    <div><label className="fw-bold small text-muted mb-1 d-block uppercase" style={{fontSize:'0.65rem'}}>End</label><input type="date" className="form-control form-control-sm" value={endDate} onChange={(e) => setEndDate(e.target.value)} /></div>
+                    <button className="btn btn-danger btn-sm px-3 fw-bold shadow-sm" onClick={() => { setHistorySearch(''); setStartDate(''); setEndDate(''); }}>RESET</button>
                 </div>
-
                 <div className="bg-white border rounded-2 overflow-hidden mx-2 shadow-sm">
                     <div style={{minHeight: '450px'}}>
                         <table className="table table-hover align-middle mb-0" style={{fontSize: '0.85rem'}}>
-                            <thead className="sticky-top">
-                                <tr>
-                                    <th className="ps-4">MODEL</th>
-                                    <th>ASSEMBLY</th>
-                                    <th>TYPE</th>
-                                    <th>STATION</th>
-                                    <th className="text-center">STATUS</th>
-                                    <th>USER</th>
-                                    <th className="text-end pe-4">TIMESTAMP</th>
-                                </tr>
+                            <thead className="table-dark">
+                                <tr><th>MODEL</th><th>ASSEMBLY</th><th>TYPE</th><th>STATION</th><th className="text-center">STATUS</th><th className="text-end pe-4">TIMESTAMP</th></tr>
                             </thead>
                             <tbody>
-                                {paginatedHistory.length > 0 ? (
-                                    paginatedHistory.map(log => {
-                                        const ts = formatTimestamp(log.timestamp || log.created_at);
-                                        return (
-                                            <tr key={log.id}>
-                                                <td className="ps-4 fw-bold">{log.model || log.model_id}</td>
-                                                <td><code className="text-primary fw-bold">{log.assembly_no}</code></td>
-                                                <td className="text-muted small fw-bold">{log.action_type || 'UPDATE'}</td>
-                                                <td className="fw-semibold">{log.station_name || log.station}</td>
-                                                <td className="text-center"><span className={`badge rounded-1 px-3 ${getStatusBadgeClass(log.status_after || log.status)}`}>{log.status_after || log.status}</span></td>
-                                                <td className="small">{log.action_by || 'System'}</td>
-                                                <td className="text-end pe-4 small text-muted"><strong>{ts.date}</strong><br/>{ts.time}</td>
-                                            </tr>
-                                        );
-                                    })
-                                ) : (
-                                    <tr><td colSpan="7" className="text-center py-5 text-muted italic">No logs found.</td></tr>
-                                )}
+                                {paginatedHistory.map(log => {
+                                    const ts = formatTimestamp(log.timestamp || log.created_at);
+                                    return (
+                                        <tr key={log.id}>
+                                            <td className="ps-4 fw-bold">{log.model || log.model_id}</td>
+                                            <td><code className="text-primary fw-bold">{log.assembly_no}</code></td>
+                                            <td className="small text-muted fw-bold">{log.action_type || 'UPDATE'}</td>
+                                            <td className="fw-semibold">{log.station_name || log.station}</td>
+                                            <td className="text-center"><span className={`badge rounded-1 px-3 ${getStatusBadgeClass(log.status_after || log.status)}`}>{log.status_after || log.status}</span></td>
+                                            <td className="text-end pe-4 small text-muted"><strong>{ts.date}</strong><br/>{ts.time}</td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
-                    </div>
-                    <div className="p-3 border-top d-flex justify-content-between align-items-center bg-light">
-                        <div className="small text-muted fw-bold">Page {currentPage} of {totalPages || 1}</div>
-                        <nav>
-                            <ul className="pagination pagination-sm mb-0">
-                                <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
-                                    <button className="page-link shadow-none" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}><i className="bi bi-chevron-left"></i></button>
-                                </li>
-                                {[...Array(totalPages)].map((_, index) => (
-                                    <li key={index} className={`page-item ${currentPage === index + 1 ? 'active' : ''}`}>
-                                        <button className="page-link shadow-none" onClick={() => setCurrentPage(index + 1)}>{index + 1}</button>
-                                    </li>
-                                ))}
-                                <li className={`page-item ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}`}>
-                                    <button className="page-link shadow-none" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}><i className="bi bi-chevron-right"></i></button>
-                                </li>
-                            </ul>
-                        </nav>
                     </div>
                 </div>
             </div>
@@ -465,44 +339,32 @@ export function StationsOverview({
                 .delay-card { border: 2px solid #dc3545 !important; background-color: #fff5f5; }
                 .delay-tag { position: absolute; top: 10px; right: 10px; color: #dc3545; font-size: 0.6rem; font-weight: 800; border: 1px solid #dc3545; padding: 1px 6px; border-radius: 4px; }
                 .metric-row { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #475569; }
-                .metric-row:last-child { border-bottom: none; }
-                .btn-monitor { background: #1e293b; color: #fff; border: none; }
-                .btn-monitor:hover { background: #0f172a; color: #fff; }
                 .animate-pulse { animation: pulse-red 1.5s infinite !important; }
-                @keyframes pulse-red { 0% { transform: scale(1); } 50% { transform: scale(1.05); color: #dc3545; } 100% { transform: scale(1); } }
+                @keyframes pulse-red { 0% { transform: scale(1); } 50% { transform: scale(1.02); color: #dc3545; } 100% { transform: scale(1); } }
             `}</style>
             
             <div className="d-flex justify-content-between align-items-center mb-4 px-2 border-bottom pb-3">
-                <div><h4 className="fw-bold text-dark mb-0">Station Control Panel</h4><p className="text-muted small mb-0">Operational real-time monitoring.</p></div>
-                <button className="btn btn-dark btn-sm btn-box px-4 py-2 shadow-sm" onClick={() => setActiveTab('overall_history')}>OVERALL HISTORY</button>
+                <div><h4 className="fw-bold text-dark mb-0">Station Control Panel</h4><p className="text-muted small mb-0">Operational real-time monitoring dashboard.</p></div>
+                <button className="btn btn-dark btn-sm px-4 py-2 shadow-sm fw-bold" onClick={() => setActiveTab('overall_history')}>OVERALL HISTORY</button>
             </div>
             
             <div className="row g-4">
                 {namedStations.map((station) => {
                     const metrics = calculateMetrics(station.id);
                     const delayedCount = (metrics.stationLogs || []).filter(log => log.status === 'In Progress' && checkUnitDelay(station.id, log.updated_at || log.created_at).isDelayed).length;
-
                     return (
                         <div key={station.id} className="col-md-3">
                             <div className={`station-card-flat shadow-sm ${delayedCount > 0 ? 'delay-card' : ''}`}>
-                                {delayedCount > 0 && (
-                                    <div className="delay-tag animate-pulse">
-                                        <i className="bi bi-exclamation-triangle-fill me-1"></i>
-                                        {delayedCount} UNIT{delayedCount > 1 ? 'S' : ''} DELAYED
-                                    </div>
-                                )}
-                                <div className="mb-3">
-                                    <span className="text-muted" style={{fontSize: '0.65rem', fontWeight: 800}}>STATION ID: {station.id}</span>
-                                    <h6 className="fw-bold text-dark text-truncate mb-0 mt-1">{station.name}</h6>
-                                </div>
+                                {delayedCount > 0 && <div className="delay-tag animate-pulse">DELAYED ({delayedCount})</div>}
+                                <div className="mb-3"><span className="text-muted small fw-bold uppercase">ID: {station.id}</span><h6 className="fw-bold text-dark text-truncate mt-1 uppercase">{station.name}</h6></div>
                                 <div className="mb-4">
-                                    <div className="metric-row"><span>COMPLETED</span><span className="metric-value text-success">{metrics.completedUnits}</span></div>
-                                    <div className="metric-row"><span>IN PROGRESS</span><span className="metric-value text-primary">{metrics.pendingUnits}</span></div>
-                                    <div className="metric-row"><span>NO GOOD (NG)</span><span className="metric-value text-danger">{metrics.ngUnits}</span></div>
+                                    <div className="metric-row"><span>COMPLETED</span><span className="text-success">{metrics.completedUnits}</span></div>
+                                    <div className="metric-row"><span>IN PROGRESS</span><span className="text-primary">{metrics.pendingUnits}</span></div>
+                                    <div className="metric-row"><span>NO GOOD (NG)</span><span className="text-danger">{metrics.ngUnits}</span></div>
                                 </div>
                                 <div className="d-flex gap-2">
-                                    <button className="btn btn-monitor btn-sm btn-box flex-grow-1 shadow-sm" onClick={() => handleMonitorStation(station.id)}>MONITOR</button>
-                                    <button className="btn btn-outline-secondary btn-sm btn-box px-3 shadow-sm" onClick={() => handleViewHistory(station.id)}>HISTORY</button>
+                                    <button className="btn btn-dark btn-sm flex-grow-1 fw-bold shadow-sm" onClick={() => handleMonitorStation(station.id)}>MONITOR</button>
+                                    <button className="btn btn-outline-secondary btn-sm px-3 shadow-sm" onClick={() => handleViewHistory(station.id)}><i className="bi bi-clock-history"></i></button>
                                 </div>
                             </div>
                         </div>
@@ -511,4 +373,4 @@ export function StationsOverview({
             </div>
         </div>
     );
-}
+}   
