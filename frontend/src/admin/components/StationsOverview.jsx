@@ -53,8 +53,13 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
     const [statusFilter, setStatusFilter] = useState('All'); 
     const [selectedUnitProcess, setSelectedUnitProcess] = useState(null); 
     const [expandedStepIdx, setExpandedStepIdx] = useState(null);
-    const [aiAnalysis, setAiAnalysis] = useState(null);
-    const [isAiLoading, setIsAiLoading] = useState(false);
+    const [stationAiAnalysis, setStationAiAnalysis] = useState(null);
+    const [isStationAiLoading, setIsStationAiLoading] = useState(false);
+    const [summaryExpanded, setSummaryExpanded] = useState({
+        root: false,
+        impact: false,
+        actions: false,
+    });
 
     const monitorMetrics = calculateMetrics(stationMonitorId);
 
@@ -67,6 +72,26 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
     const stationIndex = parseInt(stationMonitorId.replace('Station', '')) - 1;
     const processName = processStations[stationIndex] || stationMonitorId;
     const hasGeminiKey = Boolean(process.env.REACT_APP_GEMINI_API_KEY);
+
+    // Helper to convert raw AI text into short summary buckets
+    const parseStationSummary = (text) => {
+        if (!text) return {};
+
+        // Split on line breaks and bullet markers (*) to be robust
+        const pieces = text
+            .split(/\n|\r|\*/)
+            .map(l => l.trim().replace(/^[-•\d.)\s]+/, '')) // remove leading bullets/numbers
+            .filter(Boolean);
+
+        const take = (idx) => pieces[idx] || '';
+
+        return {
+            rootCause: take(0),
+            impact: take(1),
+            actions: take(2),
+            raw: text,
+        };
+    };
 
     // Use the stable REST `v1` API directly.
     // Your key currently returns 404 for models on `v1beta`, so we:
@@ -88,55 +113,87 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
         return model.name; // e.g. "models/gemini-2.0-flash"
     };
 
-    const fetchAIDiagnosis = async (unit) => {
-    setIsAiLoading(true);
-    setAiAnalysis(null);
-    try {
-        const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
-        if (!apiKey) {
-            throw new Error("Missing REACT_APP_GEMINI_API_KEY. Add it to `frontend/.env` and restart the dev server (then hard-refresh the page).");
+    // 🔎 Station-level diagnostic (aggregated across all units in this station)
+    const fetchStationDiagnosis = async () => {
+        setIsStationAiLoading(true);
+        setStationAiAnalysis(null);
+        try {
+            const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
+            if (!apiKey) {
+                throw new Error("Missing REACT_APP_GEMINI_API_KEY. Add it to `frontend/.env` and restart the dev server (then hard-refresh the page).");
+            }
+
+            const modelName = await pickGenerativeModelName(apiKey);
+
+            const stationLogs = monitorMetrics.stationLogs || [];
+            const totalUnits = stationLogs.length;
+
+            let delayedUnits = 0;
+            let totalDelayMinutes = 0;
+            let maxDelayMinutes = 0;
+
+            stationLogs.forEach(log => {
+                if (log.status === 'In Progress') {
+                    const d = checkUnitDelay(stationMonitorId, log.updated_at || log.created_at);
+                    if (d.isDelayed) {
+                        delayedUnits += 1;
+                        totalDelayMinutes += d.minutes;
+                        if (d.minutes > maxDelayMinutes) maxDelayMinutes = d.minutes;
+                    }
+                }
+            });
+
+            const avgDelayMinutes = delayedUnits > 0 ? (totalDelayMinutes / delayedUnits) : 0;
+            const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationMonitorId] || 10;
+
+            const prompt = `You are a Senior Manufacturing Engineer at MKFF.
+            Analyze delay patterns for this production station and summarize the situation very concisely.
+
+            Station name: ${processName}
+            Station ID: ${stationMonitorId}
+            Standard delay threshold (minutes): ${thresholdMinutes}
+            Total units in this station (current view): ${totalUnits}
+            Units currently delayed beyond threshold: ${delayedUnits}
+            Average delay of delayed units (minutes): ${avgDelayMinutes.toFixed(1)}
+            Maximum observed delay (minutes): ${maxDelayMinutes.toFixed(1)}
+
+            Use the fact that the station has a checklist and previous unit histories, and that delays here usually mean units are staying longer than the configured time window.
+            Focus the analysis on why this specific station tends to have frequent or long delays, not on a single unit.
+
+            Respond with EXACTLY 3 very short lines (no extra text, no introductions, no labels):
+            Line 1: Most probable root-cause patterns for delays in this station (max 18 words).
+            Line 2: Impact on throughput and downstream stations (max 18 words).
+            Line 3: Practical corrective and preventive actions for operators and engineers (max 18 words).`;
+
+            const genRes = await fetch(`${GEMINI_V1_BASE}/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{ role: "user", parts: [{ text: prompt }] }],
+                }),
+            });
+
+            if (!genRes.ok) {
+                const body = await genRes.text().catch(() => "");
+                throw new Error(`generateContent failed (${genRes.status}): ${body || genRes.statusText}`);
+            }
+
+            const genData = await genRes.json();
+            const text =
+                genData?.candidates?.[0]?.content?.parts?.map(p => p?.text).filter(Boolean).join("") ||
+                genData?.candidates?.[0]?.output ||
+                "";
+
+            if (!text) throw new Error("Empty AI response.");
+
+            setStationAiAnalysis(text);
+        } catch (err) {
+            console.error("Gemini Station Error:", err);
+            setStationAiAnalysis("Station diagnostic failed: " + err.message);
+        } finally {
+            setIsStationAiLoading(false);
         }
-
-        const modelName = await pickGenerativeModelName(apiKey);
-
-        const prompt = `You are a Senior Manufacturing Engineer at MKFF. 
-        Analyze this production data: 
-        Station: ${processName}, 
-        Assembly: ${unit.assembly_no || 'N/A'}, 
-        Model: ${unit.model || 'N/A'}.
-        Identify the most probable technical root cause and a concrete corrective action. 
-        Respond in EXACTLY 2 sentences.`;
-
-        const genRes = await fetch(`${GEMINI_V1_BASE}/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-            }),
-        });
-
-        if (!genRes.ok) {
-            const body = await genRes.text().catch(() => "");
-            throw new Error(`generateContent failed (${genRes.status}): ${body || genRes.statusText}`);
-        }
-
-        const genData = await genRes.json();
-        const text =
-            genData?.candidates?.[0]?.content?.parts?.map(p => p?.text).filter(Boolean).join("") ||
-            genData?.candidates?.[0]?.output ||
-            "";
-
-        if (!text) throw new Error("Empty AI response.");
-        
-        setAiAnalysis(text);
-    } catch (err) {
-        console.error("Gemini Error:", err);
-        // I-display ang totoong error message para malaman natin kung bakit failed
-        setAiAnalysis("AI Diagnostic failed: " + err.message);
-    } finally {
-        setIsAiLoading(false);
-    }
-};
+    };
 
     return (
         <div className="pb-5 container-fluid px-0">
@@ -151,6 +208,13 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 .tracker-table td { padding: 8px 8px; font-weight: 700; border-bottom: 1px solid #e2e8f0; text-align: center; font-size: 0.7rem; }
                 .diagnostic-card-minimal { background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
                 .delay-row { background-color: #fff5f5 !important; }
+                .station-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+                @media (max-width: 768px) {
+                    .station-summary-grid { grid-template-columns: 1fr; }
+                }
+                .station-summary-chip { border-radius: 10px; padding: 10px 12px; border: 1px solid #e2e8f0; background: #f9fafb; min-height: 64px; display: flex; flex-direction: column; justify-content: flex-start; }
+                .station-summary-label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 4px; }
+                .station-summary-text { font-size: 0.8rem; font-weight: 600; color: #0f172a; }
             `}</style>
 
             <div className="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3 px-2">
@@ -159,6 +223,72 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                     <p className="text-muted small mb-0">Operational View • ID: {stationMonitorId}</p>
                 </div>
                 <button className="btn btn-light border btn-sm px-3 shadow-sm fw-bold" onClick={() => setActiveTab('stations')}>BACK</button>
+            </div>
+
+            {/* 🔍 Station-level delay diagnosis */}
+            <div className="diagnostic-card-minimal p-3 mb-4 shadow-sm">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <div className="fw-bold text-dark small uppercase tracking-wider">ROOT CAUSE DELAY ANALYTICS</div>
+                        <div className="small text-muted">Short AI summary of delay patterns and recommended actions for this station.</div>
+                    </div>
+                    <button
+                        className="btn btn-outline-dark btn-sm fw-bold shadow-sm px-4 rounded-pill"
+                        onClick={fetchStationDiagnosis}
+                        disabled={isStationAiLoading}
+                    >
+                        {isStationAiLoading ? 'ANALYZING...' : 'ANALYZE STATION'}
+                    </button>
+                </div>
+                <div className="p-3 bg-white rounded border text-dark small shadow-inner">
+                    {stationAiAnalysis ? (() => {
+                        const summary = parseStationSummary(stationAiAnalysis);
+                        const textOrFallback = (s) => (s && s.trim().length > 0 ? s : 'No data.');
+                        const makeChip = (label, key, fullText) => {
+                            const max = 120;
+                            const normalized = textOrFallback(fullText);
+                            const isLong = normalized.length > max;
+                            const isOpen = summaryExpanded[key];
+                            const displayText = isOpen || !isLong ? normalized : normalized.slice(0, max - 1) + '…';
+                            return (
+                                <div className="station-summary-chip" key={key}>
+                                    <div className="station-summary-label d-flex justify-content-between align-items-center">
+                                        <span>{label}</span>
+                                        {isLong && (
+                                            <button
+                                                type="button"
+                                                className="btn btn-link p-0 m-0 small text-primary text-decoration-none"
+                                                onClick={() =>
+                                                    setSummaryExpanded(prev => ({
+                                                        ...prev,
+                                                        [key]: !prev[key],
+                                                    }))
+                                                }
+                                            >
+                                                {isOpen ? 'Hide' : 'View full'}
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="station-summary-text">
+                                        {displayText}
+                                    </div>
+                                </div>
+                            );
+                        };
+
+                        return (
+                            <div className="station-summary-grid">
+                                {makeChip('Root cause', 'root', summary.rootCause)}
+                                {makeChip('Impact', 'impact', summary.impact)}
+                                {makeChip('Recommended actions', 'actions', summary.actions)}
+                            </div>
+                        );
+                    })() : (
+                        <div className="text-muted italic text-center py-1">
+                            Click "ANALYZE STATION" to get AI summary of why this station is delayed and what to do next.
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="row g-4 mb-4">
@@ -205,8 +335,8 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                         <td className="small text-muted">{new Date(log.updated_at || log.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                                         <td className="text-center">
                                             <div className="d-flex gap-1 justify-content-center">
-                                                <button className={`btn btn-sm ${delay.isDelayed ? 'btn-danger' : 'btn-primary'} px-3 fw-bold`} onClick={() => setSelectedUnitProcess(log)}>
-                                                    {delay.isDelayed ? 'VIEW CAUSE' : 'DETAILS'}
+                                                <button className="btn btn-sm btn-primary px-3 fw-bold" onClick={() => setSelectedUnitProcess(log)}>
+                                                    DETAILS
                                                 </button>
                                                 <button className="btn btn-sm btn-danger px-3 fw-bold" onClick={() => handleEditClick(log)}>EDIT</button>
                                             </div>
@@ -224,35 +354,10 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                     <div className="bg-white rounded-3 shadow-xl p-0 overflow-hidden border-0" style={{ width: '95%', maxWidth: '900px' }}>
                         <div className="p-4 d-flex justify-content-between align-items-center text-white bg-primary shadow-sm">
                             <div><h5 className="mb-0 fw-bold">Process Tracker & Analysis</h5><p className="mb-0 small opacity-75">{selectedUnitProcess.assembly_no}</p></div>
-                            <button className="btn-close btn-close-white shadow-none" onClick={() => {setSelectedUnitProcess(null); setAiAnalysis(null);}}></button>
+                            <button className="btn-close btn-close-white shadow-none" onClick={() => setSelectedUnitProcess(null)}></button>
                         </div>
 
                         <div className="p-4" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
-                            <div className="diagnostic-card-minimal p-3 mb-4 shadow-sm">
-                                <div className="d-flex justify-content-between align-items-center mb-3">
-                                    <div>
-                                        <div className="fw-bold text-dark small uppercase tracking-wider">DIAGNOSTIC ROOT CAUSE</div>
-                                        <div className="small text-muted mt-1">
-                                            Gemini key: <span className={hasGeminiKey ? 'text-success fw-bold' : 'text-danger fw-bold'}>{hasGeminiKey ? 'DETECTED' : 'MISSING'}</span>
-                                        </div>
-                                    </div>
-                                    <button 
-                                        className="btn btn-dark btn-sm fw-bold shadow-sm px-4 rounded-pill" 
-                                        onClick={() => fetchAIDiagnosis(selectedUnitProcess)} 
-                                        disabled={isAiLoading}
-                                    >
-                                                                                {isAiLoading ? 'ANALYZING...' : 'START DIAGNOSTIC'}
-                                    </button>
-                                </div>
-                                <div className="p-3 bg-white rounded border text-dark small shadow-inner">
-                                    {aiAnalysis ? (
-                                        <div className="lh-lg"><span className="fw-bold text-primary mr-2">FINDINGS:</span> {aiAnalysis}</div>
-                                    ) : (
-                                        <div className="text-muted italic text-center py-2">Click the button to run technical analysis.</div>
-                                    )}
-                                </div>
-                            </div>
-
                             <div className="process-timeline mt-4 ps-2">
                                 {processStations.map((station, idx) => {
                                     const isCurrent = idx === stationIndex;

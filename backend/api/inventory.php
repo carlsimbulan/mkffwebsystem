@@ -1,15 +1,21 @@
 <?php
 // backend/api/inventory.php
 
-// 1. Setup CORS Headers para sa React Frontend
+// 1. Setup CORS Headers
 $allowedOrigins = ["http://localhost:3000", "http://localhost:3001"];
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 if (in_array($origin, $allowedOrigins)) {
     header("Access-Control-Allow-Origin: $origin");
 }
 header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: GET");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS"); // Idinagdag ang POST at OPTIONS
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+
+// Handle Preflight Request (Para sa CORS)
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
 
 // 2. Include database connection
 include '../db.php'; 
@@ -20,21 +26,63 @@ if (!isset($pdo)) {
     exit();
 }
 
-try {
-    // 3. Query para kunin ang lahat ng PCBA pairing records
-    // Naka-order by created_at DESC para ang pinakabagong pairing ang nasa itaas
-    $sql = "SELECT * FROM unit_pcba_details ORDER BY created_at DESC";
+$method = $_SERVER['REQUEST_METHOD'];
+
+if ($method === 'GET') {
+    // --- FETCH LOGIC ---
+    try {
+        $sql = "SELECT * FROM unit_pcba_details ORDER BY created_at DESC";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute();
+        $inventory = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode($inventory);
+    } catch (\PDOException $e) {
+        http_response_code(500);
+        echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    }
+
+} elseif ($method === 'POST') {
+    // --- UPDATE LOGIC ---
+    // Kunin ang JSON data mula sa React
+    $input = json_decode(file_get_contents("php://input"), true);
+
+    if (!isset($input['id']) || !isset($input['column']) || !isset($input['newValue'])) {
+        http_response_code(400);
+        echo json_encode(["status" => "error", "message" => "Missing required fields (id, column, or newValue)"]);
+        exit();
+    }
+
+    $id = $input['id'];
+    $column = $input['column'];
+    $newValue = $input['newValue'];
+
+    // Security: I-validate kung ang column name ay authorized para iwas SQL Injection
+    $allowedColumns = ['mnbd_board_no', 'cmbd_board_no', 'lrbd_board_no', 'pqbd_board_no', 'bkbd_board_no'];
     
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute();
-    $inventory = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    if (!in_array($column, $allowedColumns)) {
+        http_response_code(400);
+        echo json_encode(["status" => "error", "message" => "Invalid column name"]);
+        exit();
+    }
 
-    // 4. Success Response
-    http_response_code(200);
-    echo json_encode($inventory);
+    try {
+        // I-update ang database gamit ang prepared statement
+        $sql = "UPDATE unit_pcba_details SET $column = :newValue WHERE id = :id";
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindParam(':newValue', $newValue);
+        $stmt->bindParam(':id', $id);
 
-} catch (\PDOException $e) {
-    http_response_code(500);
-    echo json_encode(["status" => "error", "message" => "Failed to fetch inventory: " . $e->getMessage()]);
+        if ($stmt->execute()) {
+            echo json_encode(["status" => "success", "message" => "Record updated successfully"]);
+        } else {
+            echo json_encode(["status" => "error", "message" => "Failed to update record"]);
+        }
+    } catch (\PDOException $e) {
+        http_response_code(500);
+        echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    }
+} else {
+    http_response_code(405);
+    echo json_encode(["status" => "error", "message" => "Method Not Allowed"]);
 }
 ?>
