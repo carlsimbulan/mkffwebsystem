@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 
-export const StationHistoryModal = ({ stationId, onClose, HISTORY_ENDPOINT }) => {
+export const StationHistoryModal = ({ stationId, onClose, HISTORY_ENDPOINT, highlightedUnitId }) => {
     const [historyLogs, setHistoryLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');

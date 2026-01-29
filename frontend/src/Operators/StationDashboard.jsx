@@ -29,7 +29,7 @@ const STATION_STANDARD_TIMES = {
     'Station5': 15, 'Station 5': 15,
     'Station6': 15, 'Station 6': 15,
     'Station7': 3, 'Station 7': 3,
-    'Station8': 0, 'Station 8': 0,
+    'Station8': 15, 'Station 8': 15,
     'Station9': 480, 'Station 9': 480,
     'Station10': 8, 'Station 10': 8,
     'Station11': 22, 'Station 11': 22,

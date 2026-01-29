@@ -50,7 +50,7 @@ const DELAY_THRESHOLDS_MINUTES = {
     'Station5': 15, 'Station 5': 15,
     'Station6': 15, 'Station 6': 15,
     'Station7': 3, 'Station 7': 3,
-    'Station8': 0, 'Station 8': 0,
+    'Station8': 15, 'Station 8': 15,
     'Station9': 480, 'Station 9': 480,
     'Station10': 8, 'Station 10': 8,
     'Station11': 22, 'Station 11': 22,
@@ -172,26 +172,35 @@ const checkDelayedUnitsAndReports = useCallback((allUnits) => {
     const newDelayedNotifications = [];
     const currentDelayedUnitIds = new Set();
 
-    const inProgressUnits = allUnits.filter(l => l.status === 'In Progress');
+    // 🔑 PINALITAN: Isama ang 'In Progress' AT 'No Good (NG)' sa delay monitoring
+    const validDelayedUnits = allUnits.filter(l => {
+        const status = (l.status || '').trim();
+        // Tatanggapin ang 'In Progress' o kahit anong status na may 'No Good' o 'NG'
+        return status === 'In Progress' || 
+               status.toLowerCase().includes('no good') || 
+               status.toLowerCase() === 'ng';
+    });
 
-    inProgressUnits.forEach(unit => {
+    validDelayedUnits.forEach(unit => {
         const stationId = unit.station;
         const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationId] || DELAY_THRESHOLDS_MINUTES[stationId.replace(' ', '')] || 0;
 
         if (thresholdMinutes > 0) {
-            // 🌟 PINALITAN: 'updated_at' na ang basehan para mag-reset ang timer sa bawat station
             const startTime = new Date(unit.updated_at || unit.created_at); 
-            const elapsedMilliseconds = now.getTime() - startTime.getTime();
-            const elapsedMinutes = Math.floor(elapsedMilliseconds / (1000 * 60));
+            const elapsedMinutes = Math.floor((now.getTime() - startTime.getTime()) / (1000 * 60));
 
             if (elapsedMinutes > thresholdMinutes) {
                 currentDelayedUnitIds.add(unit.id);
+                
+                // Tukuyin kung NG ba o normal delay para sa title
+                const isNG = unit.status.toLowerCase().includes('ng') || unit.status.toLowerCase().includes('no good');
+                const alertTitle = isNG ? `🚨 Quality Alert (NG) at ${stationId}` : `⚠️ Unit Delay Alert at ${stationId}`;
+
                 newDelayedNotifications.push({
                     id: `delayed-${unit.id}`,
                     type: 'DelayedUnit',
-                    title: `⚠️ Unit Delay Alert at ${stationId}`,
-                    // I-update ang display message para makita ang tamang minutes sa bagong station
-                    message: `Unit ${unit.device_serial_no || unit.assembly_no} has been at this station for ${elapsedMinutes} mins (Limit: ${thresholdMinutes} mins).`,
+                    title: alertTitle,
+                    message: `Unit ${unit.assembly_no} (${unit.status}) stayed for ${elapsedMinutes} mins (Limit: ${thresholdMinutes} mins).`,
                     timestamp: now.toISOString(),
                     unitId: unit.id,
                     stationId: stationId,
@@ -200,11 +209,8 @@ const checkDelayedUnitsAndReports = useCallback((allUnits) => {
         }
     });
 
-    const existingDelayed = notifications.filter(n => n.type === 'DelayedUnit' && currentDelayedUnitIds.has(n.unitId));
-    const updatedDelayed = newDelayedNotifications.filter(newN => !existingDelayed.some(e => e.id === newN.id));
-    
-    setNotifications([...existingDelayed, ...updatedDelayed]);
-}, [notifications]);
+    setNotifications(newDelayedNotifications);
+}, []);
 
 
     // --- FETCH DATA (UPDATED TO INCLUDE HISTORY LOGS AND NEW REPORT COUNT) ---
@@ -331,28 +337,38 @@ const fetchData = async () => {
     const handleClearDelayedUnits = () => { setNotifications(prev => prev.filter(n => n.type !== 'DelayedUnit')); };
 
     const handleNotificationClick = (notification) => {
-        if (notification.type === 'NewReport') {
-            setHighlightedUnitId(null);
-            handleTabChange('reports');
-            const report = dailyReportsList.find(r => r.id === notification.reportId);
-            if (report) {
-                setReportDate(report.report_date.split(' ')[0]);
-                setReportFilterStationId(report.station); 
-                setSelectedReportToView(report);
-            }
-        } else if (notification.type === 'DelayedUnit') {
-            handleTabChange('station_monitor');
-            // Normalize station ID match for notification click
-            const targetStation = stations.find(s => s.id.replace(/\s/g, '') === notification.stationId.replace(/\s/g, ''));
-            if (targetStation) {
-                setStationMonitorId(targetStation.id);
-            }
-            setHighlightedUnitId(notification.unitId);
+    if (notification.type === 'NewReport') {
+        setHighlightedUnitId(null);
+        handleTabChange('reports');
+        const report = dailyReportsList.find(r => r.id === notification.reportId);
+        if (report) {
+            setReportDate(report.report_date.split(' ')[0]);
+            setReportFilterStationId(report.station); 
+            setSelectedReportToView(report);
         }
-        if (notification.type === 'NewReport') {
-            setNotifications(prev => prev.filter(n => n.id !== notification.id));
+        // Alisin ang notification sa listahan matapos i-click
+        setNotifications(prev => prev.filter(n => n.id !== notification.id));
+
+    } else if (notification.type === 'DelayedUnit') {
+        // 1. I-save muna ang Unit ID para sa highlighting
+        setHighlightedUnitId(notification.unitId);
+
+        // 2. Hanapin at i-set ang tamang Station ID
+        const targetStation = stations.find(s => 
+            s.id.replace(/\s/g, '').toLowerCase() === notification.stationId.replace(/\s/g, '').toLowerCase()
+        );
+
+        if (targetStation) {
+            setStationMonitorId(targetStation.id);
+        } else {
+            // Fallback kung hindi mahanap ang exact match
+            setStationMonitorId(notification.stationId);
         }
-    };
+
+        // 3. Lumipat sa monitor view
+        handleTabChange('station_monitor');
+    }
+};
 
     // --- UNIT HANDLERS (KEPT AS IS) ---
     const handleMonitorStation = (stationId) => {

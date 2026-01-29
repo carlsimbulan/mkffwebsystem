@@ -1,9 +1,20 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import logo from '../logo.png';
-
-// Import separated components and modals
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
+import {
+    Chart as ChartJS,
+    LineElement,
+    PointElement,
+    BarElement,
+    ArcElement,
+    CategoryScale,
+    LinearScale,
+    Tooltip,
+    Legend,
+    Filler
+} from 'chart.js';
 import LoadingOverlay from './components/LoadingOverlay';
 import CustomMessageModal from './modals/CustomMessageModal';
 import StationHistoryModal from './modals/StationHistoryModal';
@@ -13,6 +24,18 @@ import GeneratedQRList from './components/GeneratedQRList';
 import { UserProfileModal } from './modals/UserProfileModal';
 import ApprovalConfirmationModal from './modals/ApprovalConfirmationModal'; 
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+
+ChartJS.register(
+    LineElement,
+    PointElement,
+    BarElement,
+    ArcElement,
+    CategoryScale,
+    LinearScale,
+    Tooltip,
+    Legend,
+    Filler
+);
 
 // --- 🛠️ CONFIGURATION ---
 const API_BASE_URL = "http://localhost/mkffwebsystem/backend/api";
@@ -30,6 +53,16 @@ const PROCESS_STATIONS = [
     "Final Functional/Connectivity Test", "Label Sticker Attachment", "FVI",
     "Packing", "QC Stamping"
 ];
+
+const DELAY_THRESHOLDS_MINUTES = {
+    'Station1': 6, 'Station 1': 6, 'Station2': 8, 'Station 2': 8, 'Station3': 3, 'Station 3': 3,
+    'Station4': 12, 'Station 4': 12, 'Station5': 15, 'Station 5': 15, 'Station6': 15, 'Station 6': 15,
+    'Station7': 3, 'Station 7': 3, 'Station8': 15, 'Station 8': 15, 'Station9': 480, 'Station 9': 480,
+    'Station10': 8, 'Station 10': 8, 'Station11': 22, 'Station 11': 22, 'Station12': 5, 'Station 12': 5,
+    'Station13': 10, 'Station 13': 10, 'Station14': 8, 'Station 14': 8, 'Station15': 5, 'Station 15': 5
+};
+
+const hourLabel = (d) => d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
 // Utility Helper Functions
 const formatSerial = (num) => String(num).padStart(5, '0');
@@ -69,6 +102,8 @@ export default function ITAssistantPage({ user, onLogout }) {
     const [activeMonitorStationId, setActiveMonitorStationId] = useState(null);
     const [activeHistoryStation, setActiveHistoryStation] = useState(null);
     const [showProfileModal, setShowProfileModal] = useState(false);
+    const [inventorySearch, setInventorySearch] = useState('');
+    const [inventoryCurrentPage, setInventoryCurrentPage] = useState(1);
 
     // --- 📡 DATA SYNC ---
     useEffect(() => {
@@ -218,6 +253,127 @@ export default function ITAssistantPage({ user, onLogout }) {
         return { completed, inProgress, noGood, total, yieldRate };
     };
 
+    // 🥇 Throughput Trend: Completed units per hour (last 12 hours) + delta vs previous 12 hours
+    const throughputTrend = useMemo(() => {
+        const now = new Date();
+        const hours = 12;
+        const bucketStart = new Date(now.getTime() - hours * 60 * 60 * 1000);
+        bucketStart.setMinutes(0, 0, 0);
+
+        const makeBuckets = (start, count) => {
+            const arr = [];
+            for (let i = 0; i < count; i++) {
+                const t = new Date(start.getTime() + i * 60 * 60 * 1000);
+                arr.push({ t, key: t.getTime(), count: 0 });
+            }
+            return arr;
+        };
+
+        const buckets = makeBuckets(bucketStart, hours + 1); // include current hour
+        const bucketMap = new Map(buckets.map(b => [b.key, b]));
+
+        const prevStart = new Date(bucketStart.getTime() - hours * 60 * 60 * 1000);
+        const prevEnd = new Date(bucketStart.getTime());
+
+        let currentTotal = 0;
+        let prevTotal = 0;
+
+        (unitLogs || []).forEach(l => {
+            const status = (l.status || '').toLowerCase();
+            const isCompleted = status === 'completed' || status.includes('completed') || status.includes('ok');
+            if (!isCompleted) return;
+
+            const ts = new Date(l.updated_at || l.created_at);
+            if (Number.isNaN(ts.getTime())) return;
+
+            // current window buckets
+            if (ts >= bucketStart) {
+                const h = new Date(ts);
+                h.setMinutes(0, 0, 0);
+                const k = h.getTime();
+                if (bucketMap.has(k)) {
+                    bucketMap.get(k).count += 1;
+                    currentTotal += 1;
+                }
+            }
+
+            // previous window total
+            if (ts >= prevStart && ts < prevEnd) {
+                prevTotal += 1;
+            }
+        });
+
+        const labels = buckets.map(b => hourLabel(b.t));
+        const data = buckets.map(b => b.count);
+        const deltaPct = prevTotal > 0 ? ((currentTotal - prevTotal) / prevTotal) * 100 : (currentTotal > 0 ? 100 : 0);
+
+        return { labels, data, currentTotal, prevTotal, deltaPct };
+    }, [unitLogs]);
+
+    // 🥈 Avg Cycle Time per Station: avg minutes in-station for in-progress units vs threshold
+    const cycleTimePerStation = useMemo(() => {
+        const rows = (stations || []).slice(0, PROCESS_STATIONS.length).map((s, idx) => {
+            const stationUnits = unitLogs.filter(u => u.station?.toString().replace(/\s+/g, '') === s.id);
+            const inProgress = stationUnits.filter(l => (l.status || '') === 'In Progress');
+
+            const times = inProgress
+                .map(l => {
+                    const ts = new Date(l.updated_at || l.created_at);
+                    if (Number.isNaN(ts.getTime())) return null;
+                    return (new Date().getTime() - ts.getTime()) / (1000 * 60);
+                })
+                .filter(v => typeof v === 'number');
+
+            const avg = times.length ? (times.reduce((a, b) => a + b, 0) / times.length) : 0;
+            const threshold = DELAY_THRESHOLDS_MINUTES[s.id] || 10;
+            return {
+                id: s.id,
+                name: PROCESS_STATIONS[idx] || s.id,
+                avgMinutes: avg,
+                thresholdMinutes: threshold,
+                exceedsPct: threshold > 0 ? ((avg - threshold) / threshold) * 100 : 0,
+            };
+        });
+
+        // Show worst offenders first (avg above threshold)
+        rows.sort((a, b) => (b.avgMinutes - b.thresholdMinutes) - (a.avgMinutes - a.thresholdMinutes));
+        return rows;
+    }, [stations, unitLogs]);
+
+    // 🥉 FPY (approx): Completed / (Completed + NG)
+    const fpy = useMemo(() => {
+        const completed = unitLogs.filter(u => u.status === 'Completed').length;
+        const ng = unitLogs.filter(u => u.status === 'No Good (NG)').length;
+        const processed = completed + ng;
+        const pct = processed > 0 ? (completed / processed) * 100 : 0;
+        return { completed, ng, processed, pct };
+    }, [unitLogs]);
+
+    // Inventory filtered by search
+    const filteredInventory = useMemo(() => {
+        if (!inventorySearch.trim()) return unitLogs;
+        const searchLower = inventorySearch.toLowerCase().trim();
+        return unitLogs.filter(u => 
+            u.assembly_no?.toLowerCase().includes(searchLower) ||
+            u.model?.toLowerCase().includes(searchLower)
+        );
+    }, [unitLogs, inventorySearch]);
+
+    // Paginated inventory (10 items per page)
+    const ITEMS_PER_PAGE = 10;
+    const paginatedInventory = useMemo(() => {
+        const startIndex = (inventoryCurrentPage - 1) * ITEMS_PER_PAGE;
+        const endIndex = startIndex + ITEMS_PER_PAGE;
+        return filteredInventory.slice(startIndex, endIndex);
+    }, [filteredInventory, inventoryCurrentPage]);
+
+    const totalPages = Math.ceil(filteredInventory.length / ITEMS_PER_PAGE);
+
+    // Reset to page 1 when search changes
+    useEffect(() => {
+        setInventoryCurrentPage(1);
+    }, [inventorySearch]);
+
     const handleGenerateQR = (e) => {
         e.preventDefault();
         const quantity = parseInt(qrFormData.quantity, 10);
@@ -309,6 +465,171 @@ export default function ITAssistantPage({ user, onLogout }) {
                                             <div className="badge bg-primary bg-opacity-10 text-primary p-2" style={{ fontSize: '0.7rem', width: 'fit-content' }}>{m.pctPending}% Units</div>
                                         </div>
                                         <button className="btn btn-primary btn-sm rounded-pill px-3 fw-bold shadow-sm" style={{ fontSize: '0.7rem' }} onClick={() => setActiveTab('approvals')}>GO <i className="bi bi-chevron-right ms-1"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 📊 Advanced Analytics (Top 3 KPIs) */}
+                        <div className="row g-4 mt-4">
+                            {/* 🥇 Throughput Trend */}
+                            <div className="col-lg-6">
+                                <div className="card border-0 shadow-sm h-100">
+                                    <div className="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 className="fw-bold mb-0 uppercase text-dark" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>TOP 1 — Throughput Trend</h6>
+                                            <small className="text-muted" style={{ fontSize: '0.7rem' }}>Completed units per hour (last 12 hours)</small>
+                                        </div>
+                                        <span className={`badge rounded-pill px-3 py-2 ${throughputTrend.deltaPct < 0 ? 'bg-danger' : 'bg-success'}`} style={{ fontSize: '0.65rem', fontWeight: '700' }}>
+                                            {throughputTrend.deltaPct < 0 ? 'DOWN' : 'UP'} {Math.abs(throughputTrend.deltaPct).toFixed(0)}%
+                                        </span>
+                                    </div>
+                                    <div className="card-body p-3" style={{ height: 280 }}>
+                                        <Line
+                                            data={{
+                                                labels: throughputTrend.labels,
+                                                datasets: [
+                                                    {
+                                                        label: 'Completed / hour',
+                                                        data: throughputTrend.data,
+                                                        borderColor: '#0ea5e9',
+                                                        backgroundColor: 'rgba(14, 165, 233, 0.15)',
+                                                        tension: 0.35,
+                                                        fill: true,
+                                                        pointRadius: 3,
+                                                        pointBackgroundColor: '#0ea5e9',
+                                                    },
+                                                ],
+                                            }}
+                                            options={{
+                                                responsive: true,
+                                                maintainAspectRatio: false,
+                                                plugins: { legend: { display: false } },
+                                                scales: {
+                                                    x: { grid: { display: false }, ticks: { color: '#64748b', maxRotation: 0, font: { size: 10 } } },
+                                                    y: { beginAtZero: true, ticks: { color: '#94a3b8', precision: 0, font: { size: 10 } }, grid: { color: '#f1f5f9' } },
+                                                },
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="card-footer bg-white border-top px-3 py-2">
+                                        <small className="text-muted" style={{ fontSize: '0.7rem' }}>
+                                            Total (12h): <strong>{throughputTrend.currentTotal}</strong> • Prev (12h): <strong>{throughputTrend.prevTotal}</strong>
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 🥈 Avg Cycle Time per Station */}
+                            <div className="col-lg-6">
+                                <div className="card border-0 shadow-sm h-100">
+                                    <div className="card-header bg-white py-3 border-bottom">
+                                        <h6 className="fw-bold mb-0 uppercase text-dark" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>TOP 2 — Average Cycle Time per Station</h6>
+                                        <small className="text-muted" style={{ fontSize: '0.7rem' }}>Avg minutes in station (WIP) vs threshold</small>
+                                    </div>
+                                    <div className="card-body p-3" style={{ height: 280 }}>
+                                        <Bar
+                                            data={{
+                                                labels: cycleTimePerStation.map(r => r.name),
+                                                datasets: [
+                                                    {
+                                                        label: 'Avg mins (WIP)',
+                                                        data: cycleTimePerStation.map(r => Number(r.avgMinutes.toFixed(1))),
+                                                        backgroundColor: 'rgba(245, 158, 11, 0.85)',
+                                                        borderRadius: 10,
+                                                        barThickness: 10,
+                                                    },
+                                                    {
+                                                        label: 'Threshold',
+                                                        data: cycleTimePerStation.map(r => r.thresholdMinutes),
+                                                        backgroundColor: 'rgba(148, 163, 184, 0.45)',
+                                                        borderRadius: 10,
+                                                        barThickness: 10,
+                                                    },
+                                                ],
+                                            }}
+                                            options={{
+                                                responsive: true,
+                                                maintainAspectRatio: false,
+                                                indexAxis: 'y',
+                                                plugins: { legend: { position: 'bottom', labels: { color: '#64748b', font: { size: 11 } } } },
+                                                scales: {
+                                                    x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#f1f5f9' } },
+                                                    y: { ticks: { color: '#475569', font: { size: 10, weight: '600' } }, grid: { display: false } },
+                                                },
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="card-footer bg-white border-top px-3 py-2">
+                                        <small className="text-muted" style={{ fontSize: '0.7rem' }}>
+                                            Worst station: <strong>{cycleTimePerStation[0]?.name || 'N/A'}</strong>
+                                            {cycleTimePerStation[0] ? (
+                                                <> • Exceeds by <strong>{Math.max(0, cycleTimePerStation[0].exceedsPct).toFixed(0)}%</strong></>
+                                            ) : null}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 🥉 FPY */}
+                            <div className="col-lg-12">
+                                <div className="card border-0 shadow-sm">
+                                    <div className="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 className="fw-bold mb-0 uppercase text-dark" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>TOP 3 — First Pass Yield (FPY)</h6>
+                                            <small className="text-muted" style={{ fontSize: '0.7rem' }}>Completed ÷ (Completed + NG)</small>
+                                        </div>
+                                        <span className="badge bg-primary rounded-pill px-3 py-2" style={{ fontSize: '0.65rem', fontWeight: '700' }}>FPY {fpy.pct.toFixed(1)}%</span>
+                                    </div>
+                                    <div className="card-body p-3 d-flex flex-wrap gap-3 align-items-center justify-content-between">
+                                        <div style={{ width: 260, height: 220, position: 'relative' }}>
+                                            <Doughnut
+                                                data={{
+                                                    labels: ['Pass', 'Fail'],
+                                                    datasets: [
+                                                        {
+                                                            data: [Number(fpy.pct.toFixed(1)), Number((100 - fpy.pct).toFixed(1))],
+                                                            backgroundColor: ['#10b981', '#ef4444'],
+                                                            borderColor: ['#fff', '#fff'],
+                                                            borderWidth: 4,
+                                                            cutout: '72%',
+                                                            borderRadius: 10,
+                                                        },
+                                                    ],
+                                                }}
+                                                options={{
+                                                    responsive: true,
+                                                    maintainAspectRatio: false,
+                                                    plugins: { legend: { position: 'bottom', labels: { color: '#64748b', font: { size: 11 } } } },
+                                                }}
+                                            />
+                                            <div className="position-absolute top-50 start-50 translate-middle text-center">
+                                                <div className="text-uppercase fw-bold" style={{ fontSize: '0.65rem', color: '#64748b', letterSpacing: '0.5px' }}>FPY</div>
+                                                <div className="fw-black" style={{ fontSize: '2rem', color: '#0f172a' }}>{fpy.pct.toFixed(1)}%</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex-grow-1">
+                                            <div className="d-flex flex-wrap gap-3">
+                                                <div className="card border-0 shadow-sm p-3" style={{ minWidth: 220, backgroundColor: '#f8fafc' }}>
+                                                    <div className="text-uppercase fw-bold mb-1" style={{ fontSize: '0.65rem', color: '#64748b', letterSpacing: '0.5px' }}>Processed</div>
+                                                    <div className="fw-black" style={{ fontSize: '1.6rem' }}>{fpy.processed}</div>
+                                                    <div className="small text-muted" style={{ fontSize: '0.7rem' }}>Completed + NG</div>
+                                                </div>
+                                                <div className="card border-0 shadow-sm p-3" style={{ minWidth: 220, backgroundColor: '#f0fdf4' }}>
+                                                    <div className="text-uppercase fw-bold mb-1" style={{ fontSize: '0.65rem', color: '#64748b', letterSpacing: '0.5px' }}>Completed</div>
+                                                    <div className="fw-black text-success" style={{ fontSize: '1.6rem' }}>{fpy.completed}</div>
+                                                    <div className="small text-muted" style={{ fontSize: '0.7rem' }}>First-pass success</div>
+                                                </div>
+                                                <div className="card border-0 shadow-sm p-3" style={{ minWidth: 220, backgroundColor: '#fef2f2' }}>
+                                                    <div className="text-uppercase fw-bold mb-1" style={{ fontSize: '0.65rem', color: '#64748b', letterSpacing: '0.5px' }}>NG</div>
+                                                    <div className="fw-black text-danger" style={{ fontSize: '1.6rem' }}>{fpy.ng}</div>
+                                                    <div className="small text-muted" style={{ fontSize: '0.7rem' }}>First-pass fail</div>
+                                                </div>
+                                            </div>
+                                            <div className="small text-muted mt-2" style={{ fontSize: '0.7rem' }}>
+                                                Tip: FPY drops usually indicate checklist gaps, test failures, or rework loops in specific stations.
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -427,6 +748,166 @@ export default function ITAssistantPage({ user, onLogout }) {
                         )}
                     </>
                 );
+            case "inventory":
+                const getHistoryStatus = (status) => {
+                    const statusLower = (status || '').toLowerCase();
+                    if (statusLower.includes('dispatched')) {
+                        return <span className="badge bg-success">Already Dispatched</span>;
+                    }
+                    if (statusLower.includes('completed') || 
+                        statusLower.includes('no good') || 
+                        statusLower.includes('ng') ||
+                        statusLower.includes('pending') ||
+                        statusLower.includes('in progress') ||
+                        statusLower.includes('for scanning')) {
+                        return <span className="badge bg-warning text-dark">Still on Production</span>;
+                    }
+                    return <span className="badge bg-secondary">Unknown</span>;
+                };
+
+                const formatDateTime = (dateStr) => {
+                    if (!dateStr) return 'N/A';
+                    try {
+                        const date = new Date(dateStr);
+                        return date.toLocaleString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true
+                        });
+                    } catch {
+                        return dateStr;
+                    }
+                };
+
+                return (
+                    <div>
+                        <div className="card border-0 shadow-sm mb-4">
+                            <div className="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 className="fw-bold mb-0 uppercase text-dark" style={{ fontSize: '0.85rem' }}>Unit Inventory</h6>
+                                    <small className="text-muted" style={{ fontSize: '0.7rem' }}>All generated units with generation history</small>
+                                </div>
+                                <span className="badge bg-primary rounded-pill px-3 py-2" style={{ fontSize: '0.7rem', fontWeight: '700' }}>
+                                    {filteredInventory.length} {filteredInventory.length === 1 ? 'Unit' : 'Units'}
+                                </span>
+                            </div>
+                            <div className="card-body p-3">
+                                <div className="row g-3">
+                                    <div className="col-md-6">
+                                        <div className="position-relative">
+                                            <i className="bi bi-search position-absolute start-0 ms-3 top-50 translate-middle-y text-muted"></i>
+                                            <input 
+                                                type="text" 
+                                                className="form-control ps-5" 
+                                                placeholder="Search by Assembly No or Model..." 
+                                                value={inventorySearch}
+                                                onChange={(e) => setInventorySearch(e.target.value)}
+                                                style={{ height: '40px' }}
+                                            />
+                                        </div>
+                                    </div>
+                                    {inventorySearch && (
+                                        <div className="col-md-6 d-flex align-items-center">
+                                            <button 
+                                                className="btn btn-outline-secondary btn-sm"
+                                                onClick={() => setInventorySearch('')}
+                                            >
+                                                <i className="bi bi-x-circle me-1"></i> Clear Search
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="card border-0 shadow-sm">
+                            <div className="card-body p-0">
+                                <div className="table-responsive">
+                                    <table className="table table-hover table-bordered mb-0 uppercase" style={{ fontSize: '0.75rem' }}>
+                                        <thead className="table-dark">
+                                            <tr>
+                                                <th style={{ width: '15%' }}>MODEL</th>
+                                                <th style={{ width: '18%' }}>ASSEMBLY NO</th>
+                                                <th style={{ width: '12%' }}>REVISION</th>
+                                                <th style={{ width: '15%' }}>BASE UNIT KIT</th>
+                                                <th style={{ width: '15%' }}>ACCESSORY KIT</th>
+                                                <th style={{ width: '18%' }}>GENERATION DATE & TIME</th>
+                                                <th style={{ width: '17%' }}>HISTORY</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {paginatedInventory.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan="7" className="text-center py-4 text-muted">
+                                                        {inventorySearch ? 'No units found matching your search.' : 'No units in inventory.'}
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                paginatedInventory.map(u => (
+                                                    <tr key={u.id} className="align-middle">
+                                                        <td className="fw-bold">{u.model || 'N/A'}</td>
+                                                        <td className="fw-bold text-primary">{u.assembly_no || 'N/A'}</td>
+                                                        <td>{u.revision || 'N/A'}</td>
+                                                        <td>{u.base_unit_kitting_no || 'N/A'}</td>
+                                                        <td>{u.accessory_kitting_no || 'N/A'}</td>
+                                                        <td>
+                                                            <div className="small">
+                                                                <div className="fw-bold">{formatDateTime(u.created_at)}</div>
+                                                            </div>
+                                                        </td>
+                                                        <td>{getHistoryStatus(u.status)}</td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            {totalPages > 1 && (
+                                <div className="card-footer bg-white border-top d-flex justify-content-between align-items-center py-3">
+                                    <div className="text-muted small">
+                                        Showing {((inventoryCurrentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(inventoryCurrentPage * ITEMS_PER_PAGE, filteredInventory.length)} of {filteredInventory.length} units
+                                    </div>
+                                    <nav>
+                                        <ul className="pagination pagination-sm mb-0">
+                                            <li className={`page-item ${inventoryCurrentPage === 1 ? 'disabled' : ''}`}>
+                                                <button 
+                                                    className="page-link" 
+                                                    onClick={() => setInventoryCurrentPage(prev => Math.max(1, prev - 1))}
+                                                    disabled={inventoryCurrentPage === 1}
+                                                >
+                                                    <i className="bi bi-chevron-left"></i>
+                                                </button>
+                                            </li>
+                                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                                                <li key={page} className={`page-item ${inventoryCurrentPage === page ? 'active' : ''}`}>
+                                                    <button 
+                                                        className="page-link" 
+                                                        onClick={() => setInventoryCurrentPage(page)}
+                                                    >
+                                                        {page}
+                                                    </button>
+                                                </li>
+                                            ))}
+                                            <li className={`page-item ${inventoryCurrentPage === totalPages ? 'disabled' : ''}`}>
+                                                <button 
+                                                    className="page-link" 
+                                                    onClick={() => setInventoryCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                                    disabled={inventoryCurrentPage === totalPages}
+                                                >
+                                                    <i className="bi bi-chevron-right"></i>
+                                                </button>
+                                            </li>
+                                        </ul>
+                                    </nav>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
             default: return null;
         }
     };
@@ -501,6 +982,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                     <button className={`sidebar-link ${activeTab === 'overview' ? 'active-glass' : ''}`} onClick={() => setActiveTab('overview')}><i className="bi bi-grid-1x2"></i> OVERVIEW</button>
                     <button className={`sidebar-link ${activeTab === 'qr_generator' ? 'active-glass' : ''}`} onClick={() => setActiveTab('qr_generator')}><i className="bi bi-qr-code-scan"></i> QR GENERATOR</button>
                     <button className={`sidebar-link ${activeTab.includes('station') ? 'active-glass' : ''}`} onClick={() => setActiveTab('station_monitor')}><i className="bi bi-layers-half"></i> STATION MONITOR</button>
+                    <button className={`sidebar-link ${activeTab === 'inventory' ? 'active-glass' : ''}`} onClick={() => setActiveTab('inventory')}><i className="bi bi-box-seam"></i> INVENTORY</button>
                     <button className={`sidebar-link ${activeTab === 'approvals' ? 'active-glass' : ''}`} onClick={() => setActiveTab('approvals')}><i className="bi bi-check-circle"></i> APPROVALS</button>
                     <div className="sidebar-label">System</div>
                     <button onClick={onLogout} className="sidebar-link" style={{ color: '#ef4444' }}><i className="bi bi-power"></i> LOGOUT SESSION</button>

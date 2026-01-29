@@ -1,18 +1,18 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
-
+ 
 const HISTORY_ENDPOINT = "http://localhost/mkffwebsystem/backend/api/unit_history.php";
-
+ 
 const getTodayDate = () => new Date().toISOString().split('T')[0];
-
-const StationHistoryModal = ({ stationId, onClose, user }) => {
+ 
+const StationHistoryModal = ({ stationId, onClose, user, highlightedUnitId }) => {
     const [historyLogs, setHistoryLogs] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(true);
     const [historyError, setHistoryError] = useState(null);
     const [filterAssemblyNo, setFilterAssemblyNo] = useState('');
     const [filterStartDate, setFilterStartDate] = useState('');
     const [filterEndDate, setFilterEndDate] = useState(getTodayDate());
-
+ 
     const fetchHistory = useCallback(async () => {
         setHistoryLoading(true);
         setHistoryError(null);
@@ -26,9 +26,9 @@ const StationHistoryModal = ({ stationId, onClose, user }) => {
             setHistoryLoading(false);
         }
     }, [stationId]);
-
+ 
     useEffect(() => { fetchHistory(); }, [fetchHistory]);
-
+ 
     const filteredLogs = useMemo(() => {
         let logs = historyLogs;
         if (filterAssemblyNo) {
@@ -56,16 +56,28 @@ const StationHistoryModal = ({ stationId, onClose, user }) => {
         }
         return logs;
     }, [historyLogs, filterAssemblyNo, filterStartDate, filterEndDate]);
-
+ 
     const getStatusClass = (status) => {
         if (status?.includes('Completed') || status?.includes('OK')) return 'bg-success bg-opacity-10 text-success';
         if (status?.includes('No Good') || status?.includes('Error') || status?.includes('Failed')) return 'bg-danger bg-opacity-10 text-danger';
         if (status?.includes('Progress') || status?.includes('Pending')) return 'bg-warning bg-opacity-10 text-warning text-dark';
         return 'bg-secondary bg-opacity-10 text-secondary';
     };
-
+ 
     return (
         <div className="modal d-block animate-in fade-in" style={{ backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1080 }}>
+            <style>{`
+                .highlight-pulse { 
+                    animation: highlightPulse 2s ease-in-out infinite;
+                    background-color: #ffebee !important;
+                    border-left: 4px solid #ef4444 !important;
+                }
+                @keyframes highlightPulse {
+                    0% { background-color: #ffebee; }
+                    50% { background-color: #ffcdd2; }
+                    100% { background-color: #ffebee; }
+                }
+            `}</style>
             <div className="modal-dialog modal-dialog-centered modal-xl">
                 <div className="modal-content border-0 shadow" style={{ borderRadius: '12px' }}>
                     <div className="modal-header bg-dark text-white border-0">
@@ -102,7 +114,7 @@ const StationHistoryModal = ({ stationId, onClose, user }) => {
                                     </thead>
                                     <tbody>
                                         {filteredLogs.map(log => (
-                                            <tr key={log.history_id}>
+                                            <tr key={log.id} className={log.id === highlightedUnitId ? "highlight-pulse" : ""}>
                                                 <td className="ps-3 fw-bold">{log.model || 'N/A'}</td>
                                                 <td className="text-primary fw-bold">{log.assembly_no}</td>
                                                 <td>{log.action_type || 'UPDATE'}</td>
@@ -124,5 +136,5 @@ const StationHistoryModal = ({ stationId, onClose, user }) => {
         </div>
     );
 };
-
+ 
 export default StationHistoryModal;

@@ -30,7 +30,7 @@ ChartJS.register(
 const DELAY_THRESHOLDS_MINUTES = {
     'Station1': 6, 'Station 1': 6, 'Station2': 8, 'Station 2': 8, 'Station3': 3, 'Station 3': 3,
     'Station4': 12, 'Station 4': 12, 'Station5': 15, 'Station 5': 15, 'Station6': 15, 'Station 6': 15,
-    'Station7': 3, 'Station 7': 3, 'Station8': 0, 'Station 8': 0, 'Station9': 480, 'Station 9': 480,
+    'Station7': 3, 'Station 7': 3, 'Station8': 15, 'Station 8': 15, 'Station9': 480, 'Station 9': 480,
     'Station10': 8, 'Station 10': 8, 'Station11': 22, 'Station 11': 22, 'Station12': 5, 'Station 12': 5,
     'Station13': 10, 'Station 13': 10, 'Station14': 8, 'Station 14': 8, 'Station15': 5, 'Station 15': 5
 };
@@ -202,10 +202,13 @@ export function Dashboard({
 
     // 🥈 Avg Cycle Time per Station: avg minutes in-station for in-progress units vs threshold
     const cycleTimePerStation = useMemo(() => {
-        const rows = (stations || []).slice(0, processStations.length).map((s, idx) => {
+        const rows = (stations || []).map((s, idx) => {
             const m = calculateMetrics(s.id) || {};
             const stationLogs = m.stationLogs || [];
-            const inProgress = stationLogs.filter(l => (l.status || '') === 'In Progress');
+            const inProgress = stationLogs.filter(l => {
+                const statusText = (l.status || '').toLowerCase();
+                return l.status === 'In Progress' || statusText.includes('no good') || statusText.includes('ng');
+            });
 
             const times = inProgress
                 .map(l => {
@@ -217,17 +220,25 @@ export function Dashboard({
 
             const avg = times.length ? (times.reduce((a, b) => a + b, 0) / times.length) : 0;
             const threshold = DELAY_THRESHOLDS_MINUTES[s.id] || 10;
+            const exceedsThreshold = avg > threshold;
+            
             return {
                 id: s.id,
-                name: processStations[idx] || s.id,
+                name: s.name || s.id, // Use actual station name
                 avgMinutes: avg,
                 thresholdMinutes: threshold,
                 exceedsPct: threshold > 0 ? ((avg - threshold) / threshold) * 100 : 0,
+                exceedsThreshold,
+                delayedUnits: inProgress.filter(l => {
+                    const delay = checkUnitDelay(s.id, l.updated_at || l.created_at);
+                    return delay.isDelayed;
+                }).length,
+                totalUnits: inProgress.length
             };
         });
 
-        // Show worst offenders first (avg above threshold)
-        rows.sort((a, b) => (b.avgMinutes - b.thresholdMinutes) - (a.avgMinutes - a.thresholdMinutes));
+        // Sort by exceedance percentage (worst first) but show all stations
+        rows.sort((a, b) => b.exceedsPct - a.exceedsPct);
         return rows;
     }, [stations, calculateMetrics]);
 
@@ -438,7 +449,9 @@ export function Dashboard({
                                         {
                                             label: 'Avg mins (WIP)',
                                             data: cycleTimePerStation.map(r => Number(r.avgMinutes.toFixed(1))),
-                                            backgroundColor: 'rgba(245, 158, 11, 0.85)',
+                                            backgroundColor: cycleTimePerStation.map(r => 
+                                                r.exceedsThreshold ? 'rgba(239, 68, 68, 0.85)' : 'rgba(245, 158, 11, 0.85)'
+                                            ),
                                             borderRadius: 10,
                                             barThickness: 10,
                                         },
@@ -455,7 +468,25 @@ export function Dashboard({
                                     responsive: true,
                                     maintainAspectRatio: false,
                                     indexAxis: 'y',
-                                    plugins: { legend: { position: 'bottom', labels: { color: '#64748b' } } },
+                                    plugins: { 
+                                        legend: { position: 'bottom', labels: { color: '#64748b' } },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: function(context) {
+                                                    const station = cycleTimePerStation[context.dataIndex];
+                                                    if (context.datasetIndex === 0) {
+                                                        return [
+                                                            `Avg: ${context.parsed.x} mins`,
+                                                            `Threshold: ${station.thresholdMinutes} mins`,
+                                                            `Delayed Units: ${station.delayedUnits}/${station.totalUnits}`,
+                                                            station.exceedsThreshold ? `⚠️ EXCEEDS BY ${Math.abs(station.exceedsPct).toFixed(0)}%` : '✅ Within Threshold'
+                                                        ];
+                                                    }
+                                                    return `Threshold: ${context.parsed.x} mins`;
+                                                }
+                                            }
+                                        }
+                                    },
                                     scales: {
                                         x: { ticks: { color: '#94a3b8' }, grid: { color: '#f1f5f9' } },
                                         y: { ticks: { color: '#475569', font: { size: 11, weight: '600' } }, grid: { display: false } },
@@ -464,9 +495,10 @@ export function Dashboard({
                             />
                         </div>
                         <div className="px-3 pb-3 small text-muted">
-                            Worst station: <strong>{cycleTimePerStation[0]?.name || 'N/A'}</strong>
-                            {cycleTimePerStation[0] ? (
-                                <> • Exceeds by <strong>{Math.max(0, cycleTimePerStation[0].exceedsPct).toFixed(0)}%</strong></>
+                            {cycleTimePerStation.filter(r => r.exceedsThreshold).length} stations exceeding threshold • 
+                            Worst: <strong>{cycleTimePerStation.find(r => r.exceedsThreshold)?.name || 'None'}</strong>
+                            {cycleTimePerStation.find(r => r.exceedsThreshold) ? (
+                                <> • Exceeds by <strong>{Math.abs(cycleTimePerStation.find(r => r.exceedsThreshold)?.exceedsPct || 0).toFixed(0)}%</strong></>
                             ) : null}
                         </div>
                     </div>

@@ -1,36 +1,56 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import 'bootstrap-icons/font/bootstrap-icons.css';
-import { StationSingleDoughnutChart } from './StationSingleDoughnutChart';
+
+// Import station standard times from parent component
+const STATION_STANDARD_TIMES = {
+    'Station1': 6, 'Station 1': 6,
+    'Station2': 8, 'Station 2': 8,
+    'Station3': 3, 'Station 3': 3,
+    'Station4': 12, 'Station 4': 12,
+    'Station5': 15, 'Station 5': 15,
+    'Station6': 15, 'Station 6': 15,
+    'Station7': 3, 'Station 7': 3,
+    'Station8': 15, 'Station 8': 15,
+    'Station9': 480, 'Station 9': 480,
+    'Station10': 8, 'Station 10': 8,
+    'Station11': 22, 'Station 11': 22,
+    'Station12': 5, 'Station 12': 5,
+    'Station13': 10, 'Station 13': 10,
+    'Station14': 8, 'Station 14': 8,
+    'Station15': 5, 'Station 15': 5,
+};
 
 export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, announcementCount, logs, calculateMetrics }) {
     
-    const chartRef = useRef(null);
+    // 🔑 Delay calculation function (same as admin component)
+    const checkUnitDelay = (stationId, updatedAt) => {
+        const threshold = STATION_STANDARD_TIMES[stationId] || 10;
+        const lastUpdate = new Date(updatedAt).getTime();
+        const minutesInStation = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
+        if (minutesInStation > threshold * 3) return { isDelayed: true, level: 'CRITICAL', minutes: minutesInStation };
+        if (minutesInStation > threshold) return { isDelayed: true, level: 'MODERATE', minutes: minutesInStation };
+        return { isDelayed: false, level: 'NORMAL', minutes: minutesInStation };
+    };
 
     // 🔑 1. Filter logs to find only Delayed Units 
     // Ginagamit ang assembly_no (underscore) base sa logs data
     const delayedUnits = useMemo(() => {
-        return logs.filter(unit => unit.status === 'In Progress' && unit.delayMinutes > 0);
-    }, [logs]);
+        return logs.filter(unit => {
+            const statusText = (unit.status || '').toLowerCase();
+            const isInProgressOrNG = unit.status === 'In Progress' || statusText.includes('no good') || statusText.includes('ng');
+            if (!isInProgressOrNG) return false;
+            
+            const delay = checkUnitDelay(currentStation, unit.updated_at || unit.created_at);
+            return delay.isDelayed;
+        }).map(unit => {
+            const delay = checkUnitDelay(currentStation, unit.updated_at || unit.created_at);
+            return {
+                ...unit,
+                delayMinutes: Math.round(delay.minutes)
+            };
+        });
+    }, [logs, currentStation]);
 
-    const handleExportChart = () => {
-        const chartInstance = chartRef.current;
-        if (!chartInstance) {
-             alert("Chart data not ready for export.");
-             return;
-        }
-        try {
-            const imageURI = chartInstance.toBase64Image('image/png', 1);
-            const a = document.createElement('a');
-            a.href = imageURI;
-            a.download = `Daily_Report_${currentStation}.png`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        } catch (err) {
-             console.error("Export failed:", err);
-        }
-    };
-    
     const totalUnits = homeStats.completed + homeStats.inProgress + homeStats.ng;
     
     const calculateStationPercentage = (value) => {
@@ -120,8 +140,8 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
 
             {/* --- MAIN CONTENT GRID --- */}
             <div className="row g-4">
-                {/* 1. DELAYED UNITS TABLE */}
-                <div className={delayedUnits.length > 0 ? "col-lg-8" : "col-lg-12"}>
+                {/* DELAYED UNITS TABLE */}
+                <div className="col-lg-12">
                     <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
                         <div className="card-header bg-white py-4 px-4 border-0">
                             <div className="d-flex justify-content-between align-items-center">
@@ -151,7 +171,7 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
                                                 <tr key={unit.id}>
                                                     {/* Binago: log.model_id o log.model depende sa source */}
                                                     <td className="px-4 fw-bold text-dark">{unit.model || unit.model_id}</td>
-                                                    {/* 🔑 PINAKAMAHALAGA: ASSEMBLY NO FIX (underscore dapat) */}
+                                                    {/* PINAKAMAHALAGA: ASSEMBLY NO FIX (underscore dapat) */}
                                                     <td className="fw-bold text-primary">
                                                         <code style={{fontSize: '0.9rem'}}>{unit.assembly_no || unit.assemblyNo}</code>
                                                     </td>
@@ -164,8 +184,12 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
                                                         </div>
                                                     </td>
                                                     <td>
-                                                        <span className="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 px-2 rounded-pill">
-                                                            IN PROGRESS
+                                                        <span className={`badge ${
+                                                            unit.status === 'In Progress' 
+                                                                ? 'bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25' 
+                                                                : 'bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25'
+                                                        } px-2 rounded-pill`}>
+                                                            {unit.status === 'In Progress' ? 'IN PROGRESS' : 'NO GOOD (NG)'}
                                                         </span>
                                                     </td>
                                                     <td className="text-end px-4">
@@ -188,42 +212,6 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
                         </div>
                     </div>
                 </div>
-
-                {/* 2. PRODUCTION ANALYTICS */}
-                {delayedUnits.length > 0 && (
-                <div className="col-lg-4">
-                    <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
-                        <div className="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
-                            <h5 className="mb-0 fw-bold text-dark">Yield Analysis</h5>
-                            <button className="btn btn-light btn-sm rounded-circle" onClick={handleExportChart} title="Download Chart">
-                                <i className="bi bi-download"></i>
-                            </button>
-                        </div>
-                        <div className="card-body p-4 text-center">
-                            <div style={{ height: '280px' }} className="d-flex align-items-center justify-content-center">
-                                <StationSingleDoughnutChart 
-                                    ref={chartRef}
-                                    stationId={currentStation} 
-                                    logs={logs} 
-                                    calculateMetrics={calculateMetrics}
-                                />
-                            </div>
-                            <div className="mt-4 pt-3 border-top">
-                                <div className="row g-0 text-center">
-                                    <div className="col-6 border-end">
-                                        <div className="text-muted smaller">Total Volume</div>
-                                        <div className="fw-bold h5 mb-0">{totalUnits}</div>
-                                    </div>
-                                    <div className="col-6">
-                                        <div className="text-muted smaller">Efficiency</div>
-                                        <div className="fw-bold h5 mb-0 text-success">{calculateStationPercentage(homeStats.completed)}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                )}
             </div>
 
             <style jsx>{`

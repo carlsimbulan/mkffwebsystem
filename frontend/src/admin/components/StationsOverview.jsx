@@ -12,7 +12,7 @@ const processStations = [
 const DELAY_THRESHOLDS_MINUTES = {
     'Station1': 6, 'Station 1': 6, 'Station2': 8, 'Station 2': 8, 'Station3': 3, 'Station 3': 3,
     'Station4': 12, 'Station 4': 12, 'Station5': 15, 'Station 5': 15, 'Station6': 15, 'Station 6': 15,
-    'Station7': 3, 'Station 7': 3, 'Station8': 0, 'Station 8': 0, 'Station9': 480, 'Station 9': 480,
+    'Station7': 3, 'Station 7': 3, 'Station8': 15, 'Station 8': 15, 'Station9': 480, 'Station 9': 480,
     'Station10': 8, 'Station 10': 8, 'Station11': 22, 'Station 11': 22, 'Station12': 5, 'Station 12': 5,
     'Station13': 10, 'Station 13': 10, 'Station14': 8, 'Station 14': 8, 'Station15': 5, 'Station 15': 5
 };
@@ -71,7 +71,16 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
     
     const stationIndex = parseInt(stationMonitorId.replace('Station', '')) - 1;
     const processName = processStations[stationIndex] || stationMonitorId;
-    const hasGeminiKey = Boolean(process.env.REACT_APP_GEMINI_API_KEY);
+    const hasGeminiKey = true; // Backend handles API key securely
+
+    // Only show ROOT CAUSE DELAY ANALYTICS when there is at least 1 truly delayed unit in this station
+    const hasDelayedUnits = useMemo(() => {
+        return (monitorMetrics.stationLogs || []).some(log => {
+            if (log.status !== 'In Progress' && !log.status?.toLowerCase().includes('no good') && !log.status?.toLowerCase().includes('ng')) return false;
+            const d = checkUnitDelay(stationMonitorId, log.updated_at || log.created_at);
+            return d.isDelayed;
+        });
+    }, [monitorMetrics.stationLogs, stationMonitorId]);
 
     // Helper to convert raw AI text into short summary buckets
     const parseStationSummary = (text) => {
@@ -93,57 +102,81 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
         };
     };
 
-    // Use the stable REST `v1` API directly.
-    // Your key currently returns 404 for models on `v1beta`, so we:
-    // 1) List models from `v1`
-    // 2) Pick the first model that supports `generateContent`
-    // 3) Call `generateContent` on that model
-    const GEMINI_V1_BASE = "https://generativelanguage.googleapis.com/v1";
-
-    const pickGenerativeModelName = async (apiKey) => {
-        const res = await fetch(`${GEMINI_V1_BASE}/models?key=${encodeURIComponent(apiKey)}`);
-        if (!res.ok) {
-            const body = await res.text().catch(() => "");
-            throw new Error(`ListModels failed (${res.status}): ${body || res.statusText}`);
-        }
-        const data = await res.json();
-        const models = Array.isArray(data.models) ? data.models : [];
-        const model = models.find(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"));
-        if (!model?.name) throw new Error("No available Gemini model supports generateContent for this API key.");
-        return model.name; // e.g. "models/gemini-2.0-flash"
-    };
-
     // 🔎 Station-level diagnostic (aggregated across all units in this station)
     const fetchStationDiagnosis = async () => {
         setIsStationAiLoading(true);
         setStationAiAnalysis(null);
         try {
-            const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
-            if (!apiKey) {
-                throw new Error("Missing REACT_APP_GEMINI_API_KEY. Add it to `frontend/.env` and restart the dev server (then hard-refresh the page).");
+            // Step 1: Get available model from backend
+            const modelRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'list_models' })
+            });
+            
+            if (!modelRes.ok) {
+                const body = await modelRes.text().catch(() => "");
+                throw new Error(`Model listing failed (${modelRes.status}): ${body || modelRes.statusText}`);
             }
-
-            const modelName = await pickGenerativeModelName(apiKey);
+            
+            const modelData = await modelRes.json();
+            if (!modelData.modelName) {
+                throw new Error('No model returned from backend');
+            }
+            
+            const modelName = modelData.modelName;
 
             const stationLogs = monitorMetrics.stationLogs || [];
             const totalUnits = stationLogs.length;
 
-            let delayedUnits = 0;
-            let totalDelayMinutes = 0;
-            let maxDelayMinutes = 0;
-
-            stationLogs.forEach(log => {
-                if (log.status === 'In Progress') {
-                    const d = checkUnitDelay(stationMonitorId, log.updated_at || log.created_at);
-                    if (d.isDelayed) {
-                        delayedUnits += 1;
-                        totalDelayMinutes += d.minutes;
-                        if (d.minutes > maxDelayMinutes) maxDelayMinutes = d.minutes;
-                    }
-                }
+            // Collect delayed units with their checklist data and time spent
+            const delayedUnits = stationLogs.filter(log => {
+                if (log.status !== 'In Progress' && !log.status?.toLowerCase().includes('no good') && !log.status?.toLowerCase().includes('ng')) return false;
+                const d = checkUnitDelay(stationMonitorId, log.updated_at || log.created_at);
+                return d.isDelayed;
             });
 
-            const avgDelayMinutes = delayedUnits > 0 ? (totalDelayMinutes / delayedUnits) : 0;
+            const delayedContext = delayedUnits.map(log => {
+                const lastUpdate = new Date(log.updated_at || log.created_at).getTime();
+                const timeSpentMinutes = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
+                
+                // Collect relevant checklist fields based on station
+                const checklistData = {};
+                
+                // Station-specific checklist fields
+                if (stationIndex === 0) { // PCB Pairing
+                    checklistData.header_seated_90_deg = log.header_seated_90_deg;
+                    checklistData.leads_properly_soldered = log.leads_properly_soldered;
+                } else if (stationIndex === 1) { // Integrated Board Test
+                    checklistData.integrated_board_level_test1 = log.integrated_board_level_test1;
+                    checklistData.integrated_board_level_test2 = log.integrated_board_level_test2;
+                    checklistData.integrated_board_level_test3 = log.integrated_board_level_test3;
+                } else if (stationIndex === 5) { // Complete Unit Test/Calibration
+                    checklistData.voltage = log.voltage;
+                    checklistData.go_no_go = log.go_no_go;
+                    checklistData.lora_module = log.lora_module;
+                }
+                
+                return {
+                    assembly_no: log.assembly_no,
+                    time_spent_minutes: Math.round(timeSpentMinutes * 10) / 10,
+                    status: log.status,
+                    remarks: log.remarks,
+                    checklist_data: checklistData
+                };
+            });
+
+            const delayedCount = delayedUnits.length;
+            const totalDelayMinutes = delayedUnits.reduce((sum, log) => {
+                const d = checkUnitDelay(stationMonitorId, log.updated_at || log.created_at);
+                return sum + d.minutes;
+            }, 0);
+            const maxDelayMinutes = delayedUnits.reduce((max, log) => {
+                const d = checkUnitDelay(stationMonitorId, log.updated_at || log.created_at);
+                return Math.max(max, d.minutes);
+            }, 0);
+
+            const avgDelayMinutes = delayedCount > 0 ? (totalDelayMinutes / delayedCount) : 0;
             const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationMonitorId] || 10;
 
             const prompt = `You are a Senior Manufacturing Engineer at MKFF.
@@ -153,24 +186,33 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
             Station ID: ${stationMonitorId}
             Standard delay threshold (minutes): ${thresholdMinutes}
             Total units in this station (current view): ${totalUnits}
-            Units currently delayed beyond threshold: ${delayedUnits}
+            Units currently delayed beyond threshold: ${delayedCount}
             Average delay of delayed units (minutes): ${avgDelayMinutes.toFixed(1)}
             Maximum observed delay (minutes): ${maxDelayMinutes.toFixed(1)}
 
-            Use the fact that the station has a checklist and previous unit histories, and that delays here usually mean units are staying longer than the configured time window.
-            Focus the analysis on why this specific station tends to have frequent or long delays, not on a single unit.
+            DELAYED UNITS WITH CHECKLIST DATA:
+            ${JSON.stringify(delayedContext, null, 2)}
+
+            CRITICAL ANALYSIS INSTRUCTIONS:
+            Analyze the actual checklist values and stay durations to identify if delays are:
+            1. TECHNICAL FAILURES: Units failing tests (NO GO, FAIL values, missing checklist data)
+            2. BOTTLENECKS: Units passing tests but not moving forward (GO/OK values but long stays)
+
+            Focus on why this specific station tends to have frequent or long delays based on the real checklist data above.
 
             Respond with EXACTLY 3 very short lines (no extra text, no introductions, no labels):
             Line 1: Most probable root-cause patterns for delays in this station (max 18 words).
             Line 2: Impact on throughput and downstream stations (max 18 words).
             Line 3: Practical corrective and preventive actions for operators and engineers (max 18 words).`;
 
-            const genRes = await fetch(`${GEMINI_V1_BASE}/${modelName}:generateContent?key=${encodeURIComponent(apiKey)}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
+            // Step 2: Generate content using backend
+            const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    contents: [{ role: "user", parts: [{ text: prompt }] }],
-                }),
+                    modelName: modelName,
+                    prompt: prompt
+                })
             });
 
             if (!genRes.ok) {
@@ -179,10 +221,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
             }
 
             const genData = await genRes.json();
-            const text =
-                genData?.candidates?.[0]?.content?.parts?.map(p => p?.text).filter(Boolean).join("") ||
-                genData?.candidates?.[0]?.output ||
-                "";
+            const text = genData.text || '';
 
             if (!text) throw new Error("Empty AI response.");
 
@@ -198,6 +237,17 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
     return (
         <div className="pb-5 container-fluid px-0">
             <style>{`
+                        @keyframes highlight-pulse-effect {
+                    0% { background-color: rgba(239, 68, 68, 0.1); outline: 2px solid transparent; }
+                    50% { background-color: rgba(239, 68, 68, 0.3); outline: 2px solid #ef4444; }
+                    100% { background-color: rgba(239, 68, 68, 0.1); outline: 2px solid transparent; }
+                }
+
+                .highlight-pulse {
+                    animation: highlight-pulse-effect 2s infinite ease-in-out;
+                    position: relative;
+                    z-index: 5;
+                }
                 .stat-card-pro { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 22px; height: 100%; border-left: 5px solid #198754; }
                 .table thead th { background-color: #1e293b !important; color: #ffffff !important; font-weight: 600; padding: 12px 15px; }
                 .modal-step { padding: 15px 20px; border-left: 2px solid #e9ecef; position: relative; cursor: pointer; }
@@ -225,71 +275,73 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 <button className="btn btn-light border btn-sm px-3 shadow-sm fw-bold" onClick={() => setActiveTab('stations')}>BACK</button>
             </div>
 
-            {/* 🔍 Station-level delay diagnosis */}
-            <div className="diagnostic-card-minimal p-3 mb-4 shadow-sm">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                    <div>
-                        <div className="fw-bold text-dark small uppercase tracking-wider">ROOT CAUSE DELAY ANALYTICS</div>
-                        <div className="small text-muted">Short AI summary of delay patterns and recommended actions for this station.</div>
+            {/* 🔍 Station-level delay diagnosis – only when there are delayed units */}
+            {hasDelayedUnits && (
+                <div className="diagnostic-card-minimal p-3 mb-4 shadow-sm">
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <div className="fw-bold text-dark small uppercase tracking-wider">ROOT CAUSE DELAY ANALYTICS</div>
+                            <div className="small text-muted">Short AI summary of delay patterns and recommended actions for this station.</div>
+                        </div>
+                        <button
+                            className="btn btn-outline-dark btn-sm fw-bold shadow-sm px-4 rounded-pill"
+                            onClick={fetchStationDiagnosis}
+                            disabled={isStationAiLoading}
+                        >
+                            {isStationAiLoading ? 'ANALYZING...' : 'ANALYZE STATION'}
+                        </button>
                     </div>
-                    <button
-                        className="btn btn-outline-dark btn-sm fw-bold shadow-sm px-4 rounded-pill"
-                        onClick={fetchStationDiagnosis}
-                        disabled={isStationAiLoading}
-                    >
-                        {isStationAiLoading ? 'ANALYZING...' : 'ANALYZE STATION'}
-                    </button>
-                </div>
-                <div className="p-3 bg-white rounded border text-dark small shadow-inner">
-                    {stationAiAnalysis ? (() => {
-                        const summary = parseStationSummary(stationAiAnalysis);
-                        const textOrFallback = (s) => (s && s.trim().length > 0 ? s : 'No data.');
-                        const makeChip = (label, key, fullText) => {
-                            const max = 120;
-                            const normalized = textOrFallback(fullText);
-                            const isLong = normalized.length > max;
-                            const isOpen = summaryExpanded[key];
-                            const displayText = isOpen || !isLong ? normalized : normalized.slice(0, max - 1) + '…';
+                    <div className="p-3 bg-white rounded border text-dark small shadow-inner">
+                        {stationAiAnalysis ? (() => {
+                            const summary = parseStationSummary(stationAiAnalysis);
+                            const textOrFallback = (s) => (s && s.trim().length > 0 ? s : 'No data.');
+                            const makeChip = (label, key, fullText) => {
+                                const max = 120;
+                                const normalized = textOrFallback(fullText);
+                                const isLong = normalized.length > max;
+                                const isOpen = summaryExpanded[key];
+                                const displayText = isOpen || !isLong ? normalized : normalized.slice(0, max - 1) + '…';
+                                return (
+                                    <div className="station-summary-chip" key={key}>
+                                        <div className="station-summary-label d-flex justify-content-between align-items-center">
+                                            <span>{label}</span>
+                                            {isLong && (
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-link p-0 m-0 small text-primary text-decoration-none"
+                                                    onClick={() =>
+                                                        setSummaryExpanded(prev => ({
+                                                            ...prev,
+                                                            [key]: !prev[key],
+                                                        }))
+                                                    }
+                                                >
+                                                    {isOpen ? 'Hide' : 'View full'}
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="station-summary-text">
+                                            {displayText}
+                                        </div>
+                                    </div>
+                                );
+                            };
+
                             return (
-                                <div className="station-summary-chip" key={key}>
-                                    <div className="station-summary-label d-flex justify-content-between align-items-center">
-                                        <span>{label}</span>
-                                        {isLong && (
-                                            <button
-                                                type="button"
-                                                className="btn btn-link p-0 m-0 small text-primary text-decoration-none"
-                                                onClick={() =>
-                                                    setSummaryExpanded(prev => ({
-                                                        ...prev,
-                                                        [key]: !prev[key],
-                                                    }))
-                                                }
-                                            >
-                                                {isOpen ? 'Hide' : 'View full'}
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="station-summary-text">
-                                        {displayText}
-                                    </div>
+                                <div className="station-summary-grid">
+                                    {makeChip('Root cause', 'root', summary.rootCause)}
+                                    {makeChip('Impact', 'impact', summary.impact)}
+                                    {makeChip('Recommended actions', 'actions', summary.actions)}
                                 </div>
                             );
-                        };
-
-                        return (
-                            <div className="station-summary-grid">
-                                {makeChip('Root cause', 'root', summary.rootCause)}
-                                {makeChip('Impact', 'impact', summary.impact)}
-                                {makeChip('Recommended actions', 'actions', summary.actions)}
+                        })() : (
+                            <div className="text-muted italic text-center py-1">
+                                Click "ANALYZE STATION" to get AI summary of why this station is delayed and what to do next.
                             </div>
-                        );
-                    })() : (
-                        <div className="text-muted italic text-center py-1">
-                            Click "ANALYZE STATION" to get AI summary of why this station is delayed and what to do next.
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
 
             <div className="row g-4 mb-4">
                 <div className="col-md-6 col-xl-3"><div className="stat-card-pro"><span className="text-muted small fw-bold uppercase">Completed</span><h3 className="fw-bold text-success mt-1">{monitorMetrics.completedUnits}</h3></div></div>
@@ -318,25 +370,33 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                         </thead>
                         <tbody>
                             {filteredLogs.map(log => {
+                                const isHighlighted = log.id === highlightedUnitId;
                                 const lastTs = log.updated_at || log.created_at;
                                 const minutesInStation = lastTs
                                     ? Math.max(0, (new Date().getTime() - new Date(lastTs).getTime()) / (1000 * 60))
                                     : 0;
 
                                 const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationMonitorId] || 10;
-                                const delay = log.status === 'In Progress'
+                                const statusText = (log.status || '').toLowerCase();
+                                const isInProgressOrNG = log.status === 'In Progress' || statusText.includes('no good') || statusText.includes('ng');
+                                const delay = isInProgressOrNG
                                     ? checkUnitDelay(stationMonitorId, lastTs)
                                     : { isDelayed: false, minutes: minutesInStation, level: 'NORMAL' };
 
-                                // If status is Completed/OK but still not moving after threshold → show note
-                                const statusText = (log.status || '').toLowerCase();
                                 const isCompleted = statusText.includes('completed') || statusText.includes('ok');
                                 const moveNextThreshold = Math.max(10, thresholdMinutes); // avoid too sensitive thresholds
                                 const needsMoveNext = isCompleted && minutesInStation > moveNextThreshold;
 
                                 const delayMinutes = Math.max(0, minutesInStation - thresholdMinutes);
                                 return (
-                                    <tr key={log.id} className={delay.isDelayed ? 'delay-row' : ''}>
+                                    <tr 
+                                        key={log.id} 
+                                        // PINALITAN: Nagdagdag ng check kung ang log.id ay tumutugma sa highlightedUnitId
+                                        className={`
+                                            ${delay.isDelayed ? 'delay-row' : ''} 
+                                            ${log.id === highlightedUnitId ? 'highlight-pulse' : ''}
+                                        `}
+                                    >
                                         <td className="ps-4 fw-bold">{log.model}</td>
                                         <td>{log.revision}</td>
                                         <td>{log.base_unit_kitting_no}</td>
@@ -348,7 +408,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                         <td>{log.accessory_kitting_no}</td>
                                         <td className="text-center"><span className={`badge rounded-1 px-3 py-1 ${getStatusBadgeClass(log.status)}`}>{log.status}</span></td>
                                         <td className="text-center">
-                                            {log.status === 'In Progress' && delay.isDelayed ? (
+                                            {isInProgressOrNG && delay.isDelayed ? (
                                                 <span className={`badge rounded-pill ${delay.level === 'CRITICAL' ? 'bg-danger' : 'bg-warning text-dark'}`}>
                                                     +{Math.round(delayMinutes)}m
                                                 </span>
@@ -490,7 +550,10 @@ export function StationsOverview({
 
             const remarkCounts = new Map();
             logsForStation.forEach(log => {
-                if (log.status === 'In Progress') {
+                const statusText = (log.status || '').toLowerCase();
+                const isInProgressOrNG = log.status === 'In Progress' || statusText.includes('no good') || statusText.includes('ng');
+                
+                if (isInProgressOrNG) {
                     const delay = checkUnitDelay(station.id, log.updated_at || log.created_at);
                     if (delay.isDelayed) {
                         delayedUnits += 1;
@@ -513,19 +576,15 @@ export function StationsOverview({
                 }
             });
 
-            const fallbackReason = topRemark
-                ? `Common remark: "${topRemark}"`
-                : 'Most delays come from units exceeding the standard time window (likely rework/verification/parts waiting).';
-
-            return {
-                stationId: station.id,
-                stationName: station.name,
-                delayedUnits,
-                avgDelayMinutes,
-                maxDelayMinutes,
-                thresholdMinutes: DELAY_THRESHOLDS_MINUTES[station.id] || 10,
-                fallbackReason,
-            };
+   return {
+    stationId: station.id,
+    stationName: station.name,
+    delayedUnits,
+    avgDelayMinutes,
+    maxDelayMinutes,
+    thresholdMinutes: DELAY_THRESHOLDS_MINUTES[station.id] || 10,
+    fallbackReason: '', // Gawing blanko ito
+};
         });
 
         return stats
@@ -538,20 +597,23 @@ export function StationsOverview({
         setIsDelayHotspotsAiLoading(true);
         setDelayHotspotsAi(null);
         try {
-            const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
-            if (!apiKey) throw new Error("Missing REACT_APP_GEMINI_API_KEY.");
-
-            const GEMINI_V1_BASE = "https://generativelanguage.googleapis.com/v1";
-            const listRes = await fetch(`${GEMINI_V1_BASE}/models?key=${encodeURIComponent(apiKey)}`);
-            if (!listRes.ok) {
-                const body = await listRes.text().catch(() => "");
-                throw new Error(`ListModels failed (${listRes.status}): ${body || listRes.statusText}`);
+            // Step 1: Get available model from backend
+            const modelRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'list_models' })
+            });
+            
+            if (!modelRes.ok) {
+                const body = await modelRes.text().catch(() => "");
+                throw new Error(`Model listing failed (${modelRes.status}): ${body || modelRes.statusText}`);
             }
-            const listData = await listRes.json();
-            const models = Array.isArray(listData.models) ? listData.models : [];
-            const model = models.find(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"));
-            if (!model?.name) throw new Error("No available Gemini model supports generateContent for this API key.");
-
+            
+            const modelData = await modelRes.json();
+            if (!modelData.modelName) {
+                throw new Error('No model returned from backend');
+            }
+            
             const payload = delayHotspots.map(h => ({
                 stationId: h.stationId,
                 stationName: h.stationName,
@@ -571,20 +633,24 @@ ${JSON.stringify(payload, null, 2)}
 Return EXACTLY ${payload.length} lines (no extra text), format:
 StationID | one short reason (max 14 words)`;
 
-            const genRes = await fetch(`${GEMINI_V1_BASE}/${model.name}:generateContent?key=${encodeURIComponent(apiKey)}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] }),
+            // Step 2: Generate content using backend
+            const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    modelName: modelData.modelName,
+                    prompt: prompt
+                })
             });
+            
             if (!genRes.ok) {
                 const body = await genRes.text().catch(() => "");
                 throw new Error(`generateContent failed (${genRes.status}): ${body || genRes.statusText}`);
             }
+            
             const genData = await genRes.json();
-            const text =
-                genData?.candidates?.[0]?.content?.parts?.map(p => p?.text).filter(Boolean).join("") ||
-                genData?.candidates?.[0]?.output ||
-                "";
+            const text = genData.text || '';
+            
             if (!text) throw new Error("Empty AI response.");
 
             const lines = text
@@ -733,11 +799,6 @@ StationID | one short reason (max 14 words)`;
                                 <div className="fw-bold text-muted">{Math.round(h.maxDelayMinutes)}</div>
                                 <div className="small">
                                     {delayHotspotsAi?.[h.stationId] || h.fallbackReason}
-                                    <div className="mt-1">
-                                        <button className="btn btn-link p-0 small fw-bold text-decoration-none" onClick={() => handleMonitorStation(h.stationId)}>
-                                            MONITOR →
-                                        </button>
-                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -748,7 +809,11 @@ StationID | one short reason (max 14 words)`;
             <div className="row g-4">
                 {namedStations.map((station) => {
                     const metrics = calculateMetrics(station.id);
-                    const delayedCount = (metrics.stationLogs || []).filter(log => log.status === 'In Progress' && checkUnitDelay(station.id, log.updated_at || log.created_at).isDelayed).length;
+                    const delayedCount = (metrics.stationLogs || []).filter(log => {
+                        const statusText = (log.status || '').toLowerCase();
+                        const isInProgressOrNG = log.status === 'In Progress' || statusText.includes('no good') || statusText.includes('ng');
+                        return isInProgressOrNG && checkUnitDelay(station.id, log.updated_at || log.created_at).isDelayed;
+                    }).length;
                     return (
                         <div key={station.id} className="col-md-3">
                             <div className={`station-card-flat shadow-sm ${delayedCount > 0 ? 'delay-card' : ''}`}>
