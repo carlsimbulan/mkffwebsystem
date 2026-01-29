@@ -313,12 +313,28 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                             <tr>
                                 <th className="ps-4">MODEL</th><th>REVISION</th><th>BASE UNIT</th><th>ASSEMBLY</th>
                                 <th>DEVICE SERIAL</th><th>ACCESSORY</th><th className="text-center">STATUS</th>
-                                <th>REMARKS</th><th>LAST MOVEMENT</th><th className="text-center">ACTIONS</th>
+                                <th className="text-center">DELAY (MINS)</th><th>REMARKS / NOTES</th><th>LAST MOVEMENT</th><th className="text-center">ACTIONS</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredLogs.map(log => {
-                                const delay = log.status === 'In Progress' ? checkUnitDelay(stationMonitorId, log.updated_at || log.created_at) : { isDelayed: false };
+                                const lastTs = log.updated_at || log.created_at;
+                                const minutesInStation = lastTs
+                                    ? Math.max(0, (new Date().getTime() - new Date(lastTs).getTime()) / (1000 * 60))
+                                    : 0;
+
+                                const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationMonitorId] || 10;
+                                const delay = log.status === 'In Progress'
+                                    ? checkUnitDelay(stationMonitorId, lastTs)
+                                    : { isDelayed: false, minutes: minutesInStation, level: 'NORMAL' };
+
+                                // If status is Completed/OK but still not moving after threshold → show note
+                                const statusText = (log.status || '').toLowerCase();
+                                const isCompleted = statusText.includes('completed') || statusText.includes('ok');
+                                const moveNextThreshold = Math.max(10, thresholdMinutes); // avoid too sensitive thresholds
+                                const needsMoveNext = isCompleted && minutesInStation > moveNextThreshold;
+
+                                const delayMinutes = Math.max(0, minutesInStation - thresholdMinutes);
                                 return (
                                     <tr key={log.id} className={delay.isDelayed ? 'delay-row' : ''}>
                                         <td className="ps-4 fw-bold">{log.model}</td>
@@ -331,7 +347,24 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                         <td className="fw-bold">{log.device_serial_no}</td>
                                         <td>{log.accessory_kitting_no}</td>
                                         <td className="text-center"><span className={`badge rounded-1 px-3 py-1 ${getStatusBadgeClass(log.status)}`}>{log.status}</span></td>
-                                        <td className="text-muted small italic">{log.remarks || '---'}</td>
+                                        <td className="text-center">
+                                            {log.status === 'In Progress' && delay.isDelayed ? (
+                                                <span className={`badge rounded-pill ${delay.level === 'CRITICAL' ? 'bg-danger' : 'bg-warning text-dark'}`}>
+                                                    +{Math.round(delayMinutes)}m
+                                                </span>
+                                            ) : (
+                                                <span className="text-muted small">—</span>
+                                            )}
+                                        </td>
+                                        <td className="text-muted small italic">
+                                            {log.remarks || '---'}
+                                            {needsMoveNext && (
+                                                <div className="mt-1">
+                                                    <span className="badge bg-warning text-dark fw-bold">MOVE TO NEXT STATION</span>
+                                                    <div className="small text-muted mt-1">Completed but still here for {Math.round(minutesInStation)} mins.</div>
+                                                </div>
+                                            )}
+                                        </td>
                                         <td className="small text-muted">{new Date(log.updated_at || log.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                                         <td className="text-center">
                                             <div className="d-flex gap-1 justify-content-center">
@@ -414,6 +447,8 @@ export function StationsOverview({
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
+    const [delayHotspotsAi, setDelayHotspotsAi] = useState(null); // { [stationId]: reason }
+    const [isDelayHotspotsAiLoading, setIsDelayHotspotsAiLoading] = useState(false);
 
     const filteredHistory = useMemo(() => {
         if (!allLogs) return [];
@@ -435,6 +470,144 @@ export function StationsOverview({
         const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
         return filteredHistory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
     }, [filteredHistory, currentPage]);
+
+    const namedStations = useMemo(() => {
+        return (stations || []).slice(0, processStations.length).map((station, index) => ({
+            ...station,
+            name: processStations[index],
+        }));
+    }, [stations]);
+
+    const delayHotspots = useMemo(() => {
+        // Compute top 3 stations with most delayed units (and basic reason from remarks)
+        const stats = namedStations.map((station) => {
+            const metrics = calculateMetrics(station.id);
+            const logsForStation = metrics.stationLogs || [];
+
+            let delayedUnits = 0;
+            let totalDelayMinutes = 0;
+            let maxDelayMinutes = 0;
+
+            const remarkCounts = new Map();
+            logsForStation.forEach(log => {
+                if (log.status === 'In Progress') {
+                    const delay = checkUnitDelay(station.id, log.updated_at || log.created_at);
+                    if (delay.isDelayed) {
+                        delayedUnits += 1;
+                        totalDelayMinutes += delay.minutes;
+                        if (delay.minutes > maxDelayMinutes) maxDelayMinutes = delay.minutes;
+
+                        const remark = (log.remarks || '').trim();
+                        if (remark) remarkCounts.set(remark, (remarkCounts.get(remark) || 0) + 1);
+                    }
+                }
+            });
+
+            const avgDelayMinutes = delayedUnits ? (totalDelayMinutes / delayedUnits) : 0;
+            let topRemark = '';
+            let topRemarkCount = 0;
+            remarkCounts.forEach((count, remark) => {
+                if (count > topRemarkCount) {
+                    topRemark = remark;
+                    topRemarkCount = count;
+                }
+            });
+
+            const fallbackReason = topRemark
+                ? `Common remark: "${topRemark}"`
+                : 'Most delays come from units exceeding the standard time window (likely rework/verification/parts waiting).';
+
+            return {
+                stationId: station.id,
+                stationName: station.name,
+                delayedUnits,
+                avgDelayMinutes,
+                maxDelayMinutes,
+                thresholdMinutes: DELAY_THRESHOLDS_MINUTES[station.id] || 10,
+                fallbackReason,
+            };
+        });
+
+        return stats
+            .filter(s => s.delayedUnits > 0)
+            .sort((a, b) => (b.delayedUnits - a.delayedUnits) || (b.maxDelayMinutes - a.maxDelayMinutes))
+            .slice(0, 3);
+    }, [namedStations, calculateMetrics]);
+
+    const fetchDelayHotspotReasons = async () => {
+        setIsDelayHotspotsAiLoading(true);
+        setDelayHotspotsAi(null);
+        try {
+            const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
+            if (!apiKey) throw new Error("Missing REACT_APP_GEMINI_API_KEY.");
+
+            const GEMINI_V1_BASE = "https://generativelanguage.googleapis.com/v1";
+            const listRes = await fetch(`${GEMINI_V1_BASE}/models?key=${encodeURIComponent(apiKey)}`);
+            if (!listRes.ok) {
+                const body = await listRes.text().catch(() => "");
+                throw new Error(`ListModels failed (${listRes.status}): ${body || listRes.statusText}`);
+            }
+            const listData = await listRes.json();
+            const models = Array.isArray(listData.models) ? listData.models : [];
+            const model = models.find(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"));
+            if (!model?.name) throw new Error("No available Gemini model supports generateContent for this API key.");
+
+            const payload = delayHotspots.map(h => ({
+                stationId: h.stationId,
+                stationName: h.stationName,
+                thresholdMinutes: h.thresholdMinutes,
+                delayedUnits: h.delayedUnits,
+                avgDelayMinutes: Number(h.avgDelayMinutes.toFixed(1)),
+                maxDelayMinutes: Number(h.maxDelayMinutes.toFixed(1)),
+            }));
+
+            const prompt = `You are a Senior Manufacturing Engineer at MKFF.
+Given the delay hotspot stats below, produce ONE probable reason per station (do NOT overexplain).
+Use manufacturing logic: time threshold breaches, checklist issues, escalation gaps, rework/verification, missing parts, test failures.
+
+Delay hotspots JSON:
+${JSON.stringify(payload, null, 2)}
+
+Return EXACTLY ${payload.length} lines (no extra text), format:
+StationID | one short reason (max 14 words)`;
+
+            const genRes = await fetch(`${GEMINI_V1_BASE}/${model.name}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] }),
+            });
+            if (!genRes.ok) {
+                const body = await genRes.text().catch(() => "");
+                throw new Error(`generateContent failed (${genRes.status}): ${body || genRes.statusText}`);
+            }
+            const genData = await genRes.json();
+            const text =
+                genData?.candidates?.[0]?.content?.parts?.map(p => p?.text).filter(Boolean).join("") ||
+                genData?.candidates?.[0]?.output ||
+                "";
+            if (!text) throw new Error("Empty AI response.");
+
+            const lines = text
+                .split(/\r?\n/)
+                .map(l => l.trim())
+                .filter(Boolean);
+
+            const map = {};
+            lines.forEach(line => {
+                const [stationIdRaw, ...rest] = line.split('|');
+                const stationId = (stationIdRaw || '').trim();
+                const reason = rest.join('|').trim();
+                if (stationId && reason) map[stationId] = reason;
+            });
+
+            setDelayHotspotsAi(map);
+        } catch (err) {
+            console.error("Delay Hotspots AI Error:", err);
+            setDelayHotspotsAi({ __error: String(err?.message || err) });
+        } finally {
+            setIsDelayHotspotsAiLoading(false);
+        }
+    };
 
     if (activeTab === "station_monitor" && stationMonitorId) {
         return <StationMonitorView {...{stationMonitorId, calculateMetrics, handleEditClick, highlightedUnitId, setActiveTab, fetchData}} />;
@@ -493,10 +666,6 @@ export function StationsOverview({
         );
     }
 
-    const namedStations = stations.slice(0, processStations.length).map((station, index) => ({
-        ...station, name: processStations[index],
-    }));
-
     return (
         <div className="container-fluid px-0">
             <style>{`
@@ -505,11 +674,75 @@ export function StationsOverview({
                 .delay-tag { position: absolute; top: 10px; right: 10px; color: #dc3545; font-size: 0.6rem; font-weight: 800; border: 1px solid #dc3545; padding: 1px 6px; border-radius: 4px; }
                 .metric-row { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #475569; }
                 .animate-pulse { animation: pulse-red 1.5s infinite !important; }
+                .hotspot-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; }
+                .hotspot-row { display: grid; grid-template-columns: 34px 1.4fr 0.6fr 0.6fr 2fr; gap: 10px; align-items: center; }
+                @media (max-width: 992px) {
+                    .hotspot-row { grid-template-columns: 34px 1fr; gap: 6px; }
+                }
             `}</style>
             
             <div className="d-flex justify-content-between align-items-center mb-4 px-2 border-bottom pb-3">
                 <div><h4 className="fw-bold text-dark mb-0">Station Control Panel</h4><p className="text-muted small mb-0">Operational real-time monitoring dashboard.</p></div>
                 <button className="btn btn-dark btn-sm px-4 py-2 shadow-sm fw-bold" onClick={() => setActiveTab('overall_history')}>OVERALL HISTORY</button>
+            </div>
+
+            {/* 🔥 Delay Hotspots Analytics (Top 3) */}
+            <div className="mx-2 mb-4 hotspot-card shadow-sm">
+                <div className="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <div className="fw-bold text-dark small uppercase tracking-wider">DELAY HOTSPOTS (TOP 3)</div>
+                        <div className="small text-muted">Most frequently delayed stations based on your time thresholds.</div>
+                    </div>
+                    <div className="d-flex gap-2">
+                        <button
+                            className="btn btn-outline-dark btn-sm fw-bold px-3"
+                            onClick={fetchDelayHotspotReasons}
+                            disabled={isDelayHotspotsAiLoading || delayHotspots.length === 0}
+                            title={delayHotspots.length === 0 ? 'No delayed stations right now.' : 'Generate 1 reason per station using AI.'}
+                        >
+                            {isDelayHotspotsAiLoading ? 'GENERATING...' : 'GENERATE REASONS'}
+                        </button>
+                    </div>
+                </div>
+
+                {delayHotspotsAi?.__error && (
+                    <div className="alert alert-warning py-2 mb-2 small">
+                        AI reasons unavailable: {delayHotspotsAi.__error}
+                    </div>
+                )}
+
+                {delayHotspots.length === 0 ? (
+                    <div className="text-muted small">No delayed stations detected at the moment.</div>
+                ) : (
+                    <div className="d-flex flex-column gap-2">
+                        <div className="hotspot-row small text-muted fw-bold border-bottom pb-2">
+                            <div>#</div>
+                            <div>STATION</div>
+                            <div>DELAYED</div>
+                            <div>WORST (MINS)</div>
+                            <div>PROBABLE REASON</div>
+                        </div>
+                        {delayHotspots.map((h, idx) => (
+                            <div key={h.stationId} className="hotspot-row py-2 border-bottom">
+                                <div className="fw-bold">{idx + 1}</div>
+                                <div>
+                                    <div className="fw-bold text-dark">{h.stationName}</div>
+                                    <div className="small text-muted">{h.stationId} • Threshold: {h.thresholdMinutes} min</div>
+                                </div>
+                                <div className="fw-bold text-danger">{h.delayedUnits}</div>
+                                <div className="fw-bold text-muted">{Math.round(h.maxDelayMinutes)}</div>
+                                <div className="small">
+                                    {delayHotspotsAi?.[h.stationId] || h.fallbackReason}
+                                    <div className="mt-1">
+                                        <button className="btn btn-link p-0 small fw-bold text-decoration-none" onClick={() => handleMonitorStation(h.stationId)}>
+                                            MONITOR →
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
             
             <div className="row g-4">

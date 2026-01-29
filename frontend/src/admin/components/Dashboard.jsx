@@ -1,7 +1,29 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react'; 
-import { UnitPieChart } from './UnitPieChart'; 
-import { StationBarChart } from './StationBarChart'; 
-import html2canvas from 'html2canvas'; 
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
+import {
+    Chart as ChartJS,
+    LineElement,
+    PointElement,
+    BarElement,
+    ArcElement,
+    CategoryScale,
+    LinearScale,
+    Tooltip,
+    Legend,
+    Filler
+} from 'chart.js';
+
+ChartJS.register(
+    LineElement,
+    PointElement,
+    BarElement,
+    ArcElement,
+    CategoryScale,
+    LinearScale,
+    Tooltip,
+    Legend,
+    Filler
+);
 
 // --- CONFIGURATIONS ---
 
@@ -39,6 +61,17 @@ const stationDescriptions = {
     "QC Stamping": "Validation of unit checklist and final QC approval."
 };
 
+const checkUnitDelay = (stationId, updatedAt) => {
+    const threshold = DELAY_THRESHOLDS_MINUTES[stationId] || 10;
+    const lastUpdate = new Date(updatedAt).getTime();
+    const minutesInStation = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
+    if (minutesInStation > threshold * 3) return { isDelayed: true, level: 'CRITICAL', minutes: minutesInStation };
+    if (minutesInStation > threshold) return { isDelayed: true, level: 'MODERATE', minutes: minutesInStation };
+    return { isDelayed: false, level: 'NORMAL', minutes: minutesInStation };
+};
+
+const hourLabel = (d) => d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
 const getStatusBadgeClass = (status) => {
     const statusText = status?.toLowerCase() || '';
     if (statusText.includes('completed') || statusText.includes('ok')) return 'bg-success-subtle text-success border-0';
@@ -55,15 +88,11 @@ export function Dashboard({
     calculateMetrics,
     overallMetrics, 
     setActiveTab,
-    dashboardView,
-    nextChart,
-    prevChart,
     handleMonitorStation,
     newReportsToday,
     setHighlightedUnitId
 }) {
     
-    const chartRef = useRef(null); 
     const stepperRef = useRef(null); 
     const [searchTerm, setSearchTerm] = useState('');
     const [qrValue, setQrValue] = useState(''); 
@@ -114,58 +143,102 @@ export function Dashboard({
         };
     }, [overallMetrics, forScanningUnitsCount]);
 
-    const bottleneckLineData = useMemo(() => {
-        return stations.map((s, idx) => {
-            const m = calculateMetrics(s.id);
-            const stationLogs = m.stationLogs || [];
-            
-            const delayedUnits = stationLogs.filter(log => {
-                if (log.status !== 'In Progress') return false;
-                const threshold = DELAY_THRESHOLDS_MINUTES[s.id] || 10;
-                const lastUpdate = new Date(log.updated_at || log.created_at).getTime();
-                const diff = (new Date().getTime() - lastUpdate) / (1000 * 60);
-                return diff > threshold;
-            });
+    // 🥇 Throughput Trend: Completed units per hour (last 12 hours) + delta vs previous 12 hours
+    const throughputTrend = useMemo(() => {
+        const now = new Date();
+        const hours = 12;
+        const bucketStart = new Date(now.getTime() - hours * 60 * 60 * 1000);
+        bucketStart.setMinutes(0, 0, 0);
 
-            const maxDelay = delayedUnits.length > 0 
-                ? Math.max(...delayedUnits.map(l => (new Date().getTime() - new Date(l.updated_at || l.created_at).getTime()) / (1000 * 60)))
-                : 0;
+        const makeBuckets = (start, count) => {
+            const arr = [];
+            for (let i = 0; i < count; i++) {
+                const t = new Date(start.getTime() + i * 60 * 60 * 1000);
+                arr.push({ t, key: t.getTime(), count: 0 });
+            }
+            return arr;
+        };
 
-            // English Status Description Logic
-            let flowStatusDesc = "";
-            if (m.ngUnits > 2) {
-                flowStatusDesc = `Quality issue detected: ${m.ngUnits} units marked as No Good. Technical review required.`;
-            } else if (m.ngUnits > 0) {
-                flowStatusDesc = `Minor defect found: ${m.ngUnits} unit(s) failed. Action required soon.`;
-            } else if (delayedUnits.length > 0) {
-                flowStatusDesc = `Station is currently slow: Operations delayed by ${maxDelay.toFixed(0)} minutes.`;
-            } else {
-                flowStatusDesc = "Station operating within normal parameters.";
+        const buckets = makeBuckets(bucketStart, hours + 1); // include current hour
+        const bucketMap = new Map(buckets.map(b => [b.key, b]));
+
+        const prevStart = new Date(bucketStart.getTime() - hours * 60 * 60 * 1000);
+        const prevEnd = new Date(bucketStart.getTime());
+
+        let currentTotal = 0;
+        let prevTotal = 0;
+
+        (logs || []).forEach(l => {
+            const status = (l.status || '').toLowerCase();
+            const isCompleted = status === 'completed' || status.includes('completed') || status.includes('ok');
+            if (!isCompleted) return;
+
+            const ts = new Date(l.updated_at || l.created_at);
+            if (Number.isNaN(ts.getTime())) return;
+
+            // current window buckets
+            if (ts >= bucketStart) {
+                const h = new Date(ts);
+                h.setMinutes(0, 0, 0);
+                const k = h.getTime();
+                if (bucketMap.has(k)) {
+                    bucketMap.get(k).count += 1;
+                    currentTotal += 1;
+                }
             }
 
+            // previous window total
+            if (ts >= prevStart && ts < prevEnd) {
+                prevTotal += 1;
+            }
+        });
+
+        const labels = buckets.map(b => hourLabel(b.t));
+        const data = buckets.map(b => b.count);
+        const deltaPct = prevTotal > 0 ? ((currentTotal - prevTotal) / prevTotal) * 100 : (currentTotal > 0 ? 100 : 0);
+
+        return { labels, data, currentTotal, prevTotal, deltaPct };
+    }, [logs]);
+
+    // 🥈 Avg Cycle Time per Station: avg minutes in-station for in-progress units vs threshold
+    const cycleTimePerStation = useMemo(() => {
+        const rows = (stations || []).slice(0, processStations.length).map((s, idx) => {
+            const m = calculateMetrics(s.id) || {};
+            const stationLogs = m.stationLogs || [];
+            const inProgress = stationLogs.filter(l => (l.status || '') === 'In Progress');
+
+            const times = inProgress
+                .map(l => {
+                    const ts = new Date(l.updated_at || l.created_at);
+                    if (Number.isNaN(ts.getTime())) return null;
+                    return (new Date().getTime() - ts.getTime()) / (1000 * 60);
+                })
+                .filter(v => typeof v === 'number');
+
+            const avg = times.length ? (times.reduce((a, b) => a + b, 0) / times.length) : 0;
+            const threshold = DELAY_THRESHOLDS_MINUTES[s.id] || 10;
             return {
                 id: s.id,
                 name: processStations[idx] || s.id,
-                wip: m.pendingUnits,
-                ng: m.ngUnits,
-                isSlowByNG: m.ngUnits > 2,
-                isSlowByDelay: delayedUnits.length > 0,
-                delayTime: maxDelay.toFixed(0),
-                statusText: flowStatusDesc
+                avgMinutes: avg,
+                thresholdMinutes: threshold,
+                exceedsPct: threshold > 0 ? ((avg - threshold) / threshold) * 100 : 0,
             };
         });
-    }, [stations, calculateMetrics, logs]);
 
-    const exportChartAsImage = () => {
-        if (!chartRef.current) return;
-        html2canvas(chartRef.current, { allowTaint: true, useCORS: true, backgroundColor: "#ffffff", scale: 2 }).then(canvas => {
-            const image = canvas.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.href = image;
-            link.download = `MKFF_Report_${new Date().getTime()}.png`;
-            link.click();
-        });
-    };
+        // Show worst offenders first (avg above threshold)
+        rows.sort((a, b) => (b.avgMinutes - b.thresholdMinutes) - (a.avgMinutes - a.thresholdMinutes));
+        return rows;
+    }, [stations, calculateMetrics]);
+
+    // 🥉 FPY (approx): Completed / (Completed + NG)
+    const fpy = useMemo(() => {
+        const completed = Number(overallMetrics?.completedUnits || 0);
+        const ng = Number(overallMetrics?.ngUnits || 0);
+        const processed = completed + ng;
+        const pct = processed > 0 ? (completed / processed) * 100 : 0;
+        return { completed, ng, processed, pct };
+    }, [overallMetrics]);
 
     const handleGoToStation = (unit) => {
         if (!unit.station) return;
@@ -173,8 +246,6 @@ export function Dashboard({
         handleMonitorStation(unit.station); 
         setSelectedUnit(null);
     };
-
-    const currentChartTitle = dashboardView === 'bar' ? 'STATION OUTPUT' : 'STATUS DISTRIBUTION';
 
     return (
         <div className="container-fluid px-0 py-2">
@@ -188,21 +259,7 @@ export function Dashboard({
                 
                 .search-input-pro { padding-left: 38px !important; background-color: #f8fafc; border: 1px solid #e2e8f0; height: 40px; }
                 .qr-input-pro { padding-left: 38px !important; background-color: #f5f3ff; border: 1px solid #ddd6fe; height: 40px; color: #5b21b6; }
-                .chart-container-pro { background: #ffffff; border: 1px solid #edf2f7; border-radius: 20px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1); }
                 .modal-blur { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); }
-
-                .flow-container { background: #fff; border-radius: 20px; border: 1px solid #edf2f7; padding: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-                /* Non-clickable flow item */
-                .flow-line-item { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #f1f5f9; position: relative; transition: all 0.2s; cursor: default; }
-                .flow-line-item:hover { background: #fcfdfe; }
-                .flow-line-item:last-child { border-bottom: none; }
-                .flow-index { width: 30px; font-weight: 900; color: #cbd5e1; font-size: 0.8rem; }
-                .flow-name-box { flex: 1; }
-                .flow-name { font-weight: 700; color: #1e293b; font-size: 0.85rem; text-transform: uppercase; margin-bottom: 2px; }
-                .flow-desc-text { font-size: 0.75rem; color: #94a3b8; font-weight: 500; }
-                .flow-metrics { display: flex; gap: 20px; align-items: center; }
-                .slow-alert { font-size: 0.65rem; font-weight: 800; padding: 4px 12px; border-radius: 50px; animation: pulse-red 2s infinite; }
-                @keyframes pulse-red { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
                 .stepper-nav-container { position: relative; display: flex; align-items: center; }
                 .stepper-nav-btn { position: absolute; top: 30%; transform: translateY(-50%); z-index: 20; width: 32px; height: 32px; background: #fff; border: 1px solid #e2e8f0; border-radius: 50%; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; align-items: center; justify-content: center; cursor: pointer; color: #64748b; transition: all 0.2s; }
@@ -228,6 +285,11 @@ export function Dashboard({
                 .custom-scrollbar::-webkit-scrollbar { width: 5px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+
+                .analytics-card { background: #ffffff; border: 1px solid #edf2f7; border-radius: 18px; box-shadow: 0 6px 18px rgba(0,0,0,0.08); overflow: hidden; }
+                .analytics-card-header { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; background: #f8fafc; }
+                .analytics-card-body { padding: 14px 16px; }
+                .kpi-pill { font-size: 0.65rem; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; padding: 6px 10px; border-radius: 999px; border: 1px solid #e2e8f0; background: #fff; }
             `}</style>
 
             <div className="d-flex justify-content-between align-items-center mb-4 px-2">
@@ -313,74 +375,163 @@ export function Dashboard({
                 </div>
             </div>
 
-            <div className="flow-container mb-5 mx-2">
-                <div className="d-flex justify-content-between align-items-center mb-4">
-                    <div>
-                        <h5 className="fw-black text-dark mb-1 uppercase" style={{letterSpacing: '1px'}}>Live Production Line Flow</h5>
-                        <p className="text-muted small mb-0">Real-time bottleneck identification per process stage.</p>
-                    </div>
-                    <div className="d-flex gap-3">
-                        <div className="small fw-bold text-danger"><i className="bi bi-circle-fill me-1"></i> HIGH NG</div>
-                        <div className="small fw-bold text-warning"><i className="bi bi-circle-fill me-1"></i> STUCK</div>
+            {/* 📊 Advanced Analytics (Top 3 KPIs) */}
+            <div className="row g-4 mb-5 mx-1">
+                {/* 🥇 Throughput Trend */}
+                <div className="col-lg-6">
+                    <div className="analytics-card h-100">
+                        <div className="analytics-card-header d-flex justify-content-between align-items-center">
+                            <div>
+                                <div className="label-caps mb-0">TOP 1 — Throughput Trend</div>
+                                <div className="small text-muted">Completed units per hour (last 12 hours)</div>
+                            </div>
+                            <span className={`kpi-pill ${throughputTrend.deltaPct < 0 ? 'text-danger' : 'text-success'}`}>
+                                {throughputTrend.deltaPct < 0 ? 'DOWN' : 'UP'} {Math.abs(throughputTrend.deltaPct).toFixed(0)}%
+                            </span>
+                        </div>
+                        <div className="analytics-card-body" style={{ height: 280 }}>
+                            <Line
+                                data={{
+                                    labels: throughputTrend.labels,
+                                    datasets: [
+                                        {
+                                            label: 'Completed / hour',
+                                            data: throughputTrend.data,
+                                            borderColor: '#0ea5e9',
+                                            backgroundColor: 'rgba(14, 165, 233, 0.15)',
+                                            tension: 0.35,
+                                            fill: true,
+                                            pointRadius: 3,
+                                            pointBackgroundColor: '#0ea5e9',
+                                        },
+                                    ],
+                                }}
+                                options={{
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: { legend: { display: false } },
+                                    scales: {
+                                        x: { grid: { display: false }, ticks: { color: '#64748b', maxRotation: 0 } },
+                                        y: { beginAtZero: true, ticks: { color: '#94a3b8', precision: 0 }, grid: { color: '#f1f5f9' } },
+                                    },
+                                }}
+                            />
+                        </div>
+                        <div className="px-3 pb-3 small text-muted">
+                            Total (12h): <strong>{throughputTrend.currentTotal}</strong> • Prev (12h): <strong>{throughputTrend.prevTotal}</strong>
+                        </div>
                     </div>
                 </div>
 
-                <div className="flow-list custom-scrollbar" style={{maxHeight: '450px', overflowY: 'auto'}}>
-                    {bottleneckLineData.map((node, i) => (
-                        <div key={node.id} className="flow-line-item">
-                            <div className="flow-index">{i + 1}</div>
-                            <div className="flow-name-box">
-                                <div className="flow-name">{node.name}</div>
-                                <div className="flow-desc-text">{node.statusText}</div>
-                            </div>
-                            
-                            <div className="flow-metrics">
-                                {node.isSlowByNG && (
-                                    <div className="slow-alert bg-danger text-white">
-                                        <i className="bi bi-exclamation-triangle-fill me-1"></i> CRITICAL: {node.ng} NG UNITS
-                                    </div>
-                                )}
-                                
-                                {node.isSlowByDelay && (
-                                    <div className="slow-alert bg-warning text-dark">
-                                        <i className="bi bi-clock-fill me-1"></i> DELAY: {node.delayTime} MINS
-                                    </div>
-                                )}
+                {/* 🥈 Avg Cycle Time per Station */}
+                <div className="col-lg-6">
+                    <div className="analytics-card h-100">
+                        <div className="analytics-card-header">
+                            <div className="label-caps mb-0">TOP 2 — Average Cycle Time per Station</div>
+                            <div className="small text-muted">Avg minutes in station (WIP) vs threshold</div>
+                        </div>
+                        <div className="analytics-card-body" style={{ height: 280 }}>
+                            <Bar
+                                data={{
+                                    labels: cycleTimePerStation.map(r => r.name),
+                                    datasets: [
+                                        {
+                                            label: 'Avg mins (WIP)',
+                                            data: cycleTimePerStation.map(r => Number(r.avgMinutes.toFixed(1))),
+                                            backgroundColor: 'rgba(245, 158, 11, 0.85)',
+                                            borderRadius: 10,
+                                            barThickness: 10,
+                                        },
+                                        {
+                                            label: 'Threshold',
+                                            data: cycleTimePerStation.map(r => r.thresholdMinutes),
+                                            backgroundColor: 'rgba(148, 163, 184, 0.45)',
+                                            borderRadius: 10,
+                                            barThickness: 10,
+                                        },
+                                    ],
+                                }}
+                                options={{
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    indexAxis: 'y',
+                                    plugins: { legend: { position: 'bottom', labels: { color: '#64748b' } } },
+                                    scales: {
+                                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#f1f5f9' } },
+                                        y: { ticks: { color: '#475569', font: { size: 11, weight: '600' } }, grid: { display: false } },
+                                    },
+                                }}
+                            />
+                        </div>
+                        <div className="px-3 pb-3 small text-muted">
+                            Worst station: <strong>{cycleTimePerStation[0]?.name || 'N/A'}</strong>
+                            {cycleTimePerStation[0] ? (
+                                <> • Exceeds by <strong>{Math.max(0, cycleTimePerStation[0].exceedsPct).toFixed(0)}%</strong></>
+                            ) : null}
+                        </div>
+                    </div>
+                </div>
 
-                                <div className="d-flex gap-3 ms-4">
-                                    <div className="text-center">
-                                        <div className="fw-black text-primary mb-0" style={{fontSize: '0.9rem'}}>{node.wip}</div>
-                                        <div className="text-muted" style={{fontSize: '0.5rem', fontWeight: 800}}>WIP</div>
+                {/* 🥉 FPY */}
+                <div className="col-lg-12">
+                    <div className="analytics-card">
+                        <div className="analytics-card-header d-flex justify-content-between align-items-center">
+                            <div>
+                                <div className="label-caps mb-0">TOP 3 — First Pass Yield (FPY)</div>
+                                <div className="small text-muted">Completed ÷ (Completed + NG)</div>
+                            </div>
+                            <span className="kpi-pill text-primary">FPY {fpy.pct.toFixed(1)}%</span>
+                        </div>
+                        <div className="analytics-card-body d-flex flex-wrap gap-3 align-items-center justify-content-between">
+                            <div style={{ width: 260, height: 220, position: 'relative' }}>
+                                <Doughnut
+                                    data={{
+                                        labels: ['Pass', 'Fail'],
+                                        datasets: [
+                                            {
+                                                data: [Number(fpy.pct.toFixed(1)), Number((100 - fpy.pct).toFixed(1))],
+                                                backgroundColor: ['#10b981', '#ef4444'],
+                                                borderColor: ['#fff', '#fff'],
+                                                borderWidth: 4,
+                                                cutout: '72%',
+                                                borderRadius: 10,
+                                            },
+                                        ],
+                                    }}
+                                    options={{
+                                        responsive: true,
+                                        maintainAspectRatio: false,
+                                        plugins: { legend: { position: 'bottom', labels: { color: '#64748b' } } },
+                                    }}
+                                />
+                                <div className="position-absolute top-50 start-50 translate-middle text-center">
+                                    <div className="label-caps">FPY</div>
+                                    <div className="fw-black" style={{ fontSize: '2rem', color: '#0f172a' }}>{fpy.pct.toFixed(1)}%</div>
+                                </div>
+                            </div>
+                            <div className="flex-grow-1">
+                                <div className="d-flex flex-wrap gap-3">
+                                    <div className="stat-card-pro" style={{ padding: 14, minWidth: 220 }}>
+                                        <div className="label-caps">Processed</div>
+                                        <div className="fw-black" style={{ fontSize: '1.6rem' }}>{fpy.processed}</div>
+                                        <div className="small text-muted">Completed + NG</div>
                                     </div>
-                                    <div className="text-center border-start ps-3">
-                                        <div className="fw-black text-danger mb-0" style={{fontSize: '0.9rem'}}>{node.ng}</div>
-                                        <div className="text-muted" style={{fontSize: '0.5rem', fontWeight: 800}}>NG</div>
+                                    <div className="stat-card-pro" style={{ padding: 14, minWidth: 220 }}>
+                                        <div className="label-caps">Completed</div>
+                                        <div className="fw-black text-success" style={{ fontSize: '1.6rem' }}>{fpy.completed}</div>
+                                        <div className="small text-muted">First-pass success</div>
                                     </div>
+                                    <div className="stat-card-pro" style={{ padding: 14, minWidth: 220 }}>
+                                        <div className="label-caps">NG</div>
+                                        <div className="fw-black text-danger" style={{ fontSize: '1.6rem' }}>{fpy.ng}</div>
+                                        <div className="small text-muted">First-pass fail</div>
+                                    </div>
+                                </div>
+                                <div className="small text-muted mt-2">
+                                    Tip: FPY drops usually indicate checklist gaps, test failures, or rework loops in specific stations.
                                 </div>
                             </div>
                         </div>
-                    ))}
-                </div>
-            </div>
-
-            <div className="chart-container-pro overflow-hidden mb-5">
-                <div className="d-flex justify-content-between align-items-center p-3 px-4 border-bottom bg-light bg-opacity-10">
-                    <span className="label-caps m-0">{currentChartTitle}</span>
-                    <div className="d-flex gap-2">
-                        <button className="btn btn-sm btn-outline-secondary rounded-pill px-3 border-0 bg-light" onClick={exportChartAsImage}><i className="bi bi-download me-1"></i> EXPORT</button>
-                        <div className="btn-group">
-                            <button className="btn btn-sm btn-outline-secondary border-0 bg-light" onClick={prevChart}><i className="bi bi-chevron-left"></i></button>
-                            <button className="btn btn-sm btn-outline-secondary border-0 bg-light" onClick={nextChart}><i className="bi bi-chevron-right"></i></button>
-                        </div>
-                    </div>
-                </div>
-                <div className="p-4" ref={chartRef}>
-                    <div style={{ minHeight: '400px' }}>
-                        {dashboardView === 'bar' ? (
-                            <StationBarChart logs={logs} stations={stations} calculateMetrics={calculateMetrics} />
-                        ) : (
-                            <UnitPieChart metrics={overallMetrics} title="" />
-                        )}
                     </div>
                 </div>
             </div>
