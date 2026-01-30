@@ -35,113 +35,78 @@ const NoGoodUnits = ({ logs, handleEditClick }) => {
     };
 
     return (
-        <div className="container-fluid px-0 py-3 animate-in fade-in">
-            <style>
-                {`
-                .ng-container { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); overflow: hidden; }
-                .table-ng { font-size: 0.8rem; width: 100%; border-collapse: separate; border-spacing: 0; }
-                .table-ng thead th { background: #f1f5f9; color: #475569; font-weight: 800; text-transform: uppercase; font-size: 0.65rem; letter-spacing: 0.05em; padding: 14px 10px; border-bottom: 2px solid #e2e8f0; white-space: nowrap; }
-                .table-ng tbody td { padding: 12px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; color: #334155; }
-                .table-ng tbody tr:hover { background-color: #f8fafc; }
-                .mono-box { font-family: 'JetBrains Mono', monospace; background: #f8fafc; padding: 2px 5px; border-radius: 4px; font-size: 0.75rem; color: #0f172a; border: 1px solid #e2e8f0; }
-                .summary-header { padding: 20px; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
-                .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1060; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
-                .modal-content-balanced { background: white; width: 95%; max-width: 850px; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); display: flex; flex-direction: column; max-height: 85vh; border: 1px solid #cbd5e1; }
-                .modal-step { padding: 12px 20px; border-left: 3px solid #e2e8f0; position: relative; cursor: pointer; transition: all 0.2s ease; }
-                .modal-step.active-ng { border-left-color: #ef4444; background: #fef2f2; }
-                .modal-step.done { border-left-color: #22c55e; }
-                .modal-dot { position: absolute; left: -8px; top: 18px; width: 13px; height: 13px; border-radius: 50%; background: #e2e8f0; border: 2px solid white; z-index: 2; }
-                .active-ng .modal-dot { background: #ef4444; }
-                .done .modal-dot { background: #22c55e; }
-                .tracker-checklist-box { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 10px; overflow-x: auto; }
-                .tracker-table { width: 100%; font-size: 0.7rem; text-align: center; border-collapse: collapse; min-width: 600px; }
-                .tracker-table th { background: #f8fafc; padding: 8px; border-bottom: 1px solid #e2e8f0; font-weight: 800; color: #64748b; text-transform: uppercase; }
-                .tracker-table td { padding: 10px 8px; border-bottom: 1px solid #f1f5f9; font-weight: 700; }
-                .tracker-checklist-box {
-                    overflow-x: auto;
-                    display: block;
-                    width: 100%;
-                }
-                .tracker-table {
-                    min-width: 1000px; /* Para mapuwersa ang horizontal scroll */
-                }
-                `}
-            </style>
-
-            <div className="ng-container">
-                <div className="summary-header">
-                    <div>
-                        <h5 className="fw-bold mb-0 text-danger"><i className="bi bi-exclamation-triangle-fill me-2"></i>NO GOOD (NG) LOGS REGISTRY</h5>
-                        <small className="text-muted">Master list of all non-conforming units across stations</small>
-                    </div>
-                    <span className="badge bg-danger rounded-pill px-3 py-2">Total Units: {allNoGoodLogs.length}</span>
+        <div className="pb-5">
+            <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3 px-2">
+                <div>
+                    <h3 className="fw-bold text-dark mb-0">No Good (NG) Units</h3>
+                    <p className="text-muted small mb-0">Master list of all non-conforming units across stations</p>
                 </div>
+                <span className="badge bg-danger rounded-pill px-3 py-2">Total: {allNoGoodLogs.length}</span>
+            </div>
 
-                <div className="table-responsive">
-                    <table className="table-ng">
-                        <thead>
-                            <tr>
-                                <th>MODEL</th>
-                                <th>REVISION</th>
-                                <th>BASE UNIT</th>
-                                <th>ASSEMBLY</th>
-                                <th>DEVICE SERIAL</th>
-                                <th>ACCESSORY</th>
-                                {/* 🔑 ADDED ERROR STATION COLUMN */}
-                                <th className="text-danger">ERROR STATION</th>
-                                <th>STATUS</th>
-                                {/* 🔑 ADDED LAST MOVEMENT COLUMN */}
-                                <th>LAST MOVEMENT</th>
-                                <th className="text-center">ACTIONS</th>
+            <div className="bg-white border rounded-2 overflow-hidden shadow-sm mx-2">
+                <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem' }}>
+                    <thead className="table-dark">
+                        <tr>
+                            <th className="ps-4">MODEL</th>
+                            <th>REVISION</th>
+                            <th>BASE UNIT</th>
+                            <th>ASSEMBLY</th>
+                            <th>DEVICE SERIAL</th>
+                            <th>ACCESSORY</th>
+                            <th className="text-danger">ERROR STATION</th>
+                            <th>STATUS</th>
+                            <th>LAST MOVEMENT</th>
+                            <th className="text-center pe-4">ACTIONS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {allNoGoodLogs.map(log => (
+                            <tr key={log.id}>
+                                <td className="ps-4 fw-bold">{log.model}</td>
+                                <td className="text-muted">{log.revision || '---'}</td>
+                                <td>{log.base_unit_kitting_no || '---'}</td>
+                                <td>
+                                    <code className="text-primary fw-bold">{log.assembly_no}</code>
+                                </td>
+                                <td className="fw-bold">{log.device_serial_no}</td>
+                                <td>{log.accessory_kitting_no || '---'}</td>
+                                <td>
+                                    <span className="fw-bold text-danger">
+                                        <i className="bi bi-geo-alt-fill me-1"></i>
+                                        {log.station_name || log.station || 'N/A'}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span className="badge bg-danger text-white rounded-1 px-3">
+                                        {log.status}
+                                    </span>
+                                </td>
+                                <td className="small text-muted">
+                                    {formatTimestamp(log.updated_at || log.created_at)}
+                                </td>
+                                <td className="text-center pe-4">
+                                    <div className="d-flex gap-1 justify-content-center">
+                                        <button className="btn btn-sm btn-primary px-3 fw-bold" onClick={() => setSelectedUnit(log)}>DETAILS</button>
+                                        <button className="btn btn-sm btn-outline-danger px-3 fw-bold" onClick={() => handleEditClick(log)}>MANAGE</button>
+                                    </div>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            {allNoGoodLogs.map(log => (
-                                <tr key={log.id}>
-                                    <td className="fw-bold">{log.model}</td>
-                                    <td className="text-muted">{log.revision || '---'}</td>
-                                    <td><span className="mono-box">{log.base_unit_kitting_no || '---'}</span></td>
-                                    <td><span className="mono-box">{log.assembly_no}</span></td>
-                                    <td><span className="mono-box text-primary fw-bold">{log.device_serial_no}</span></td>
-                                    <td><span className="mono-box">{log.accessory_kitting_no || '---'}</span></td>
-                                    {/* 🔑 SHOWING STATION WHERE ERROR HAPPENED */}
-                                    <td>
-                                        <span className="fw-bold text-danger">
-                                            <i className="bi bi-geo-alt-fill me-1"></i>
-                                            {log.station_name || log.station || 'N/A'}
-                                        </span>
-                                    </td>
-                                    <td><span className="text-danger fw-bold small">● {log.status}</span></td>
-                                    {/* 🔑 SHOWING FORMATTED TIMESTAMP AS LAST MOVEMENT */}
-                                    <td className="text-muted small">{formatTimestamp(log.updated_at || log.created_at)}</td>
-                                    <td className="text-center">
-                                        <div className="d-flex gap-1 justify-content-center">
-                                            <button className="btn btn-sm btn-dark px-3 fw-bold" style={{fontSize: '0.7rem'}} onClick={() => setSelectedUnit(log)}>DETAILS</button>
-                                            <button className="btn btn-sm btn-outline-danger px-3 fw-bold" style={{fontSize: '0.7rem'}} onClick={() => handleEditClick(log)}>MANAGE</button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                        ))}
+                    </tbody>
+                </table>
             </div>
 
             {selectedUnit && (
-                <div className="modal-overlay" onClick={() => setSelectedUnit(null)}>
-                    <div className="modal-content-balanced animate-in slide-in-bottom" onClick={e => e.stopPropagation()}>
-                        <div className="p-3 bg-danger text-white d-flex justify-content-between align-items-center">
-                            <h6 className="mb-0 fw-bold">Unit Analysis & Tracker | SN: {selectedUnit.device_serial_no}</h6>
-                            <button className="btn-close btn-close-white" onClick={() => setSelectedUnit(null)}></button>
+                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.4)', zIndex: 1050 }}>
+                    <div className="bg-white rounded-3 shadow-xl p-0 overflow-hidden border-0" style={{ width: '95%', maxWidth: '850px' }}>
+                        <div className="p-4 d-flex justify-content-between align-items-center text-white bg-danger shadow-sm">
+                            <div><h5 className="mb-0 fw-bold">Unit Analysis | SN: {selectedUnit.device_serial_no}</h5></div>
+                            <button className="btn-close btn-close-white shadow-none" onClick={() => setSelectedUnit(null)}></button>
                         </div>
 
-                        <div className="p-3 overflow-auto">
-                            <div className="alert alert-danger border-0 p-3 mb-3">
-                                <div className="fw-bold text-uppercase mb-1 text-danger" style={{fontSize: '0.6rem'}}>Defect Remarks:</div>
-                                <div className="text-dark fw-bold fs-6">"{selectedUnit.remarks || "No recorded remarks."}"</div>
-                            </div>
-
-                            <div className="process-timeline border-top pt-2">
+                        <div className="p-4" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
+                            <div className="process-timeline mt-4 ps-2">
                                 {processStations.map((station, idx) => {
                                     const currentStationIdx = getStationIndex(selectedUnit);
                                     const isNGPoint = idx === currentStationIdx;
@@ -195,7 +160,7 @@ const NoGoodUnits = ({ logs, handleEditClick }) => {
                                                                     const val = String(value).toUpperCase().trim();
                                                                     let isFail = false;
                                                                     const failureWords = ["NO GO", "FAIL", "NO GOOD", "NG", "NOT DETECTED", "FALSE"];
-                                                                    
+    
                                                                     if (failureWords.includes(val)) isFail = true;
 
                                                                     if (["Volt", "L1", "L2", "L3"].includes(key)) {
@@ -227,6 +192,16 @@ const NoGoodUnits = ({ logs, handleEditClick }) => {
                     </div>
                 </div>
             )}
+
+            <style>{`
+                .modal-step { padding: 15px 20px; border-left: 2px solid #e9ecef; position: relative; cursor: pointer; }
+                .modal-dot { position: absolute; left: -7px; top: 22px; width: 12px; height: 12px; border-radius: 50%; background: #dee2e6; border: 2px solid white; z-index: 2; }
+                .done .modal-dot { background: #198754; }
+                .active-ng .modal-dot { background: #dc3545; }
+                .tracker-checklist-box { background: #f8fafc; border-radius: 8px; margin-top: 10px; }
+                .tracker-table th { background: #f1f5f9; padding: 8px; border-bottom: 1px solid #cbd5e1; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; }
+                .tracker-table td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; font-weight: 700; }
+            `}</style>
         </div>
     );
 };

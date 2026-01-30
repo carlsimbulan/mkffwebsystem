@@ -262,7 +262,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
 
 
 
-    // Only show ROOT CAUSE DELAY ANALYTICS when there is at least 1 truly delayed unit in this station
+    // Only show ROOT CAUSE DELAY ANALYSIS when there is at least 1 truly delayed unit in this station
 
     const hasDelayedUnits = useMemo(() => {
 
@@ -320,7 +320,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
 
 
 
-    // 🔎 Advanced Station-level diagnostic with root cause delay analytics
+    // 🔎 Advanced Station-level diagnostic with root cause delay analysis
 
     const fetchStationDiagnosis = async () => {
 
@@ -852,7 +852,7 @@ USE MANUFACTURING TERMS: Rework Loop, Systemic Failure, Calibration Drift, Quali
 
                         <div>
 
-                            <div className="fw-bold text-dark small uppercase tracking-wider">ROOT CAUSE DELAY ANALYTICS</div>
+                            <div className="fw-bold text-dark small uppercase tracking-wider">ROOT CAUSE DELAY ANALYSIS</div>
 
                             <div className="small text-muted">Short AI summary of delay patterns and recommended actions for this station.</div>
 
@@ -1925,13 +1925,19 @@ StationID | [Deep-dive technical reason linking history to current delay. Max 25
 
                 .station-card-flat { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; height: 100%; position: relative; }
 
-                .delay-card { border: 2px solid #dc3545 !important; background-color: #fff5f5; }
+                .delay-indicator { position: absolute; top: 10px; right: 10px; color: #dc3545; font-size: 0.8rem; animation: pulse-red 1.5s infinite; }
 
-                .delay-tag { position: absolute; top: 10px; right: 10px; color: #dc3545; font-size: 0.6rem; font-weight: 800; border: 1px solid #dc3545; padding: 1px 6px; border-radius: 4px; }
+                @keyframes pulse-red {
+
+                    0% { opacity: 1; transform: scale(1); }
+
+                    50% { opacity: 0.7; transform: scale(1.1); }
+
+                    100% { opacity: 1; transform: scale(1); }
+
+                }
 
                 .metric-row { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #475569; }
-
-                .animate-pulse { animation: pulse-red 1.5s infinite !important; }
 
                 .hotspot-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; }
 
@@ -1957,80 +1963,6 @@ StationID | [Deep-dive technical reason linking history to current delay. Max 25
 
 
 
-            {/* 🔥 Delay Hotspots Analytics (Top 3) */}
-
-            <div className="mx-2 mb-4 hotspot-card shadow-sm">
-
-                <div className="d-flex justify-content-between align-items-center mb-2">
-
-                    <div>
-
-                        <div className="fw-bold text-dark small uppercase tracking-wider">ROOT CAUSE DELAY ANALYSIS - TOP 3</div>
-
-                        <div className="small text-muted">Most frequently delayed stations based on your time thresholds.</div>
-
-                    </div>
-
-                    <div className="d-flex gap-2">
-
-                        <button
-
-                            className="btn btn-outline-dark btn-sm fw-bold px-3"
-
-                            onClick={fetchDelayHotspotReasons}
-
-                            disabled={isDelayHotspotsAiLoading || delayHotspots.length === 0}
-
-                            title={delayHotspots.length === 0 ? 'No delayed stations right now.' : 'Generate 1 reason per station using AI.'}
-
-                        >
-
-                            {isDelayHotspotsAiLoading ? 'GENERATING...' : 'GENERATE REASONS'}
-
-                        </button>
-
-                    </div>
-
-                </div>
-
-
-
-                {delayHotspotsAi?.__error && (
-
-                    <div className="alert alert-warning py-2 mb-2 small">
-
-                        AI reasons unavailable: {delayHotspotsAi.__error}
-
-                    </div>
-
-                )}
-
-
-
-                {delayHotspots.length === 0 ? (
-                    <div className="text-muted p-3">No delayed stations detected at the moment.</div>
-                ) : (
-                    <div className="ai-numbered-list text-dark p-3">
-                        {delayHotspots.map((h, idx) => (
-                            <div key={h.stationId}>
-                                <div className="item">
-                                    <span className="number">{idx + 1}</span>
-                                    <strong>{h.stationName}</strong> ({h.stationId})<br/>
-                                    <small>Delayed: {h.delayedUnits} units | Worst: {Math.round(h.maxDelayMinutes)} mins</small>
-                                </div>
-                                {delayHotspotsAi?.[h.stationId] && (
-                                    <div className="item">
-                                        <span className="number">{idx + 1}</span>
-                                        <div dangerouslySetInnerHTML={{ __html: formatHotspotOutput(delayHotspotsAi[h.stationId]) }} />
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-            </div>
-
             
 
             <div className="row g-4">
@@ -2053,11 +1985,27 @@ StationID | [Deep-dive technical reason linking history to current delay. Max 25
 
                         <div key={station.id} className="col-md-3">
 
-                            <div className={`station-card-flat shadow-sm ${delayedCount > 0 ? 'delay-card' : ''}`}>
+                            <div className="station-card-flat shadow-sm">
 
-                                {delayedCount > 0 && <div className="delay-tag animate-pulse">DELAYED ({delayedCount})</div>}
+                                {delayedCount > 0 && (
 
-                                <div className="mb-3"><span className="text-muted small fw-bold uppercase">ID: {station.id}</span><h6 className="fw-bold text-dark text-truncate mt-1 uppercase">{station.name}</h6></div>
+                                    <div className="delay-indicator">
+
+                                        <i className="bi bi-exclamation-triangle-fill me-1"></i>
+
+                                        <span className="fw-bold">DELAYED ({delayedCount})</span>
+
+                                    </div>
+
+                                )}
+
+                                <div className="mb-3">
+
+                                    <span className="text-muted small fw-bold uppercase">ID: {station.id}</span>
+
+                                    <h6 className="fw-bold text-dark text-truncate mt-1 uppercase">{station.name}</h6>
+
+                                </div>
 
                                 <div className="mb-4">
 

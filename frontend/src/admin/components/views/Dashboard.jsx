@@ -97,6 +97,8 @@ export function Dashboard({
     const [searchTerm, setSearchTerm] = useState('');
     const [qrValue, setQrValue] = useState(''); 
     const [selectedUnit, setSelectedUnit] = useState(null);
+    const [criticalStationAnalysis, setCriticalStationAnalysis] = useState('');
+    const [isCriticalAnalysisLoading, setIsCriticalAnalysisLoading] = useState(false);
 
     const handleQrInput = (val) => {
         setQrValue(val);
@@ -242,7 +244,50 @@ export function Dashboard({
         return rows;
     }, [stations, calculateMetrics]);
 
-    // 🥉 FPY (approx): Completed / (Completed + NG)
+    // � Identify Worst Station: station with most units exceeding thresholds
+    const worstStation = useMemo(() => {
+        const stationAnalysis = (stations || []).map((s, idx) => {
+            const m = calculateMetrics(s.id) || {};
+            const stationLogs = m.stationLogs || [];
+            const inProgress = stationLogs.filter(l => {
+                const statusText = (l.status || '').toLowerCase();
+                return l.status === 'In Progress' || statusText.includes('no good') || statusText.includes('ng');
+            });
+
+            // Count units exceeding thresholds
+            const delayedUnits = inProgress.filter(l => {
+                const delay = checkUnitDelay(s.id, l.updated_at || l.created_at);
+                return delay.isDelayed;
+            });
+
+            // Calculate metrics
+            const totalWIP = inProgress.length;
+            const stuckUnits = delayedUnits.length;
+            const delays = delayedUnits.map(l => {
+                const delay = checkUnitDelay(s.id, l.updated_at || l.created_at);
+                return delay.minutes;
+            });
+            const avgDelay = delays.length > 0 ? delays.reduce((a, b) => a + b, 0) / delays.length : 0;
+
+            return {
+                id: s.id,
+                name: s.name || s.id,
+                totalWIP,
+                stuckUnits,
+                avgDelay,
+                delayedUnits,
+                stationLogs: inProgress
+            };
+        });
+
+        // Sort by number of stuck units (worst first)
+        stationAnalysis.sort((a, b) => b.stuckUnits - a.stuckUnits);
+        
+        // Return the worst station (first in sorted list)
+        return stationAnalysis[0] || null;
+    }, [stations, calculateMetrics]);
+
+    // �� FPY (approx): Completed / (Completed + NG)
     const fpy = useMemo(() => {
         const completed = Number(overallMetrics?.completedUnits || 0);
         const ng = Number(overallMetrics?.ngUnits || 0);
@@ -256,6 +301,129 @@ export function Dashboard({
         setHighlightedUnitId?.(unit.id); 
         handleMonitorStation(unit.station); 
         setSelectedUnit(null);
+    };
+
+    // 🔍 Critical Station AI Diagnosis
+    const fetchCriticalStationDiagnosis = async () => {
+        if (!worstStation) return;
+        
+        setIsCriticalAnalysisLoading(true);
+        setCriticalStationAnalysis('');
+        
+        try {
+            // Step 1: Get available model from backend
+            const modelRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'list_models' })
+            });
+            
+            if (!modelRes.ok) {
+                const body = await modelRes.text().catch(() => "");
+                throw new Error(`Model listing failed (${modelRes.status}): ${body || modelRes.statusText}`);
+            }
+            
+            const modelData = await modelRes.json();
+            if (!modelData.modelName) {
+                throw new Error('No model returned from backend');
+            }
+            
+            const modelName = modelData.modelName;
+
+            // Step 2: Prepare comprehensive station data for AI analysis
+            const delayedUnits = worstStation.delayedUnits || [];
+            const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[worstStation.id] || 10;
+            
+            // Enhanced context with checklist error scanning
+            const delayedContext = delayedUnits.map(log => {
+                const lastUpdate = new Date(log.updated_at || log.created_at).getTime();
+                const timeSpentMinutes = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
+                
+                // Checklist error scanning (similar to StationsOverview)
+                const checklist_errors = [];
+                const checklist_values = {};
+                const voltage_tolerance = { min: 113.85, max: 116.15 };
+                
+                // Station-specific checks based on station ID
+                if (worstStation.id.includes('Station1') || worstStation.id.includes('Station 1')) {
+                    checklist_values.s1_header_seated_90_deg = log.s1_header_seated_90_deg;
+                    checklist_values.s1_leads_properly_soldered = log.s1_leads_properly_soldered;
+                    if (log.s1_header_seated_90_deg === 'NO GO' || log.s1_header_seated_90_deg === 'FAIL') checklist_errors.push('S1: Header seating failure');
+                    if (log.s1_leads_properly_soldered === 'NO GO' || log.s1_leads_properly_soldered === 'FAIL') checklist_errors.push('S1: Soldering defects');
+                }
+                
+                if (worstStation.id.includes('Station2') || worstStation.id.includes('Station 2')) {
+                    checklist_values.s2_voltage = log.s2_voltage;
+                    checklist_values.s2_go_no_go = log.s2_go_no_go;
+                    if (log.s2_voltage && (log.s2_voltage < voltage_tolerance.min || log.s2_voltage > voltage_tolerance.max)) checklist_errors.push('S2: Voltage out of tolerance');
+                    if (log.s2_go_no_go === 'NO GO' || log.s2_go_no_go === 'FAIL') checklist_errors.push('S2: Final test failure');
+                }
+                
+                // Generic checks for other stations
+                if (log.remarks && log.remarks.toLowerCase().includes('error')) checklist_errors.push('Remarks indicate error condition');
+                
+                return {
+                    assembly_no: log.assembly_no,
+                    time_spent_minutes: Math.round(timeSpentMinutes * 10) / 10,
+                    status: log.status,
+                    remarks: log.remarks || '',
+                    checklist_errors: checklist_errors,
+                    checklist_values: checklist_values
+                };
+            });
+
+            const prompt = `You are a Senior Manufacturing Auditor at MKFF Laserteknique International inc.
+CRITICAL BOTTLENECK DIRECTIVE: Perform immediate root-cause analysis for the worst performing station.
+
+CRITICAL STATION ANALYTICS:
+Station: ${worstStation.name} (${worstStation.id}) | Threshold: ${thresholdMinutes}min
+Total WIP: ${worstStation.totalWIP} units | Stuck Units: ${worstStation.stuckUnits} units | Average Delay: ${worstStation.avgDelay.toFixed(1)}min
+
+DELAYED UNITS DATA:
+${JSON.stringify(delayedContext, null, 2)}
+
+MANUFACTURING AUDIT PROTOCOL:
+1. BOTTLENECK CLASSIFICATION: Determine if this is Quality-Driven (high errors) or Process-Driven (low errors, high time)
+2. ROOT CAUSE ISOLATION: Identify the specific failure mode causing this station to be the worst
+3. IMPACT ASSESSMENT: Calculate production loss and downstream effects
+4. CORRECTIVE ACTION: Provide immediate actionable steps to resolve the bottleneck
+
+TECHNICAL RESPONSE FORMAT:
+1. [CRITICAL DIAGNOSIS] - Specific bottleneck classification with manufacturing terminology
+
+2. [ROOT CAUSE] - Station-specific failure mechanism analysis
+
+Summary: [Immediate corrective action - max 15 words]
+
+USE MANUFACTURING TERMS: Bottleneck, Throughput Constraint, Quality Escape, Process Stall, Systemic Failure, Rework Loop`;
+
+            // Step 3: Generate AI analysis
+            const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    modelName: modelName,
+                    prompt: prompt
+                })
+            });
+
+            if (!genRes.ok) {
+                const body = await genRes.text().catch(() => "");
+                throw new Error(`generateContent failed (${genRes.status}): ${body || genRes.statusText}`);
+            }
+
+            const genData = await genRes.json();
+            const text = genData.text || '';
+            
+            if (!text) throw new Error("Empty AI response.");
+            setCriticalStationAnalysis(text);
+
+        } catch (err) {
+            console.error("Critical Station AI Error:", err);
+            setCriticalStationAnalysis("Diagnosis failed: " + err.message);
+        } finally {
+            setIsCriticalAnalysisLoading(false);
+        }
     };
 
     return (
@@ -297,10 +465,10 @@ export function Dashboard({
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
 
-                .analytics-card { background: #ffffff; border: 1px solid #edf2f7; border-radius: 18px; box-shadow: 0 6px 18px rgba(0,0,0,0.08); overflow: hidden; }
+                .analytics-card { background: #ffffff; border: 0.5px solid #e0e0e0ff; border-radius: 18px; box-shadow: 0 6px 18px rgba(0,0,0,0.08); overflow: hidden; }
                 .analytics-card-header { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; background: #f8fafc; }
                 .analytics-card-body { padding: 14px 16px; }
-                .kpi-pill { font-size: 0.65rem; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; padding: 6px 10px; border-radius: 999px; border: 1px solid #e2e8f0; background: #fff; }
+                .kpi-pill { font-size: 0.65rem; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; padding: 6px 10px; border-radius: 999px; border: 1px solid #f3f3f3ff; background: #fff; }
             `}</style>
 
             <div className="d-flex justify-content-between align-items-center mb-4 px-2">
@@ -434,12 +602,12 @@ export function Dashboard({
                     </div>
                 </div>
 
-                {/* 🥈 Avg Cycle Time per Station */}
+                {/* 🥈 Critical Station Analysis */}
                 <div className="col-lg-6">
                     <div className="analytics-card h-100">
                         <div className="analytics-card-header">
-                            <div className="label-caps mb-0">TOP 2 — Average Cycle Time per Station</div>
-                            <div className="small text-muted">Avg minutes in station (WIP) vs threshold</div>
+                            <div className="label-caps mb-0">Worst Station</div>
+                            <div className="small text-muted">Real-time bottleneck analysis with critical metrics</div>
                         </div>
                         <div className="analytics-card-body" style={{ height: 280 }}>
                             <Bar
@@ -494,11 +662,166 @@ export function Dashboard({
                                 }}
                             />
                         </div>
+                        
+                        {/* Worst Station Indicator Box */}
+                        {worstStation && worstStation.stuckUnits > 0 && (
+                            <div className="px-3 pb-3">
+                                <div className="analytics-card p-3 border">
+                                    <div className="d-flex justify-content-between align-items-center mb-2">
+                                        <div>
+                                            <div className="fw-bold text-dark fs-6">
+                                                <i className="bi bi-exclamation-triangle-fill me-2"></i>
+                                                Worst Station: {worstStation.name}
+                                            </div>
+                                            <div className="small text-muted">{worstStation.id}</div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Simple indicators */}
+                                    <div className="row g-2 text-center">
+                                        <div className="col-3">
+                                            <div className="fw-bold text-dark">{worstStation.totalWIP}</div>
+                                            <div className="small text-muted" style={{fontSize: '0.65rem'}}>WIP</div>
+                                        </div>
+                                        <div className="col-3">
+                                            <div className="fw-bold text-danger">{worstStation.stuckUnits}</div>
+                                            <div className="small text-muted" style={{fontSize: '0.65rem'}}>Units</div>
+                                        </div>
+                                        <div className="col-3">
+                                            <div className="fw-bold text-warning">{worstStation.avgDelay.toFixed(1)}m</div>
+                                            <div className="small text-muted" style={{fontSize: '0.65rem'}}>Avg Delay</div>
+                                        </div>
+                                        <div className="col-3">
+                                            <div className="fw-bold text-primary" style={{fontSize: '0.7rem', cursor: 'pointer'}} onClick={fetchCriticalStationDiagnosis}>
+                                                {isCriticalAnalysisLoading ? (
+                                                    <span className="spinner-border spinner-border-sm me-1"></span>
+                                                ) : null}
+                                                ANALYZE
+                                            </div>
+                                        </div>
+                                    </div> 
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* Simple AI Result Display */}
+                        {criticalStationAnalysis && (
+                            <div className="px-3 pb-3">
+                                <div className="analytics-card p-3" style={{ border: 'none' }}>
+                                    <div className="d-flex justify-content-between align-items-center mb-2">
+                                        <div className="fw-semibold text-dark fs-6">
+                                            Analysis Result
+                                        </div>
+                                        <button 
+                                            className="btn btn-sm"
+                                            onClick={() => setCriticalStationAnalysis('')}
+                                            style={{ border: 'none', background: 'none', padding: '4px' }}
+                                        >
+                                            <i className="bi bi-x"></i>
+                                        </button>
+                                    </div>
+                                    <div className="text-dark" style={{ fontSize: '0.85rem', lineHeight: '1.4', fontWeight: '500' }}>
+                                        {(() => {
+                                            const cleanedAnalysis = criticalStationAnalysis.replace(/\*\*/g, '');
+                                            
+                                            // ... rest of the code remains the same ...
+                                            // Try different patterns to extract the sections
+                                            let diagnosis = '';
+                                            let rootCause = '';
+                                            let summary = '';
+                                            
+                                            // Pattern 1: Look for numbered sections
+                                            const diagnosisMatch1 = cleanedAnalysis.match(/1\.\s*\[CRITICAL DIAGNOSIS\]\s*-\s*(.+?)(?=2\.\s*\[ROOT CAUSE\]|Summary:|$)/s);
+                                            const rootCauseMatch1 = cleanedAnalysis.match(/2\.\s*\[ROOT CAUSE\]\s*-\s*(.+?)(?=Summary:|$)/s);
+                                            
+                                            // Pattern 2: Look for bracketed sections without numbers
+                                            const diagnosisMatch2 = cleanedAnalysis.match(/\[CRITICAL DIAGNOSIS\]\s*-\s*(.+?)(?=\[ROOT CAUSE\]|Summary:|$)/s);
+                                            const rootCauseMatch2 = cleanedAnalysis.match(/\[ROOT CAUSE\]\s*-\s*(.+?)(?=Summary:|$)/s);
+                                            
+                                            // Pattern 3: Look for sections with just text
+                                            const diagnosisMatch3 = cleanedAnalysis.match(/CRITICAL DIAGNOSIS\s*[:\-]\s*(.+?)(?=ROOT CAUSE|Summary:|$)/s);
+                                            const rootCauseMatch3 = cleanedAnalysis.match(/ROOT CAUSE\s*[:\-]\s*(.+?)(?=Summary:|$)/s);
+                                            
+                                            // Use the first pattern that matches
+                                            diagnosis = diagnosisMatch1?.[1]?.trim() || diagnosisMatch2?.[1]?.trim() || diagnosisMatch3?.[1]?.trim() || '';
+                                            rootCause = rootCauseMatch1?.[1]?.trim() || rootCauseMatch2?.[1]?.trim() || rootCauseMatch3?.[1]?.trim() || '';
+                                            
+                                            // Extract summary
+                                            const summaryMatch = cleanedAnalysis.match(/Summary\s*[:\-]\s*(.+?)(?=$)/s);
+                                            summary = summaryMatch?.[1]?.trim() || '';
+                                            
+                                            // If still no diagnosis/rootCause, try to split by common patterns
+                                            if (!diagnosis && !rootCause) {
+                                                const lines = cleanedAnalysis.split('\n').filter(line => line.trim());
+                                                for (let i = 0; i < lines.length; i++) {
+                                                    const line = lines[i].trim();
+                                                    if (line.toLowerCase().includes('diagnosis') && i < lines.length - 1) {
+                                                        diagnosis = lines[i + 1]?.trim() || '';
+                                                    }
+                                                    if (line.toLowerCase().includes('root cause') && i < lines.length - 1) {
+                                                        rootCause = lines[i + 1]?.trim() || '';
+                                                    }
+                                                    if (line.toLowerCase().includes('summary') && i < lines.length - 1) {
+                                                        summary = lines[i + 1]?.trim() || '';
+                                                    }
+                                                }
+                                            }
+                                            
+                                            return (
+                                                <div>
+                                                    {diagnosis && (
+                                                        <div className="analytics-card mb-3">
+                                                            <div className="analytics-card-header">
+                                                                <div className="label-caps mb-0">1. CRITICAL DIAGNOSIS</div>
+                                                            </div>
+                                                            <div className="analytics-card-body">
+                                                                <div>{diagnosis}</div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {rootCause && (
+                                                        <div className="analytics-card mb-3">
+                                                            <div className="analytics-card-header">
+                                                                <div className="label-caps mb-0">2. ROOT CAUSE</div>
+                                                            </div>
+                                                            <div className="analytics-card-body">
+                                                                <div>{rootCause}</div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {summary && (
+                                                        <div className="analytics-card">
+                                                            <div className="analytics-card-header">
+                                                                <div className="label-caps mb-0">Summary</div>
+                                                            </div>
+                                                            <div className="analytics-card-body">
+                                                                <div>{summary}</div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {!diagnosis && !rootCause && summary && (
+                                                        <div className="analytics-card">
+                                                            <div className="analytics-card-header">
+                                                                <div className="label-caps mb-0">Analysis Result</div>
+                                                            </div>
+                                                            <div className="analytics-card-body">
+                                                                <div>{cleanedAnalysis}</div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        
                         <div className="px-3 pb-3 small text-muted">
                             {cycleTimePerStation.filter(r => r.exceedsThreshold).length} stations exceeding threshold • 
-                            Worst: <strong>{cycleTimePerStation.find(r => r.exceedsThreshold)?.name || 'None'}</strong>
-                            {cycleTimePerStation.find(r => r.exceedsThreshold) ? (
-                                <> • Exceeds by <strong>{Math.abs(cycleTimePerStation.find(r => r.exceedsThreshold)?.exceedsPct || 0).toFixed(0)}%</strong></>
+                            Worst: <strong>{worstStation?.name || 'None'}</strong>
+                            {worstStation && worstStation.stuckUnits > 0 ? (
+                                <> • Stuck Units: <strong>{worstStation.stuckUnits}</strong></>
                             ) : null}
                         </div>
                     </div>

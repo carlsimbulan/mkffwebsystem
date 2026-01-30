@@ -100,6 +100,7 @@ const handleTabChange = (tabName) => {
     navigate(`/admin/${tabName}`);
 };
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [showQualityDropdown, setShowQualityDropdown] = useState(false);
     const [filterStartDate, setFilterStartDate] = useState('');
     const [filterEndDate, setFilterEndDate] = useState(getTodayDate());
     const [logs, setLogs] = useState([]); // Unit logs (Current State)
