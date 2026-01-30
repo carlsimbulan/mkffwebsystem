@@ -252,7 +252,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
 
 
 
-    // 🔎 Station-level diagnostic (aggregated across all units in this station)
+    // 🔎 Advanced Station-level diagnostic with root cause delay analytics
 
     const fetchStationDiagnosis = async () => {
 
@@ -306,7 +306,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
 
 
 
-            // Collect delayed units with their checklist data and time spent
+            // Collect delayed units with enhanced checklist error scanning
 
             const delayedUnits = stationLogs.filter(log => {
 
@@ -320,7 +320,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
 
 
 
-            // Dito kinukuha ang mismong laman ng Checklist
+            // Enhanced delayed context with comprehensive historical scanning
 
             const delayedContext = delayedUnits.map(log => {
 
@@ -330,46 +330,221 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
 
                 
 
-                // Collect relevant checklist fields based on station
+                // Advanced pre-diagnostic checklist error scanning for ALL stations
 
-                const checklistData = {};
+                const checklist_errors = [];
+
+                const checklist_values = {}; // Store actual values for analysis
+
+                const voltage_tolerance = { min: 113.85, max: 116.15 }; // ±1% of 115V
 
                 
 
-                // Station-specific checklist fields
+                // Full History Scan: Station 1 checks
 
-                if (stationIndex === 0) { // PCB Pairing
+                checklist_values.s1_header_seated_90_deg = log.s1_header_seated_90_deg;
 
-                    checklistData.header_seated_90_deg = log.header_seated_90_deg;
+                checklist_values.s1_leads_properly_soldered = log.s1_leads_properly_soldered;
 
-                    checklistData.leads_properly_soldered = log.leads_properly_soldered;
+                if (log.s1_header_seated_90_deg === 'NO GO' || log.s1_header_seated_90_deg === 'FAIL') checklist_errors.push('S1: Header seating failure');
 
-                } else if (stationIndex === 1) { // Integrated Board Test
+                if (log.s1_leads_properly_soldered === 'NO GO' || log.s1_leads_properly_soldered === 'FAIL') checklist_errors.push('S1: Soldering defects');
 
-                    checklistData.integrated_board_level_test1 = log.integrated_board_level_test1;
+                
 
-                    checklistData.integrated_board_level_test2 = log.integrated_board_level_test2;
+                // Full History Scan: Station 2 checks
 
-                    checklistData.integrated_board_level_test3 = log.integrated_board_level_test3;
+                checklist_values.s2_lora_module = log.s2_lora_module;
 
-// Hanapin ito sa loob ng fetchStationDiagnosis function:
-// Hanapin ito sa loob ng fetchStationDiagnosis function:
-} else if (stationIndex === 5) { // Station 6: Complete Unit Test/Calibration
-    checklistData.lora_module = log.lora_module;
-    checklistData.lora_mesh_test = log.lora_mesh_test;
-    checklistData.energy_meter = log.energy_meter;
-    checklistData.power_good_test = log.power_good_test;
-    checklistData.voltage = log.voltage;
-    checklistData.line1 = log.line1;
-    checklistData.line2 = log.line2;
-    checklistData.line3 = log.line3;
-    checklistData.temp_reading = log.temp_reading;
-    checklistData.freq_reading = log.freq_reading;
-    checklistData.led_status_4g = log.led_status_4g;
-    checklistData.led_status_fast_blink = log.led_status_fast_blink;
-    checklistData.go_no_go = log.go_no_go;
-    checklistData.sw1_off_to_led_off_duration = log.sw1_off_to_led_off_duration;
-}
+                checklist_values.s2_lora_mesh_test = log.s2_lora_mesh_test;
+
+                checklist_values.s2_energy_meter = log.s2_energy_meter;
+
+                checklist_values.s2_power_good_test = log.s2_power_good_test;
+
+                checklist_values.s2_voltage = log.s2_voltage;
+
+                checklist_values.s2_line1 = log.s2_line1;
+
+                checklist_values.s2_line2 = log.s2_line2;
+
+                checklist_values.s2_line3 = log.s2_line3;
+
+                checklist_values.s2_temp_reading = log.s2_temp_reading;
+
+                checklist_values.s2_freq_reading = log.s2_freq_reading;
+
+                checklist_values.s2_led_status_4g = log.s2_led_status_4g;
+
+                checklist_values.s2_led_status_fast_blink = log.s2_led_status_fast_blink;
+
+                checklist_values.s2_go_no_go = log.s2_go_no_go;
+
+                checklist_values.s2_sw1_off_to_led_off_duration = log.s2_sw1_off_to_led_off_duration;
+
+                
+
+                if (log.s2_lora_module === 'Not Detected' || log.s2_lora_module === 'FAIL') checklist_errors.push('S2: LoRa module not detected');
+
+                if (log.s2_lora_mesh_test === 'Not Detected' || log.s2_lora_mesh_test === 'FAIL') checklist_errors.push('S2: Mesh test failure');
+
+                if (log.s2_energy_meter === 'Not Detected' || log.s2_energy_meter === 'FAIL') checklist_errors.push('S2: Energy meter issue');
+
+                if (log.s2_power_good_test === 'Not Detected' || log.s2_power_good_test === 'FAIL') checklist_errors.push('S2: Power good failure');
+
+                if (log.s2_voltage && (log.s2_voltage < voltage_tolerance.min || log.s2_voltage > voltage_tolerance.max)) checklist_errors.push('S2: Voltage out of tolerance');
+
+                if (log.s2_go_no_go === 'NO GO' || log.s2_go_no_go === 'FAIL') checklist_errors.push('S2: Final test failure');
+
+                
+
+                // Full History Scan: Station 3-5 checks (standard stations)
+
+                checklist_values.s3_requirements = log.s3_requirements;
+
+                checklist_values.s3_remarks = log.s3_remarks;
+
+                checklist_values.s4_requirements = log.s4_requirements;
+
+                checklist_values.s4_remarks = log.s4_remarks;
+
+                checklist_values.s5_requirements = log.s5_requirements;
+
+                checklist_values.s5_remarks = log.s5_remarks;
+
+                
+
+                if (log.s3_requirements === 'FAIL' || log.s3_requirements === 'NO GO') checklist_errors.push('S3: Requirements not met');
+
+                if (log.s4_requirements === 'FAIL' || log.s4_requirements === 'NO GO') checklist_errors.push('S4: Requirements not met');
+
+                if (log.s5_requirements === 'FAIL' || log.s5_requirements === 'NO GO') checklist_errors.push('S5: Requirements not met');
+
+                
+
+                // Full History Scan: Station 6 checks
+
+                checklist_values.s6_lora_module = log.s6_lora_module;
+
+                checklist_values.s6_lora_mesh_test = log.s6_lora_mesh_test;
+
+                checklist_values.s6_energy_meter = log.s6_energy_meter;
+
+                checklist_values.s6_power_good_test = log.s6_power_good_test;
+
+                checklist_values.s6_voltage = log.s6_voltage;
+
+                checklist_values.s6_line1 = log.s6_line1;
+
+                checklist_values.s6_line2 = log.s6_line2;
+
+                checklist_values.s6_line3 = log.s6_line3;
+
+                checklist_values.s6_temp_reading = log.s6_temp_reading;
+
+                checklist_values.s6_freq_reading = log.s6_freq_reading;
+
+                checklist_values.s6_led_status_4g = log.s6_led_status_4g;
+
+                checklist_values.s6_led_status_fast_blink = log.s6_led_status_fast_blink;
+
+                checklist_values.s6_go_no_go = log.s6_go_no_go;
+
+                checklist_values.s6_sw1_off_to_led_off_duration = log.s6_sw1_off_to_led_off_duration;
+
+                
+
+                if (log.s6_lora_module === 'Not Detected' || log.s6_lora_module === 'FAIL') checklist_errors.push('S6: LoRa module not detected');
+
+                if (log.s6_lora_mesh_test === 'Not Detected' || log.s6_lora_mesh_test === 'FAIL') checklist_errors.push('S6: Mesh test failure');
+
+                if (log.s6_voltage && (log.s6_voltage < voltage_tolerance.min || log.s6_voltage > voltage_tolerance.max)) checklist_errors.push('S6: Voltage out of tolerance');
+
+                if (log.s6_go_no_go === 'NO GO' || log.s6_go_no_go === 'FAIL') checklist_errors.push('S6: Final calibration failure');
+
+                
+
+                // Full History Scan: Station 7-10 checks
+
+                checklist_values.s7_requirements = log.s7_requirements;
+
+                checklist_values.s7_remarks = log.s7_remarks;
+
+                checklist_values.s8_power_unit_disable_lora = log.s8_power_unit_disable_lora;
+
+                checklist_values.s8_frequency_band = log.s8_frequency_band;
+
+                checklist_values.s8_start_testing = log.s8_start_testing;
+
+                checklist_values.s8_rsso_testing = log.s8_rsso_testing;
+
+                checklist_values.s8_data_outage = log.s8_data_outage;
+
+                checklist_values.s9_requirements = log.s9_requirements;
+
+                checklist_values.s9_remarks = log.s9_remarks;
+
+                checklist_values.s10_requirements = log.s10_requirements;
+
+                checklist_values.s10_remarks = log.s10_remarks;
+
+                
+
+                if (log.s7_requirements === 'FAIL' || log.s7_requirements === 'NO GO') checklist_errors.push('S7: Requirements not met');
+
+                if (log.s8_power_unit_disable_lora === 'FAIL' || log.s8_power_unit_disable_lora === 'NO GO') checklist_errors.push('S8: Power unit issue');
+
+                if (log.s8_rsso_testing === 'FAIL' || log.s8_rsso_testing === 'NO GO') checklist_errors.push('S8: RSSO test failure');
+
+                if (log.s9_requirements === 'FAIL' || log.s9_requirements === 'NO GO') checklist_errors.push('S9: Requirements not met');
+
+                if (log.s10_requirements === 'FAIL' || log.s10_requirements === 'NO GO') checklist_errors.push('S10: Requirements not met');
+
+                
+
+                // Full History Scan: Station 11 checks
+
+                checklist_values.s11_led_status = log.s11_led_status;
+
+                checklist_values.s11_low_range = log.s11_low_range;
+
+                checklist_values.s11_medium_range = log.s11_medium_range;
+
+                checklist_values.s11_high_range = log.s11_high_range;
+
+                
+
+                if (log.s11_led_status === 'FAIL' || log.s11_led_status === 'NO GO') checklist_errors.push('S11: LED status failure');
+
+                if (log.s11_low_range === 'FAIL' || log.s11_low_range === 'NO GO') checklist_errors.push('S11: Low range failure');
+
+                if (log.s11_medium_range === 'FAIL' || log.s11_medium_range === 'NO GO') checklist_errors.push('S11: Medium range failure');
+
+                if (log.s11_high_range === 'FAIL' || log.s11_high_range === 'NO GO') checklist_errors.push('S11: High range failure');
+
+                
+
+                // Full History Scan: Station 12-14 checks
+
+                checklist_values.s12_requirements = log.s12_requirements;
+
+                checklist_values.s12_remarks = log.s12_remarks;
+
+                checklist_values.s13_requirements = log.s13_requirements;
+
+                checklist_values.s13_remarks = log.s13_remarks;
+
+                checklist_values.s14_requirements = log.s14_requirements;
+
+                checklist_values.s14_remarks = log.s14_remarks;
+
+                
+
+                if (log.s12_requirements === 'FAIL' || log.s12_requirements === 'NO GO') checklist_errors.push('S12: Sticker attachment failure');
+
+                if (log.s13_requirements === 'FAIL' || log.s13_requirements === 'NO GO') checklist_errors.push('S13: FVI requirements not met');
+
+                if (log.s14_requirements === 'FAIL' || log.s14_requirements === 'NO GO') checklist_errors.push('S14: Packing requirements not met');
 
                 
 
@@ -381,15 +556,49 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
 
                     status: log.status,
 
-                    remarks: log.remarks,
+                    remarks: log.remarks || '',
 
-                    checklist_data: checklistData
+                    checklist_errors: checklist_errors, // Comprehensive error array
+
+                    checklist_values: checklist_values, // Actual values for analysis
+
+                    // Full checklist data for AI analysis using new aliases
+
+                    checklist_data: {
+
+                        s1: { seated: log.s1_header_seated_90_deg, solder: log.s1_leads_properly_soldered },
+
+                        s2: { lora: log.s2_lora_module, mesh: log.s2_lora_mesh_test, v: log.s2_voltage, go_no_go: log.s2_go_no_go, duration: log.s2_sw1_off_to_led_off_duration },
+
+                        s6: { v: log.s6_voltage, verdict: log.s6_go_no_go, duration: log.s6_sw1_off_to_led_off_duration },
+
+                        s11: { led: log.s11_led_status, range: log.s11_low_range, medium: log.s11_medium_range, high: log.s11_high_range },
+
+                        s3: { requirements: log.s3_requirements, remarks: log.s3_remarks },
+
+                        s4: { requirements: log.s4_requirements, remarks: log.s4_remarks },
+
+                        s5: { requirements: log.s5_requirements, remarks: log.s5_remarks },
+
+                        s7: { requirements: log.s7_requirements, remarks: log.s7_remarks },
+
+                        s8: { power: log.s8_power_unit_disable_lora, freq: log.s8_frequency_band, testing: log.s8_start_testing, rsso: log.s8_rsso_testing, outage: log.s8_data_outage },
+
+                        s9: { requirements: log.s9_requirements, remarks: log.s9_remarks },
+
+                        s10: { requirements: log.s10_requirements, remarks: log.s10_remarks },
+
+                        s12: { requirements: log.s12_requirements, remarks: log.s12_remarks },
+
+                        s13: { requirements: log.s13_requirements, remarks: log.s13_remarks },
+
+                        s14: { requirements: log.s14_requirements, remarks: log.s14_remarks }
+
+                    }
 
                 };
 
             });
-
-
 
             const delayedCount = delayedUnits.length;
 
@@ -409,63 +618,81 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
 
             }, 0);
 
-
-
             const avgDelayMinutes = delayedCount > 0 ? (totalDelayMinutes / delayedCount) : 0;
 
             const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationMonitorId] || 10;
 
 
 
-            const prompt = `You are a Senior Manufacturing Engineer at MKFF.
+            const prompt = `You are a Senior Manufacturing Systems Engineer at MKFF.
 
-            Analyze delay patterns for this production station and summarize the situation very concisely.
-
-
-
-            Station name: ${processName}
-
-            Station ID: ${stationMonitorId}
-
-            Standard delay threshold (minutes): ${thresholdMinutes}
-
-            Total units in this station (current view): ${totalUnits}
-
-            Units currently delayed beyond threshold: ${delayedCount}
-
-            Average delay of delayed units (minutes): ${avgDelayMinutes.toFixed(1)}
-
-            Maximum observed delay (minutes): ${maxDelayMinutes.toFixed(1)}
+Perform advanced root-cause analysis for this specific station's delay patterns using comprehensive diagnostic data.
 
 
 
-            DELAYED UNITS WITH CHECKLIST DATA:
+STATION ANALYTICS OVERVIEW:
 
-            ${JSON.stringify(delayedContext, null, 2)}
+Station name: ${processName}
 
+Station ID: ${stationMonitorId}
 
+Standard delay threshold (minutes): ${thresholdMinutes}
 
-            CRITICAL ANALYSIS INSTRUCTIONS:
+Total units in this station (current view): ${totalUnits}
 
-            Analyze the actual checklist values and stay durations to identify if delays are:
+Units currently delayed beyond threshold: ${delayedCount}
 
-            1. TECHNICAL FAILURES: Units failing tests (NO GO, FAIL values, missing checklist data)
+Average delay of delayed units (minutes): ${avgDelayMinutes.toFixed(1)}
 
-            2. BOTTLENECKS: Units passing tests but not moving forward (GO/OK values but long stays)
-
-
-
-            Focus on why this specific station tends to have frequent or long delays based on the real checklist data above.
+Maximum observed delay (minutes): ${maxDelayMinutes.toFixed(1)}
 
 
 
-            Respond with EXACTLY 3 very short lines (no extra text, no introductions, no labels):
+ENHANCED DIAGNOSTIC DATA (JSON format):
 
-            Line 1: Most probable root-cause patterns for delays in this station (max 18 words).
+${JSON.stringify(delayedContext, null, 2)}
 
-            Line 2: Impact on throughput and downstream stations (max 18 words).
 
-            Line 3: Practical corrective and preventive actions for operators and engineers (max 18 words).`;
+
+ADVANCED STATION ANALYSIS PROTOCOL:
+
+1. CUMULATIVE REWORK DETECTION: Cross-reference checklist_errors array with current delays. If errors exist in previous stations, diagnose "inherited defects" or "cumulative rework loops".
+
+2. INHERITED DEFECT PATTERNS: Scan checklist_errors for:
+
+   - S1/S2 failures causing downstream verification delays
+
+   - Voltage tolerance violations (±1% of 115V) indicating power quality issues
+
+   - Sequential failures across multiple stations indicating systemic problems
+
+3. STATION-SPECIFIC LOGIC:
+
+   - If checklist_errors array has entries: "Inherited defects from [source stations] causing extended verification"
+
+   - If checklist_errors empty but time_spent_minutes > threshold: "Manpower bottleneck or logistics impedance"
+
+   - If Station 11 range failures: "Connectivity interference or calibration drift requiring extended testing"
+
+   - If voltage tolerance violations: "Power quality issues causing repeated test failures"
+
+4. DELAY CLASSIFICATION: Analyze time_spent_minutes vs checklist_errors to determine if delays are:
+
+   - Defect-driven (high error count + high time)
+
+   - Process-driven (low error count + high time)
+
+   - Hybrid (moderate errors + moderate time)
+
+
+
+Respond with EXACTLY 3 very short lines (no extra text, no introductions, no labels):
+
+Line 1: Root-cause pattern with inherited defect analysis (max 18 words).
+
+Line 2: Throughput impact and downstream station effects (max 18 words).
+
+Line 3: Targeted corrective actions based on defect history (max 18 words).`;
 
 
 
@@ -503,11 +730,9 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
 
             const text = genData.text || '';
 
-
+            
 
             if (!text) throw new Error("Empty AI response.");
-
-
 
             setStationAiAnalysis(text);
 
@@ -965,9 +1190,13 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
 
                                 {processStations.map((station, idx) => {
 
-                                    const isCurrent = idx === stationIndex;
+                                    // Determine unit's actual station progress from unit data, not current viewing station
+                                    const unitCurrentStation = selectedUnitProcess.station || '';
+                                    const unitStationIndex = parseInt(unitCurrentStation.replace('Station', '')) - 1;
+                                    
+                                    const isCurrent = idx === unitStationIndex;
 
-                                    const isDoneBefore = idx < stationIndex;
+                                    const isDoneBefore = idx < unitStationIndex;
 
                                     const unitStatus = selectedUnitProcess.status?.toLowerCase() || '';
 
@@ -979,113 +1208,116 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
 
 
 
-                                   // Hanapin ang block na ito sa loob ng .map function ng processStations:
+                                   // Enhanced logic: Show historical checklist data from all previous stations
 let stationData = null;
 
-if (idx === 0) { // Station 1: PCB Pairing - from station1_checklists table
-    stationData = { 
-        "Header Connector Upright (90°)": selectedUnitProcess.s1_header_seated_90_deg ?? "N/A",
-        "Leads Properly Soldered": selectedUnitProcess.s1_leads_properly_soldered ?? "N/A"
-    };
-} else if (idx === 1) { // Station 2: Integrated Board Test - from station2_checklists table
-    stationData = { 
-        "LoRa Module": selectedUnitProcess.s2_lora_module ?? "N/A",
-        "LoRa Mesh Test": selectedUnitProcess.s2_lora_mesh_test ?? "N/A",
-        "Energy Meter": selectedUnitProcess.s2_energy_meter ?? "N/A",
-        "Power Good Test": selectedUnitProcess.s2_power_good_test ?? "N/A",
-        "Voltage (Ref)": selectedUnitProcess.s2_voltage ?? "N/A",
-        "Line 1": selectedUnitProcess.s2_line1 ?? "N/A",
-        "Line 2": selectedUnitProcess.s2_line2 ?? "N/A",
-        "Line 3": selectedUnitProcess.s2_line3 ?? "N/A",
-        "Temp Reading": selectedUnitProcess.s2_temp_reading ?? "N/A",
-        "Freq Reading": selectedUnitProcess.s2_freq_reading ?? "N/A",
-        "4G LED": selectedUnitProcess.s2_led_status_4g ?? "N/A",
-        "Fast Blink RED": selectedUnitProcess.s2_led_status_fast_blink ?? "N/A",
-        "SW1 Off to LED Off (sec)": selectedUnitProcess.s2_sw1_off_to_led_off_duration === 0 ? "0s" : (selectedUnitProcess.s2_sw1_off_to_led_off_duration ?? "N/A"),
-        "Go/No-Go Result": selectedUnitProcess.s2_go_no_go ?? "N/A"
-    };
-} else if (idx === 2) { // Station 3: Main Board Conformal Coating - from station3_checklists table
-    stationData = { 
-        "Requirements": selectedUnitProcess.s3_requirements ?? "N/A",
-        "Remarks": selectedUnitProcess.s3_remarks ?? "N/A"
-    };
-} else if (idx === 3) { // Station 4: RTV Application - from station4_checklists table
-    stationData = { 
-        "Requirements": selectedUnitProcess.s4_requirements ?? "N/A",
-        "Remarks": selectedUnitProcess.s4_remarks ?? "N/A"
-    };
-} else if (idx === 4) { // Station 5: Casing/Harnessing - from station5_checklists table
-    stationData = { 
-        "Requirements": selectedUnitProcess.s5_requirements ?? "N/A",
-        "Remarks": selectedUnitProcess.s5_remarks ?? "N/A"
-    };
-} else if (idx === 5) { // Station 6: Complete Unit Test/Calibration - from station6_checklists table
-    stationData = { 
-        "LoRa Module": selectedUnitProcess.s6_lora_module ?? "N/A",
-        "LoRa Mesh Test": selectedUnitProcess.s6_lora_mesh_test ?? "N/A",
-        "Energy Meter": selectedUnitProcess.s6_energy_meter ?? "N/A",
-        "Power Good Test": selectedUnitProcess.s6_power_good_test ?? "N/A",
-        "Voltage (Ref)": selectedUnitProcess.s6_voltage ?? "N/A",
-        "Line 1": selectedUnitProcess.s6_line1 ?? "N/A",
-        "Line 2": selectedUnitProcess.s6_line2 ?? "N/A",
-        "Line 3": selectedUnitProcess.s6_line3 ?? "N/A",
-        "Temp Reading": selectedUnitProcess.s6_temp_reading ?? "N/A",
-        "Freq Reading": selectedUnitProcess.s6_freq_reading ?? "N/A",
-        "4G LED": selectedUnitProcess.s6_led_status_4g ?? "N/A",
-        "Fast Blink RED": selectedUnitProcess.s6_led_status_fast_blink ?? "N/A",
-        "SW1 Off to LED Off (sec)": selectedUnitProcess.s6_sw1_off_to_led_off_duration === 0 ? "0s" : (selectedUnitProcess.s6_sw1_off_to_led_off_duration ?? "N/A"),
-        "Go/No-Go Result": selectedUnitProcess.s6_go_no_go ?? "N/A"
-    };
-} else if (idx === 6) { // Station 7: Pre BI Hi-Pot Test - from station7_checklists table
-    stationData = { 
-        "Requirements": selectedUnitProcess.s7_requirements ?? "N/A",
-        "Remarks": selectedUnitProcess.s7_remarks ?? "N/A"
-    };
-} else if (idx === 7) { // Station 8: Burn-in Testing - from station8_checklists table
-    stationData = { 
-        "Power Unit and Disable LoRa": selectedUnitProcess.s8_power_unit_disable_lora ?? "N/A",
-        "Confirm Frequency Band": selectedUnitProcess.s8_frequency_band ?? "N/A",
-        "Start Testing": selectedUnitProcess.s8_start_testing ?? "N/A",
-        "Confirm RSSO Testing": selectedUnitProcess.s8_rsso_testing ?? "N/A",
-        "Data Outage": selectedUnitProcess.s8_data_outage ?? "N/A"
-    };
-} else if (idx === 8) { // Station 9: Sealing - from station9_checklists table
-    stationData = { 
-        "Requirements": selectedUnitProcess.s9_requirements ?? "N/A",
-        "Remarks": selectedUnitProcess.s9_remarks ?? "N/A"
-    };
-} else if (idx === 9) { // Station 10: Post BI Hi-Pot Test - from station10_checklists table
-    stationData = { 
-        "Requirements": selectedUnitProcess.s10_requirements ?? "N/A",
-        "Remarks": selectedUnitProcess.s10_remarks ?? "N/A"
-    };
-} else if (idx === 10) { // Station 11: Final Functional/Connectivity Test - from station11_checklists table
-    stationData = { 
-        "LED Status": selectedUnitProcess.s11_led_status ?? "N/A",
-        "Low Range": selectedUnitProcess.s11_low_range ?? "N/A",
-        "Medium Range": selectedUnitProcess.s11_medium_range ?? "N/A",
-        "High Range": selectedUnitProcess.s11_high_range ?? "N/A"
-    };
-} else if (idx === 11) { // Station 12: Label Sticker Attachment - from station12_checklists table
-    stationData = { 
-        "Requirements": selectedUnitProcess.s12_requirements ?? "N/A",
-        "Remarks": selectedUnitProcess.s12_remarks ?? "N/A"
-    };
-} else if (idx === 12) { // Station 13: FVI - from station13_checklists table
-    stationData = { 
-        "Requirements": selectedUnitProcess.s13_requirements ?? "N/A",
-        "Remarks": selectedUnitProcess.s13_remarks ?? "N/A"
-    };
-} else if (idx === 13) { // Station 14: Packing - from station14_checklists table
-    stationData = { 
-        "Requirements": selectedUnitProcess.s14_requirements ?? "N/A",
-        "Remarks": selectedUnitProcess.s14_remarks ?? "N/A"
-    };
-} else if (idx === 14) { // Station 15: QC Stamping - from station15_checklists table
-    stationData = { 
-        "Requirements": selectedUnitProcess.s15_requirements ?? "N/A",
-        "Remarks": selectedUnitProcess.s15_remarks ?? "N/A"
-    };
+// Show data for ALL previous stations the unit has passed through, based on unit's actual progress
+if (idx <= unitStationIndex) { // Show data for current station AND all previous stations
+    if (idx === 0) { // Station 1: PCB Pairing - from station1_checklists table
+        stationData = { 
+            "Header Connector Upright (90°)": selectedUnitProcess.s1_header_seated_90_deg ?? "N/A",
+            "Leads Properly Soldered": selectedUnitProcess.s1_leads_properly_soldered ?? "N/A"
+        };
+    } else if (idx === 1) { // Station 2: Integrated Board Test - from station2_checklists table
+        stationData = { 
+            "LoRa Module": selectedUnitProcess.s2_lora_module ?? "N/A",
+            "LoRa Mesh Test": selectedUnitProcess.s2_lora_mesh_test ?? "N/A",
+            "Energy Meter": selectedUnitProcess.s2_energy_meter ?? "N/A",
+            "Power Good Test": selectedUnitProcess.s2_power_good_test ?? "N/A",
+            "Voltage (Ref)": selectedUnitProcess.s2_voltage ?? "N/A",
+            "Line 1": selectedUnitProcess.s2_line1 ?? "N/A",
+            "Line 2": selectedUnitProcess.s2_line2 ?? "N/A",
+            "Line 3": selectedUnitProcess.s2_line3 ?? "N/A",
+            "Temp Reading": selectedUnitProcess.s2_temp_reading ?? "N/A",
+            "Freq Reading": selectedUnitProcess.s2_freq_reading ?? "N/A",
+            "4G LED": selectedUnitProcess.s2_led_status_4g ?? "N/A",
+            "Fast Blink RED": selectedUnitProcess.s2_led_status_fast_blink ?? "N/A",
+            "SW1 Off to LED Off (sec)": selectedUnitProcess.s2_sw1_off_to_led_off_duration === 0 ? "0s" : (selectedUnitProcess.s2_sw1_off_to_led_off_duration ?? "N/A"),
+            "Go/No-Go Result": selectedUnitProcess.s2_go_no_go ?? "N/A"
+        };
+    } else if (idx === 2) { // Station 3: Main Board Conformal Coating - from station3_checklists table
+        stationData = { 
+            "Requirements": selectedUnitProcess.s3_requirements ?? "N/A",
+            "Remarks": selectedUnitProcess.s3_remarks ?? "N/A"
+        };
+    } else if (idx === 3) { // Station 4: RTV Application - from station4_checklists table
+        stationData = { 
+            "Requirements": selectedUnitProcess.s4_requirements ?? "N/A",
+            "Remarks": selectedUnitProcess.s4_remarks ?? "N/A"
+        };
+    } else if (idx === 4) { // Station 5: Casing/Harnessing - from station5_checklists table
+        stationData = { 
+            "Requirements": selectedUnitProcess.s5_requirements ?? "N/A",
+            "Remarks": selectedUnitProcess.s5_remarks ?? "N/A"
+        };
+    } else if (idx === 5) { // Station 6: Complete Unit Test/Calibration - from station6_checklists table
+        stationData = { 
+            "LoRa Module": selectedUnitProcess.s6_lora_module ?? "N/A",
+            "LoRa Mesh Test": selectedUnitProcess.s6_lora_mesh_test ?? "N/A",
+            "Energy Meter": selectedUnitProcess.s6_energy_meter ?? "N/A",
+            "Power Good Test": selectedUnitProcess.s6_power_good_test ?? "N/A",
+            "Voltage (Ref)": selectedUnitProcess.s6_voltage ?? "N/A",
+            "Line 1": selectedUnitProcess.s6_line1 ?? "N/A",
+            "Line 2": selectedUnitProcess.s6_line2 ?? "N/A",
+            "Line 3": selectedUnitProcess.s6_line3 ?? "N/A",
+            "Temp Reading": selectedUnitProcess.s6_temp_reading ?? "N/A",
+            "Freq Reading": selectedUnitProcess.s6_freq_reading ?? "N/A",
+            "4G LED": selectedUnitProcess.s6_led_status_4g ?? "N/A",
+            "Fast Blink RED": selectedUnitProcess.s6_led_status_fast_blink ?? "N/A",
+            "SW1 Off to LED Off (sec)": selectedUnitProcess.s6_sw1_off_to_led_off_duration === 0 ? "0s" : (selectedUnitProcess.s6_sw1_off_to_led_off_duration ?? "N/A"),
+            "Go/No-Go Result": selectedUnitProcess.s6_go_no_go ?? "N/A"
+        };
+    } else if (idx === 6) { // Station 7: Pre BI Hi-Pot Test - from station7_checklists table
+        stationData = { 
+            "Requirements": selectedUnitProcess.s7_requirements ?? "N/A",
+            "Remarks": selectedUnitProcess.s7_remarks ?? "N/A"
+        };
+    } else if (idx === 7) { // Station 8: Burn-in Testing - from station8_checklists table
+        stationData = { 
+            "Power Unit and Disable LoRa": selectedUnitProcess.s8_power_unit_disable_lora ?? "N/A",
+            "Confirm Frequency Band": selectedUnitProcess.s8_frequency_band ?? "N/A",
+            "Start Testing": selectedUnitProcess.s8_start_testing ?? "N/A",
+            "Confirm RSSO Testing": selectedUnitProcess.s8_rsso_testing ?? "N/A",
+            "Data Outage": selectedUnitProcess.s8_data_outage ?? "N/A"
+        };
+    } else if (idx === 8) { // Station 9: Sealing - from station9_checklists table
+        stationData = { 
+            "Requirements": selectedUnitProcess.s9_requirements ?? "N/A",
+            "Remarks": selectedUnitProcess.s9_remarks ?? "N/A"
+        };
+    } else if (idx === 9) { // Station 10: Post BI Hi-Pot Test - from station10_checklists table
+        stationData = { 
+            "Requirements": selectedUnitProcess.s10_requirements ?? "N/A",
+            "Remarks": selectedUnitProcess.s10_remarks ?? "N/A"
+        };
+    } else if (idx === 10) { // Station 11: Final Functional/Connectivity Test - from station11_checklists table
+        stationData = { 
+            "LED Status": selectedUnitProcess.s11_led_status ?? "N/A",
+            "Low Range": selectedUnitProcess.s11_low_range ?? "N/A",
+            "Medium Range": selectedUnitProcess.s11_medium_range ?? "N/A",
+            "High Range": selectedUnitProcess.s11_high_range ?? "N/A"
+        };
+    } else if (idx === 11) { // Station 12: Label Sticker Attachment - from station12_checklists table
+        stationData = { 
+            "Requirements": selectedUnitProcess.s12_requirements ?? "N/A",
+            "Remarks": selectedUnitProcess.s12_remarks ?? "N/A"
+        };
+    } else if (idx === 12) { // Station 13: FVI - from station13_checklists table
+        stationData = { 
+            "Requirements": selectedUnitProcess.s13_requirements ?? "N/A",
+            "Remarks": selectedUnitProcess.s13_remarks ?? "N/A"
+        };
+    } else if (idx === 13) { // Station 14: Packing - from station14_checklists table
+        stationData = { 
+            "Requirements": selectedUnitProcess.s14_requirements ?? "N/A",
+            "Remarks": selectedUnitProcess.s14_remarks ?? "N/A"
+        };
+    } else if (idx === 14) { // Station 15: QC Stamping - from station15_checklists table
+        stationData = { 
+            "Requirements": selectedUnitProcess.s15_requirements ?? "N/A",
+            "Remarks": selectedUnitProcess.s15_remarks ?? "N/A"
+        };
+    }
 }
                                  let stepClass = isDoneBefore || isCompletedHere ? 'done' : (isNG ? 'ng' : (isCurrent ? 'current' : ''));
 
@@ -1391,15 +1623,25 @@ const payload = delayHotspots.map(h => {
         .map(log => {
             // Pre-diagnostic checklist error scanning
             const checklist_errors = [];
+            const checklist_values = {}; // Store actual values for analysis
             
-            // Scan all historical stations for failures
+            // Scan all historical stations for failures and capture values
             const voltage_tolerance = { min: 113.85, max: 116.15 }; // ±1% of 115V
             
             // Station 1 checks
+            checklist_values.s1_header_seated_90_deg = log.s1_header_seated_90_deg;
+            checklist_values.s1_leads_properly_soldered = log.s1_leads_properly_soldered;
             if (log.s1_header_seated_90_deg === 'NO GO' || log.s1_header_seated_90_deg === 'FAIL') checklist_errors.push('S1: Header seating failure');
             if (log.s1_leads_properly_soldered === 'NO GO' || log.s1_leads_properly_soldered === 'FAIL') checklist_errors.push('S1: Soldering defects');
             
             // Station 2 checks
+            checklist_values.s2_lora_module = log.s2_lora_module;
+            checklist_values.s2_lora_mesh_test = log.s2_lora_mesh_test;
+            checklist_values.s2_energy_meter = log.s2_energy_meter;
+            checklist_values.s2_power_good_test = log.s2_power_good_test;
+            checklist_values.s2_voltage = log.s2_voltage;
+            checklist_values.s2_go_no_go = log.s2_go_no_go;
+            
             if (log.s2_lora_module === 'Not Detected' || log.s2_lora_module === 'FAIL') checklist_errors.push('S2: LoRa module not detected');
             if (log.s2_lora_mesh_test === 'Not Detected' || log.s2_lora_mesh_test === 'FAIL') checklist_errors.push('S2: Mesh test failure');
             if (log.s2_energy_meter === 'Not Detected' || log.s2_energy_meter === 'FAIL') checklist_errors.push('S2: Energy meter issue');
@@ -1408,17 +1650,32 @@ const payload = delayHotspots.map(h => {
             if (log.s2_go_no_go === 'NO GO' || log.s2_go_no_go === 'FAIL') checklist_errors.push('S2: Final test failure');
             
             // Station 3-5 checks (standard stations)
+            checklist_values.s3_requirements = log.s3_requirements;
+            checklist_values.s4_requirements = log.s4_requirements;
+            checklist_values.s5_requirements = log.s5_requirements;
+            
             if (log.s3_requirements === 'FAIL' || log.s3_requirements === 'NO GO') checklist_errors.push('S3: Requirements not met');
             if (log.s4_requirements === 'FAIL' || log.s4_requirements === 'NO GO') checklist_errors.push('S4: Requirements not met');
             if (log.s5_requirements === 'FAIL' || log.s5_requirements === 'NO GO') checklist_errors.push('S5: Requirements not met');
             
             // Station 6 checks
+            checklist_values.s6_lora_module = log.s6_lora_module;
+            checklist_values.s6_lora_mesh_test = log.s6_lora_mesh_test;
+            checklist_values.s6_voltage = log.s6_voltage;
+            checklist_values.s6_go_no_go = log.s6_go_no_go;
+            
             if (log.s6_lora_module === 'Not Detected' || log.s6_lora_module === 'FAIL') checklist_errors.push('S6: LoRa module not detected');
             if (log.s6_lora_mesh_test === 'Not Detected' || log.s6_lora_mesh_test === 'FAIL') checklist_errors.push('S6: Mesh test failure');
             if (log.s6_voltage && (log.s6_voltage < voltage_tolerance.min || log.s6_voltage > voltage_tolerance.max)) checklist_errors.push('S6: Voltage out of tolerance');
             if (log.s6_go_no_go === 'NO GO' || log.s6_go_no_go === 'FAIL') checklist_errors.push('S6: Final calibration failure');
             
             // Station 7-10 checks
+            checklist_values.s7_requirements = log.s7_requirements;
+            checklist_values.s8_power_unit_disable_lora = log.s8_power_unit_disable_lora;
+            checklist_values.s8_rsso_testing = log.s8_rsso_testing;
+            checklist_values.s9_requirements = log.s9_requirements;
+            checklist_values.s10_requirements = log.s10_requirements;
+            
             if (log.s7_requirements === 'FAIL' || log.s7_requirements === 'NO GO') checklist_errors.push('S7: Requirements not met');
             if (log.s8_power_unit_disable_lora === 'FAIL' || log.s8_power_unit_disable_lora === 'NO GO') checklist_errors.push('S8: Power unit issue');
             if (log.s8_rsso_testing === 'FAIL' || log.s8_rsso_testing === 'NO GO') checklist_errors.push('S8: RSSO test failure');
@@ -1426,12 +1683,21 @@ const payload = delayHotspots.map(h => {
             if (log.s10_requirements === 'FAIL' || log.s10_requirements === 'NO GO') checklist_errors.push('S10: Requirements not met');
             
             // Station 11 checks
+            checklist_values.s11_led_status = log.s11_led_status;
+            checklist_values.s11_low_range = log.s11_low_range;
+            checklist_values.s11_medium_range = log.s11_medium_range;
+            checklist_values.s11_high_range = log.s11_high_range;
+            
             if (log.s11_led_status === 'FAIL' || log.s11_led_status === 'NO GO') checklist_errors.push('S11: LED status failure');
             if (log.s11_low_range === 'FAIL' || log.s11_low_range === 'NO GO') checklist_errors.push('S11: Low range failure');
             if (log.s11_medium_range === 'FAIL' || log.s11_medium_range === 'NO GO') checklist_errors.push('S11: Medium range failure');
             if (log.s11_high_range === 'FAIL' || log.s11_high_range === 'NO GO') checklist_errors.push('S11: High range failure');
             
             // Station 12-14 checks
+            checklist_values.s12_requirements = log.s12_requirements;
+            checklist_values.s13_requirements = log.s13_requirements;
+            checklist_values.s14_requirements = log.s14_requirements;
+            
             if (log.s12_requirements === 'FAIL' || log.s12_requirements === 'NO GO') checklist_errors.push('S12: Sticker attachment failure');
             if (log.s13_requirements === 'FAIL' || log.s13_requirements === 'NO GO') checklist_errors.push('S13: FVI requirements not met');
             if (log.s14_requirements === 'FAIL' || log.s14_requirements === 'NO GO') checklist_errors.push('S14: Packing requirements not met');
@@ -1440,7 +1706,8 @@ const payload = delayHotspots.map(h => {
                 assembly: log.assembly_no,
                 current_station: log.station,
                 time_spent: Math.round(checkUnitDelay(h.stationId, log.updated_at).minutes),
-                checklist_errors: checklist_errors, // Pre-diagnostic error array
+                checklist_errors: checklist_errors, // Error array (may be empty if all GO)
+                checklist_values: checklist_values, // Actual values for analysis
                 last_remarks: log.remarks || '',
                 // Full checklist data for AI analysis
                 full_checklists: {
@@ -1476,16 +1743,21 @@ ADVANCED ANALYSIS PROTOCOL:
    - Voltage tolerance violations (±1% of 115V) indicating power quality issues
    - Sequential failures across multiple stations indicating systemic problems
 
-3. MANUFACTURING SYSTEM LOGIC:
-   - If checklist_errors array has entries: "Inherited defects from [station] causing extended rework verification"
-   - If checklist_errors empty but time_spent > threshold: "Manpower bottleneck or logistics impedance"
+3. PROCESS STALL ANALYSIS: When checklist_errors array is EMPTY, analyze checklist_values:
+   - If checklist_values show "GO", "Detected", "Passed" values: Process stall or documentation failure
+   - If checklist_values are null/undefined: Missing checklist data requiring documentation update
+   - If all tests passed but time_spent is high: Manpower bottleneck or logistics impedance
+
+4. MANUFACTURING SYSTEM LOGIC:
+   - If checklist_errors has entries: "Inherited defects from [station] causing extended rework verification"
+   - If checklist_errors empty but checklist_values show GO values: "Process stall with all tests passed - documentation or workflow issue"
    - If Station 11 range failures: "Connectivity interference or calibration drift requiring extended testing"
    - If voltage tolerance violations: "Power quality issues causing repeated test failures"
 
-4. HISTORICAL CORRELATION: Analyze time_spent vs checklist_errors to determine if delays are:
+5. HISTORICAL CORRELATION: Analyze time_spent vs checklist_errors to determine if delays are:
    - Defect-driven (high error count + high time)
    - Process-driven (low error count + high time)
-   - Hybrid (moderate errors + moderate time)
+   - Documentation-driven (GO values but no progress)
 
 OUTPUT SPECIFICATION:
 Return EXACTLY ${payload.length} lines (no extra text), format:
