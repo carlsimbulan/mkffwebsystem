@@ -178,16 +178,6 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 const content = line.replace(/^\d+\.\s*/, '');
                 formatted += `<div class="item"><span class="number">${itemIndex}</span>${content}</div>`;
             }
-            // Check if it's a Root Cause line
-            else if (line.toLowerCase().includes('root cause:')) {
-                const rootCause = line.replace(/^root cause:\s*/i, '');
-                formatted += `<div class="item"><strong>Root Cause:</strong> ${rootCause}</div>`;
-            }
-            // Check if it's a Recommended Action line
-            else if (line.toLowerCase().includes('recommended action:')) {
-                const action = line.replace(/^recommended action:\s*/i, '');
-                formatted += `<div class="action-item"><strong>Recommended Action:</strong> ${action}</div>`;
-            }
             // Check if it's a summary line
             else if (line.toLowerCase().includes('summary:')) {
                 const summary = line.replace(/^summary:\s*/i, '');
@@ -272,7 +262,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
 
 
 
-    // Only show ROOT CAUSE DELAY ANALYSIS when there is at least 1 truly delayed unit in this station
+    // Only show ROOT CAUSE DELAY ANALYTICS when there is at least 1 truly delayed unit in this station
 
     const hasDelayedUnits = useMemo(() => {
 
@@ -696,11 +686,11 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
 
             }, 0);
 
-const avgDelayMinutes = delayedCount > 0 ? (totalDelayMinutes / delayedCount) : 0;
+            const avgDelayMinutes = delayedCount > 0 ? (totalDelayMinutes / delayedCount) : 0;
 
-const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationMonitorId] || 10;
+            const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationMonitorId] || 10;
 
-const prompt = `You are a Senior Manufacturing Auditor at MKFF Laserteknique International inc.
+            const prompt = `You are a Senior Manufacturing Auditor at MKFF Laserteknique International inc.
 DIAGNOSTIC DIRECTIVE: Perform blunt root-cause analysis for manufacturing delays using technical precision.
 
 MANUFACTURING ANALYTICS OVERVIEW:
@@ -717,23 +707,22 @@ MANUFACTURING AUDIT PROTOCOL:
 4. SYSTEMIC FAILURE PATTERN: Sequential station failures → "SYSTEMIC FAILURE - Cross-Station Calibration Drift"
 5. REMARKS INTELLIGENCE: Prioritize remarks field for human-caused delays and operator notes
 
-RECOMMENDED ACTION PROTOCOL:
-- Inherited Defects: If cause is inherited from S1/S2 → "Initiate immediate quality audit and machine calibration at the source station."
-- Process Stalls: If unit is 'GO' but delayed → "Alert floor supervisor for manpower reallocation or logistics clearance."
-- Voltage Issues: If voltage is out of range → "Contact facilities engineering for power grid stability check."
-- Component Failures: If recurring part failure (LoRa, LED, etc.) → "Flag component batch for potential RMA/Supplier defect investigation."
+DIAGNOSTIC CLASSIFICATION:
+- Defect-Driven: High error count + high time → "QUALITY-DRIVEN DELAY"
+- Process-Driven: Low error count + high time → "MANPOWER-DRIVEN DELAY"  
+- Quality Escape: Upstream errors causing downstream delays → "INHERITED DEFECT ESCAPE"
 
 TECHNICAL RESPONSE FORMAT:
-**Root Cause:** [Direct diagnosis with manufacturing terminology - max 30 words]
+1. [Direct diagnosis with manufacturing terminology]
+2. [Root cause with station-specific failure mode]
 
-**Recommended Action:** [Specific action based on protocol - max 30 words]
+Summary: [Corrective action directive - max 20 words]
 
 USE MANUFACTURING TERMS: Rework Loop, Systemic Failure, Calibration Drift, Quality Escape, Manpower Bottleneck, Workflow Impediment`;
 
-// Step 2: Generate content using backend
+            // Step 2: Generate content using backend
 
-const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
-    method: 'POST',
+            const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
                 method: 'POST',
 
                 headers: { 'Content-Type': 'application/json' },
@@ -831,7 +820,6 @@ const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.ph
                 .ai-numbered-list { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 0.95rem; line-height: 1.8; font-weight: 500; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
                 .ai-numbered-list .number { font-weight: 700; color: #dc2626; margin-right: 12px; font-size: 1.1rem; display: inline-block; width: 28px; height: 28px; line-height: 28px; text-align: center; background: #fee2e2; border-radius: 50%; }
                 .ai-numbered-list .item { margin-bottom: 12px; padding: 12px 16px; border-radius: 8px; background: rgba(255, 255, 255, 0.8); }
-                .ai-numbered-list .action-item { margin-bottom: 12px; padding: 16px; border-radius: 8px; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; font-weight: 600; border-left: 4px solid #1d4ed8; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3); }
                 .ai-numbered-list .summary { font-weight: 700; color: #1e293b; margin-top: 16px; padding-top: 16px; border-top: 2px solid #e2e8f0; font-size: 1rem; background: rgba(59, 130, 246, 0.05); padding: 16px; border-radius: 8px; }
 
             `}</style>
@@ -864,7 +852,7 @@ const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.ph
 
                         <div>
 
-                            <div className="fw-bold text-dark small uppercase tracking-wider">ROOT CAUSE DELAY ANALYSIS</div>
+                            <div className="fw-bold text-dark small uppercase tracking-wider">ROOT CAUSE DELAY ANALYTICS</div>
 
                             <div className="small text-muted">Short AI summary of delay patterns and recommended actions for this station.</div>
 
@@ -1725,17 +1713,14 @@ ADVANCED ANALYSIS PROTOCOL:
    - Process-driven (low error count + high time)
    - Documentation-driven (GO values but no progress)
 
-RECOMMENDED ACTION PROTOCOL:
-- Inherited Defects: If cause is inherited from S1/S2 → "Initiate immediate quality audit and machine calibration at the source station."
-- Process Stalls: If unit is 'GO' but delayed → "Alert floor supervisor for manpower reallocation or logistics clearance."
-- Voltage Issues: If voltage is out of range → "Contact facilities engineering for power grid stability check."
-- Component Failures: If recurring part failure (LoRa, LED, etc.) → "Flag component batch for potential RMA/Supplier defect investigation."
-
 OUTPUT SPECIFICATION:
 Return EXACTLY ${payload.length} lines (no extra text), format:
-StationID | **Root Cause:** [Technical diagnosis - max 25 words] **Recommended Action:** [Specific action based on protocol - max 25 words]`;
+StationID | [Deep-dive technical reason linking history to current delay. Max 25 words]`;
 
-// ...
+
+
+            // Step 2: Generate content using backend
+
             const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
 
                 method: 'POST',
@@ -2023,35 +2008,19 @@ StationID | **Root Cause:** [Technical diagnosis - max 25 words] **Recommended A
 
 
                 {delayHotspots.length === 0 ? (
-                    <div className="text-muted p-4 text-center">No delayed stations detected at the moment.</div>
+                    <div className="text-muted p-3">No delayed stations detected at the moment.</div>
                 ) : (
-                    <div className="ai-numbered-list text-dark p-4">
+                    <div className="ai-numbered-list text-dark p-3">
                         {delayHotspots.map((h, idx) => (
-                            <div key={h.stationId} className="mb-4">
-                                {/* Station Header with Metrics */}
-                                <div className="item mb-3">
+                            <div key={h.stationId}>
+                                <div className="item">
                                     <span className="number">{idx + 1}</span>
-                                    <div className="d-flex justify-content-between align-items-start flex-wrap">
-                                        <div className="flex-grow-1">
-                                            <h5 className="fw-bold text-dark mb-2">{h.stationName}</h5>
-                                            <div className="text-muted small mb-2">{h.stationId} • Threshold: {h.thresholdMinutes} min</div>
-                                        </div>
-                                        <div className="d-flex gap-2 ms-3">
-                                            <span className="badge bg-danger text-white px-3 py-2 rounded-pill">
-                                                <i className="bi bi-exclamation-triangle-fill me-1"></i>
-                                                {h.delayedUnits} Units
-                                            </span>
-                                            <span className="badge bg-warning text-dark px-3 py-2 rounded-pill">
-                                                <i className="bi bi-clock-fill me-1"></i>
-                                                {Math.round(h.maxDelayMinutes)} mins
-                                            </span>
-                                        </div>
-                                    </div>
+                                    <strong>{h.stationName}</strong> ({h.stationId})<br/>
+                                    <small>Delayed: {h.delayedUnits} units | Worst: {Math.round(h.maxDelayMinutes)} mins</small>
                                 </div>
-                                
-                                {/* AI Analysis with Root Cause and Recommended Action */}
                                 {delayHotspotsAi?.[h.stationId] && (
-                                    <div className="ms-5">
+                                    <div className="item">
+                                        <span className="number">{idx + 1}</span>
                                         <div dangerouslySetInnerHTML={{ __html: formatHotspotOutput(delayHotspotsAi[h.stationId]) }} />
                                     </div>
                                 )}
@@ -2061,6 +2030,8 @@ StationID | **Root Cause:** [Technical diagnosis - max 25 words] **Recommended A
                 )}
 
             </div>
+
+            
 
             <div className="row g-4">
 

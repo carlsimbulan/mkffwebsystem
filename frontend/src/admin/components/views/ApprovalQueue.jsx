@@ -38,9 +38,9 @@ export function ApprovalQueue({
                     <p className="text-muted small mb-0">Review flagged units requiring QA validation.</p>
                 </div>
                 {approvalQueueLogs.length > 0 && (
-                    <span className="badge bg-danger rounded-pill px-3 py-2 shadow-sm d-flex align-items-center">
-                        <span className="spinner-grow spinner-grow-sm me-2" role="status" aria-hidden="true"></span>
-                        {approvalQueueLogs.length} Pending
+                    <span className="badge bg-light rounded-pill px-3 py-2 shadow-sm d-flex align-items-center border">
+                        <span className="spinner-grow spinner-grow-sm text-danger me-2" role="status" aria-hidden="true"></span>
+                        <span className="text-dark fw-medium">{approvalQueueLogs.length} Pending</span>
                     </span>
                 )}
             </div>
@@ -67,13 +67,13 @@ export function ApprovalQueue({
                                     return (
                                         <tr key={log.id} className={isOverdue ? 'overdue-row' : ''}>
                                             {/* Overdue Left Border Indicator */}
-                                            <td className="ps-4 position-relative">
-                                                {isOverdue && <div className="overdue-indicator"></div>}
+                                            <td className="ps-4">
                                                 <div className="d-flex align-items-center">
                                                     <span className="fw-bold text-primary font-monospace">{log.assembly_no}</span>
                                                     {isOverdue && (
-                                                        <span className="ms-2 badge bg-danger rounded-pill px-2 py-1" style={{ fontSize: '0.65rem' }}>
-                                                            <i className="bi bi-exclamation-triangle-fill me-1"></i>Overdue
+                                                        <span className="ms-2 badge bg-light rounded-pill px-2 py-1 border border-danger-subtle" style={{ fontSize: '0.7rem' }}>
+                                                            <i className="bi bi-clock-fill text-danger me-1"></i>
+                                                            <span className="text-danger fw-medium">Overdue</span>
                                                         </span>
                                                     )}
                                                 </div>
@@ -82,12 +82,12 @@ export function ApprovalQueue({
                                             {/* Origin Station */}
                                             <td>
                                                 <div className="d-flex align-items-center">
-                                                    <div className={`status-icon-wrapper me-2 ${isOverdue ? 'bg-danger-light' : 'bg-light border'}`}>
-                                                        <i className={`bi ${isOverdue ? 'bi-exclamation-triangle-fill text-danger' : 'bi-geo-alt-fill text-secondary'}`}></i>
+                                                    <div className={`status-icon-wrapper me-2 ${isOverdue ? 'bg-danger-subtle' : 'bg-light border'}`}>
+                                                        <i className={`bi ${isOverdue ? 'bi-clock-fill text-danger' : 'bi-geo-alt-fill text-muted'}`}></i>
                                                     </div>
                                                     <div>
                                                         <span className={`fw-medium ${isOverdue ? 'text-danger' : 'text-dark'}`}>{log.station}</span>
-                                                        {isOverdue && <div className="small text-danger">Needs immediate action</div>}
+                                                        {isOverdue && <div className="small text-danger fw-medium">Extended wait time</div>}
                                                     </div>
                                                 </div>
                                             </td>
@@ -96,22 +96,22 @@ export function ApprovalQueue({
                                             <td className="text-center">
                                                 <span className={`badge rounded-pill px-3 py-2 fw-normal ${
                                                     isOverdue 
-                                                        ? 'bg-danger-soft text-danger border-danger-subtle' 
-                                                        : 'bg-warning-soft text-warning border-warning-subtle'
-                                                } border`}>
-                                                    {isOverdue ? 'Critical' : 'Pending QA'}
+                                                        ? 'bg-danger-subtle text-danger border border-danger-subtle' 
+                                                        : 'bg-light text-muted border'
+                                                }`}>
+                                                    {isOverdue ? 'Overdue' : 'Pending QA'}
                                                 </span>
                                             </td>
 
                                             {/* Remarks */}
                                             <td>
                                                 <div className="remarks-container text-muted small fst-italic">
-                                                    <i className={`bi ${isOverdue ? 'bi-exclamation-circle-fill text-danger' : 'bi-chat-quote-fill'} me-2`}></i>
+                                                    <i className={`bi ${isOverdue ? 'bi-clock-fill text-danger' : 'bi-chat-quote-fill text-muted'} me-2`}></i>
                                                     <div className="d-inline">
                                                         "{log.remarks || 'No remarks provided'}"
                                                         {isOverdue && (
-                                                            <div className="text-danger small mt-1 fw-bold">
-                                                                <i className="bi bi-clock-fill me-1"></i>Unit has been waiting too long
+                                                            <div className="text-danger small mt-1 fw-medium">
+                                                                <i className="bi bi-clock-fill me-1"></i>Extended wait time
                                                             </div>
                                                         )}
                                                     </div>
@@ -129,16 +129,16 @@ export function ApprovalQueue({
                                             {/* Action Button */}
                                             <td className="text-center pe-4">
                                                 <button
-                                                    className={`btn btn-sm fw-bold px-3 py-2 rounded-2 shadow-sm action-btn ${
-                                                        isOverdue ? 'btn-danger' : 'btn-success'
+                                                    className={`btn btn-sm fw-medium px-3 py-2 rounded-2 shadow-sm action-btn ${
+                                                        isOverdue ? 'btn-outline-danger' : 'btn-primary'
                                                     }`}
                                                     onClick={() => {
                                                         setSelectedLogToApprove(log);
                                                         setShowApproveModal(true);
                                                     }}
                                                 >
-                                                    <i className={`bi ${isOverdue ? 'bi-exclamation-triangle' : 'bi-check2-square'} me-2`}></i> 
-                                                    {isOverdue ? 'Urgent' : 'Approve'}
+                                                    <i className={`bi ${isOverdue ? 'bi-clock' : 'bi-check2-square'} me-2`}></i> 
+                                                    <span className="fw-medium">{isOverdue ? 'Review' : 'Approve'}</span>
                                                 </button>
                                             </td>
                                         </tr>
@@ -182,15 +182,6 @@ export function ApprovalQueue({
                     padding-bottom: 1rem;
                     border: none;
                 }
-                .overdue-indicator {
-                    position: absolute;
-                    left: 0;
-                    top: 0;
-                    bottom: 0;
-                    width: 4px;
-                    background-color: #dc3545;
-                    animation: pulse-red 2s infinite;
-                }
                 .status-icon-wrapper {
                     width: 32px;
                     height: 32px;
@@ -199,26 +190,41 @@ export function ApprovalQueue({
                     align-items: center;
                     justify-content: center;
                 }
-                .bg-danger-light { background-color: rgba(220, 53, 69, 0.1); }
-                .bg-danger-soft { background-color: rgba(220, 53, 69, 0.05); }
-                .bg-warning-soft { background-color: rgba(255, 193, 7, 0.05); }
+                .bg-danger-subtle { background-color: rgba(220, 53, 69, 0.05); }
                 .border-danger-subtle { border-color: rgba(220, 53, 69, 0.2) !important; }
-                .border-warning-subtle { border-color: rgba(255, 193, 7, 0.2) !important; }
                 
                 .action-btn {
                     min-width: 110px;
                     transition: all 0.2s ease;
+                    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                    letter-spacing: 0.01em;
                 }
                 .action-btn:hover {
                     transform: translateY(-2px);
                     filter: brightness(1.1);
                 }
+                .approval-queue-container {
+                    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                }
+                .approval-queue-container h3 {
+                    font-weight: 600;
+                    letter-spacing: -0.02em;
+                }
+                .approval-queue-container .small {
+                    font-size: 0.875rem;
+                    letter-spacing: 0.01em;
+                }
+                .approval-queue-container .font-monospace {
+                    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+                    font-weight: 500;
+                }
+                .approval-queue-container .badge {
+                    font-weight: 500;
+                    letter-spacing: 0.01em;
+                }
                 .animate-in { animation: fadeIn 0.3s ease-out; }
                 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-                @keyframes pulse-red {
-                    0%, 100% { opacity: 1; }
-                    50% { opacity: 0.4; }
-                }
+                .border-secondary-subtle { border-color: rgba(108, 117, 125, 0.2) !important; }
                 .remarks-container {
                     display: flex;
                     align-items: flex-start;
