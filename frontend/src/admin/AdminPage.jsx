@@ -6,32 +6,36 @@ import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, BarElement, T
 import logo from '../logo.png';
 
 // 2. IMPORT SEPARATED COMPONENTS (Updated List)
-// Existing Modals and Utilities
-import { EditUnitModal } from './modals/EditUnitModal';
-import { ReportDetailModal } from './modals/ReportDetailModal';
-import { ManageUserModal } from './modals/ManageUserModal';
-import { DeleteUserModal } from './modals/DeleteUserModal';
-import { SubmitReportModal } from './modals/SubmitReportModal';
-import { StationHistoryModal } from './modals/StationHistoryModal';
-import { NotificationBell } from './components/NotificationBell';
-import { NotificationContent } from './components/NotificationContent';
-import { ViewUserModal } from './modals/ViewUserModal';
-import { AnnouncementModal } from './modals/AnnouncementModal';
-// NEW VIEW COMPONENTS
-import { Dashboard } from './components/Dashboard';
-import { StationsOverview } from './components/StationsOverview';
-import { ReportsView } from './components/ReportsView';
-import { AnnouncementsView } from './components/AnnouncementsView'; 
-import { ApprovalQueue } from './components/ApprovalQueue';
-import { UserManagement } from './components/UserManagement';
-import { InventoryView } from './components/InventoryView';
-// NEW EMBEDDED MODALS
-import { ApproveUnitModal } from './modals/ApproveUnitModal';
-import { DeleteAnnouncementModal } from './modals/DeleteAnnouncementModal';
+// Import all components from organized index files
+import {
+    EditUnitModal,
+    ReportDetailModal,
+    ManageUserModal,
+    DeleteUserModal,
+    SubmitReportModal,
+    StationHistoryModal,
+    ViewUserModal,
+    AnnouncementModal,
+    ApproveUnitModal,
+    DeleteAnnouncementModal
+} from './modals';
 
-import { Shipment } from './components/Shipment';
+import {
+    Dashboard,
+    StationsOverview,
+    ReportsView,
+    AnnouncementsView,
+    ApprovalQueue,
+    UserManagement,
+    InventoryView,
+    Shipment,
+    NoGoodUnits,
+    StationBarChart,
+    UnitPieChart,
+    NotificationBell,
+    NotificationContent
+} from './components';
 
-import NoGoodUnits from './components/NoGoodUnits';
 // Palitan ang lumang import ng:
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 
@@ -310,7 +314,21 @@ const fetchData = async () => {
     useEffect(() => {
         fetchData();
         const interval = setInterval(fetchData, 1000);
-        return () => clearInterval(interval);
+        
+        // Listen for real-time updates from operator dashboard
+        const handleMessage = (event) => {
+            if (event.data.type === 'UNIT_UPDATED') {
+                console.log('Received unit update notification:', event.data);
+                fetchData(); // Refresh data immediately
+            }
+        };
+        
+        window.addEventListener('message', handleMessage);
+        
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('message', handleMessage);
+        };
     }, [checkDelayedUnitsAndReports]); // Added checkDelayedUnitsAndReports to dependency array to satisfy ESLint, though the polling interval keeps it running.
 
     // --- DASHBOARD CHART HANDLERS (KEPT AS IS) ---
@@ -898,11 +916,18 @@ return (
 
         <li className="nav-item">
             <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${activeTab === "approval" ? "active-glass" : ""}`}
+                className={`nav-link text-white w-100 d-flex align-items-center justify-content-between py-2 px-3 sidebar-btn ${activeTab === "approval" ? "active-glass" : ""}`}
                 onClick={() => handleTabChange("approval")}
             >
-                <i className="bi bi-check-circle"></i>
-                <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Approvals</span>
+                <div className="d-flex align-items-center gap-3">
+                    <i className="bi bi-check-circle"></i>
+                    <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Approvals</span>
+                </div>
+                {logs.filter(l => l.status === 'Pending Approval').length > 0 && (
+                    <span className="badge bg-danger rounded-pill px-2 py-1" style={{ fontSize: '0.7rem', minWidth: '20px' }}>
+                        {logs.filter(l => l.status === 'Pending Approval').length}
+                    </span>
+                )}
             </button>
         </li>
 

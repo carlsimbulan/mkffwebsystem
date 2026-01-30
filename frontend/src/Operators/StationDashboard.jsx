@@ -537,7 +537,7 @@ setFormData(prev => ({
     };
 
     // --- HANDLE UNIT SUBMISSION / UPDATE (Omitted for brevity, unchanged) ---
-const handleSubmit = async (e) => {
+const handleSubmit = async (e, checklist_data = null) => {
         e.preventDefault();
         if (!formData.assemblyNo) {
             setProcessStatus('error'); 
@@ -550,35 +550,20 @@ const handleSubmit = async (e) => {
         setStatusMessage("Saving unit...");
 
         try {
-const commonData = {
-    ...formData,
-    // 🔑 Siguraduhin na ang names ay tugma sa tinatanggap ng units.php
-    device_serial_no: formData.deviceSerialNo,
-    accessory_kitting_no: formData.accessoryKittingNo,
-    base_unit_kitting_no: formData.baseUnitKittingNo,
-    station: currentStation, 
-    full_name: user.full_name,
-    username: user.username,
-};
+            const commonData = {
+                ...formData,
+                // Ensure names match what units.php expects
+                device_serial_no: formData.deviceSerialNo,
+                accessory_kitting_no: formData.accessoryKittingNo,
+                base_unit_kitting_no: formData.baseUnitKittingNo,
+                station: currentStation, 
+                full_name: user.full_name,
+                username: user.username,
+                checklist_data: checklist_data
+            };
 
-            let res;
-            let finalId = scannedUnitId;
-
-            // SAFETY NET: Check for existing unit ID (especially for Station 1 new entries)
-            if (!finalId && currentStation === "Station 1") {
-                const checkRes = await axios.get(UNITS_ENDPOINT, { params: { search_assembly: formData.assemblyNo } });
-                if (checkRes.data && checkRes.data.length > 0) {
-                    finalId = checkRes.data[0].id;
-                }
-            }
-
-            if (finalId) {
-                // UPDATE / HANDOVER
-                res = await axios.post(UNITS_ENDPOINT, { ...commonData, id: finalId, action: 'update' });
-            } else {
-                // CREATE NEW
-                res = await axios.post(UNITS_ENDPOINT, { ...commonData, action: 'create' });
-            }
+            // Always use POST - let PHP determine if it's update or create based on assembly_no
+            const res = await axios.post(UNITS_ENDPOINT, commonData);
 
             if (res.data.status === 'success' || res.data.success === true) {
                 setProcessStatus('success');
@@ -597,11 +582,10 @@ const commonData = {
                 setTimeout(() => setProcessStatus('idle'), 5000);
             }
         } catch (err) {
-            // 🔑 FIXED: Specifically targeting the 'error' key from your PHP JSON response
+            // Handle error response from PHP backend
             setProcessStatus('error');
             
-            // Based on your network tab, the PHP backend sends the message under the "error" key.
-            // err.response.data.error will capture the "Error: Board serial '111111'..." message.
+            // Extract error message from response
             const errMsg = err.response?.data?.error || err.response?.data?.message || err.message;
             
             // Display the specific message directly so the operator sees the conflict details
@@ -668,6 +652,12 @@ const commonData = {
             if (res.data.status === 'success') {
                 setProcessStatus('success');
                 setStatusMessage(res.data.message); 
+                
+                // Notify parent window (admin panel) to refresh data immediately
+                if (window.parent !== window) {
+                    window.parent.postMessage({ type: 'UNIT_UPDATED', data: res.data }, '*');
+                }
+                
                 setTimeout(() => {
                     setProcessStatus('idle');
                     if (['home', 'in_progress', 'completed', 'no_good', 'pending'].includes(activeTab)) fetchUnits(activeTab === 'home' ? '' : activeTab); 

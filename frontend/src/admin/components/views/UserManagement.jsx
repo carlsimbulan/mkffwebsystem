@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ViewUserModal } from '../modals/ViewUserModal';
+import { ViewUserModal } from '../../modals';
 
 const getStationNumber = (station) => {
     if (!station || station.toLowerCase().includes('not assigned')) return 999; 

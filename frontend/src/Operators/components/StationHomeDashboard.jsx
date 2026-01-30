@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
 // Import station standard times from parent component
@@ -50,6 +50,17 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
             };
         });
     }, [logs, currentStation]);
+
+    // 🔑 NOTES STATE FOR DELAYED UNITS
+    const [delayedUnitNotes, setDelayedUnitNotes] = useState({});
+
+    // 🔑 Handle note change for delayed unit
+    const handleNoteChange = (unitId, note) => {
+        setDelayedUnitNotes(prev => ({
+            ...prev,
+            [unitId]: note
+        }));
+    };
 
     const totalUnits = homeStats.completed + homeStats.inProgress + homeStats.ng;
     
@@ -163,6 +174,7 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
                                                 <th>REMARKS</th>
                                                 <th>DELAY TIME</th>
                                                 <th>STATUS</th>
+                                                <th>CHECKLIST NOTES</th>
                                                 <th className="text-end px-4">ACTIONS</th>
                                             </tr>
                                         </thead>
@@ -191,6 +203,21 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
                                                         } px-2 rounded-pill`}>
                                                             {unit.status === 'In Progress' ? 'IN PROGRESS' : 'NO GOOD (NG)'}
                                                         </span>
+                                                    </td>
+                                                    <td style={{ minWidth: '200px' }}>
+                                                        <input
+                                                            type="text"
+                                                            className="form-control form-control-sm"
+                                                            placeholder="Add required checklist notes..."
+                                                            value={delayedUnitNotes[unit.id] || ''}
+                                                            onChange={(e) => handleNoteChange(unit.id, e.target.value)}
+                                                            style={{ fontSize: '0.8rem' }}
+                                                        />
+                                                        {delayedUnitNotes[unit.id] && (
+                                                            <div className="small text-muted mt-1">
+                                                                <i className="bi bi-check-circle-fill text-success"></i> Notes added
+                                                            </div>
+                                                        )}
                                                     </td>
                                                     <td className="text-end px-4">
                                                         <button className="btn btn-sm btn-dark rounded-pill px-3 fw-bold" onClick={() => setActiveTab('in_progress')}>

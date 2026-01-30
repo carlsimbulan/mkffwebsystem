@@ -57,6 +57,14 @@ const NoGoodUnits = ({ logs, handleEditClick }) => {
                 .tracker-table { width: 100%; font-size: 0.7rem; text-align: center; border-collapse: collapse; min-width: 600px; }
                 .tracker-table th { background: #f8fafc; padding: 8px; border-bottom: 1px solid #e2e8f0; font-weight: 800; color: #64748b; text-transform: uppercase; }
                 .tracker-table td { padding: 10px 8px; border-bottom: 1px solid #f1f5f9; font-weight: 700; }
+                .tracker-checklist-box {
+                    overflow-x: auto;
+                    display: block;
+                    width: 100%;
+                }
+                .tracker-table {
+                    min-width: 1000px; /* Para mapuwersa ang horizontal scroll */
+                }
                 `}
             </style>
 
@@ -223,4 +231,4 @@ const NoGoodUnits = ({ logs, handleEditClick }) => {
     );
 };
 
-export default NoGoodUnits;
+export { NoGoodUnits };

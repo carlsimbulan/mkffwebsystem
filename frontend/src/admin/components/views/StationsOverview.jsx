@@ -1,838 +1,1880 @@
 import React, { useState, useMemo } from 'react';
+
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
+
+
 const processStations = [
+
     "PCB Pairing", "Integrated Board Test", "Main Board Conformal Coating",
+
     "RTV Application", "Casing/Harnessing", "Complete Unit Test/Calibration",
+
     "Pre BI Hi-Pot Test", "Burn-in Testing", "Sealing", "Post BI Hi-Pot Test",
+
     "Final Functional/Connectivity Test", "Label Sticker Attachment", "FVI",
+
     "Packing", "QC Stamping"
+
 ];
 
+
+
 const DELAY_THRESHOLDS_MINUTES = {
+
     'Station1': 6, 'Station 1': 6, 'Station2': 8, 'Station 2': 8, 'Station3': 3, 'Station 3': 3,
+
     'Station4': 12, 'Station 4': 12, 'Station5': 15, 'Station 5': 15, 'Station6': 15, 'Station 6': 15,
+
     'Station7': 3, 'Station 7': 3, 'Station8': 15, 'Station 8': 15, 'Station9': 480, 'Station 9': 480,
+
     'Station10': 8, 'Station 10': 8, 'Station11': 22, 'Station 11': 22, 'Station12': 5, 'Station 12': 5,
+
     'Station13': 10, 'Station 13': 10, 'Station14': 8, 'Station 14': 8, 'Station15': 5, 'Station 15': 5
+
 };
 
+
+
 const allStatuses = ['All', 'In Progress', 'Completed', 'No Good (NG)', 'Pending Approval', 'For Scanning'];
+
 const ITEMS_PER_PAGE = 10;
 
+
+
 const formatTimestamp = (isoString) => {
+
     if (!isoString) return { date: 'N/A', time: 'N/A' };
+
     const date = new Date(isoString);
+
     return {
+
         date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+
         time: date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+
+    };
+
+};
+
+
+
+const getStatusBadgeClass = (status) => {
+
+    const statusText = status?.toLowerCase() || '';
+
+    if (statusText.includes('completed') || statusText.includes('ok')) return 'bg-success text-white';
+
+    if (statusText.includes('no good') || statusText.includes('ng')) return 'bg-danger text-white';
+
+    if (statusText.includes('in progress')) return 'bg-warning text-dark';
+
+    if (statusText.includes('pending approval')) return 'bg-primary text-white'; 
+
+    if (statusText.includes('scanning')) return 'bg-info text-white';
+
+    return 'bg-light text-secondary border';
+
+};
+
+
+
+const checkUnitDelay = (stationId, updatedAt) => {
+
+    const threshold = DELAY_THRESHOLDS_MINUTES[stationId] || 10;
+
+    const lastUpdate = new Date(updatedAt).getTime();
+
+    const minutesInStation = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
+
+    if (minutesInStation > threshold * 3) return { isDelayed: true, level: 'CRITICAL', minutes: minutesInStation };
+
+    if (minutesInStation > threshold) return { isDelayed: true, level: 'MODERATE', minutes: minutesInStation };
+
+    return { isDelayed: false, level: 'NORMAL', minutes: minutesInStation };
+
+};
+
+// Helper function to validate voltage tolerance (±1% of 115V = 113.85 to 116.15)
+const getVoltageErrorStatus = (value) => {
+    const num = parseFloat(value);
+    if (isNaN(num)) return true; // Error if not a number
+    return num < 113.85 || num > 116.15;
+};
+
+// Helper function to determine if a value represents an error
+const isErrorValue = (value, key) => {
+    if (value === null || value === undefined || value === "N/A") return true;
+    
+    const stringValue = String(value).toUpperCase();
+    const errorStrings = ["NOT DETECTED", "NO GO", "FAIL", "N/A", "NO PASSED", "NOT PASSED", "NOT COMPLETE", "FAILED", "BLINKING", "OFF", "RED"];
+    
+    if (errorStrings.some(error => stringValue.includes(error))) return true;
+    
+    // Special validation for Station 11 LED status
+    if (key && key.includes("LED STATUS") && stringValue !== "SOLID GREEN") return true;
+    
+    // Voltage validation for voltage-related fields
+    if (key && (key.includes("V(") || key.includes("L1") || key.includes("L2") || key.includes("L3"))) {
+        const numericValue = parseFloat(stringValue.replace("V", ""));
+        return getVoltageErrorStatus(numericValue);
+    }
+    
+    return false;
+};
+
+const parseStationSummary = (text) => {
+    if (!text) return {};
+
+    const pieces = text
+        .split(/\n|\r|\*/)
+        .map(l => l.trim().replace(/^[-•\d.)\s]+/, '')) // remove leading bullets/numbers
+        .filter(Boolean);
+
+    const take = (idx) => pieces[idx] || '';
+
+    return {
+        rootCause: take(0),
+        impact: take(1),
+        actions: take(2),
+        raw: text,
     };
 };
 
-const getStatusBadgeClass = (status) => {
-    const statusText = status?.toLowerCase() || '';
-    if (statusText.includes('completed') || statusText.includes('ok')) return 'bg-success text-white';
-    if (statusText.includes('no good') || statusText.includes('ng')) return 'bg-danger text-white';
-    if (statusText.includes('in progress')) return 'bg-warning text-dark';
-    if (statusText.includes('pending approval')) return 'bg-primary text-white'; 
-    if (statusText.includes('scanning')) return 'bg-info text-white';
-    return 'bg-light text-secondary border';
-};
 
-const checkUnitDelay = (stationId, updatedAt) => {
-    const threshold = DELAY_THRESHOLDS_MINUTES[stationId] || 10;
-    const lastUpdate = new Date(updatedAt).getTime();
-    const minutesInStation = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
-    if (minutesInStation > threshold * 3) return { isDelayed: true, level: 'CRITICAL', minutes: minutesInStation };
-    if (minutesInStation > threshold) return { isDelayed: true, level: 'MODERATE', minutes: minutesInStation };
-    return { isDelayed: false, level: 'NORMAL', minutes: minutesInStation };
-};
 
 const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClick, highlightedUnitId, setActiveTab, fetchData }) => {
+
     const [searchTerm, setSearchTerm] = useState('');
+
     const [statusFilter, setStatusFilter] = useState('All'); 
+
     const [selectedUnitProcess, setSelectedUnitProcess] = useState(null); 
+
     const [expandedStepIdx, setExpandedStepIdx] = useState(null);
+
     const [stationAiAnalysis, setStationAiAnalysis] = useState(null);
+
     const [isStationAiLoading, setIsStationAiLoading] = useState(false);
+
     const [summaryExpanded, setSummaryExpanded] = useState({
+
         root: false,
+
         impact: false,
+
         actions: false,
+
     });
+
+
 
     const monitorMetrics = calculateMetrics(stationMonitorId);
 
+
+
     const filteredLogs = useMemo(() => {
+
         return (monitorMetrics.stationLogs || [])
+
             .filter(log => log.assembly_no?.toLowerCase().includes(searchTerm.toLowerCase()))
+
             .filter(log => statusFilter === 'All' || log.status === statusFilter);
+
     }, [monitorMetrics.stationLogs, searchTerm, statusFilter]);
+
     
+
     const stationIndex = parseInt(stationMonitorId.replace('Station', '')) - 1;
+
     const processName = processStations[stationIndex] || stationMonitorId;
+
     const hasGeminiKey = true; // Backend handles API key securely
 
+
+
     // Only show ROOT CAUSE DELAY ANALYTICS when there is at least 1 truly delayed unit in this station
+
     const hasDelayedUnits = useMemo(() => {
+
         return (monitorMetrics.stationLogs || []).some(log => {
+
             if (log.status !== 'In Progress' && !log.status?.toLowerCase().includes('no good') && !log.status?.toLowerCase().includes('ng')) return false;
+
             const d = checkUnitDelay(stationMonitorId, log.updated_at || log.created_at);
+
             return d.isDelayed;
+
         });
+
     }, [monitorMetrics.stationLogs, stationMonitorId]);
 
+
+
     // Helper to convert raw AI text into short summary buckets
+
     const parseStationSummary = (text) => {
+
         if (!text) return {};
 
+
+
         // Split on line breaks and bullet markers (*) to be robust
+
         const pieces = text
+
             .split(/\n|\r|\*/)
+
             .map(l => l.trim().replace(/^[-•\d.)\s]+/, '')) // remove leading bullets/numbers
+
             .filter(Boolean);
+
+
 
         const take = (idx) => pieces[idx] || '';
 
+
+
         return {
+
             rootCause: take(0),
+
             impact: take(1),
+
             actions: take(2),
+
             raw: text,
+
         };
+
     };
 
+
+
     // 🔎 Station-level diagnostic (aggregated across all units in this station)
+
     const fetchStationDiagnosis = async () => {
+
         setIsStationAiLoading(true);
+
         setStationAiAnalysis(null);
+
         try {
+
             // Step 1: Get available model from backend
+
             const modelRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
+
                 method: 'POST',
+
                 headers: { 'Content-Type': 'application/json' },
+
                 body: JSON.stringify({ action: 'list_models' })
+
             });
+
             
+
             if (!modelRes.ok) {
+
                 const body = await modelRes.text().catch(() => "");
+
                 throw new Error(`Model listing failed (${modelRes.status}): ${body || modelRes.statusText}`);
+
             }
+
             
+
             const modelData = await modelRes.json();
+
             if (!modelData.modelName) {
+
                 throw new Error('No model returned from backend');
+
             }
+
             
+
             const modelName = modelData.modelName;
 
+
+
             const stationLogs = monitorMetrics.stationLogs || [];
+
             const totalUnits = stationLogs.length;
 
+
+
             // Collect delayed units with their checklist data and time spent
+
             const delayedUnits = stationLogs.filter(log => {
+
                 if (log.status !== 'In Progress' && !log.status?.toLowerCase().includes('no good') && !log.status?.toLowerCase().includes('ng')) return false;
+
                 const d = checkUnitDelay(stationMonitorId, log.updated_at || log.created_at);
+
                 return d.isDelayed;
+
             });
+
+
+
+            // Dito kinukuha ang mismong laman ng Checklist
 
             const delayedContext = delayedUnits.map(log => {
+
                 const lastUpdate = new Date(log.updated_at || log.created_at).getTime();
+
                 const timeSpentMinutes = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
+
                 
+
                 // Collect relevant checklist fields based on station
+
                 const checklistData = {};
+
                 
+
                 // Station-specific checklist fields
+
                 if (stationIndex === 0) { // PCB Pairing
+
                     checklistData.header_seated_90_deg = log.header_seated_90_deg;
+
                     checklistData.leads_properly_soldered = log.leads_properly_soldered;
+
                 } else if (stationIndex === 1) { // Integrated Board Test
+
                     checklistData.integrated_board_level_test1 = log.integrated_board_level_test1;
+
                     checklistData.integrated_board_level_test2 = log.integrated_board_level_test2;
+
                     checklistData.integrated_board_level_test3 = log.integrated_board_level_test3;
-                } else if (stationIndex === 5) { // Complete Unit Test/Calibration
-                    checklistData.voltage = log.voltage;
-                    checklistData.go_no_go = log.go_no_go;
-                    checklistData.lora_module = log.lora_module;
-                }
+
+// Hanapin ito sa loob ng fetchStationDiagnosis function:
+// Hanapin ito sa loob ng fetchStationDiagnosis function:
+} else if (stationIndex === 5) { // Station 6: Complete Unit Test/Calibration
+    checklistData.lora_module = log.lora_module;
+    checklistData.lora_mesh_test = log.lora_mesh_test;
+    checklistData.energy_meter = log.energy_meter;
+    checklistData.power_good_test = log.power_good_test;
+    checklistData.voltage = log.voltage;
+    checklistData.line1 = log.line1;
+    checklistData.line2 = log.line2;
+    checklistData.line3 = log.line3;
+    checklistData.temp_reading = log.temp_reading;
+    checklistData.freq_reading = log.freq_reading;
+    checklistData.led_status_4g = log.led_status_4g;
+    checklistData.led_status_fast_blink = log.led_status_fast_blink;
+    checklistData.go_no_go = log.go_no_go;
+    checklistData.sw1_off_to_led_off_duration = log.sw1_off_to_led_off_duration;
+}
+
                 
+
                 return {
+
                     assembly_no: log.assembly_no,
+
                     time_spent_minutes: Math.round(timeSpentMinutes * 10) / 10,
+
                     status: log.status,
+
                     remarks: log.remarks,
+
                     checklist_data: checklistData
+
                 };
+
             });
 
+
+
             const delayedCount = delayedUnits.length;
+
             const totalDelayMinutes = delayedUnits.reduce((sum, log) => {
+
                 const d = checkUnitDelay(stationMonitorId, log.updated_at || log.created_at);
+
                 return sum + d.minutes;
+
             }, 0);
+
             const maxDelayMinutes = delayedUnits.reduce((max, log) => {
+
                 const d = checkUnitDelay(stationMonitorId, log.updated_at || log.created_at);
+
                 return Math.max(max, d.minutes);
+
             }, 0);
+
+
 
             const avgDelayMinutes = delayedCount > 0 ? (totalDelayMinutes / delayedCount) : 0;
+
             const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationMonitorId] || 10;
 
+
+
             const prompt = `You are a Senior Manufacturing Engineer at MKFF.
+
             Analyze delay patterns for this production station and summarize the situation very concisely.
 
+
+
             Station name: ${processName}
+
             Station ID: ${stationMonitorId}
+
             Standard delay threshold (minutes): ${thresholdMinutes}
+
             Total units in this station (current view): ${totalUnits}
+
             Units currently delayed beyond threshold: ${delayedCount}
+
             Average delay of delayed units (minutes): ${avgDelayMinutes.toFixed(1)}
+
             Maximum observed delay (minutes): ${maxDelayMinutes.toFixed(1)}
 
+
+
             DELAYED UNITS WITH CHECKLIST DATA:
+
             ${JSON.stringify(delayedContext, null, 2)}
 
+
+
             CRITICAL ANALYSIS INSTRUCTIONS:
+
             Analyze the actual checklist values and stay durations to identify if delays are:
+
             1. TECHNICAL FAILURES: Units failing tests (NO GO, FAIL values, missing checklist data)
+
             2. BOTTLENECKS: Units passing tests but not moving forward (GO/OK values but long stays)
+
+
 
             Focus on why this specific station tends to have frequent or long delays based on the real checklist data above.
 
+
+
             Respond with EXACTLY 3 very short lines (no extra text, no introductions, no labels):
+
             Line 1: Most probable root-cause patterns for delays in this station (max 18 words).
+
             Line 2: Impact on throughput and downstream stations (max 18 words).
+
             Line 3: Practical corrective and preventive actions for operators and engineers (max 18 words).`;
 
+
+
             // Step 2: Generate content using backend
+
             const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
+
                 method: 'POST',
+
                 headers: { 'Content-Type': 'application/json' },
+
                 body: JSON.stringify({
+
                     modelName: modelName,
+
                     prompt: prompt
+
                 })
+
             });
 
+
+
             if (!genRes.ok) {
+
                 const body = await genRes.text().catch(() => "");
+
                 throw new Error(`generateContent failed (${genRes.status}): ${body || genRes.statusText}`);
+
             }
 
+
+
             const genData = await genRes.json();
+
             const text = genData.text || '';
 
+
+
             if (!text) throw new Error("Empty AI response.");
+
+
 
             setStationAiAnalysis(text);
+
         } catch (err) {
+
             console.error("Gemini Station Error:", err);
+
             setStationAiAnalysis("Station diagnostic failed: " + err.message);
+
         } finally {
+
             setIsStationAiLoading(false);
+
         }
+
     };
 
+
+
     return (
+
         <div className="pb-5 container-fluid px-0">
+
             <style>{`
+
                         @keyframes highlight-pulse-effect {
+
                     0% { background-color: rgba(239, 68, 68, 0.1); outline: 2px solid transparent; }
+
                     50% { background-color: rgba(239, 68, 68, 0.3); outline: 2px solid #ef4444; }
+
                     100% { background-color: rgba(239, 68, 68, 0.1); outline: 2px solid transparent; }
+
                 }
+
+
 
                 .highlight-pulse {
+
                     animation: highlight-pulse-effect 2s infinite ease-in-out;
+
                     position: relative;
+
                     z-index: 5;
+
                 }
+
                 .stat-card-pro { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 22px; height: 100%; border-left: 5px solid #198754; }
+
                 .table thead th { background-color: #1e293b !important; color: #ffffff !important; font-weight: 600; padding: 12px 15px; }
+
                 .modal-step { padding: 15px 20px; border-left: 2px solid #e9ecef; position: relative; cursor: pointer; }
+
                 .modal-dot { position: absolute; left: -7px; top: 22px; width: 12px; height: 12px; border-radius: 50%; background: #dee2e6; border: 2px solid white; z-index: 2; }
+
                 .done .modal-dot { background: #198754; }
+
                 .current .modal-dot { background: #0d6efd; }
+
                 .tracker-table th { background: #f1f5f9; padding: 6px 8px; border-bottom: 1px solid #cbd5e1; text-transform: uppercase; font-weight: 800; text-align: center; font-size: 0.7rem; }
+
                 .tracker-table td { padding: 8px 8px; font-weight: 700; border-bottom: 1px solid #e2e8f0; text-align: center; font-size: 0.7rem; }
+
                 .diagnostic-card-minimal { background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
+
                 .delay-row { background-color: #fff5f5 !important; }
+
                 .station-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+
                 @media (max-width: 768px) {
+
                     .station-summary-grid { grid-template-columns: 1fr; }
+
                 }
+
                 .station-summary-chip { border-radius: 10px; padding: 10px 12px; border: 1px solid #e2e8f0; background: #f9fafb; min-height: 64px; display: flex; flex-direction: column; justify-content: flex-start; }
+
                 .station-summary-label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 4px; }
+
                 .station-summary-text { font-size: 0.8rem; font-weight: 600; color: #0f172a; }
+
             `}</style>
+
+
 
             <div className="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3 px-2">
+
                 <div>
+
                     <h3 className="fw-bold text-dark mb-1">{processName}</h3>
+
                     <p className="text-muted small mb-0">Operational View • ID: {stationMonitorId}</p>
+
                 </div>
+
                 <button className="btn btn-light border btn-sm px-3 shadow-sm fw-bold" onClick={() => setActiveTab('stations')}>BACK</button>
+
             </div>
+
+
 
             {/* 🔍 Station-level delay diagnosis – only when there are delayed units */}
+
             {hasDelayedUnits && (
+
                 <div className="diagnostic-card-minimal p-3 mb-4 shadow-sm">
+
                     <div className="d-flex justify-content-between align-items-center mb-2">
+
                         <div>
+
                             <div className="fw-bold text-dark small uppercase tracking-wider">ROOT CAUSE DELAY ANALYTICS</div>
+
                             <div className="small text-muted">Short AI summary of delay patterns and recommended actions for this station.</div>
+
                         </div>
+
                         <button
+
                             className="btn btn-outline-dark btn-sm fw-bold shadow-sm px-4 rounded-pill"
+
                             onClick={fetchStationDiagnosis}
+
                             disabled={isStationAiLoading}
+
                         >
+
                             {isStationAiLoading ? 'ANALYZING...' : 'ANALYZE STATION'}
+
                         </button>
+
                     </div>
+
                     <div className="p-3 bg-white rounded border text-dark small shadow-inner">
+
                         {stationAiAnalysis ? (() => {
+
                             const summary = parseStationSummary(stationAiAnalysis);
+
                             const textOrFallback = (s) => (s && s.trim().length > 0 ? s : 'No data.');
+
                             const makeChip = (label, key, fullText) => {
+
                                 const max = 120;
+
                                 const normalized = textOrFallback(fullText);
+
                                 const isLong = normalized.length > max;
+
                                 const isOpen = summaryExpanded[key];
+
                                 const displayText = isOpen || !isLong ? normalized : normalized.slice(0, max - 1) + '…';
+
                                 return (
+
                                     <div className="station-summary-chip" key={key}>
+
                                         <div className="station-summary-label d-flex justify-content-between align-items-center">
+
                                             <span>{label}</span>
+
                                             {isLong && (
+
                                                 <button
+
                                                     type="button"
+
                                                     className="btn btn-link p-0 m-0 small text-primary text-decoration-none"
+
                                                     onClick={() =>
+
                                                         setSummaryExpanded(prev => ({
+
                                                             ...prev,
+
                                                             [key]: !prev[key],
+
                                                         }))
+
                                                     }
+
                                                 >
+
                                                     {isOpen ? 'Hide' : 'View full'}
+
                                                 </button>
+
                                             )}
+
                                         </div>
+
                                         <div className="station-summary-text">
+
                                             {displayText}
+
                                         </div>
+
                                     </div>
+
                                 );
+
                             };
 
+
+
                             return (
+
                                 <div className="station-summary-grid">
+
                                     {makeChip('Root cause', 'root', summary.rootCause)}
+
                                     {makeChip('Impact', 'impact', summary.impact)}
+
                                     {makeChip('Recommended actions', 'actions', summary.actions)}
+
                                 </div>
+
                             );
+
                         })() : (
+
                             <div className="text-muted italic text-center py-1">
+
                                 Click "ANALYZE STATION" to get AI summary of why this station is delayed and what to do next.
+
                             </div>
+
                         )}
+
                     </div>
+
                 </div>
+
             )}
+
+
 
             <div className="row g-4 mb-4">
+
                 <div className="col-md-6 col-xl-3"><div className="stat-card-pro"><span className="text-muted small fw-bold uppercase">Completed</span><h3 className="fw-bold text-success mt-1">{monitorMetrics.completedUnits}</h3></div></div>
+
                 <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{borderLeftColor: '#0d6efd'}}><span className="text-muted small fw-bold uppercase">Yield Rate</span><h3 className="fw-bold text-primary mt-1">{monitorMetrics.yieldRate}%</h3></div></div>
+
                 <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{borderLeftColor: '#ffc107'}}><span className="text-muted small fw-bold uppercase">In Progress</span><h3 className="fw-bold text-warning mt-1">{monitorMetrics.pendingUnits}</h3></div></div>
+
                 <div className="col-md-6 col-xl-3"><div className="stat-card-pro" style={{borderLeftColor: '#dc3545'}}><span className="text-muted small fw-bold uppercase">No Good (NG)</span><h3 className="fw-bold text-danger mt-1">{monitorMetrics.ngUnits}</h3></div></div>
+
             </div>
+
+
 
             <div className="bg-white border rounded-2 overflow-hidden shadow-sm">
+
                 <div className="p-3 border-bottom d-flex justify-content-between align-items-center bg-light">
+
                     <span className="fw-bold small text-muted text-uppercase">Station Logs</span>
+
                     <div className="d-flex gap-2">
+
                         <select className="form-select form-select-sm" style={{width:'160px'}} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>{allStatuses.map(s => <option key={s} value={s}>{s}</option>)}</select>
+
                         <input type="text" className="form-control form-control-sm" style={{width:'200px'}} placeholder="Search ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+
                         <button className="btn btn-secondary btn-sm px-3 fw-bold" onClick={() => {setSearchTerm(''); setStatusFilter('All'); fetchData();}}>RESET</button>
+
                     </div>
+
                 </div>
+
                 <div className="table-responsive">
+
                     <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem' }}>
+
                         <thead>
+
                             <tr>
+
                                 <th className="ps-4">MODEL</th><th>REVISION</th><th>BASE UNIT</th><th>ASSEMBLY</th>
+
                                 <th>DEVICE SERIAL</th><th>ACCESSORY</th><th className="text-center">STATUS</th>
+
                                 <th className="text-center">DELAY (MINS)</th><th>REMARKS / NOTES</th><th>LAST MOVEMENT</th><th className="text-center">ACTIONS</th>
+
                             </tr>
+
                         </thead>
+
                         <tbody>
+
                             {filteredLogs.map(log => {
+
                                 const isHighlighted = log.id === highlightedUnitId;
+
                                 const lastTs = log.updated_at || log.created_at;
+
                                 const minutesInStation = lastTs
+
                                     ? Math.max(0, (new Date().getTime() - new Date(lastTs).getTime()) / (1000 * 60))
+
                                     : 0;
 
+
+
                                 const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationMonitorId] || 10;
+
                                 const statusText = (log.status || '').toLowerCase();
+
                                 const isInProgressOrNG = log.status === 'In Progress' || statusText.includes('no good') || statusText.includes('ng');
+
                                 const delay = isInProgressOrNG
+
                                     ? checkUnitDelay(stationMonitorId, lastTs)
+
                                     : { isDelayed: false, minutes: minutesInStation, level: 'NORMAL' };
 
+
+
                                 const isCompleted = statusText.includes('completed') || statusText.includes('ok');
+
                                 const moveNextThreshold = Math.max(10, thresholdMinutes); // avoid too sensitive thresholds
+
                                 const needsMoveNext = isCompleted && minutesInStation > moveNextThreshold;
 
+
+
                                 const delayMinutes = Math.max(0, minutesInStation - thresholdMinutes);
+
                                 return (
+
                                     <tr 
+
                                         key={log.id} 
+
                                         // PINALITAN: Nagdagdag ng check kung ang log.id ay tumutugma sa highlightedUnitId
+
                                         className={`
+
                                             ${delay.isDelayed ? 'delay-row' : ''} 
+
                                             ${log.id === highlightedUnitId ? 'highlight-pulse' : ''}
+
                                         `}
+
                                     >
+
                                         <td className="ps-4 fw-bold">{log.model}</td>
+
                                         <td>{log.revision}</td>
+
                                         <td>{log.base_unit_kitting_no}</td>
+
                                         <td>
+
                                             <code className="text-primary fw-bold">{log.assembly_no}</code>
+
                                             {delay.isDelayed && <i className="bi bi-exclamation-triangle-fill text-danger ms-2" title={`Delayed: ${delay.level}`}></i>}
+
                                         </td>
+
                                         <td className="fw-bold">{log.device_serial_no}</td>
+
                                         <td>{log.accessory_kitting_no}</td>
+
                                         <td className="text-center"><span className={`badge rounded-1 px-3 py-1 ${getStatusBadgeClass(log.status)}`}>{log.status}</span></td>
+
                                         <td className="text-center">
+
                                             {isInProgressOrNG && delay.isDelayed ? (
+
                                                 <span className={`badge rounded-pill ${delay.level === 'CRITICAL' ? 'bg-danger' : 'bg-warning text-dark'}`}>
+
                                                     +{Math.round(delayMinutes)}m
+
                                                 </span>
+
                                             ) : (
+
                                                 <span className="text-muted small">—</span>
+
                                             )}
+
                                         </td>
+
                                         <td className="text-muted small italic">
+
                                             {log.remarks || '---'}
+
                                             {needsMoveNext && (
+
                                                 <div className="mt-1">
+
                                                     <span className="badge bg-warning text-dark fw-bold">MOVE TO NEXT STATION</span>
+
                                                     <div className="small text-muted mt-1">Completed but still here for {Math.round(minutesInStation)} mins.</div>
+
                                                 </div>
+
                                             )}
+
                                         </td>
+
                                         <td className="small text-muted">{new Date(log.updated_at || log.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+
                                         <td className="text-center">
+
                                             <div className="d-flex gap-1 justify-content-center">
+
                                                 <button className="btn btn-sm btn-primary px-3 fw-bold" onClick={() => setSelectedUnitProcess(log)}>
+
                                                     DETAILS
+
                                                 </button>
+
                                                 <button className="btn btn-sm btn-danger px-3 fw-bold" onClick={() => handleEditClick(log)}>EDIT</button>
+
                                             </div>
+
                                         </td>
+
                                     </tr>
+
                                 );
+
                             })}
+
                         </tbody>
+
                     </table>
+
                 </div>
+
             </div>
+
+
 
             {selectedUnitProcess && (
+
                 <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.4)', zIndex: 1050 }}>
+
                     <div className="bg-white rounded-3 shadow-xl p-0 overflow-hidden border-0" style={{ width: '95%', maxWidth: '900px' }}>
+
                         <div className="p-4 d-flex justify-content-between align-items-center text-white bg-primary shadow-sm">
-                            <div><h5 className="mb-0 fw-bold">Process Tracker & Analysis</h5><p className="mb-0 small opacity-75">{selectedUnitProcess.assembly_no}</p></div>
+
+                            <div><h5 className="mb-0 fw-bold">Process Tracker</h5><p className="mb-0 small opacity-75">{selectedUnitProcess.assembly_no}</p></div>
+
                             <button className="btn-close btn-close-white shadow-none" onClick={() => setSelectedUnitProcess(null)}></button>
+
                         </div>
+
+
 
                         <div className="p-4" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
+
                             <div className="process-timeline mt-4 ps-2">
+
                                 {processStations.map((station, idx) => {
+
                                     const isCurrent = idx === stationIndex;
+
                                     const isDoneBefore = idx < stationIndex;
+
                                     const unitStatus = selectedUnitProcess.status?.toLowerCase() || '';
+
                                     const isCompletedHere = isCurrent && unitStatus.includes('completed');
+
                                     const isNG = isCurrent && unitStatus.includes('no good');
+
                                     const isExpanded = expandedStepIdx === idx;
 
-                                    let stationData = null;
-                                    if (idx === 0 && selectedUnitProcess.header_seated_90_deg) stationData = { "Header Seated": selectedUnitProcess.header_seated_90_deg, "Soldering": selectedUnitProcess.leads_properly_soldered };
-                                    else if (idx === 1 && selectedUnitProcess.integrated_board_level_test1) stationData = { "Board 1": selectedUnitProcess.integrated_board_level_test1, "Board 2": selectedUnitProcess.integrated_board_level_test2, "Board 3": selectedUnitProcess.integrated_board_level_test3 };
-                                    else if (idx === 5 && selectedUnitProcess.voltage) stationData = { "LoRa": selectedUnitProcess.lora_module, "Volt": selectedUnitProcess.voltage + "V", "Verdict": selectedUnitProcess.go_no_go };
 
-                                    let stepClass = isDoneBefore || isCompletedHere ? 'done' : (isNG ? 'ng' : (isCurrent ? 'current' : ''));
+
+                                   // Hanapin ang block na ito sa loob ng .map function ng processStations:
+let stationData = null;
+
+if (idx === 0) { // Station 1: PCB Pairing - from station1_checklists table
+    stationData = { 
+        "Header Connector Upright (90°)": selectedUnitProcess.s1_header_seated_90_deg ?? "N/A",
+        "Leads Properly Soldered": selectedUnitProcess.s1_leads_properly_soldered ?? "N/A"
+    };
+} else if (idx === 1) { // Station 2: Integrated Board Test - from station2_checklists table
+    stationData = { 
+        "LoRa Module": selectedUnitProcess.s2_lora_module ?? "N/A",
+        "LoRa Mesh Test": selectedUnitProcess.s2_lora_mesh_test ?? "N/A",
+        "Energy Meter": selectedUnitProcess.s2_energy_meter ?? "N/A",
+        "Power Good Test": selectedUnitProcess.s2_power_good_test ?? "N/A",
+        "Voltage (Ref)": selectedUnitProcess.s2_voltage ?? "N/A",
+        "Line 1": selectedUnitProcess.s2_line1 ?? "N/A",
+        "Line 2": selectedUnitProcess.s2_line2 ?? "N/A",
+        "Line 3": selectedUnitProcess.s2_line3 ?? "N/A",
+        "Temp Reading": selectedUnitProcess.s2_temp_reading ?? "N/A",
+        "Freq Reading": selectedUnitProcess.s2_freq_reading ?? "N/A",
+        "4G LED": selectedUnitProcess.s2_led_status_4g ?? "N/A",
+        "Fast Blink RED": selectedUnitProcess.s2_led_status_fast_blink ?? "N/A",
+        "SW1 Off to LED Off (sec)": selectedUnitProcess.s2_sw1_off_to_led_off_duration === 0 ? "0s" : (selectedUnitProcess.s2_sw1_off_to_led_off_duration ?? "N/A"),
+        "Go/No-Go Result": selectedUnitProcess.s2_go_no_go ?? "N/A"
+    };
+} else if (idx === 2) { // Station 3: Main Board Conformal Coating - from station3_checklists table
+    stationData = { 
+        "Requirements": selectedUnitProcess.s3_requirements ?? "N/A",
+        "Remarks": selectedUnitProcess.s3_remarks ?? "N/A"
+    };
+} else if (idx === 3) { // Station 4: RTV Application - from station4_checklists table
+    stationData = { 
+        "Requirements": selectedUnitProcess.s4_requirements ?? "N/A",
+        "Remarks": selectedUnitProcess.s4_remarks ?? "N/A"
+    };
+} else if (idx === 4) { // Station 5: Casing/Harnessing - from station5_checklists table
+    stationData = { 
+        "Requirements": selectedUnitProcess.s5_requirements ?? "N/A",
+        "Remarks": selectedUnitProcess.s5_remarks ?? "N/A"
+    };
+} else if (idx === 5) { // Station 6: Complete Unit Test/Calibration - from station6_checklists table
+    stationData = { 
+        "LoRa Module": selectedUnitProcess.s6_lora_module ?? "N/A",
+        "LoRa Mesh Test": selectedUnitProcess.s6_lora_mesh_test ?? "N/A",
+        "Energy Meter": selectedUnitProcess.s6_energy_meter ?? "N/A",
+        "Power Good Test": selectedUnitProcess.s6_power_good_test ?? "N/A",
+        "Voltage (Ref)": selectedUnitProcess.s6_voltage ?? "N/A",
+        "Line 1": selectedUnitProcess.s6_line1 ?? "N/A",
+        "Line 2": selectedUnitProcess.s6_line2 ?? "N/A",
+        "Line 3": selectedUnitProcess.s6_line3 ?? "N/A",
+        "Temp Reading": selectedUnitProcess.s6_temp_reading ?? "N/A",
+        "Freq Reading": selectedUnitProcess.s6_freq_reading ?? "N/A",
+        "4G LED": selectedUnitProcess.s6_led_status_4g ?? "N/A",
+        "Fast Blink RED": selectedUnitProcess.s6_led_status_fast_blink ?? "N/A",
+        "SW1 Off to LED Off (sec)": selectedUnitProcess.s6_sw1_off_to_led_off_duration === 0 ? "0s" : (selectedUnitProcess.s6_sw1_off_to_led_off_duration ?? "N/A"),
+        "Go/No-Go Result": selectedUnitProcess.s6_go_no_go ?? "N/A"
+    };
+} else if (idx === 6) { // Station 7: Pre BI Hi-Pot Test - from station7_checklists table
+    stationData = { 
+        "Requirements": selectedUnitProcess.s7_requirements ?? "N/A",
+        "Remarks": selectedUnitProcess.s7_remarks ?? "N/A"
+    };
+} else if (idx === 7) { // Station 8: Burn-in Testing - from station8_checklists table
+    stationData = { 
+        "Power Unit and Disable LoRa": selectedUnitProcess.s8_power_unit_disable_lora ?? "N/A",
+        "Confirm Frequency Band": selectedUnitProcess.s8_frequency_band ?? "N/A",
+        "Start Testing": selectedUnitProcess.s8_start_testing ?? "N/A",
+        "Confirm RSSO Testing": selectedUnitProcess.s8_rsso_testing ?? "N/A",
+        "Data Outage": selectedUnitProcess.s8_data_outage ?? "N/A"
+    };
+} else if (idx === 8) { // Station 9: Sealing - from station9_checklists table
+    stationData = { 
+        "Requirements": selectedUnitProcess.s9_requirements ?? "N/A",
+        "Remarks": selectedUnitProcess.s9_remarks ?? "N/A"
+    };
+} else if (idx === 9) { // Station 10: Post BI Hi-Pot Test - from station10_checklists table
+    stationData = { 
+        "Requirements": selectedUnitProcess.s10_requirements ?? "N/A",
+        "Remarks": selectedUnitProcess.s10_remarks ?? "N/A"
+    };
+} else if (idx === 10) { // Station 11: Final Functional/Connectivity Test - from station11_checklists table
+    stationData = { 
+        "LED Status": selectedUnitProcess.s11_led_status ?? "N/A",
+        "Low Range": selectedUnitProcess.s11_low_range ?? "N/A",
+        "Medium Range": selectedUnitProcess.s11_medium_range ?? "N/A",
+        "High Range": selectedUnitProcess.s11_high_range ?? "N/A"
+    };
+} else if (idx === 11) { // Station 12: Label Sticker Attachment - from station12_checklists table
+    stationData = { 
+        "Requirements": selectedUnitProcess.s12_requirements ?? "N/A",
+        "Remarks": selectedUnitProcess.s12_remarks ?? "N/A"
+    };
+} else if (idx === 12) { // Station 13: FVI - from station13_checklists table
+    stationData = { 
+        "Requirements": selectedUnitProcess.s13_requirements ?? "N/A",
+        "Remarks": selectedUnitProcess.s13_remarks ?? "N/A"
+    };
+} else if (idx === 13) { // Station 14: Packing - from station14_checklists table
+    stationData = { 
+        "Requirements": selectedUnitProcess.s14_requirements ?? "N/A",
+        "Remarks": selectedUnitProcess.s14_remarks ?? "N/A"
+    };
+} else if (idx === 14) { // Station 15: QC Stamping - from station15_checklists table
+    stationData = { 
+        "Requirements": selectedUnitProcess.s15_requirements ?? "N/A",
+        "Remarks": selectedUnitProcess.s15_remarks ?? "N/A"
+    };
+}
+                                 let stepClass = isDoneBefore || isCompletedHere ? 'done' : (isNG ? 'ng' : (isCurrent ? 'current' : ''));
+
                                     return (
+
                                         <div key={idx} className={`modal-step ${stepClass}`} onClick={() => stationData && setExpandedStepIdx(isExpanded ? null : idx)}>
+
                                             <div className="modal-dot"></div>
+
                                             <div className="d-flex justify-content-between align-items-center">
+
                                                 <div><div className="fw-bold small">{idx + 1}. {station}</div></div>
+
                                                 {stationData && <span className="badge bg-light text-dark border" style={{fontSize: '0.6rem'}}>VIEW DATA</span>}
+
                                             </div>
+
                                             {isExpanded && stationData && (
+
                                                 <div className="tracker-checklist-box">
+
                                                     <table className="tracker-table table-sm">
+
                                                         <thead><tr>{Object.keys(stationData).map(k => <th key={k}>{k}</th>)}</tr></thead>
+
                                                         <tbody>
-                                                            <tr>{Object.values(stationData).map((v, i) => (
-                                                                <td key={i} className={["NO GO", "FAIL"].includes(v) ? 'text-danger fw-bold' : 'text-success'}>{v || 'N/A'}</td>
+
+                                                            <tr>{Object.entries(stationData).map(([key, value]) => (
+                                                                <td key={key} className={isErrorValue(value, key) ? 'text-danger fw-bold' : 'text-success'}>{value || 'N/A'}</td>
                                                             ))}</tr>
+
                                                         </tbody>
+
                                                     </table>
+
                                                 </div>
+
                                             )}
+
                                         </div>
+
                                     );
+
                                 })}
+
                             </div>
+
                         </div>
+
                         <div className="p-3 bg-light border-top text-end">
+
                             <button className="btn btn-secondary px-5 fw-bold py-2 rounded shadow-sm" onClick={() => setSelectedUnitProcess(null)}>DISMISS</button>
+
                         </div>
+
                     </div>
+
                 </div>
+
             )}
+
         </div>
+
     );
+
 };
+
+
 
 export function StationsOverview({
+
     activeTab, stations, calculateMetrics, stationMonitorId, highlightedUnitId, setActiveTab, handleMonitorStation, handleViewHistory, handleEditClick, fetchData, allLogs, 
+
 }) {
+
     const [historySearch, setHistorySearch] = useState('');
+
     const [startDate, setStartDate] = useState('');
+
     const [endDate, setEndDate] = useState('');
+
     const [currentPage, setCurrentPage] = useState(1);
+
     const [delayHotspotsAi, setDelayHotspotsAi] = useState(null); // { [stationId]: reason }
+
     const [isDelayHotspotsAiLoading, setIsDelayHotspotsAiLoading] = useState(false);
 
+
+
     const filteredHistory = useMemo(() => {
+
         if (!allLogs) return [];
+
         return allLogs.filter(log => {
+
             const matchesSearch = log.assembly_no?.toLowerCase().includes(historySearch.toLowerCase());
+
             if (!startDate && !endDate) return matchesSearch;
+
             const logDate = new Date(log.timestamp || log.created_at);
+
             const start = startDate ? new Date(startDate) : null;
+
             const end = endDate ? new Date(endDate) : null;
+
             if (start) start.setHours(0, 0, 0, 0); 
+
             if (end) end.setHours(23, 59, 59, 999);
+
             return matchesSearch && (!start || logDate >= start) && (!end || logDate <= end);
+
         }).sort((a, b) => new Date(b.timestamp || b.created_at) - new Date(a.timestamp || a.created_at));
+
     }, [allLogs, historySearch, startDate, endDate]);
 
+
+
     // ✨ PAGINATION LOGIC RESTORED
+
     const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
+
     const paginatedHistory = useMemo(() => {
+
         const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+
         return filteredHistory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
     }, [filteredHistory, currentPage]);
 
+
+
     const namedStations = useMemo(() => {
+
         return (stations || []).slice(0, processStations.length).map((station, index) => ({
+
             ...station,
+
             name: processStations[index],
+
         }));
+
     }, [stations]);
 
+
+
     const delayHotspots = useMemo(() => {
+
         // Compute top 3 stations with most delayed units (and basic reason from remarks)
+
         const stats = namedStations.map((station) => {
+
             const metrics = calculateMetrics(station.id);
+
             const logsForStation = metrics.stationLogs || [];
 
+
+
             let delayedUnits = 0;
+
             let totalDelayMinutes = 0;
+
             let maxDelayMinutes = 0;
 
+
+
             const remarkCounts = new Map();
+
             logsForStation.forEach(log => {
+
                 const statusText = (log.status || '').toLowerCase();
+
                 const isInProgressOrNG = log.status === 'In Progress' || statusText.includes('no good') || statusText.includes('ng');
+
                 
+
                 if (isInProgressOrNG) {
+
                     const delay = checkUnitDelay(station.id, log.updated_at || log.created_at);
+
                     if (delay.isDelayed) {
+
                         delayedUnits += 1;
+
                         totalDelayMinutes += delay.minutes;
+
                         if (delay.minutes > maxDelayMinutes) maxDelayMinutes = delay.minutes;
 
+
+
                         const remark = (log.remarks || '').trim();
+
                         if (remark) remarkCounts.set(remark, (remarkCounts.get(remark) || 0) + 1);
+
                     }
+
                 }
+
             });
+
+
 
             const avgDelayMinutes = delayedUnits ? (totalDelayMinutes / delayedUnits) : 0;
+
             let topRemark = '';
+
             let topRemarkCount = 0;
+
             remarkCounts.forEach((count, remark) => {
+
                 if (count > topRemarkCount) {
+
                     topRemark = remark;
+
                     topRemarkCount = count;
+
                 }
+
             });
+
+
 
    return {
+
     stationId: station.id,
+
     stationName: station.name,
+
     delayedUnits,
+
     avgDelayMinutes,
+
     maxDelayMinutes,
+
     thresholdMinutes: DELAY_THRESHOLDS_MINUTES[station.id] || 10,
+
     fallbackReason: '', // Gawing blanko ito
+
 };
+
         });
 
+
+
         return stats
+
             .filter(s => s.delayedUnits > 0)
+
             .sort((a, b) => (b.delayedUnits - a.delayedUnits) || (b.maxDelayMinutes - a.maxDelayMinutes))
+
             .slice(0, 3);
+
     }, [namedStations, calculateMetrics]);
 
+
+
     const fetchDelayHotspotReasons = async () => {
+
         setIsDelayHotspotsAiLoading(true);
+
         setDelayHotspotsAi(null);
+
         try {
+
             // Step 1: Get available model from backend
+
             const modelRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
+
                 method: 'POST',
+
                 headers: { 'Content-Type': 'application/json' },
+
                 body: JSON.stringify({ action: 'list_models' })
+
             });
+
             
+
             if (!modelRes.ok) {
+
                 const body = await modelRes.text().catch(() => "");
+
                 throw new Error(`Model listing failed (${modelRes.status}): ${body || modelRes.statusText}`);
+
             }
+
             
+
             const modelData = await modelRes.json();
+
             if (!modelData.modelName) {
+
                 throw new Error('No model returned from backend');
+
             }
-            
-            const payload = delayHotspots.map(h => ({
+
+            // Ito ang binabasa ni Gemini
+
+           const payload = delayHotspots.map(h => {
+
+            // 1. Kunin natin ang mga logs para sa specific station na ito
+
+            const metrics = calculateMetrics(h.stationId);
+
+            const stationLogs = metrics.stationLogs || [];
+
+
+
+            // 2. I-filter lang natin ang mga units na "Truly Delayed" 
+
+            // at kumuha ng sample checklist data nila (limitahan natin sa 3 para hindi masyadong mahaba ang prompt)
+
+            const delayedSamples = stationLogs
+
+                .filter(log => {
+
+                    const statusText = (log.status || '').toLowerCase();
+
+                    const isInProgressOrNG = log.status === 'In Progress' || statusText.includes('ng') || statusText.includes('no good');
+
+                    return isInProgressOrNG && checkUnitDelay(h.stationId, log.updated_at || log.created_at).isDelayed;
+
+                })
+
+                .slice(0, 3) // Top 3 samples lang para tipid sa tokens
+
+                .map(log => ({
+
+                    assembly: log.assembly_no,
+
+                    remarks: log.remarks,
+
+                    // Isama ang checklist fields (depende kung anong station ito)
+
+                    data: {
+
+                        val1: log.header_seated_90_deg || log.integrated_board_level_test1 || log.voltage,
+
+                        val2: log.leads_properly_soldered || log.integrated_board_level_test2 || log.go_no_go,
+
+                        val3: log.integrated_board_level_test3 || log.lora_module
+
+                    }
+
+                }));
+
+
+
+            return {
+
                 stationId: h.stationId,
+
                 stationName: h.stationName,
+
                 thresholdMinutes: h.thresholdMinutes,
+
                 delayedUnits: h.delayedUnits,
+
                 avgDelayMinutes: Number(h.avgDelayMinutes.toFixed(1)),
-                maxDelayMinutes: Number(h.maxDelayMinutes.toFixed(1)),
-            }));
+
+                checklists_samples: delayedSamples 
+
+            };
+
+        });
+
+            //prompt
 
             const prompt = `You are a Senior Manufacturing Engineer at MKFF.
-Given the delay hotspot stats below, produce ONE probable reason per station (do NOT overexplain).
-Use manufacturing logic: time threshold breaches, checklist issues, escalation gaps, rework/verification, missing parts, test failures.
+
+            Given the delay hotspot stats below, produce ONE probable reason per station (do NOT overexplain).
+
+            Use manufacturing logic: time threshold breaches, checklist issues, escalation gaps, rework/verification, missing parts, test failures.
+
+
 
 Delay hotspots JSON:
+
 ${JSON.stringify(payload, null, 2)}
 
-Return EXACTLY ${payload.length} lines (no extra text), format:
+
+
+Return EXACTLY ${payload.length} lines (no extra text), format
+
 StationID | one short reason (max 14 words)`;
 
+
+
             // Step 2: Generate content using backend
+
             const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
+
                 method: 'POST',
+
                 headers: { 'Content-Type': 'application/json' },
+
                 body: JSON.stringify({
+
                     modelName: modelData.modelName,
+
                     prompt: prompt
+
                 })
+
             });
+
             
+
             if (!genRes.ok) {
+
                 const body = await genRes.text().catch(() => "");
+
                 throw new Error(`generateContent failed (${genRes.status}): ${body || genRes.statusText}`);
+
             }
+
             
+
             const genData = await genRes.json();
+
             const text = genData.text || '';
+
             
+
             if (!text) throw new Error("Empty AI response.");
 
+
+
             const lines = text
+
                 .split(/\r?\n/)
+
                 .map(l => l.trim())
+
                 .filter(Boolean);
 
+
+
             const map = {};
+
             lines.forEach(line => {
+
                 const [stationIdRaw, ...rest] = line.split('|');
+
                 const stationId = (stationIdRaw || '').trim();
+
                 const reason = rest.join('|').trim();
+
                 if (stationId && reason) map[stationId] = reason;
+
             });
 
+
+
             setDelayHotspotsAi(map);
+
         } catch (err) {
+
             console.error("Delay Hotspots AI Error:", err);
+
             setDelayHotspotsAi({ __error: String(err?.message || err) });
+
         } finally {
+
             setIsDelayHotspotsAiLoading(false);
+
         }
+
     };
 
+
+
     if (activeTab === "station_monitor" && stationMonitorId) {
+
         return <StationMonitorView {...{stationMonitorId, calculateMetrics, handleEditClick, highlightedUnitId, setActiveTab, fetchData}} />;
+
     }
+
+
 
     if (activeTab === "overall_history") {
+
         return (
+
             <div className="pb-5 container-fluid px-0">
+
                 <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3 px-2">
+
                     <div><h4 className="fw-bold text-dark mb-0">Production History</h4></div>
+
                     <button className="btn btn-light border btn-sm px-3 shadow-sm fw-bold" onClick={() => setActiveTab('stations')}>BACK</button>
+
                 </div>
+
                 <div className="bg-light p-3 rounded-2 border mb-4 d-flex flex-wrap gap-3 align-items-end mx-2 shadow-sm">
+
                     <div className="flex-grow-1"><label className="fw-bold small text-muted mb-1 d-block uppercase" style={{fontSize:'0.65rem'}}>Assembly No.</label><input type="text" className="form-control form-control-sm shadow-none" placeholder="Search..." value={historySearch} onChange={(e) => {setHistorySearch(e.target.value); setCurrentPage(1);}} /></div>
+
                     <div><label className="fw-bold small text-muted mb-1 d-block uppercase" style={{fontSize:'0.65rem'}}>Start</label><input type="date" className="form-control form-control-sm" value={startDate} onChange={(e) => {setStartDate(e.target.value); setCurrentPage(1);}} /></div>
+
                     <div><label className="fw-bold small text-muted mb-1 d-block uppercase" style={{fontSize:'0.65rem'}}>End</label><input type="date" className="form-control form-control-sm" value={endDate} onChange={(e) => {setEndDate(e.target.value); setCurrentPage(1);}} /></div>
+
                     <button className="btn btn-danger btn-sm px-3 fw-bold shadow-sm" onClick={() => { setHistorySearch(''); setStartDate(''); setEndDate(''); setCurrentPage(1); }}>RESET</button>
+
                 </div>
+
                 <div className="bg-white border rounded-2 overflow-hidden mx-2 shadow-sm">
+
                     <table className="table table-hover align-middle mb-0" style={{fontSize: '0.85rem'}}>
+
                         <thead className="table-dark">
+
                             <tr><th>MODEL</th><th>ASSEMBLY</th><th>TYPE</th><th>STATION</th><th className="text-center">STATUS</th><th className="text-end pe-4">TIMESTAMP</th></tr>
+
                         </thead>
+
                         <tbody>
+
                             {paginatedHistory.map(log => {
+
                                 const ts = formatTimestamp(log.timestamp || log.created_at);
+
                                 return (
+
                                     <tr key={log.id}>
+
                                         <td className="ps-4 fw-bold">{log.model || log.model_id}</td>
+
                                         <td><code className="text-primary fw-bold">{log.assembly_no}</code></td>
+
                                         <td className="small text-muted fw-bold">{log.action_type || 'UPDATE'}</td>
+
                                         <td className="fw-semibold">{log.station_name || log.station}</td>
+
                                         <td className="text-center"><span className={`badge rounded-1 px-3 ${getStatusBadgeClass(log.status_after || log.status)}`}>{log.status_after || log.status}</span></td>
+
                                         <td className="text-end pe-4 small text-muted"><strong>{ts.date}</strong><br/>{ts.time}</td>
+
                                     </tr>
+
                                 );
+
                             })}
+
                         </tbody>
+
                     </table>
+
                     
+
                     {/* ✨ PAGINATION CONTROLS */}
+
                     {totalPages > 1 && (
+
                         <div className="d-flex justify-content-between align-items-center p-3 bg-light border-top">
+
                             <span className="small text-muted">Page {currentPage} of {totalPages} ({filteredHistory.length} total logs)</span>
+
                             <div className="btn-group shadow-sm">
+
                                 <button className="btn btn-white btn-sm border" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>PREV</button>
+
                                 {[...Array(totalPages)].map((_, i) => (
+
                                     <button key={i} className={`btn btn-sm border ${currentPage === i + 1 ? 'btn-dark' : 'btn-white'}`} onClick={() => setCurrentPage(i + 1)}>{i + 1}</button>
+
                                 )).slice(Math.max(0, currentPage - 3), Math.min(totalPages, currentPage + 2))}
+
                                 <button className="btn btn-white btn-sm border" disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => prev + 1)}>NEXT</button>
+
                             </div>
+
                         </div>
+
                     )}
+
                 </div>
+
             </div>
+
         );
+
     }
 
+
+
     return (
+
         <div className="container-fluid px-0">
+
             <style>{`
+
                 .station-card-flat { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; height: 100%; position: relative; }
+
                 .delay-card { border: 2px solid #dc3545 !important; background-color: #fff5f5; }
+
                 .delay-tag { position: absolute; top: 10px; right: 10px; color: #dc3545; font-size: 0.6rem; font-weight: 800; border: 1px solid #dc3545; padding: 1px 6px; border-radius: 4px; }
+
                 .metric-row { display: flex; justify-content: space-between; font-size: 0.75rem; font-weight: 700; padding: 8px 0; border-bottom: 1px solid #f1f5f9; color: #475569; }
+
                 .animate-pulse { animation: pulse-red 1.5s infinite !important; }
+
                 .hotspot-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; }
+
                 .hotspot-row { display: grid; grid-template-columns: 34px 1.4fr 0.6fr 0.6fr 2fr; gap: 10px; align-items: center; }
+
                 @media (max-width: 992px) {
+
                     .hotspot-row { grid-template-columns: 34px 1fr; gap: 6px; }
+
                 }
+
             `}</style>
+
             
+
             <div className="d-flex justify-content-between align-items-center mb-4 px-2 border-bottom pb-3">
+
                 <div><h4 className="fw-bold text-dark mb-0">Station Control Panel</h4><p className="text-muted small mb-0">Operational real-time monitoring dashboard.</p></div>
+
                 <button className="btn btn-dark btn-sm px-4 py-2 shadow-sm fw-bold" onClick={() => setActiveTab('overall_history')}>OVERALL HISTORY</button>
+
             </div>
+
+
 
             {/* 🔥 Delay Hotspots Analytics (Top 3) */}
+
             <div className="mx-2 mb-4 hotspot-card shadow-sm">
+
                 <div className="d-flex justify-content-between align-items-center mb-2">
+
                     <div>
-                        <div className="fw-bold text-dark small uppercase tracking-wider">DELAY HOTSPOTS (TOP 3)</div>
+
+                        <div className="fw-bold text-dark small uppercase tracking-wider">ROOT CAUSE DELAY ANALYSIS - TOP 3</div>
+
                         <div className="small text-muted">Most frequently delayed stations based on your time thresholds.</div>
+
                     </div>
+
                     <div className="d-flex gap-2">
+
                         <button
+
                             className="btn btn-outline-dark btn-sm fw-bold px-3"
+
                             onClick={fetchDelayHotspotReasons}
+
                             disabled={isDelayHotspotsAiLoading || delayHotspots.length === 0}
+
                             title={delayHotspots.length === 0 ? 'No delayed stations right now.' : 'Generate 1 reason per station using AI.'}
+
                         >
+
                             {isDelayHotspotsAiLoading ? 'GENERATING...' : 'GENERATE REASONS'}
+
                         </button>
+
                     </div>
+
                 </div>
 
+
+
                 {delayHotspotsAi?.__error && (
+
                     <div className="alert alert-warning py-2 mb-2 small">
+
                         AI reasons unavailable: {delayHotspotsAi.__error}
+
                     </div>
+
                 )}
 
+
+
                 {delayHotspots.length === 0 ? (
+
                     <div className="text-muted small">No delayed stations detected at the moment.</div>
+
                 ) : (
+
                     <div className="d-flex flex-column gap-2">
+
                         <div className="hotspot-row small text-muted fw-bold border-bottom pb-2">
+
                             <div>#</div>
+
                             <div>STATION</div>
+
                             <div>DELAYED</div>
+
                             <div>WORST (MINS)</div>
+
                             <div>PROBABLE REASON</div>
+
                         </div>
+
                         {delayHotspots.map((h, idx) => (
+
                             <div key={h.stationId} className="hotspot-row py-2 border-bottom">
+
                                 <div className="fw-bold">{idx + 1}</div>
+
                                 <div>
+
                                     <div className="fw-bold text-dark">{h.stationName}</div>
+
                                     <div className="small text-muted">{h.stationId} • Threshold: {h.thresholdMinutes} min</div>
+
                                 </div>
+
                                 <div className="fw-bold text-danger">{h.delayedUnits}</div>
+
                                 <div className="fw-bold text-muted">{Math.round(h.maxDelayMinutes)}</div>
+
                                 <div className="small">
+
                                     {delayHotspotsAi?.[h.stationId] || h.fallbackReason}
+
                                 </div>
+
                             </div>
+
                         ))}
+
                     </div>
+
                 )}
+
             </div>
+
             
+
             <div className="row g-4">
+
                 {namedStations.map((station) => {
+
                     const metrics = calculateMetrics(station.id);
+
                     const delayedCount = (metrics.stationLogs || []).filter(log => {
+
                         const statusText = (log.status || '').toLowerCase();
+
                         const isInProgressOrNG = log.status === 'In Progress' || statusText.includes('no good') || statusText.includes('ng');
+
                         return isInProgressOrNG && checkUnitDelay(station.id, log.updated_at || log.created_at).isDelayed;
+
                     }).length;
+
                     return (
+
                         <div key={station.id} className="col-md-3">
+
                             <div className={`station-card-flat shadow-sm ${delayedCount > 0 ? 'delay-card' : ''}`}>
+
                                 {delayedCount > 0 && <div className="delay-tag animate-pulse">DELAYED ({delayedCount})</div>}
+
                                 <div className="mb-3"><span className="text-muted small fw-bold uppercase">ID: {station.id}</span><h6 className="fw-bold text-dark text-truncate mt-1 uppercase">{station.name}</h6></div>
+
                                 <div className="mb-4">
+
                                     <div className="metric-row"><span>COMPLETED</span><span className="text-success">{metrics.completedUnits}</span></div>
+
                                     <div className="metric-row"><span>IN PROGRESS</span><span className="text-primary">{metrics.pendingUnits}</span></div>
+
                                     <div className="metric-row"><span>NO GOOD (NG)</span><span className="text-danger">{metrics.ngUnits}</span></div>
+
                                 </div>
+
                                 <div className="d-flex gap-2">
+
                                     <button className="btn btn-dark btn-sm flex-grow-1 fw-bold shadow-sm" onClick={() => handleMonitorStation(station.id)}>MONITOR</button>
+
                                     <button className="btn btn-outline-secondary btn-sm px-3 shadow-sm" onClick={() => handleViewHistory(station.id)}><i className="bi bi-clock-history"></i></button>
+
                                 </div>
+
                             </div>
+
                         </div>
+
                     );
+
                 })}
+
             </div>
+
         </div>
+
     );
+
 }
