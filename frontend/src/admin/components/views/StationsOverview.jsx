@@ -1383,93 +1383,113 @@ export function StationsOverview({
 
             // Ito ang binabasa ni Gemini
 
-           const payload = delayHotspots.map(h => {
-
-            // 1. Kunin natin ang mga logs para sa specific station na ito
-
-            const metrics = calculateMetrics(h.stationId);
-
-            const stationLogs = metrics.stationLogs || [];
-
-
-
-            // 2. I-filter lang natin ang mga units na "Truly Delayed" 
-
-            // at kumuha ng sample checklist data nila (limitahan natin sa 3 para hindi masyadong mahaba ang prompt)
-
-            const delayedSamples = stationLogs
-
-                .filter(log => {
-
-                    const statusText = (log.status || '').toLowerCase();
-
-                    const isInProgressOrNG = log.status === 'In Progress' || statusText.includes('ng') || statusText.includes('no good');
-
-                    return isInProgressOrNG && checkUnitDelay(h.stationId, log.updated_at || log.created_at).isDelayed;
-
-                })
-
-                .slice(0, 3) // Top 3 samples lang para tipid sa tokens
-
-                .map(log => ({
-
-                    assembly: log.assembly_no,
-
-                    remarks: log.remarks,
-
-                    // Isama ang checklist fields (depende kung anong station ito)
-
-                    data: {
-
-                        val1: log.header_seated_90_deg || log.integrated_board_level_test1 || log.voltage,
-
-                        val2: log.leads_properly_soldered || log.integrated_board_level_test2 || log.go_no_go,
-
-                        val3: log.integrated_board_level_test3 || log.lora_module
-
-                    }
-
-                }));
-
-
-
+const payload = delayHotspots.map(h => {
+    const metrics = calculateMetrics(h.stationId);
+    const delayedSamples = (metrics.stationLogs || [])
+        .filter(log => checkUnitDelay(h.stationId, log.updated_at || log.created_at).isDelayed)
+        .slice(0, 3)
+        .map(log => {
+            // Pre-diagnostic checklist error scanning
+            const checklist_errors = [];
+            
+            // Scan all historical stations for failures
+            const voltage_tolerance = { min: 113.85, max: 116.15 }; // ±1% of 115V
+            
+            // Station 1 checks
+            if (log.s1_header_seated_90_deg === 'NO GO' || log.s1_header_seated_90_deg === 'FAIL') checklist_errors.push('S1: Header seating failure');
+            if (log.s1_leads_properly_soldered === 'NO GO' || log.s1_leads_properly_soldered === 'FAIL') checklist_errors.push('S1: Soldering defects');
+            
+            // Station 2 checks
+            if (log.s2_lora_module === 'Not Detected' || log.s2_lora_module === 'FAIL') checklist_errors.push('S2: LoRa module not detected');
+            if (log.s2_lora_mesh_test === 'Not Detected' || log.s2_lora_mesh_test === 'FAIL') checklist_errors.push('S2: Mesh test failure');
+            if (log.s2_energy_meter === 'Not Detected' || log.s2_energy_meter === 'FAIL') checklist_errors.push('S2: Energy meter issue');
+            if (log.s2_power_good_test === 'Not Detected' || log.s2_power_good_test === 'FAIL') checklist_errors.push('S2: Power good failure');
+            if (log.s2_voltage && (log.s2_voltage < voltage_tolerance.min || log.s2_voltage > voltage_tolerance.max)) checklist_errors.push('S2: Voltage out of tolerance');
+            if (log.s2_go_no_go === 'NO GO' || log.s2_go_no_go === 'FAIL') checklist_errors.push('S2: Final test failure');
+            
+            // Station 3-5 checks (standard stations)
+            if (log.s3_requirements === 'FAIL' || log.s3_requirements === 'NO GO') checklist_errors.push('S3: Requirements not met');
+            if (log.s4_requirements === 'FAIL' || log.s4_requirements === 'NO GO') checklist_errors.push('S4: Requirements not met');
+            if (log.s5_requirements === 'FAIL' || log.s5_requirements === 'NO GO') checklist_errors.push('S5: Requirements not met');
+            
+            // Station 6 checks
+            if (log.s6_lora_module === 'Not Detected' || log.s6_lora_module === 'FAIL') checklist_errors.push('S6: LoRa module not detected');
+            if (log.s6_lora_mesh_test === 'Not Detected' || log.s6_lora_mesh_test === 'FAIL') checklist_errors.push('S6: Mesh test failure');
+            if (log.s6_voltage && (log.s6_voltage < voltage_tolerance.min || log.s6_voltage > voltage_tolerance.max)) checklist_errors.push('S6: Voltage out of tolerance');
+            if (log.s6_go_no_go === 'NO GO' || log.s6_go_no_go === 'FAIL') checklist_errors.push('S6: Final calibration failure');
+            
+            // Station 7-10 checks
+            if (log.s7_requirements === 'FAIL' || log.s7_requirements === 'NO GO') checklist_errors.push('S7: Requirements not met');
+            if (log.s8_power_unit_disable_lora === 'FAIL' || log.s8_power_unit_disable_lora === 'NO GO') checklist_errors.push('S8: Power unit issue');
+            if (log.s8_rsso_testing === 'FAIL' || log.s8_rsso_testing === 'NO GO') checklist_errors.push('S8: RSSO test failure');
+            if (log.s9_requirements === 'FAIL' || log.s9_requirements === 'NO GO') checklist_errors.push('S9: Requirements not met');
+            if (log.s10_requirements === 'FAIL' || log.s10_requirements === 'NO GO') checklist_errors.push('S10: Requirements not met');
+            
+            // Station 11 checks
+            if (log.s11_led_status === 'FAIL' || log.s11_led_status === 'NO GO') checklist_errors.push('S11: LED status failure');
+            if (log.s11_low_range === 'FAIL' || log.s11_low_range === 'NO GO') checklist_errors.push('S11: Low range failure');
+            if (log.s11_medium_range === 'FAIL' || log.s11_medium_range === 'NO GO') checklist_errors.push('S11: Medium range failure');
+            if (log.s11_high_range === 'FAIL' || log.s11_high_range === 'NO GO') checklist_errors.push('S11: High range failure');
+            
+            // Station 12-14 checks
+            if (log.s12_requirements === 'FAIL' || log.s12_requirements === 'NO GO') checklist_errors.push('S12: Sticker attachment failure');
+            if (log.s13_requirements === 'FAIL' || log.s13_requirements === 'NO GO') checklist_errors.push('S13: FVI requirements not met');
+            if (log.s14_requirements === 'FAIL' || log.s14_requirements === 'NO GO') checklist_errors.push('S14: Packing requirements not met');
+            
             return {
-
-                stationId: h.stationId,
-
-                stationName: h.stationName,
-
-                thresholdMinutes: h.thresholdMinutes,
-
-                delayedUnits: h.delayedUnits,
-
-                avgDelayMinutes: Number(h.avgDelayMinutes.toFixed(1)),
-
-                checklists_samples: delayedSamples 
-
+                assembly: log.assembly_no,
+                current_station: log.station,
+                time_spent: Math.round(checkUnitDelay(h.stationId, log.updated_at).minutes),
+                checklist_errors: checklist_errors, // Pre-diagnostic error array
+                last_remarks: log.remarks || '',
+                // Full checklist data for AI analysis
+                full_checklists: {
+                    s1: { seated: log.s1_header_seated_90_deg, solder: log.s1_leads_properly_soldered },
+                    s2: { lora: log.s2_lora_module, mesh: log.s2_lora_mesh_test, v: log.s2_voltage, go_no_go: log.s2_go_no_go },
+                    s6: { v: log.s6_voltage, verdict: log.s6_go_no_go },
+                    s11: { led: log.s11_led_status, range: log.s11_low_range }
+                }
             };
-
         });
 
-            //prompt
+    return {
+        stationName: h.stationName,
+        stationId: h.stationId,
+        delayedUnits: h.delayedUnits,
+        avgDelayMinutes: h.avgDelayMinutes,
+        samples: delayedSamples
+    };
+});
 
-            const prompt = `You are a Senior Manufacturing Engineer at MKFF.
+           // Siguraduhin na ang payload ay na-define na sa itaas nito
+const prompt = `You are a Senior Manufacturing Systems Engineer at MKFF.
+Perform advanced root-cause analysis for production delay hotspots using comprehensive diagnostic data.
 
-            Given the delay hotspot stats below, produce ONE probable reason per station (do NOT overexplain).
-
-            Use manufacturing logic: time threshold breaches, checklist issues, escalation gaps, rework/verification, missing parts, test failures.
-
-
-
-Delay hotspots JSON:
-
+ENHANCED DIAGNOSTIC DATA (JSON format):
 ${JSON.stringify(payload, null, 2)}
 
+ADVANCED ANALYSIS PROTOCOL:
+1. CUMULATIVE REWORK LOOPS: Cross-reference checklist_errors array with current delay. If errors exist in previous stations, diagnose "cumulative rework loops" or "inherited defects" as root cause.
 
+2. INHERITED DEFECT DETECTION: Scan checklist_errors for patterns like:
+   - S1/S2 failures causing downstream verification delays
+   - Voltage tolerance violations (±1% of 115V) indicating power quality issues
+   - Sequential failures across multiple stations indicating systemic problems
 
-Return EXACTLY ${payload.length} lines (no extra text), format
+3. MANUFACTURING SYSTEM LOGIC:
+   - If checklist_errors array has entries: "Inherited defects from [station] causing extended rework verification"
+   - If checklist_errors empty but time_spent > threshold: "Manpower bottleneck or logistics impedance"
+   - If Station 11 range failures: "Connectivity interference or calibration drift requiring extended testing"
+   - If voltage tolerance violations: "Power quality issues causing repeated test failures"
 
-StationID | one short reason (max 14 words)`;
+4. HISTORICAL CORRELATION: Analyze time_spent vs checklist_errors to determine if delays are:
+   - Defect-driven (high error count + high time)
+   - Process-driven (low error count + high time)
+   - Hybrid (moderate errors + moderate time)
+
+OUTPUT SPECIFICATION:
+Return EXACTLY ${payload.length} lines (no extra text), format:
+StationID | [Deep-dive technical reason linking history to current delay. Max 25 words]`;
 
 
 

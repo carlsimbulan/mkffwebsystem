@@ -409,7 +409,8 @@ $baseSql = "SELECT
     LEFT JOIN station11_checklists s11 ON u.id = s11.unit_id
     LEFT JOIN station12_checklists s12 ON u.id = s12.unit_id
     LEFT JOIN station13_checklists s13 ON u.id = s13.unit_id
-    LEFT JOIN station14_checklists s14 ON u.id = s14.unit_id";
+    LEFT JOIN station14_checklists s14 ON u.id = s14.unit_id
+    ";
 
         if (isset($_GET['search_assembly'])) {
             $stmt = $pdo->prepare("$baseSql WHERE u.assembly_no = :assy ORDER BY u.created_at DESC LIMIT 1");
