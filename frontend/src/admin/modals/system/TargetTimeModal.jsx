@@ -73,8 +73,8 @@ const TargetTimeModal = ({ onClose, onSave, API_BASE_URL }) => {
     if (loading) {
         return (
             <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                <div className="modal-dialog modal-lg">
-                    <div className="modal-content">
+                <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: '1400px', width: '95vw' }}>
+                    <div className="modal-content" style={{ maxHeight: '90vh' }}>
                         <div className="modal-body text-center py-5">
                             <div className="spinner-border text-primary" role="status"></div>
                             <p className="mt-3">Loading target times...</p>
@@ -86,9 +86,43 @@ const TargetTimeModal = ({ onClose, onSave, API_BASE_URL }) => {
     }
 
     return (
-        <div className="modal fade show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-            <div className="modal-dialog modal-lg">
-                <div className="modal-content">
+        <div 
+            className="modal fade show d-block" 
+            style={{ 
+                backgroundColor: 'rgba(0,0,0,0.5)',
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 1050
+            }}
+            onClick={(e) => {
+                // Only close if clicking the backdrop, not the modal content
+                if (e.target === e.currentTarget) {
+                    onClose();
+                }
+            }}
+        >
+            <div 
+                className="modal-dialog modal-dialog-centered" 
+                style={{ 
+                    maxWidth: '1400px', 
+                    width: '95vw',
+                    pointerEvents: 'auto'
+                }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="modal-content" 
+                    style={{ 
+                        maxHeight: '90vh', 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        pointerEvents: 'auto',
+                        userSelect: 'none'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
                     <div className="modal-header bg-primary text-white">
                         <h5 className="modal-title">
                             <i className="bi bi-clock-history me-2"></i>
@@ -97,7 +131,7 @@ const TargetTimeModal = ({ onClose, onSave, API_BASE_URL }) => {
                         <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
                     </div>
 
-                    <div className="modal-body">
+                    <div className="modal-body" style={{ overflowY: 'auto', flex: '1' }}>
                         {error && (
                             <div className="alert alert-danger">
                                 <i className="bi bi-exclamation-triangle me-2"></i>
@@ -120,7 +154,7 @@ const TargetTimeModal = ({ onClose, onSave, API_BASE_URL }) => {
                                 const currentTime = targetTimes[stationId] || targetTimes[stationIdWithSpace] || 0;
 
                                 return (
-                                    <div key={stationId} className="col-md-6">
+                                    <div key={stationId} className="col-md-6 col-lg-4">
                                         <div className="card h-100">
                                             <div className="card-body">
                                                 <div className="d-flex justify-content-between align-items-start mb-2">

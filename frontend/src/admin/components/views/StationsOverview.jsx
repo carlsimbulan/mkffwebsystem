@@ -47,16 +47,32 @@ const getVoltageErrorStatus = (value) => {
     return num < 113.85 || num > 116.15;
 };
 
+// Helper function to format display values consistently
+const formatDisplayValue = (value) => {
+    if (value === null || value === undefined || value === "") return 'Empty';
+    return value;
+};
+
 // Helper function to determine if a value represents an error
 const isErrorValue = (value, key) => {
-    if (value === null || value === undefined || value === "N/A") return true;
+    if (value === null || value === undefined || value === "N/A" || value === "" || value === "Empty") return true;
     
     const stringValue = String(value).toUpperCase();
-    const errorStrings = ["NOT DETECTED", "NO GO", "FAIL", "N/A", "NO PASSED", "NOT PASSED", "NOT COMPLETE", "FAILED", "BLINKING", "OFF", "RED"];
     
-    if (errorStrings.some(error => stringValue.includes(error))) return true;
+    // Check for exact success matches first - only these should be GREEN
+    const exactSuccessStrings = ["GO", "DETECTED", "PASSED", "SOLID GREEN"];
+    if (exactSuccessStrings.some(success => stringValue === success)) return false;
     
-    if (key && key.includes("LED STATUS") && stringValue !== "SOLID GREEN") return true;
+    // Check for exact error matches
+    const exactErrorStrings = ["NOT DETECTED", "NO GO", "FAIL", "N/A", "NO PASSED", "NOT PASSED", "NOT COMPLETE", "FAILED", "BLINKING", "OFF", "RED"];
+    
+    if (exactErrorStrings.some(error => stringValue === error)) return true;
+    
+    // Special handling for LED status - only "SOLID GREEN" is not an error
+    if (key && key.includes("LED STATUS") && stringValue !== "SOLID GREEN" && stringValue !== "GO") return true;
+    
+    // Special handling for Go/No-Go fields - only "GO" is not an error
+    if (key && key.includes("GO_NO_GO") && stringValue !== "GO") return true;
     
     if (key && (key.includes("V(") || key.includes("L1") || key.includes("L2") || key.includes("L3"))) {
         const numericValue = parseFloat(stringValue.replace("V", ""));
@@ -64,6 +80,286 @@ const isErrorValue = (value, key) => {
     }
     
     return false;
+};
+
+// Helper function to render station checklists
+const renderStationChecklist = (stationNumber, unit) => {
+    switch(stationNumber) {
+        case 1:
+            return (
+                <div className="row g-2">
+                    <div className="col-md-6">
+                        <small className="text-muted">Header Connector Upright (90°):</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s1_header_seated_90_deg`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s1_header_seated_90_deg`])}
+                        </div>
+                    </div>
+                    <div className="col-md-6">
+                        <small className="text-muted">Leads Properly Soldered:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s1_leads_properly_soldered`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s1_leads_properly_soldered`])}
+                        </div>
+                    </div>
+                </div>
+            );
+        case 2:
+            return (
+                <div className="row g-2">
+                    <div className="col-md-3">
+                        <small className="text-muted">LoRa Module:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s2_lora_module`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s2_lora_module`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">LoRa Mesh Test:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s2_lora_mesh_test`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s2_lora_mesh_test`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Energy Meter:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s2_energy_meter`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s2_energy_meter`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Power Good Test:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s2_power_good_test`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s2_power_good_test`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Voltage (Ref):</small>
+                        <div className={`fw-bold ${getVoltageErrorStatus(unit[`s2_voltage`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s2_voltage`])}V
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Line 1:</small>
+                        <div className={`fw-bold ${getVoltageErrorStatus(unit[`s2_line1`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s2_line1`])}V
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Line 2:</small>
+                        <div className={`fw-bold ${getVoltageErrorStatus(unit[`s2_line2`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s2_line2`])}V
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Line 3:</small>
+                        <div className={`fw-bold ${getVoltageErrorStatus(unit[`s2_line3`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s2_line3`])}V
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Temperature:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s2_temp_reading`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s2_temp_reading`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Frequency:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s2_freq_reading`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s2_freq_reading`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">4G LED:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s2_led_status_4g`], 'LED STATUS') ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s2_led_status_4g`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Fast Blink RED:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s2_led_status_fast_blink`], 'LED STATUS') ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s2_led_status_fast_blink`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">SW1 Off to LED Off:</small>
+                        <div className="fw-bold">{formatDisplayValue(unit[`s2_sw1_off_to_led_off_duration`])}s</div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Go/No-Go:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s2_go_no_go`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s2_go_no_go`])}
+                        </div>
+                    </div>
+                </div>
+            );
+        case 6:
+            return (
+                <div className="row g-2">
+                    <div className="col-md-3">
+                        <small className="text-muted">LoRa Module:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s6_lora_module`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s6_lora_module`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">LoRa Mesh Test:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s6_lora_mesh_test`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s6_lora_mesh_test`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Energy Meter:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s6_energy_meter`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s6_energy_meter`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Power Good Test:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s6_power_good_test`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s6_power_good_test`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Voltage (Ref):</small>
+                        <div className={`fw-bold ${getVoltageErrorStatus(unit[`s6_voltage`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s6_voltage`])}V
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Line 1:</small>
+                        <div className={`fw-bold ${getVoltageErrorStatus(unit[`s6_line1`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s6_line1`])}V
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Line 2:</small>
+                        <div className={`fw-bold ${getVoltageErrorStatus(unit[`s6_line2`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s6_line2`])}V
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Line 3:</small>
+                        <div className={`fw-bold ${getVoltageErrorStatus(unit[`s6_line3`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s6_line3`])}V
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Temperature:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s6_temp_reading`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s6_temp_reading`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Frequency:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s6_freq_reading`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s6_freq_reading`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">4G LED:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s6_led_status_4g`], 'LED STATUS') ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s6_led_status_4g`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Fast Blink RED:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s6_led_status_fast_blink`], 'LED STATUS') ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s6_led_status_fast_blink`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">SW1 Off to LED Off:</small>
+                        <div className="fw-bold">{formatDisplayValue(unit[`s6_sw1_off_to_led_off_duration`])}s</div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Go/No-Go:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s6_go_no_go`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s6_go_no_go`])}
+                        </div>
+                    </div>
+                </div>
+            );
+        case 3:
+        case 4:
+        case 5:
+        case 7:
+        case 9:
+        case 10:
+        case 12:
+        case 13:
+        case 14:
+            return (
+                <div className="row g-2">
+                    <div className="col-md-6">
+                        <small className="text-muted">Requirements:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s${stationNumber}_requirements`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s${stationNumber}_requirements`])}
+                        </div>
+                    </div>
+                    <div className="col-md-6">
+                        <small className="text-muted">Remarks:</small>
+                        <div className="fw-bold">{formatDisplayValue(unit[`s${stationNumber}_remarks`])}</div>
+                    </div>
+                </div>
+            );
+        case 8:
+            return (
+                <div className="row g-2">
+                    <div className="col-md-3">
+                        <small className="text-muted">Power Unit & LoRa:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s8_power_unit_disable_lora`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s8_power_unit_disable_lora`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Frequency Band:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s8_frequency_band`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s8_frequency_band`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">RSSO Testing:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s8_rsso_testing`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s8_rsso_testing`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Data Outage:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s8_data_outage`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s8_data_outage`])}
+                        </div>
+                    </div>
+                </div>
+            );
+        case 11:
+            return (
+                <div className="row g-2">
+                    <div className="col-md-3">
+                        <small className="text-muted">LED Status:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s11_led_status`], 'LED STATUS') ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s11_led_status`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Low Range:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s11_low_range`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s11_low_range`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">Medium Range:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s11_medium_range`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s11_medium_range`])}
+                        </div>
+                    </div>
+                    <div className="col-md-3">
+                        <small className="text-muted">High Range:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s11_high_range`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s11_high_range`])}
+                        </div>
+                    </div>
+                </div>
+            );
+        default:
+            return <div className="text-muted">No checklist data available for this station.</div>;
+    }
 };
 
 const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClick, highlightedUnitId, setActiveTab, fetchData, dynamicDelayThresholds }) => {
@@ -78,6 +374,10 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
     const [selectedUnit, setSelectedUnit] = useState(null);
     const [showChecklist, setShowChecklist] = useState(false);
     const [expandedStation, setExpandedStation] = useState(null);
+    
+    // State for station checklist dropdowns
+    const [stationDropdowns, setStationDropdowns] = useState({});
+    const [progressDropdowns, setProgressDropdowns] = useState({});
 
     // Enhanced AI output formatting for new 3-section format
     const formatStationOutput = (text) => {
@@ -206,6 +506,73 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
         setIsStationAiLoading(true);
         setStationAiAnalysis('');
         try {
+            // Data Scanning: Create delayedContext array with actual checklist values
+            const delayedContext = monitorMetrics.stationLogs
+                .filter(log => {
+                    const statusText = (log.status || '').toLowerCase();
+                    const isInProgressOrNG = log.status === 'In Progress' || statusText.includes('no good') || statusText.includes('ng');
+                    return isInProgressOrNG && checkUnitDelay(stationMonitorId, log.updated_at || log.created_at, dynamicDelayThresholds).isDelayed;
+                })
+                .map(log => {
+                    const checklistData = {};
+                    
+                    // Capture all relevant checklist fields for this station
+                    for (let i = 1; i <= 15; i++) {
+                        // Station-specific fields
+                        checklistData[`s${i}_requirements`] = log[`s${i}_requirements`];
+                        checklistData[`s${i}_remarks`] = log[`s${i}_remarks`];
+                        
+                        // Station 1 specific
+                        if (i === 1) {
+                            checklistData.s1_header_seated_90_deg = log.s1_header_seated_90_deg;
+                            checklistData.s1_leads_properly_soldered = log.s1_leads_properly_soldered;
+                        }
+                        
+                        // Station 2 & 6 specific (technical readings)
+                        if (i === 2 || i === 6) {
+                            checklistData[`s${i}_lora_module`] = log[`s${i}_lora_module`];
+                            checklistData[`s${i}_lora_mesh_test`] = log[`s${i}_lora_mesh_test`];
+                            checklistData[`s${i}_energy_meter`] = log[`s${i}_energy_meter`];
+                            checklistData[`s${i}_power_good_test`] = log[`s${i}_power_good_test`];
+                            checklistData[`s${i}_voltage`] = log[`s${i}_voltage`];
+                            checklistData[`s${i}_line1`] = log[`s${i}_line1`];
+                            checklistData[`s${i}_line2`] = log[`s${i}_line2`];
+                            checklistData[`s${i}_line3`] = log[`s${i}_line3`];
+                            checklistData[`s${i}_temp_reading`] = log[`s${i}_temp_reading`];
+                            checklistData[`s${i}_freq_reading`] = log[`s${i}_freq_reading`];
+                            checklistData[`s${i}_led_status_4g`] = log[`s${i}_led_status_4g`];
+                            checklistData[`s${i}_led_status_fast_blink`] = log[`s${i}_led_status_fast_blink`];
+                            checklistData[`s${i}_sw1_off_to_led_off_duration`] = log[`s${i}_sw1_off_to_led_off_duration`];
+                            checklistData[`s${i}_go_no_go`] = log[`s${i}_go_no_go`];
+                        }
+                        
+                        // Station 8 specific
+                        if (i === 8) {
+                            checklistData.s8_power_unit_disable_lora = log.s8_power_unit_disable_lora;
+                            checklistData.s8_frequency_band = log.s8_frequency_band;
+                            checklistData.s8_rsso_testing = log.s8_rsso_testing;
+                            checklistData.s8_data_outage = log.s8_data_outage;
+                        }
+                        
+                        // Station 11 specific
+                        if (i === 11) {
+                            checklistData.s11_led_status = log.s11_led_status;
+                            checklistData.s11_low_range = log.s11_low_range;
+                            checklistData.s11_medium_range = log.s11_medium_range;
+                            checklistData.s11_high_range = log.s11_high_range;
+                        }
+                    }
+                    
+                    return {
+                        assembly_no: log.assembly_no,
+                        model: log.model,
+                        station: log.station,
+                        status: log.status,
+                        minutes_in_station: Math.max(0, (new Date().getTime() - new Date(log.updated_at || log.created_at).getTime()) / (1000 * 60)),
+                        checklist_data: checklistData
+                    };
+                });
+
             const modelRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -227,12 +594,24 @@ STATION ANALYSIS: ${processName} (${stationMonitorId})
 Current Status: ${hasDelayedUnits ? 'DELAYED UNITS DETECTED' : 'NORMAL OPERATION'}
 Takt Time Status: ${taktTimeStatus}
 
+DELAYED UNITS CHECKLIST DATA:
+${JSON.stringify(delayedContext, null, 2)}
+
+ANALYSIS INSTRUCTIONS:
+1. Look for Voltage Tolerance breaches (outside 113.85V-116.15V) in the checklist data
+2. Identify if delays are Quality-Driven (due to 'NO GO', 'FAIL', 'NOT DETECTED' values) or Process-Driven (all items are 'GO' but time spent is still high)
+3. Focus on specific errors found in the actual checklist values
+4. When you see 'Empty' values in the checklist, diagnose this as Documentation Breakdown - this indicates failure in documentation protocol
+
 REQUIRED OUTPUT FORMAT (STRICT):
-[DIAGNOSIS]: Current root cause using manufacturing terminology
+[DIAGNOSIS]: Current root cause using manufacturing terminology, referencing specific checklist failures
 
-[FORECAST]: Predict station status for next 2-4 hours based on current conditions
+[FORECAST]: Predict station status for next 2-4 hours based on current conditions and error patterns
 
-[PRESCRIPTION]: Provide exactly 2 actionable steps for production supervisor
+[PRESCRIPTION]: Provide exactly 2 actionable steps for production supervisor based on specific checklist errors found
+- For voltage issues: suggest electrical equipment calibration
+- For quality failures: suggest specific process adjustments
+- For process-driven delays: suggest workflow optimization
 
 USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Reallocation, Cycle Time Variance`;
 
@@ -519,524 +898,131 @@ USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Re
             {/* Unit Details Modal */}
             {selectedUnit && (
                 <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.4)', zIndex: 1050 }}>
-                    <div className="bg-white rounded-3 shadow-xl p-0 overflow-hidden border-0" style={{ width: '95%', maxWidth: '1000px', maxHeight: '90vh', overflowY: 'auto' }}>
-                        <div className="p-4 d-flex justify-content-between align-items-center text-white bg-primary shadow-sm">
-                            <div>
-                                <h5 className="mb-0 fw-bold">Unit Details | Assembly: {selectedUnit.assembly_no}</h5>
-                                <small className="opacity-75">Model: {selectedUnit.model} | Station: {selectedUnit.station}</small>
+                    <div className="bg-white rounded-3 shadow-xl p-0 overflow-hidden border-0" style={{ width: '95%', maxWidth: '1200px', maxHeight: '95vh', display: 'flex', flexDirection: 'column' }}>
+                        <div className="modal-content" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+                            <div className="modal-header bg-primary text-white flex-shrink-0 d-flex justify-content-between align-items-center p-3">
+                                <div className="d-flex flex-column">
+                                    <h5 className="mb-0 fw-bold">Unit Details | Assembly: {selectedUnit.assembly_no}</h5>
+                                    <small className="opacity-75">Model: {selectedUnit.model} | Station: {selectedUnit.station}</small>
+                                </div>
+                                <button className="btn-close btn-close-white shadow-none" onClick={() => setSelectedUnit(null)}></button>
                             </div>
-                            <button className="btn-close btn-close-white shadow-none" onClick={() => setSelectedUnit(null)}></button>
-                        </div>
 
-                        <div className="p-4">
-                            <div className="row g-4">
-                                {/* Basic Information */}
-                                <div className="col-md-6">
-                                    <div className="card border-0 bg-light">
-                                        <div className="card-body">
-                                            <h6 className="card-title fw-bold text-primary mb-3">
-                                                <i className="bi bi-info-circle me-2"></i>Basic Information
-                                            </h6>
-                                            <div className="row g-2">
-                                                <div className="col-6">
-                                                    <small className="text-muted">Model:</small>
-                                                    <div className="fw-bold">{selectedUnit.model || '---'}</div>
+                            {/* Fixed Top Section - Progress and PCB */}
+                            <div className="flex-shrink-0 p-4">
+                                {/* Progress Line */}
+                                <div className="mb-4">
+                                    <h6 className="fw-bold text-primary mb-3">
+                                        <i className="bi bi-arrow-right-circle me-2"></i>Production Progress
+                                    </h6>
+                                    <div className="d-flex align-items-center overflow-auto">
+                                        {processStations.map((station, index) => {
+                                            const stationNumber = index + 1;
+                                            const currentStationNumber = parseInt(selectedUnit.station?.replace(/\D/g, '') || 0);
+                                            const isCurrentStation = stationNumber === currentStationNumber;
+                                            const isCompleted = stationNumber < currentStationNumber;
+                                            const isPending = stationNumber > currentStationNumber;
+                                            const isExpanded = progressDropdowns[stationNumber];
+                                            
+                                            return (
+                                                <div key={stationNumber} className="flex-shrink-0 text-center me-3">
+                                                    <button
+                                                        className={`btn rounded-circle d-flex align-items-center justify-content-center ${
+                                                            isCurrentStation ? 'btn-primary' : 
+                                                            isCompleted ? 'btn-success' : 
+                                                            'btn-outline-secondary'
+                                                        }`}
+                                                        style={{ width: '45px', height: '45px' }}
+                                                        onClick={() => setProgressDropdowns(prev => ({
+                                                            [stationNumber]: !prev[stationNumber]
+                                                        }))}
+                                                    >
+                                                        <span className="fw-bold">{stationNumber}</span>
+                                                    </button>
+                                                    <small className="d-block mt-1 text-muted" style={{ fontSize: '0.7rem', maxWidth: '80px' }}>
+                                                        {station.split(' ')[0]}
+                                                    </small>
                                                 </div>
-                                                <div className="col-6">
-                                                    <small className="text-muted">Revision:</small>
-                                                    <div className="fw-bold">{selectedUnit.revision || '---'}</div>
-                                                </div>
-                                                <div className="col-6">
-                                                    <small className="text-muted">Assembly No:</small>
-                                                    <div className="fw-bold text-primary">{selectedUnit.assembly_no || '---'}</div>
-                                                </div>
-                                                <div className="col-6">
-                                                    <small className="text-muted">Status:</small>
-                                                    <div>
-                                                        <span className={`badge ${getStatusBadgeClass(selectedUnit.status)}`}>
-                                                            {selectedUnit.status}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
 
                                 {/* PCB Board Numbers */}
-                                <div className="col-md-6">
-                                    <div className="card border-0 bg-light">
-                                        <div className="card-body">
-                                            <h6 className="card-title fw-bold text-success mb-3">
-                                                <i className="bi bi-cpu me-2"></i>PCB Board Numbers
-                                            </h6>
-                                            <div className="row g-2">
-                                                <div className="col-12">
-                                                    <small className="text-muted">MNBD Board:</small>
-                                                    <div className="fw-bold">{selectedUnit.mnbd_board_no || selectedUnit.mnbd_no || '---'}</div>
-                                                </div>
-                                                <div className="col-12">
-                                                    <small className="text-muted">CMBD Board:</small>
-                                                    <div className="fw-bold">{selectedUnit.cmbd_board_no || selectedUnit.cmbd_no || '---'}</div>
-                                                </div>
-                                                <div className="col-12">
-                                                    <small className="text-muted">LRBD Board:</small>
-                                                    <div className="fw-bold">{selectedUnit.lrbd_board_no || selectedUnit.lrbd_no || '---'}</div>
-                                                </div>
-                                                <div className="col-12">
-                                                    <small className="text-muted">PQBD Board:</small>
-                                                    <div className="fw-bold">{selectedUnit.pqbd_board_no || selectedUnit.pqbd_no || '---'}</div>
-                                                </div>
-                                                <div className="col-12">
-                                                    <small className="text-muted">BKBD Board:</small>
-                                                    <div className="fw-bold">{selectedUnit.bkbd_board_no || selectedUnit.bkbd_no || '---'}</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Serial Numbers */}
-                                <div className="col-md-6">
-                                    <div className="card border-0 bg-light">
-                                        <div className="card-body">
-                                            <h6 className="card-title fw-bold text-warning mb-3">
-                                                <i className="bi bi-hash me-2"></i>Serial Numbers
-                                            </h6>
-                                            <div className="row g-2">
-                                                <div className="col-12">
-                                                    <small className="text-muted">Device Serial:</small>
-                                                    <div className="fw-bold">{selectedUnit.device_serial_no || '---'}</div>
-                                                </div>
-                                                <div className="col-12">
-                                                    <small className="text-muted">Base Unit Kitting:</small>
-                                                    <div className="fw-bold">{selectedUnit.base_unit_kitting_no || '---'}</div>
-                                                </div>
-                                                <div className="col-12">
-                                                    <small className="text-muted">Accessory Kitting:</small>
-                                                    <div className="fw-bold">{selectedUnit.accessory_kitting_no || '---'}</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Test Results & Checklist Data */}
-                                <div className="col-md-6">
-                                    <div className="card border-0 bg-light">
-                                        <div className="card-body">
-                                            <h6 className="card-title fw-bold text-info mb-3">
-                                                <i className="bi bi-clipboard-check me-2"></i>Station 1 & 2 Tests
-                                            </h6>
-                                            <div className="row g-2" style={{ fontSize: '0.85rem' }}>
-                                                {/* Station 1 Tests */}
-                                                {selectedUnit.s1_header_seated_90_deg && (
-                                                    <div className="col-6">
-                                                        <small className="text-muted">Header Seated:</small>
-                                                        <div className={`fw-bold ${isErrorValue(selectedUnit.s1_header_seated_90_deg) ? 'text-danger' : 'text-success'}`}>
-                                                            {selectedUnit.s1_header_seated_90_deg}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {selectedUnit.s1_leads_properly_soldered && (
-                                                    <div className="col-6">
-                                                        <small className="text-muted">Soldering:</small>
-                                                        <div className={`fw-bold ${isErrorValue(selectedUnit.s1_leads_properly_soldered) ? 'text-danger' : 'text-success'}`}>
-                                                            {selectedUnit.s1_leads_properly_soldered}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                
-                                                {/* Station 2 Tests */}
-                                                {selectedUnit.s2_lora_module && (
-                                                    <div className="col-6">
-                                                        <small className="text-muted">LoRa Module:</small>
-                                                        <div className={`fw-bold ${isErrorValue(selectedUnit.s2_lora_module) ? 'text-danger' : 'text-success'}`}>
-                                                            {selectedUnit.s2_lora_module}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {selectedUnit.s2_lora_mesh_test && (
-                                                    <div className="col-6">
-                                                        <small className="text-muted">LoRa Mesh:</small>
-                                                        <div className={`fw-bold ${isErrorValue(selectedUnit.s2_lora_mesh_test) ? 'text-danger' : 'text-success'}`}>
-                                                            {selectedUnit.s2_lora_mesh_test}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {selectedUnit.s2_energy_meter && (
-                                                    <div className="col-6">
-                                                        <small className="text-muted">Energy Meter:</small>
-                                                        <div className={`fw-bold ${isErrorValue(selectedUnit.s2_energy_meter) ? 'text-danger' : 'text-success'}`}>
-                                                            {selectedUnit.s2_energy_meter}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {selectedUnit.s2_power_good_test && (
-                                                    <div className="col-6">
-                                                        <small className="text-muted">Power Good:</small>
-                                                        <div className={`fw-bold ${isErrorValue(selectedUnit.s2_power_good_test) ? 'text-danger' : 'text-success'}`}>
-                                                            {selectedUnit.s2_power_good_test}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {selectedUnit.s2_temp_reading && (
-                                                    <div className="col-6">
-                                                        <small className="text-muted">Temperature:</small>
-                                                        <div className={`fw-bold ${isErrorValue(selectedUnit.s2_temp_reading) ? 'text-danger' : 'text-success'}`}>
-                                                            {selectedUnit.s2_temp_reading}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {selectedUnit.s2_freq_reading && (
-                                                    <div className="col-6">
-                                                        <small className="text-muted">Frequency:</small>
-                                                        <div className={`fw-bold ${isErrorValue(selectedUnit.s2_freq_reading) ? 'text-danger' : 'text-success'}`}>
-                                                            {selectedUnit.s2_freq_reading}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {selectedUnit.s2_go_no_go && (
-                                                    <div className="col-12">
-                                                        <small className="text-muted">Station 2 Verdict:</small>
-                                                        <div className={`fw-bold ${isErrorValue(selectedUnit.s2_go_no_go) ? 'text-danger' : 'text-success'}`}>
-                                                            {selectedUnit.s2_go_no_go}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Voltage Readings */}
-                                {(selectedUnit.s2_voltage || selectedUnit.s2_line1 || selectedUnit.s2_line2 || selectedUnit.s2_line3 || selectedUnit.s6_voltage || selectedUnit.s6_line1 || selectedUnit.s6_line2 || selectedUnit.s6_line3) && (
-                                    <div className="col-md-6">
+                                <div className="row g-4">
+                                    <div className="col-12">
                                         <div className="card border-0 bg-light">
                                             <div className="card-body">
-                                                <h6 className="card-title fw-bold text-danger mb-3">
-                                                    <i className="bi bi-lightning me-2"></i>Voltage Readings
+                                                <h6 className="card-title fw-bold text-success mb-3">
+                                                    <i className="bi bi-cpu me-2"></i>PCB Board Numbers
                                                 </h6>
                                                 <div className="row g-2">
-                                                    {/* Station 2 Voltage Readings */}
-                                                    {selectedUnit.s2_voltage && (
-                                                        <div className="col-12">
-                                                            <small className="text-muted">Station 2 Main Voltage:</small>
-                                                            <div className={`fw-bold ${getVoltageErrorStatus(selectedUnit.s2_voltage) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s2_voltage}V
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s2_line1 && (
-                                                        <div className="col-4">
-                                                            <small className="text-muted">S2 Line 1:</small>
-                                                            <div className={`fw-bold ${getVoltageErrorStatus(selectedUnit.s2_line1) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s2_line1}V
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s2_line2 && (
-                                                        <div className="col-4">
-                                                            <small className="text-muted">S2 Line 2:</small>
-                                                            <div className={`fw-bold ${getVoltageErrorStatus(selectedUnit.s2_line2) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s2_line2}V
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s2_line3 && (
-                                                        <div className="col-4">
-                                                            <small className="text-muted">S2 Line 3:</small>
-                                                            <div className={`fw-bold ${getVoltageErrorStatus(selectedUnit.s2_line3) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s2_line3}V
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    
-                                                    {/* Station 6 Voltage Readings */}
-                                                    {selectedUnit.s6_voltage && (
-                                                        <div className="col-12">
-                                                            <small className="text-muted">Station 6 Main Voltage:</small>
-                                                            <div className={`fw-bold ${getVoltageErrorStatus(selectedUnit.s6_voltage) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s6_voltage}V
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s6_line1 && (
-                                                        <div className="col-4">
-                                                            <small className="text-muted">S6 Line 1:</small>
-                                                            <div className={`fw-bold ${getVoltageErrorStatus(selectedUnit.s6_line1) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s6_line1}V
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s6_line2 && (
-                                                        <div className="col-4">
-                                                            <small className="text-muted">S6 Line 2:</small>
-                                                            <div className={`fw-bold ${getVoltageErrorStatus(selectedUnit.s6_line2) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s6_line2}V
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s6_line3 && (
-                                                        <div className="col-4">
-                                                            <small className="text-muted">S6 Line 3:</small>
-                                                            <div className={`fw-bold ${getVoltageErrorStatus(selectedUnit.s6_line3) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s6_line3}V
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* LED Status & Final Tests */}
-                                {(selectedUnit.s2_led_status_4g || selectedUnit.s2_led_status_fast_blink || selectedUnit.s2_go_no_go || selectedUnit.s6_led_status_4g || selectedUnit.s6_led_status_fast_blink || selectedUnit.s6_go_no_go) && (
-                                    <div className="col-md-6">
-                                        <div className="card border-0 bg-light">
-                                            <div className="card-body">
-                                                <h6 className="card-title fw-bold text-secondary mb-3">
-                                                    <i className="bi bi-lightbulb me-2"></i>LED Status & Final Tests
-                                                </h6>
-                                                <div className="row g-2">
-                                                    {/* Station 2 LED Status */}
-                                                    {selectedUnit.s2_led_status_4g && (
-                                                        <div className="col-6">
-                                                            <small className="text-muted">S2 4G LED:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s2_led_status_4g, 'LED STATUS') ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s2_led_status_4g}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s2_led_status_fast_blink && (
-                                                        <div className="col-6">
-                                                            <small className="text-muted">S2 Fast Blink:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s2_led_status_fast_blink, 'LED STATUS') ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s2_led_status_fast_blink}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s2_go_no_go && (
-                                                        <div className="col-12">
-                                                            <small className="text-muted">Station 2 Final Verdict:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s2_go_no_go) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s2_go_no_go}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    
-                                                    {/* Station 6 LED Status */}
-                                                    {selectedUnit.s6_led_status_4g && (
-                                                        <div className="col-6">
-                                                            <small className="text-muted">S6 4G LED:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s6_led_status_4g, 'LED STATUS') ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s6_led_status_4g}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s6_led_status_fast_blink && (
-                                                        <div className="col-6">
-                                                            <small className="text-muted">S6 Fast Blink:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s6_led_status_fast_blink, 'LED STATUS') ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s6_led_status_fast_blink}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s6_go_no_go && (
-                                                        <div className="col-12">
-                                                            <small className="text-muted">Station 6 Final Verdict:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s6_go_no_go) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s6_go_no_go}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Station Requirements & Other Tests */}
-                                {(selectedUnit.s3_requirements || selectedUnit.s4_requirements || selectedUnit.s5_requirements || selectedUnit.s7_requirements || selectedUnit.s8_power_unit_disable_lora || selectedUnit.s9_requirements || selectedUnit.s10_requirements || selectedUnit.s11_led_status || selectedUnit.s12_requirements || selectedUnit.s13_requirements || selectedUnit.s14_requirements) && (
-                                    <div className="col-md-6">
-                                        <div className="card border-0 bg-light">
-                                            <div className="card-body">
-                                                <h6 className="card-title fw-bold text-warning mb-3">
-                                                    <i className="bi bi-gear me-2"></i>Station Requirements & Tests
-                                                </h6>
-                                                <div className="row g-2" style={{ fontSize: '0.85rem' }}>
-                                                    {selectedUnit.s3_requirements && (
-                                                        <div className="col-6">
-                                                            <small className="text-muted">Station 3:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s3_requirements) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s3_requirements}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s4_requirements && (
-                                                        <div className="col-6">
-                                                            <small className="text-muted">Station 4:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s4_requirements) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s4_requirements}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s5_requirements && (
-                                                        <div className="col-6">
-                                                            <small className="text-muted">Station 5:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s5_requirements) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s5_requirements}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s7_requirements && (
-                                                        <div className="col-6">
-                                                            <small className="text-muted">Station 7:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s7_requirements) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s7_requirements}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s8_power_unit_disable_lora && (
-                                                        <div className="col-6">
-                                                            <small className="text-muted">S8 Power Unit:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s8_power_unit_disable_lora) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s8_power_unit_disable_lora}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s8_frequency_band && (
-                                                        <div className="col-6">
-                                                            <small className="text-muted">S8 Frequency:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s8_frequency_band) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s8_frequency_band}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s9_requirements && (
-                                                        <div className="col-6">
-                                                            <small className="text-muted">Station 9:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s9_requirements) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s9_requirements}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s10_requirements && (
-                                                        <div className="col-6">
-                                                            <small className="text-muted">Station 10:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s10_requirements) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s10_requirements}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s11_led_status && (
-                                                        <div className="col-6">
-                                                            <small className="text-muted">S11 LED Status:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s11_led_status, 'LED STATUS') ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s11_led_status}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s11_low_range && (
-                                                        <div className="col-4">
-                                                            <small className="text-muted">S11 Low:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s11_low_range) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s11_low_range}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s11_medium_range && (
-                                                        <div className="col-4">
-                                                            <small className="text-muted">S11 Med:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s11_medium_range) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s11_medium_range}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s11_high_range && (
-                                                        <div className="col-4">
-                                                            <small className="text-muted">S11 High:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s11_high_range) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s11_high_range}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s12_requirements && (
-                                                        <div className="col-6">
-                                                            <small className="text-muted">Station 12:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s12_requirements) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s12_requirements}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s13_requirements && (
-                                                        <div className="col-6">
-                                                            <small className="text-muted">Station 13:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s13_requirements) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s13_requirements}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {selectedUnit.s14_requirements && (
-                                                        <div className="col-6">
-                                                            <small className="text-muted">Station 14:</small>
-                                                            <div className={`fw-bold ${isErrorValue(selectedUnit.s14_requirements) ? 'text-danger' : 'text-success'}`}>
-                                                                {selectedUnit.s14_requirements}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Timestamps */}
-                                <div className="col-md-6">
-                                    <div className="card border-0 bg-light">
-                                        <div className="card-body">
-                                            <h6 className="card-title fw-bold text-muted mb-3">
-                                                <i className="bi bi-clock me-2"></i>Timestamps
-                                            </h6>
-                                            <div className="row g-2">
-                                                <div className="col-12">
-                                                    <small className="text-muted">Created:</small>
-                                                    <div className="fw-bold">
-                                                        {selectedUnit.created_at ? new Date(selectedUnit.created_at).toLocaleString() : '---'}
+                                                    <div className="col-md-6 col-lg-4">
+                                                        <small className="text-muted">MNBD Board:</small>
+                                                        <div className="fw-bold">{selectedUnit.mnbd_board_no || selectedUnit.mnbd_no || '---'}</div>
+                                                    </div>
+                                                    <div className="col-md-6 col-lg-4">
+                                                        <small className="text-muted">CMBD Board:</small>
+                                                        <div className="fw-bold">{selectedUnit.cmbd_board_no || selectedUnit.cmbd_no || '---'}</div>
+                                                    </div>
+                                                    <div className="col-md-6 col-lg-4">
+                                                        <small className="text-muted">LRBD Board:</small>
+                                                        <div className="fw-bold">{selectedUnit.lrbd_board_no || selectedUnit.lrbd_no || '---'}</div>
+                                                    </div>
+                                                    <div className="col-md-6 col-lg-4">
+                                                        <small className="text-muted">PQBD Board:</small>
+                                                        <div className="fw-bold">{selectedUnit.pqbd_board_no || selectedUnit.pqbd_no || '---'}</div>
+                                                    </div>
+                                                    <div className="col-md-6 col-lg-4">
+                                                        <small className="text-muted">BKBD Board:</small>
+                                                        <div className="fw-bold">{selectedUnit.bkbd_board_no || selectedUnit.bkbd_no || '---'}</div>
                                                     </div>
                                                 </div>
-                                                <div className="col-12">
-                                                    <small className="text-muted">Last Updated:</small>
-                                                    <div className="fw-bold">
-                                                        {selectedUnit.updated_at ? new Date(selectedUnit.updated_at).toLocaleString() : '---'}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Remarks */}
-                                <div className="col-md-6">
-                                    <div className="card border-0 bg-light">
-                                        <div className="card-body">
-                                            <h6 className="card-title fw-bold text-dark mb-3">
-                                                <i className="bi bi-chat-text me-2"></i>Remarks
-                                            </h6>
-                                            <div className="p-2 bg-white rounded border">
-                                                {selectedUnit.remarks || <span className="text-muted fst-italic">No remarks available</span>}
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="p-3 bg-light border-top text-end">
-                            <button className="btn btn-secondary px-5 fw-bold" onClick={() => setSelectedUnit(null)}>
-                                CLOSE DETAILS
-                            </button>
+                            {/* Scrollable Bottom Section - Station Checklists */}
+                            <div className="flex-grow-1 overflow-auto p-4 pt-0">
+                                <div className="row g-4">
+                                    <div className="col-12">
+                                        <h6 className="fw-bold text-primary mb-3">
+                                            <i className="bi bi-clipboard-check me-2"></i>Station Checklists
+                                        </h6>
+                                        {processStations.map((stationName, index) => {
+                                            const stationNumber = index + 1;
+                                            const isExpanded = stationDropdowns[stationNumber];
+                                            
+                                            return (
+                                                <div key={stationNumber} className="mb-3">
+                                                    <button
+                                                        className="btn btn-outline-primary w-100 text-start d-flex justify-content-between align-items-center"
+                                                        onClick={() => setStationDropdowns(prev => ({
+                                                            [stationNumber]: !prev[stationNumber]
+                                                        }))}
+                                                    >
+                                                        <span className="fw-bold">Station {stationNumber}: {stationName}</span>
+                                                        <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'}`}></i>
+                                                    </button>
+                                                    
+                                                    {isExpanded && (
+                                                        <div className="card border-top-0 border-start border-end border-bottom">
+                                                            <div className="card-body p-3">
+                                                                {renderStationChecklist(stationNumber, selectedUnit)}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="modal-footer flex-shrink-0">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1196,6 +1182,88 @@ export function StationsOverview({
         setIsDelayHotspotsAiLoading(true);
         setDelayHotspotsAi(null);
         try {
+            // Data Sync: Create hotspotDetailedPayload with checklist data for each station
+            const hotspotDetailedPayload = delayHotspots.map(station => {
+                const stationMetrics = calculateMetrics(station.id);
+                const stationLogs = stationMetrics.stationLogs || [];
+                
+                // Get delayed units for this station
+                const delayedUnits = stationLogs.filter(log => {
+                    const statusText = (log.status || '').toLowerCase();
+                    const isInProgressOrNG = log.status === 'In Progress' || statusText.includes('no good') || statusText.includes('ng');
+                    return isInProgressOrNG && checkUnitDelay(station.id, log.updated_at || log.created_at, dynamicDelayThresholds).isDelayed;
+                });
+
+                // Capture checklist data for each delayed unit
+                const delayedUnitsWithChecklist = delayedUnits.map(log => {
+                    const checklistData = {};
+                    
+                    // Capture all relevant checklist fields for this station
+                    for (let i = 1; i <= 15; i++) {
+                        // Station-specific fields
+                        checklistData[`s${i}_requirements`] = log[`s${i}_requirements`];
+                        checklistData[`s${i}_remarks`] = log[`s${i}_remarks`];
+                        
+                        // Station 1 specific
+                        if (i === 1) {
+                            checklistData.s1_header_seated_90_deg = log.s1_header_seated_90_deg;
+                            checklistData.s1_leads_properly_soldered = log.s1_leads_properly_soldered;
+                        }
+                        
+                        // Station 2 & 6 specific (technical readings)
+                        if (i === 2 || i === 6) {
+                            checklistData[`s${i}_lora_module`] = log[`s${i}_lora_module`];
+                            checklistData[`s${i}_lora_mesh_test`] = log[`s${i}_lora_mesh_test`];
+                            checklistData[`s${i}_energy_meter`] = log[`s${i}_energy_meter`];
+                            checklistData[`s${i}_power_good_test`] = log[`s${i}_power_good_test`];
+                            checklistData[`s${i}_voltage`] = log[`s${i}_voltage`];
+                            checklistData[`s${i}_line1`] = log[`s${i}_line1`];
+                            checklistData[`s${i}_line2`] = log[`s${i}_line2`];
+                            checklistData[`s${i}_line3`] = log[`s${i}_line3`];
+                            checklistData[`s${i}_temp_reading`] = log[`s${i}_temp_reading`];
+                            checklistData[`s${i}_freq_reading`] = log[`s${i}_freq_reading`];
+                            checklistData[`s${i}_led_status_4g`] = log[`s${i}_led_status_4g`];
+                            checklistData[`s${i}_led_status_fast_blink`] = log[`s${i}_led_status_fast_blink`];
+                            checklistData[`s${i}_sw1_off_to_led_off_duration`] = log[`s${i}_sw1_off_to_led_off_duration`];
+                            checklistData[`s${i}_go_no_go`] = log[`s${i}_go_no_go`];
+                        }
+                        
+                        // Station 8 specific
+                        if (i === 8) {
+                            checklistData.s8_power_unit_disable_lora = log.s8_power_unit_disable_lora;
+                            checklistData.s8_frequency_band = log.s8_frequency_band;
+                            checklistData.s8_rsso_testing = log.s8_rsso_testing;
+                            checklistData.s8_data_outage = log.s8_data_outage;
+                        }
+                        
+                        // Station 11 specific
+                        if (i === 11) {
+                            checklistData.s11_led_status = log.s11_led_status;
+                            checklistData.s11_low_range = log.s11_low_range;
+                            checklistData.s11_medium_range = log.s11_medium_range;
+                            checklistData.s11_high_range = log.s11_high_range;
+                        }
+                    }
+                    
+                    return {
+                        assembly_no: log.assembly_no,
+                        model: log.model,
+                        station: log.station,
+                        status: log.status,
+                        minutes_in_station: Math.max(0, (new Date().getTime() - new Date(log.updated_at || log.created_at).getTime()) / (1000 * 60)),
+                        checklist_data: checklistData
+                    };
+                });
+
+                return {
+                    station_id: station.id,
+                    station_name: station.name,
+                    delayed_units_count: delayedUnits.length,
+                    avg_delay_minutes: station.avgDelayMinutes,
+                    delayed_units_with_checklist: delayedUnitsWithChecklist
+                };
+            });
+
             const modelRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1213,17 +1281,29 @@ export function StationsOverview({
 
             const prompt = `You are an AI Industrial Engineer specializing in real-time production optimization at MKFF Laserteknique International inc.
 
-MANUFACTURING HOTSPOTS ANALYSIS:
-${JSON.stringify(delayHotspots, null, 2)}
+MANUFACTURING HOTSPOTS ANALYSIS WITH DETAILED CHECKLIST DATA:
+${JSON.stringify(hotspotDetailedPayload, null, 2)}
+
+CROSS-STATION ANALYSIS INSTRUCTIONS:
+1. Look for patterns across DIFFERENT stations (e.g., 'If Station 1 has soldering issues, is it causing the delay in Station 2?')
+2. Identify voltage tolerance breaches (outside 113.85V-116.15V) in technical stations (2, 6)
+3. Analyze quality-driven delays (NO GO, FAIL, NOT DETECTED) vs process-driven delays
+4. Look for upstream-downstream relationships between stations
+5. Identify if issues in early stations (1-5) are causing bottlenecks in later stations (6-15)
+
+VALIDATION CRITERIA:
+- Voltage Tolerance: 115V ±1% (113.85V - 116.15V)
+- Quality Status: 'GO', 'Detected', 'Passed', 'SOLID GREEN' = GOOD
+- Quality Status: 'NO GO', 'FAIL', 'NOT DETECTED' = BAD
 
 REQUIRED OUTPUT FORMAT (STRICT):
-[DIAGNOSIS]: Current root cause analysis across all hotspot stations using manufacturing terminology
+[DIAGNOSIS]: Current root cause analysis across all hotspot stations using manufacturing terminology, referencing specific checklist failures and cross-station relationships
 
-[FORECAST]: Predict production line status for next 2-4 hours based on current bottlenecks and their propagation risk
+[FORECAST]: Predict production line status for next 2-4 hours based on current bottlenecks and their propagation risk across stations
 
-[PRESCRIPTION]: Provide exactly 2 actionable steps for production supervisor focusing on resource reallocation and bottleneck mitigation
+[PRESCRIPTION]: Provide exactly 2 actionable steps for production supervisor focusing on resource reallocation and bottleneck mitigation, addressing the specific cross-station issues found
 
-USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Reallocation, Throughput Optimization`;
+USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Reallocation, Throughput Optimization, Upstream-Downstream Dependencies`;
 
             const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
                 method: 'POST',
@@ -1536,7 +1616,6 @@ USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Re
                         </div>
                     ) : (
                         <div className="text-muted text-center py-4">
-                            <i className="bi bi-robot fs-1 mb-2 d-block"></i>
                             <div>Click "ANALYZE HOTSPOTS" to generate AI-powered manufacturing intelligence</div>
                         </div>
                     )}
