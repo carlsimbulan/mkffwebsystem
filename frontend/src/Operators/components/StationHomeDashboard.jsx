@@ -1,30 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
-// Import station standard times from parent component
-const STATION_STANDARD_TIMES = {
-    'Station1': 6, 'Station 1': 6,
-    'Station2': 8, 'Station 2': 8,
-    'Station3': 3, 'Station 3': 3,
-    'Station4': 12, 'Station 4': 12,
-    'Station5': 15, 'Station 5': 15,
-    'Station6': 15, 'Station 6': 15,
-    'Station7': 3, 'Station 7': 3,
-    'Station8': 15, 'Station 8': 15,
-    'Station9': 480, 'Station 9': 480,
-    'Station10': 8, 'Station 10': 8,
-    'Station11': 22, 'Station 11': 22,
-    'Station12': 5, 'Station 12': 5,
-    'Station13': 10, 'Station 13': 10,
-    'Station14': 8, 'Station 14': 8,
-    'Station15': 5, 'Station 15': 5,
-};
-
-export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, announcementCount, logs, calculateMetrics }) {
+export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, announcementCount, logs, calculateMetrics, dynamicTargetTimes = {} }) {
     
-    // 🔑 Delay calculation function (same as admin component)
+    // 🔑 Track loading state for target times
+    const [isTargetTimeLoading, setIsTargetTimeLoading] = useState(false);
+    
+    // 🔑 Delay calculation function (updated to use dynamic target times)
     const checkUnitDelay = (stationId, updatedAt) => {
-        const threshold = STATION_STANDARD_TIMES[stationId] || 10;
+        const threshold = dynamicTargetTimes[stationId] || 10;
         const lastUpdate = new Date(updatedAt).getTime();
         const minutesInStation = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
         if (minutesInStation > threshold * 3) return { isDelayed: true, level: 'CRITICAL', minutes: minutesInStation };
@@ -49,10 +33,32 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
                 delayMinutes: Math.round(delay.minutes)
             };
         });
-    }, [logs, currentStation]);
+    }, [logs, currentStation, dynamicTargetTimes]);
 
     // 🔑 NOTES STATE FOR DELAYED UNITS
     const [delayedUnitNotes, setDelayedUnitNotes] = useState({});
+    
+    // 🔑 Track target time changes for visual feedback
+    const [previousTargetTime, setPreviousTargetTime] = useState(dynamicTargetTimes[currentStation] || 10);
+    const [showTargetTimeUpdate, setShowTargetTimeUpdate] = useState(false);
+    
+    // Effect to detect target time changes
+    useEffect(() => {
+        const currentTargetTime = dynamicTargetTimes[currentStation] || 10;
+        if (currentTargetTime !== previousTargetTime) {
+            setIsTargetTimeLoading(true);
+            setPreviousTargetTime(currentTargetTime);
+            setShowTargetTimeUpdate(true);
+            
+            // Show loading for 1 second, then show update notification
+            setTimeout(() => {
+                setIsTargetTimeLoading(false);
+            }, 1000);
+            
+            // Hide the update indicator after 5 seconds
+            setTimeout(() => setShowTargetTimeUpdate(false), 5000);
+        }
+    }, [dynamicTargetTimes, currentStation, previousTargetTime]);
 
     // 🔑 Handle note change for delayed unit
     const handleNoteChange = (unitId, note) => {
@@ -118,6 +124,59 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
                             onClick={() => setActiveTab('input_unit')} style={{ fontSize: '0.8rem' }}>
                         <i className="bi bi-qr-code-scan"></i> NEW ENTRY
                     </button>
+                </div>
+            </div>
+
+            {/* --- STATION TARGET TIME INFO --- */}
+            <div className="row mb-4">
+                <div className="col-12">
+                    <div className="card border-0 shadow-sm target-time-card" style={{ borderRadius: '12px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+                        <div className="card-body py-3 px-4">
+                            <div className="d-flex justify-content-between align-items-center text-white">
+                                <div className="d-flex align-items-center">
+                                    <div className="me-3">
+                                        <i className="bi bi-clock-history display-6"></i>
+                                    </div>
+                                    <div>
+                                        <h5 className="mb-1 fw-bold">Station Target Time</h5>
+                                        <p className="mb-0 opacity-75 small">Current processing time limit for {currentStation}</p>
+                                    </div>
+                                </div>
+                                <div className="text-end">
+                                    {isTargetTimeLoading ? (
+                                        <div className="display-4 fw-bold text-light">
+                                            <div className="spinner-border spinner-border-sm me-2" role="status"></div>
+                                            Updating...
+                                        </div>
+                                    ) : (
+                                        <div className={`display-4 fw-bold ${showTargetTimeUpdate ? 'target-time-update' : ''}`}>
+                                            {(() => {
+                                                const targetMinutes = dynamicTargetTimes[currentStation] || 10;
+                                                if (targetMinutes >= 60) {
+                                                    const hours = Math.floor(targetMinutes / 60);
+                                                    const mins = targetMinutes % 60;
+                                                    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+                                                }
+                                                return `${targetMinutes}m`;
+                                            })()}
+                                        </div>
+                                    )}
+                                    <div className="small opacity-75">
+                                        <i className="bi bi-info-circle me-1"></i>
+                                        Units exceeding this time will trigger alerts
+                                        {showTargetTimeUpdate && !isTargetTimeLoading && (
+                                            <div className="mt-1">
+                                                <span className="badge bg-light text-dark rounded-pill px-2 py-1">
+                                                    <i className="bi bi-arrow-clockwise me-1"></i>
+                                                    Updated by Admin
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -194,6 +253,9 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
                                                         <div className="text-danger fw-bold d-flex align-items-center gap-1">
                                                             <i className="bi bi-alarm-fill"></i> {unit.delayMinutes}m Over
                                                         </div>
+                                                        <div className="small text-muted">
+                                                            Target: {dynamicTargetTimes[currentStation] || 10}m
+                                                        </div>
                                                     </td>
                                                     <td>
                                                         <span className={`badge ${
@@ -245,6 +307,25 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
                 .animate-in { animation: fadeInUp 0.4s ease-out; }
                 @keyframes fadeInUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
                 .smaller { font-size: 0.75rem; }
+                
+                /* Target time card animations */
+                .target-time-card {
+                    transition: all 0.3s ease;
+                }
+                .target-time-card:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+                }
+                
+                /* Pulse animation for target time updates */
+                @keyframes targetTimePulse {
+                    0% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
+                    100% { transform: scale(1); }
+                }
+                .target-time-update {
+                    animation: targetTimePulse 0.6s ease-in-out;
+                }
             `}</style>
         </div>
     );

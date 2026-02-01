@@ -12,6 +12,7 @@
     "axios": "^1.13.2",
     "bootstrap-icons": "^1.13.1",
     "chart.js": "^4.5.1",
+    "dexie": "^4.3.0",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.555.0",
     "moment": "^2.30.1",
