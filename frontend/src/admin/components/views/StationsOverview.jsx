@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import 'bootstrap-icons/font/bootstrap-icons.css';
+import ReactDOM from 'react-dom';
 
 const processStations = [
     "PCB Pairing", "Integrated Board Test", "Main Board Conformal Coating",
@@ -896,8 +897,8 @@ USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Re
             </div>
             
             {/* Unit Details Modal */}
-            {selectedUnit && (
-                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.4)', zIndex: 1050 }}>
+            {selectedUnit && ReactDOM.createPortal(
+                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.4)', zIndex: 9999 }}>
                     <div className="bg-white rounded-3 shadow-xl p-0 overflow-hidden border-0" style={{ width: '95%', maxWidth: '1200px', maxHeight: '95vh', display: 'flex', flexDirection: 'column' }}>
                         <div className="modal-content" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
                             <div className="modal-header bg-primary text-white flex-shrink-0 d-flex justify-content-between align-items-center p-3">
@@ -1025,12 +1026,14 @@ USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Re
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
 };
 
+/* ... */
 export function StationsOverview({
     activeTab, stations, calculateMetrics, stationMonitorId, highlightedUnitId, setActiveTab, handleMonitorStation, handleViewHistory, handleEditClick, fetchData, allLogs, liveUnitLogs, dynamicDelayThresholds, onTargetTimeManagement
 }) {
