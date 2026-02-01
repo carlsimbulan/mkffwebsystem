@@ -23,7 +23,7 @@ if (!$input) {
 }
 
 // Secure API key (stored server-side)
-$GEMINI_API_KEY = 'AIzaSyC6_z2g8PCVBdaWYv6xVCcEz_UAlbIbxXg';
+$GEMINI_API_KEY = 'AIzaSyDfEKh1vvkHBa6hayqvwGBkFGKUlb8pEpM';
 $GEMINI_V1_BASE = 'https://generativelanguage.googleapis.com/v1';
 
 try {
