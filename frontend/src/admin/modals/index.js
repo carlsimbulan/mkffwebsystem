@@ -13,3 +13,6 @@ export { ReportDetailModal } from './report/ReportDetailModal';
 export { SubmitReportModal } from './report/SubmitReportModal';
 export { AnnouncementModal } from './report/AnnouncementModal';
 export { DeleteAnnouncementModal } from './report/DeleteAnnouncementModal';
+
+// System Modals
+export { default as TargetTimeModal } from './system/TargetTimeModal';

@@ -24,6 +24,7 @@ import GeneratedQRList from './components/GeneratedQRList';
 import { UserProfileModal } from './modals/UserProfileModal';
 import ApprovalConfirmationModal from './modals/ApprovalConfirmationModal'; 
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { useTargetTimes } from '../utils/targetTimeService';
 
 ChartJS.register(
     LineElement,
@@ -54,14 +55,6 @@ const PROCESS_STATIONS = [
     "Packing", "QC Stamping"
 ];
 
-const DELAY_THRESHOLDS_MINUTES = {
-    'Station1': 6, 'Station 1': 6, 'Station2': 8, 'Station 2': 8, 'Station3': 3, 'Station 3': 3,
-    'Station4': 12, 'Station 4': 12, 'Station5': 15, 'Station 5': 15, 'Station6': 15, 'Station 6': 15,
-    'Station7': 3, 'Station 7': 3, 'Station8': 15, 'Station 8': 15, 'Station9': 480, 'Station 9': 480,
-    'Station10': 8, 'Station 10': 8, 'Station11': 22, 'Station 11': 22, 'Station12': 5, 'Station 12': 5,
-    'Station13': 10, 'Station 13': 10, 'Station14': 8, 'Station 14': 8, 'Station15': 5, 'Station 15': 5
-};
-
 const hourLabel = (d) => d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
 // Utility Helper Functions
@@ -74,6 +67,9 @@ const safeParseSerial = (serialStr, prefix) => {
 export default function ITAssistantPage({ user, onLogout }) {
     const navigate = useNavigate();
     const location = useLocation();
+
+    // Use dynamic target times
+    const { thresholds: dynamicDelayThresholds } = useTargetTimes();
 
     // Kunin ang huling bahagi ng URL
     const activeTab = location.pathname.split('/').pop() || "overview";
@@ -325,7 +321,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                 .filter(v => typeof v === 'number');
 
             const avg = times.length ? (times.reduce((a, b) => a + b, 0) / times.length) : 0;
-            const threshold = DELAY_THRESHOLDS_MINUTES[s.id] || 10;
+            const threshold = dynamicDelayThresholds[s.id] || 10;
             return {
                 id: s.id,
                 name: PROCESS_STATIONS[idx] || s.id,

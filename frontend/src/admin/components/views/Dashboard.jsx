@@ -12,6 +12,7 @@ import {
     Legend,
     Filler
 } from 'chart.js';
+import { useTargetTimes } from '../../../utils/targetTimeService';
 
 ChartJS.register(
     LineElement,
@@ -26,14 +27,6 @@ ChartJS.register(
 );
 
 // --- CONFIGURATIONS ---
-
-const DELAY_THRESHOLDS_MINUTES = {
-    'Station1': 6, 'Station 1': 6, 'Station2': 8, 'Station 2': 8, 'Station3': 3, 'Station 3': 3,
-    'Station4': 12, 'Station 4': 12, 'Station5': 15, 'Station 5': 15, 'Station6': 15, 'Station 6': 15,
-    'Station7': 3, 'Station 7': 3, 'Station8': 15, 'Station 8': 15, 'Station9': 480, 'Station 9': 480,
-    'Station10': 8, 'Station 10': 8, 'Station11': 22, 'Station 11': 22, 'Station12': 5, 'Station 12': 5,
-    'Station13': 10, 'Station 13': 10, 'Station14': 8, 'Station 14': 8, 'Station15': 5, 'Station 15': 5
-};
 
 const processStations = [
     "PCB Pairing", "Integrated Board Test", "Main Board Conformal Coating",
@@ -61,8 +54,8 @@ const stationDescriptions = {
     "QC Stamping": "Validation of unit checklist and final QC approval."
 };
 
-const checkUnitDelay = (stationId, updatedAt) => {
-    const threshold = DELAY_THRESHOLDS_MINUTES[stationId] || 10;
+const checkUnitDelay = (stationId, updatedAt, thresholds) => {
+    const threshold = thresholds[stationId] || 10;
     const lastUpdate = new Date(updatedAt).getTime();
     const minutesInStation = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
     if (minutesInStation > threshold * 3) return { isDelayed: true, level: 'CRITICAL', minutes: minutesInStation };
@@ -92,6 +85,9 @@ export function Dashboard({
     newReportsToday,
     setHighlightedUnitId
 }) {
+    
+    // Use dynamic target times
+    const { thresholds: dynamicDelayThresholds } = useTargetTimes();
     
     const stepperRef = useRef(null); 
     const [searchTerm, setSearchTerm] = useState('');
@@ -221,7 +217,7 @@ export function Dashboard({
                 .filter(v => typeof v === 'number');
 
             const avg = times.length ? (times.reduce((a, b) => a + b, 0) / times.length) : 0;
-            const threshold = DELAY_THRESHOLDS_MINUTES[s.id] || 10;
+            const threshold = dynamicDelayThresholds[s.id] || 10;
             const exceedsThreshold = avg > threshold;
             
             return {
@@ -232,7 +228,7 @@ export function Dashboard({
                 exceedsPct: threshold > 0 ? ((avg - threshold) / threshold) * 100 : 0,
                 exceedsThreshold,
                 delayedUnits: inProgress.filter(l => {
-                    const delay = checkUnitDelay(s.id, l.updated_at || l.created_at);
+                    const delay = checkUnitDelay(s.id, l.updated_at || l.created_at, dynamicDelayThresholds);
                     return delay.isDelayed;
                 }).length,
                 totalUnits: inProgress.length
@@ -256,7 +252,7 @@ export function Dashboard({
 
             // Count units exceeding thresholds
             const delayedUnits = inProgress.filter(l => {
-                const delay = checkUnitDelay(s.id, l.updated_at || l.created_at);
+                const delay = checkUnitDelay(s.id, l.updated_at || l.created_at, dynamicDelayThresholds);
                 return delay.isDelayed;
             });
 
@@ -264,7 +260,7 @@ export function Dashboard({
             const totalWIP = inProgress.length;
             const stuckUnits = delayedUnits.length;
             const delays = delayedUnits.map(l => {
-                const delay = checkUnitDelay(s.id, l.updated_at || l.created_at);
+                const delay = checkUnitDelay(s.id, l.updated_at || l.created_at, dynamicDelayThresholds);
                 return delay.minutes;
             });
             const avgDelay = delays.length > 0 ? delays.reduce((a, b) => a + b, 0) / delays.length : 0;
@@ -330,11 +326,65 @@ export function Dashboard({
             
             const modelName = modelData.modelName;
 
-            // Step 2: Prepare comprehensive station data for AI analysis
-            const delayedUnits = worstStation.delayedUnits || [];
-            const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[worstStation.id] || 10;
+            // Step 2: Fetch trend data - Get last 5 completed units for the worst station
+            const historyRes = await fetch(`http://localhost/mkffwebsystem/backend/api/unit_history.php?station=${encodeURIComponent(worstStation.id)}`);
+            let trendData = [];
+            let velocity = 'STABLE';
             
-            // Enhanced context with checklist error scanning
+            if (historyRes.ok) {
+                const historyLogs = await historyRes.json();
+                
+                // Filter for completed units at this station (last 5)
+                const completedUnits = historyLogs
+                    .filter(log => 
+                        log.station_name === worstStation.id && 
+                        (log.status_after?.toLowerCase().includes('completed') || 
+                         log.action_type === 'STATION_UPDATE' && 
+                         log.status_after?.toLowerCase() === 'in progress')
+                    )
+                    .slice(0, 5)
+                    .reverse(); // Oldest to newest for trend calculation
+
+                if (completedUnits.length >= 2) {
+                    // Calculate processing speeds (time between consecutive completions)
+                    const processingTimes = [];
+                    for (let i = 1; i < completedUnits.length; i++) {
+                        const prevTime = new Date(completedUnits[i-1].timestamp).getTime();
+                        const currTime = new Date(completedUnits[i].timestamp).getTime();
+                        const timeDiff = (currTime - prevTime) / (1000 * 60); // minutes
+                        processingTimes.push(timeDiff);
+                    }
+                    
+                    // Calculate velocity trend (comparing first half vs second half of processing times)
+                    if (processingTimes.length >= 2) {
+                        const firstHalf = processingTimes.slice(0, Math.ceil(processingTimes.length / 2));
+                        const secondHalf = processingTimes.slice(Math.floor(processingTimes.length / 2));
+                        
+                        const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
+                        const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
+                        
+                        const velocityChange = ((secondAvg - firstAvg) / firstAvg) * 100;
+                        
+                        if (velocityChange > 15) velocity = 'SLOWING_DOWN';
+                        else if (velocityChange < -15) velocity = 'SPEEDING_UP';
+                        else velocity = 'STABLE';
+                    }
+                    
+                    trendData = completedUnits.map((log, idx) => ({
+                        assembly_no: log.assembly_no,
+                        timestamp: log.timestamp,
+                        processing_time_minutes: idx > 0 ? processingTimes[idx-1] : null,
+                        action_type: log.action_type,
+                        status: log.status_after
+                    }));
+                }
+            }
+
+            // Step 3: Prepare comprehensive station data for AI analysis
+            const delayedUnits = worstStation.delayedUnits || [];
+            const thresholdMinutes = dynamicDelayThresholds[worstStation.id] || 10;
+            
+            // Enhanced context with checklist error scanning AND trend data
             const delayedContext = delayedUnits.map(log => {
                 const lastUpdate = new Date(log.updated_at || log.created_at).getTime();
                 const timeSpentMinutes = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
@@ -368,34 +418,48 @@ export function Dashboard({
                     status: log.status,
                     remarks: log.remarks || '',
                     checklist_errors: checklist_errors,
-                    checklist_values: checklist_values
+                    checklist_values: checklist_values,
+                    trend_velocity: velocity // Add velocity to each delayed unit context
                 };
             });
 
-            const prompt = `You are a Senior Manufacturing Auditor at MKFF Laserteknique International inc.
-CRITICAL BOTTLENECK DIRECTIVE: Perform immediate root-cause analysis for the worst performing station.
+            const prompt = `You are an AI Industrial Engineer specializing in real-time production optimization at MKFF Laserteknique International inc.
+PREDICTIVE MANUFACTURING ANALYSIS: Analyze current bottleneck and forecast production line status.
 
-CRITICAL STATION ANALYTICS:
-Station: ${worstStation.name} (${worstStation.id}) | Threshold: ${thresholdMinutes}min
-Total WIP: ${worstStation.totalWIP} units | Stuck Units: ${worstStation.stuckUnits} units | Average Delay: ${worstStation.avgDelay.toFixed(1)}min
+STATION PERFORMANCE METRICS:
+Station: ${worstStation.name} (${worstStation.id}) | Takt Time Threshold: ${thresholdMinutes}min
+Current WIP: ${worstStation.totalWIP} units | Bottleneck Units: ${worstStation.stuckUnits} units | Avg Cycle Time: ${worstStation.avgDelay.toFixed(1)}min
 
-DELAYED UNITS DATA:
+VELOCITY & TREND INTELLIGENCE:
+Processing Velocity: ${velocity}
+Historical Throughput (Last 5 Units): ${trendData.length} completed
+${trendData.length > 0 ? `
+Throughput Analysis:
+${trendData.map((unit, idx) => `
+  ${idx + 1}. ${unit.assembly_no} - ${unit.timestamp} 
+     Cycle Time: ${unit.processing_time_minutes ? unit.processing_time_minutes.toFixed(1) + ' min' : 'N/A'}
+     Status: ${unit.status}`).join('')}
+
+Velocity States:
+- SPEEDING_UP: Takt time improvement >15% (Process Acceleration)
+- SLOWING_DOWN: Takt time degradation >15% (Bottleneck Propagation Risk)
+- STABLE: Consistent cycle time ±15% (Steady State)
+` : 'Insufficient throughput data for velocity analysis'}
+
+BOTTLENECK UNIT ANALYSIS:
 ${JSON.stringify(delayedContext, null, 2)}
 
-MANUFACTURING AUDIT PROTOCOL:
-1. BOTTLENECK CLASSIFICATION: Determine if this is Quality-Driven (high errors) or Process-Driven (low errors, high time)
-2. ROOT CAUSE ISOLATION: Identify the specific failure mode causing this station to be the worst
-3. IMPACT ASSESSMENT: Calculate production loss and downstream effects
-4. CORRECTIVE ACTION: Provide immediate actionable steps to resolve the bottleneck
+INDUSTRIAL ENGINEERING DIRECTIVE:
+Analyze bottleneck propagation risk, forecast line impact, and recommend resource reallocation strategies.
 
-TECHNICAL RESPONSE FORMAT:
-1. [CRITICAL DIAGNOSIS] - Specific bottleneck classification with manufacturing terminology
+REQUIRED OUTPUT FORMAT (STRICT):
+[DIAGNOSIS]: Current root cause using manufacturing terminology (Takt Time violation, Quality escape, Resource constraint, etc.)
 
-2. [ROOT CAUSE] - Station-specific failure mechanism analysis
+[FORECAST]: Predict production line status for next 2-4 hours based on velocity trend (${velocity}) and current WIP (${worstStation.totalWIP} units). Include bottleneck propagation risk assessment.
 
-Summary: [Immediate corrective action - max 15 words]
+[PRESCRIPTION]: Provide exactly 2 actionable steps for production supervisor focusing on resource reallocation, takt time optimization, or bottleneck mitigation.
 
-USE MANUFACTURING TERMS: Bottleneck, Throughput Constraint, Quality Escape, Process Stall, Systemic Failure, Rework Loop`;
+USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Reallocation, Cycle Time Variance, Throughput Optimization, Capacity Constraint, Process Flow Disruption`;
 
             // Step 3: Generate AI analysis
             const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
@@ -469,6 +533,59 @@ USE MANUFACTURING TERMS: Bottleneck, Throughput Constraint, Quality Escape, Proc
                 .analytics-card-header { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; background: #f8fafc; }
                 .analytics-card-body { padding: 14px 16px; }
                 .kpi-pill { font-size: 0.65rem; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; padding: 6px 10px; border-radius: 999px; border: 1px solid #f3f3f3ff; background: #fff; }
+
+                /* AI Analyze Button Pulse Animation */
+                .ai-analyze-btn {
+                    animation: ai-pulse 2s infinite;
+                    transition: all 0.3s ease;
+                }
+                .ai-analyze-btn:hover {
+                    animation-play-state: paused;
+                    transform: scale(1.05);
+                }
+                @keyframes ai-pulse {
+                    0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+                    50% { box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.1); }
+                    100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+                }
+
+                /* Predictive Insight Card (Blue Border) */
+                .predictive-insight-card { 
+                    background: #ffffff; 
+                    border: 2px solid #3b82f6; 
+                    border-radius: 18px; 
+                    box-shadow: 0 6px 18px rgba(59, 130, 246, 0.15); 
+                    overflow: hidden; 
+                }
+                .predictive-insight-header { 
+                    padding: 14px 16px; 
+                    border-bottom: 1px solid #dbeafe; 
+                    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); 
+                    color: #1e40af;
+                }
+                .predictive-insight-body { 
+                    padding: 14px 16px; 
+                    background: #fafbff;
+                }
+
+                /* Smart Recommendation Card (Green Border) */
+                .smart-recommendation-card { 
+                    background: #ffffff; 
+                    border: 2px solid #10b981; 
+                    border-radius: 18px; 
+                    box-shadow: 0 6px 18px rgba(16, 185, 129, 0.15); 
+                    overflow: hidden; 
+                }
+                .smart-recommendation-header { 
+                    padding: 14px 16px; 
+                    border-bottom: 1px solid #d1fae5; 
+                    background: linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%); 
+                    color: #047857;
+                }
+                .smart-recommendation-body { 
+                    padding: 14px 16px; 
+                    background: #fafffe;
+                }
             `}</style>
 
             <div className="d-flex justify-content-between align-items-center mb-4 px-2">
@@ -615,7 +732,7 @@ USE MANUFACTURING TERMS: Bottleneck, Throughput Constraint, Quality Escape, Proc
                                     labels: cycleTimePerStation.map(r => r.name),
                                     datasets: [
                                         {
-                                            label: 'Avg mins (WIP)',
+                                            label: 'Avg Cycle Time (WIP)',
                                             data: cycleTimePerStation.map(r => Number(r.avgMinutes.toFixed(1))),
                                             backgroundColor: cycleTimePerStation.map(r => 
                                                 r.exceedsThreshold ? 'rgba(239, 68, 68, 0.85)' : 'rgba(245, 158, 11, 0.85)'
@@ -624,7 +741,7 @@ USE MANUFACTURING TERMS: Bottleneck, Throughput Constraint, Quality Escape, Proc
                                             barThickness: 10,
                                         },
                                         {
-                                            label: 'Threshold',
+                                            label: 'Takt Time',
                                             data: cycleTimePerStation.map(r => r.thresholdMinutes),
                                             backgroundColor: 'rgba(148, 163, 184, 0.45)',
                                             borderRadius: 10,
@@ -644,13 +761,13 @@ USE MANUFACTURING TERMS: Bottleneck, Throughput Constraint, Quality Escape, Proc
                                                     const station = cycleTimePerStation[context.dataIndex];
                                                     if (context.datasetIndex === 0) {
                                                         return [
-                                                            `Avg: ${context.parsed.x} mins`,
-                                                            `Threshold: ${station.thresholdMinutes} mins`,
-                                                            `Delayed Units: ${station.delayedUnits}/${station.totalUnits}`,
-                                                            station.exceedsThreshold ? `⚠️ EXCEEDS BY ${Math.abs(station.exceedsPct).toFixed(0)}%` : '✅ Within Threshold'
+                                                            `Avg Cycle Time: ${context.parsed.x} mins`,
+                                                            `Takt Time: ${station.thresholdMinutes} mins`,
+                                                            `Bottleneck Units: ${station.delayedUnits}/${station.totalUnits}`,
+                                                            station.exceedsThreshold ? `⚠️ EXCEEDS TAKT BY ${Math.abs(station.exceedsPct).toFixed(0)}%` : '✅ Within Takt Time'
                                                         ];
                                                     }
-                                                    return `Threshold: ${context.parsed.x} mins`;
+                                                    return `Takt Time: ${context.parsed.x} mins`;
                                                 }
                                             }
                                         }
@@ -677,22 +794,32 @@ USE MANUFACTURING TERMS: Bottleneck, Throughput Constraint, Quality Escape, Proc
                                         </div>
                                     </div>
                                     
-                                    {/* Simple indicators */}
+                                    {/* Enhanced indicators with 4H Forecast */}
                                     <div className="row g-2 text-center">
-                                        <div className="col-3">
+                                        <div className="col-2">
                                             <div className="fw-bold text-dark">{worstStation.totalWIP}</div>
                                             <div className="small text-muted" style={{fontSize: '0.65rem'}}>WIP</div>
                                         </div>
-                                        <div className="col-3">
+                                        <div className="col-2">
                                             <div className="fw-bold text-danger">{worstStation.stuckUnits}</div>
                                             <div className="small text-muted" style={{fontSize: '0.65rem'}}>Units</div>
                                         </div>
-                                        <div className="col-3">
+                                        <div className="col-2">
                                             <div className="fw-bold text-warning">{worstStation.avgDelay.toFixed(1)}m</div>
                                             <div className="small text-muted" style={{fontSize: '0.65rem'}}>Avg Delay</div>
                                         </div>
                                         <div className="col-3">
-                                            <div className="fw-bold text-primary" style={{fontSize: '0.7rem', cursor: 'pointer'}} onClick={fetchCriticalStationDiagnosis}>
+                                            <div className="fw-bold" style={{fontSize: '0.7rem'}}>
+                                                {worstStation.avgDelay > (dynamicDelayThresholds[worstStation.id] || 10) * 2 ? (
+                                                    <span className="badge bg-danger text-white px-2 py-1">📈 CRITICAL</span>
+                                                ) : (
+                                                    <span className="badge bg-secondary text-white px-2 py-1">⏳ STABLE</span>
+                                                )}
+                                            </div>
+                                            <div className="small text-muted" style={{fontSize: '0.65rem'}}>4H Forecast</div>
+                                        </div>
+                                        <div className="col-3">
+                                            <div className="fw-bold text-primary ai-analyze-btn" style={{fontSize: '0.7rem', cursor: 'pointer'}} onClick={fetchCriticalStationDiagnosis}>
                                                 {isCriticalAnalysisLoading ? (
                                                     <span className="spinner-border spinner-border-sm me-1"></span>
                                                 ) : null}
@@ -727,42 +854,37 @@ USE MANUFACTURING TERMS: Bottleneck, Throughput Constraint, Quality Escape, Proc
                                             // ... rest of the code remains the same ...
                                             // Try different patterns to extract the sections
                                             let diagnosis = '';
-                                            let rootCause = '';
-                                            let summary = '';
+                                            let forecast = '';
+                                            let prescription = '';
                                             
-                                            // Pattern 1: Look for numbered sections
-                                            const diagnosisMatch1 = cleanedAnalysis.match(/1\.\s*\[CRITICAL DIAGNOSIS\]\s*-\s*(.+?)(?=2\.\s*\[ROOT CAUSE\]|Summary:|$)/s);
-                                            const rootCauseMatch1 = cleanedAnalysis.match(/2\.\s*\[ROOT CAUSE\]\s*-\s*(.+?)(?=Summary:|$)/s);
+                                            // Pattern 1: Look for bracketed sections
+                                            const diagnosisMatch = cleanedAnalysis.match(/\[DIAGNOSIS\]\s*[:\-]?\s*(.+?)(?=\[FORECAST\]|$)/s);
+                                            const forecastMatch = cleanedAnalysis.match(/\[FORECAST\]\s*[:\-]?\s*(.+?)(?=\[PRESCRIPTION\]|$)/s);
+                                            const prescriptionMatch = cleanedAnalysis.match(/\[PRESCRIPTION\]\s*[:\-]?\s*(.+?)(?=$)/s);
                                             
-                                            // Pattern 2: Look for bracketed sections without numbers
-                                            const diagnosisMatch2 = cleanedAnalysis.match(/\[CRITICAL DIAGNOSIS\]\s*-\s*(.+?)(?=\[ROOT CAUSE\]|Summary:|$)/s);
-                                            const rootCauseMatch2 = cleanedAnalysis.match(/\[ROOT CAUSE\]\s*-\s*(.+?)(?=Summary:|$)/s);
-                                            
-                                            // Pattern 3: Look for sections with just text
-                                            const diagnosisMatch3 = cleanedAnalysis.match(/CRITICAL DIAGNOSIS\s*[:\-]\s*(.+?)(?=ROOT CAUSE|Summary:|$)/s);
-                                            const rootCauseMatch3 = cleanedAnalysis.match(/ROOT CAUSE\s*[:\-]\s*(.+?)(?=Summary:|$)/s);
+                                            // Pattern 2: Look for sections without brackets
+                                            const diagnosisMatch2 = cleanedAnalysis.match(/DIAGNOSIS\s*[:\-]\s*(.+?)(?=FORECAST|$)/s);
+                                            const forecastMatch2 = cleanedAnalysis.match(/FORECAST\s*[:\-]\s*(.+?)(?=PRESCRIPTION|$)/s);
+                                            const prescriptionMatch2 = cleanedAnalysis.match(/PRESCRIPTION\s*[:\-]\s*(.+?)(?=$)/s);
                                             
                                             // Use the first pattern that matches
-                                            diagnosis = diagnosisMatch1?.[1]?.trim() || diagnosisMatch2?.[1]?.trim() || diagnosisMatch3?.[1]?.trim() || '';
-                                            rootCause = rootCauseMatch1?.[1]?.trim() || rootCauseMatch2?.[1]?.trim() || rootCauseMatch3?.[1]?.trim() || '';
+                                            diagnosis = diagnosisMatch?.[1]?.trim() || diagnosisMatch2?.[1]?.trim() || '';
+                                            forecast = forecastMatch?.[1]?.trim() || forecastMatch2?.[1]?.trim() || '';
+                                            prescription = prescriptionMatch?.[1]?.trim() || prescriptionMatch2?.[1]?.trim() || '';
                                             
-                                            // Extract summary
-                                            const summaryMatch = cleanedAnalysis.match(/Summary\s*[:\-]\s*(.+?)(?=$)/s);
-                                            summary = summaryMatch?.[1]?.trim() || '';
-                                            
-                                            // If still no diagnosis/rootCause, try to split by common patterns
-                                            if (!diagnosis && !rootCause) {
+                                            // If still no sections found, try to split by common patterns
+                                            if (!diagnosis && !forecast && !prescription) {
                                                 const lines = cleanedAnalysis.split('\n').filter(line => line.trim());
                                                 for (let i = 0; i < lines.length; i++) {
                                                     const line = lines[i].trim();
                                                     if (line.toLowerCase().includes('diagnosis') && i < lines.length - 1) {
                                                         diagnosis = lines[i + 1]?.trim() || '';
                                                     }
-                                                    if (line.toLowerCase().includes('root cause') && i < lines.length - 1) {
-                                                        rootCause = lines[i + 1]?.trim() || '';
+                                                    if (line.toLowerCase().includes('forecast') && i < lines.length - 1) {
+                                                        forecast = lines[i + 1]?.trim() || '';
                                                     }
-                                                    if (line.toLowerCase().includes('summary') && i < lines.length - 1) {
-                                                        summary = lines[i + 1]?.trim() || '';
+                                                    if (line.toLowerCase().includes('prescription') && i < lines.length - 1) {
+                                                        prescription = lines[i + 1]?.trim() || '';
                                                     }
                                                 }
                                             }
@@ -772,34 +894,34 @@ USE MANUFACTURING TERMS: Bottleneck, Throughput Constraint, Quality Escape, Proc
                                                     {diagnosis && (
                                                         <div className="analytics-card mb-3">
                                                             <div className="analytics-card-header">
-                                                                <div className="label-caps mb-0">1. CRITICAL DIAGNOSIS</div>
+                                                                <div className="label-caps mb-0">🔍 DIAGNOSIS</div>
                                                             </div>
                                                             <div className="analytics-card-body">
                                                                 <div>{diagnosis}</div>
                                                             </div>
                                                         </div>
                                                     )}
-                                                    {rootCause && (
-                                                        <div className="analytics-card mb-3">
-                                                            <div className="analytics-card-header">
-                                                                <div className="label-caps mb-0">2. ROOT CAUSE</div>
+                                                    {forecast && (
+                                                        <div className="predictive-insight-card mb-3">
+                                                            <div className="predictive-insight-header">
+                                                                <div className="label-caps mb-0">📈 PREDICTIVE INSIGHT</div>
                                                             </div>
-                                                            <div className="analytics-card-body">
-                                                                <div>{rootCause}</div>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {summary && (
-                                                        <div className="analytics-card">
-                                                            <div className="analytics-card-header">
-                                                                <div className="label-caps mb-0">Summary</div>
-                                                            </div>
-                                                            <div className="analytics-card-body">
-                                                                <div>{summary}</div>
+                                                            <div className="predictive-insight-body">
+                                                                <div>{forecast}</div>
                                                             </div>
                                                         </div>
                                                     )}
-                                                    {!diagnosis && !rootCause && summary && (
+                                                    {prescription && (
+                                                        <div className="smart-recommendation-card">
+                                                            <div className="smart-recommendation-header">
+                                                                <div className="label-caps mb-0">💡 SMART RECOMMENDATION</div>
+                                                            </div>
+                                                            <div className="smart-recommendation-body">
+                                                                <div>{prescription}</div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {!diagnosis && !forecast && !prescription && (
                                                         <div className="analytics-card">
                                                             <div className="analytics-card-header">
                                                                 <div className="label-caps mb-0">Analysis Result</div>
@@ -818,10 +940,10 @@ USE MANUFACTURING TERMS: Bottleneck, Throughput Constraint, Quality Escape, Proc
                         )}
                         
                         <div className="px-3 pb-3 small text-muted">
-                            {cycleTimePerStation.filter(r => r.exceedsThreshold).length} stations exceeding threshold • 
+                            {cycleTimePerStation.filter(r => r.exceedsThreshold).length} stations exceeding takt time • 
                             Worst: <strong>{worstStation?.name || 'None'}</strong>
                             {worstStation && worstStation.stuckUnits > 0 ? (
-                                <> • Stuck Units: <strong>{worstStation.stuckUnits}</strong></>
+                                <> • Bottleneck Units: <strong>{worstStation.stuckUnits}</strong></>
                             ) : null}
                         </div>
                     </div>

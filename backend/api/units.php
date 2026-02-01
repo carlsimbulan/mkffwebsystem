@@ -324,6 +324,8 @@ $baseSql = "SELECT
     u.id, u.model, u.revision, u.base_unit_kitting_no, u.assembly_no, 
     u.device_serial_no, u.accessory_kitting_no, u.status, u.remarks, 
     u.station, u.created_at, u.updated_at,
+    -- PCB Board Numbers
+    pcb.mnbd_board_no, pcb.cmbd_board_no, pcb.lrbd_board_no, pcb.pqbd_board_no, pcb.bkbd_board_no,
     -- Station 1 Columns
     s1.header_seated_90_deg AS s1_header_seated_90_deg,
     s1.leads_properly_soldered AS s1_leads_properly_soldered,
@@ -396,6 +398,7 @@ $baseSql = "SELECT
     s14.requirements AS s14_requirements,
     s14.remarks AS s14_remarks
     FROM units u
+    LEFT JOIN unit_pcba_details pcb ON u.id = pcb.unit_id
     LEFT JOIN station1_checklists s1 ON u.id = s1.unit_id
     LEFT JOIN station2_checklists s2 ON u.id = s2.unit_id
     LEFT JOIN station3_checklists s3 ON u.id = s3.unit_id

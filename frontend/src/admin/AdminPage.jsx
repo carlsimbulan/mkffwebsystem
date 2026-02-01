@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { useTargetTimes, targetTimeService } from '../utils/targetTimeService';
 
 // 1. CHART IMPORTS & REGISTRATION (Keep for global chart setup)
 import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
@@ -17,7 +18,8 @@ import {
     ViewUserModal,
     AnnouncementModal,
     ApproveUnitModal,
-    DeleteAnnouncementModal
+    DeleteAnnouncementModal,
+    TargetTimeModal
 } from './modals';
 
 import {
@@ -70,7 +72,6 @@ const UNITS_ENDPOINT = `${API_BASE_URL}/units.php`;
 const REPORTS_ENDPOINT = `${API_BASE_URL}/daily_reports.php`;
 const USER_MANAGEMENT_ENDPOINT = `${API_BASE_URL}/user_management.php`;
 const HISTORY_ENDPOINT = `${API_BASE_URL}/unit_history.php`; 
-
 const ANNOUNCEMENTS_ENDPOINT = `${API_BASE_URL}/announcements.php`;
 const INVENTORY_ENDPOINT = `${API_BASE_URL}/inventory.php`; // Gagawa tayo nito mamaya
 
@@ -91,6 +92,9 @@ const getTodayDate = () => {
 export default function AdminPage({ user, onLogout }) {
     const navigate = useNavigate();
 const location = useLocation();
+
+// Use dynamic target times from centralized service
+const { thresholds: dynamicDelayThresholds } = useTargetTimes();
 
 // Kinukuha ang huling part ng URL (e.g., /admin/dashboard -> "dashboard")
 const activeTab = location.pathname.split('/').pop() || "dashboard";
@@ -153,6 +157,10 @@ const handleTabChange = (tabName) => {
     // --- NEW APPROVAL MODAL STATES ---
     const [showApproveModal, setShowApproveModal] = useState(false);
     const [selectedLogToApprove, setSelectedLogToApprove] = useState(null);
+    
+    // --- TARGET TIME MANAGEMENT STATES ---
+    const [showTargetTimeModal, setShowTargetTimeModal] = useState(false);
+    
     // --- DASHBOARD CHART STATES ---
     const [dashboardView, setDashboardView] = useState('bar');
     const chartViews = ['bar', 'pie'];
@@ -170,7 +178,7 @@ const handleTabChange = (tabName) => {
         avatar_file: null,
     };
 
-    // --- CHECK DELAYED UNITS AND REPORTS (KEPT AS IS) ---
+    // --- CHECK DELAYED UNITS AND REPORTS (UPDATED TO USE DYNAMIC THRESHOLDS) ---
     // 🔑 FIX: Gamitin ang updated_at para sa station-specific timing
 const checkDelayedUnitsAndReports = useCallback((allUnits) => {
     const now = new Date();
@@ -188,7 +196,8 @@ const checkDelayedUnitsAndReports = useCallback((allUnits) => {
 
     validDelayedUnits.forEach(unit => {
         const stationId = unit.station;
-        const thresholdMinutes = DELAY_THRESHOLDS_MINUTES[stationId] || DELAY_THRESHOLDS_MINUTES[stationId.replace(' ', '')] || 0;
+        // Use dynamic thresholds instead of static ones
+        const thresholdMinutes = dynamicDelayThresholds[stationId] || dynamicDelayThresholds[stationId.replace(' ', '')] || 0;
 
         if (thresholdMinutes > 0) {
             const startTime = new Date(unit.updated_at || unit.created_at); 
@@ -215,7 +224,7 @@ const checkDelayedUnitsAndReports = useCallback((allUnits) => {
     });
 
     setNotifications(newDelayedNotifications);
-}, []);
+}, [dynamicDelayThresholds]); // Add dynamicDelayThresholds to dependency array
 
 
     // --- FETCH DATA (UPDATED TO INCLUDE HISTORY LOGS AND NEW REPORT COUNT) ---
@@ -331,6 +340,22 @@ const fetchData = async () => {
             window.removeEventListener('message', handleMessage);
         };
     }, [checkDelayedUnitsAndReports]); // Added checkDelayedUnitsAndReports to dependency array to satisfy ESLint, though the polling interval keeps it running.
+
+    // --- TARGET TIME MANAGEMENT HANDLERS ---
+    const handleTargetTimeManagement = () => {
+        setShowTargetTimeModal(true);
+    };
+
+    const handleSaveTargetTimes = async (newTargetTimes) => {
+        try {
+            await targetTimeService.updateTargetTimes(newTargetTimes);
+            setSuccessMessage("Target times updated successfully! New thresholds are now active across all systems.");
+            setTimeout(() => setSuccessMessage(null), 4000);
+        } catch (error) {
+            console.error('Failed to save target times:', error);
+            alert('Failed to save target times. Please try again.');
+        }
+    };
 
     // --- DASHBOARD CHART HANDLERS (KEPT AS IS) ---
     const nextChart = () => {
@@ -718,6 +743,8 @@ const renderContent = () => {
                         fetchData={fetchData}
                         allLogs={unitHistoryLogs} 
                         liveUnitLogs={logs} // Pass current logs for model name lookup
+                        dynamicDelayThresholds={dynamicDelayThresholds} // Pass dynamic thresholds
+                        onTargetTimeManagement={handleTargetTimeManagement} // Pass handler for target time management
                     />
                 );
 
@@ -1184,6 +1211,15 @@ return (
                 selectedLogToApprove={selectedLogToApprove}
                 onClose={() => setShowApproveModal(false)}
                 onApprove={executeApproval}
+            />
+        )}
+        
+        {/* Target Time Management Modal */}
+        {showTargetTimeModal && (
+            <TargetTimeModal
+                onClose={() => setShowTargetTimeModal(false)}
+                onSave={handleSaveTargetTimes}
+                API_BASE_URL={API_BASE_URL}
             />
         )}
     </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
+import { useTargetTimes } from '../utils/targetTimeService';
 
 // Import local assets
 import logo from '../logo.png'; 
@@ -20,24 +21,6 @@ import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-
 
 // REGISTER CHART COMPONENTS (Kept here for global chart setup)
 ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend);
-
-const STATION_STANDARD_TIMES = {
-    'Station1': 6, 'Station 1': 6,
-    'Station2': 8, 'Station 2': 8,
-    'Station3': 3, 'Station 3': 3,
-    'Station4': 12, 'Station 4': 12,
-    'Station5': 15, 'Station 5': 15,
-    'Station6': 15, 'Station 6': 15,
-    'Station7': 3, 'Station 7': 3,
-    'Station8': 15, 'Station 8': 15,
-    'Station9': 480, 'Station 9': 480,
-    'Station10': 8, 'Station 10': 8,
-    'Station11': 22, 'Station 11': 22,
-    'Station12': 5, 'Station 12': 5,
-    'Station13': 10, 'Station 13': 10,
-    'Station14': 8, 'Station 14': 8,
-    'Station15': 5, 'Station 15': 5,
-};
 
 // --- CONFIGURATION CONSTANTS ---
 const API_BASE_URL = "http://localhost/mkffwebsystem/backend/api";
@@ -110,6 +93,9 @@ const StatusChangeToast = ({ message, onClose }) => {
 
 // --- MAIN OPERATOR COMPONENT (Controller) ---
 export default function StationDashboard({ user, onLogout }) { 
+
+    // Use dynamic target times
+    const { thresholds: dynamicTargetTimes } = useTargetTimes();
 
     // --- STATE FOR AVATAR & NAME ---
     const [currentAvatar, setCurrentAvatar] = useState(user?.avatar_url || null);
@@ -740,6 +726,7 @@ const todayAnnouncementsCount = announcements.filter(a => {
                         calculateMetrics={calculateMetrics} 
                         // Pass minimal station info, required by the chart component's original design
                         stations={[{ id: currentStation, name: currentStation }]} 
+                        dynamicTargetTimes={dynamicTargetTimes} // Pass dynamic target times
                     />
                 );
 
