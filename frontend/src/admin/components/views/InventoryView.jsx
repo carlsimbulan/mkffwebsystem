@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import ReactDOM from 'react-dom';
 
 export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => {
     const [editingCell, setEditingCell] = useState(null); 
@@ -9,6 +10,9 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
     const [isSaving, setIsSaving] = useState(false); 
     const [showOnlyDuplicates, setShowOnlyDuplicates] = useState(false);
     const [selectedModelKey, setSelectedModelKey] = useState('all'); // State for dynamic column routing
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [pendingSave, setPendingSave] = useState(null);
+    const [validationError, setValidationError] = useState('');
     const itemsPerPage = 15; 
 
     const pcbaMapping = [
@@ -154,20 +158,65 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
         return filteredLogs.slice(start, start + itemsPerPage);
     }, [filteredLogs, currentPage]);
 
+    // Check for duplicate serial number within the same model type
+    const checkDuplicateInSameModel = (newValue, boardKey, currentLogId) => {
+        if (!newValue || newValue === '000000' || newValue === '') return false;
+        
+        const boardInfo = pcbaMapping.find(board => board.dbKey === boardKey);
+        if (!boardInfo) return false;
+        
+        // Check if this serial number already exists in the same board type (excluding current item)
+        const isDuplicate = pcbaLogs.some(item => {
+            if (item.id === currentLogId) return false; // Skip current item
+            return item[boardKey] === newValue; // Check if same serial exists in same board type
+        });
+        
+        return isDuplicate;
+    };
+
     const handleEdit = (logId, key, currentVal) => {
         setEditingCell({ logId, key });
         setTempValue(currentVal || '');
+        setValidationError(''); // Clear validation error when starting edit
     };
 
     const handleSave = async (logId, key) => {
+        // Check for duplicate in same model type first
+        const isDuplicate = checkDuplicateInSameModel(tempValue, key, logId);
+        
+        if (isDuplicate) {
+            const boardInfo = pcbaMapping.find(board => board.dbKey === key);
+            const boardName = boardInfo ? boardInfo.displayName : key;
+            setValidationError(`Serial number already exists in ${boardName} board type!`);
+            return;
+        }
+        
+        // Clear validation error if no duplicate
+        setValidationError('');
+        
+        // Show confirmation modal instead of saving directly
+        const currentItem = pcbaLogs.find(item => item.id === logId);
+        const boardInfo = pcbaMapping.find(board => board.dbKey === key);
+        const boardName = boardInfo ? boardInfo.displayName : key;
+        const assemblyNo = currentItem ? currentItem.assembly_no : 'Unknown';
+        
+        setPendingSave({ logId, key, assemblyNo, boardName });
+        setShowConfirmModal(true);
+    };
+
+    const confirmSave = async () => {
+        if (!pendingSave) return;
+        
         setIsSaving(true);
+        setShowConfirmModal(false);
+        
         try {
             const response = await fetch('http://localhost/mkffwebsystem/backend/api/inventory.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    id: logId,
-                    column: key,
+                    id: pendingSave.logId,
+                    column: pendingSave.key,
                     newValue: tempValue
                 })
             });
@@ -175,8 +224,9 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
             const result = await response.json();
 
             if (result.status === 'success') {
-                if (onUpdateSerial) onUpdateSerial(logId, key, tempValue);
+                if (onUpdateSerial) onUpdateSerial(pendingSave.logId, pendingSave.key, tempValue);
                 setEditingCell(null);
+                setTempValue('');
             } else {
                 alert("Database Error: " + result.message);
             }
@@ -185,7 +235,13 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
             alert("Connection Error: Check if XAMPP is running and the URL is correct.");
         } finally {
             setIsSaving(false);
+            setPendingSave(null);
         }
+    };
+
+    const cancelSave = () => {
+        setShowConfirmModal(false);
+        setPendingSave(null);
     };
 
     const handleRowClick = (log) => {
@@ -528,19 +584,30 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                             <>
                                                 <td>
                                                     {editingCell?.logId === item.id && editingCell?.key === 'mnbd_board_no' ? (
-                                                        <div className="d-flex align-items-center">
-                                                            <input 
-                                                                autoFocus
-                                                                maxLength={6}
-                                                                disabled={isSaving}
-                                                                className="edit-input"
-                                                                value={tempValue}
-                                                                onChange={(e) => setTempValue(e.target.value)}
-                                                                onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, 'mnbd_board_no')}
-                                                            />
-                                                            <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, 'mnbd_board_no')}>
-                                                                {isSaving ? '...' : 'SAVE'}
-                                                            </button>
+                                                        <div>
+                                                            <div className="d-flex align-items-center mb-1">
+                                                                <input 
+                                                                    autoFocus
+                                                                    maxLength={6}
+                                                                    disabled={isSaving}
+                                                                    className={`edit-input ${validationError ? 'border-danger' : ''}`}
+                                                                    value={tempValue}
+                                                                    onChange={(e) => {
+                                                                        setTempValue(e.target.value);
+                                                                        setValidationError(''); // Clear error on input change
+                                                                    }}
+                                                                    onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, 'mnbd_board_no')}
+                                                                />
+                                                                <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, 'mnbd_board_no')}>
+                                                                    {isSaving ? '...' : 'SAVE'}
+                                                                </button>
+                                                            </div>
+                                                            {validationError && editingCell?.key === 'mnbd_board_no' && (
+                                                                <div className="text-danger small fw-bold">
+                                                                    <i className="bi bi-exclamation-triangle-fill me-1"></i>
+                                                                    {validationError}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     ) : (
                                                         <div className="d-flex align-items-center justify-content-between">
@@ -555,19 +622,30 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                 </td>
                                                 <td>
                                                     {editingCell?.logId === item.id && editingCell?.key === 'cmbd_board_no' ? (
-                                                        <div className="d-flex align-items-center">
-                                                            <input 
-                                                                autoFocus
-                                                                maxLength={6}
-                                                                disabled={isSaving}
-                                                                className="edit-input"
-                                                                value={tempValue}
-                                                                onChange={(e) => setTempValue(e.target.value)}
-                                                                onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, 'cmbd_board_no')}
-                                                            />
-                                                            <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, 'cmbd_board_no')}>
-                                                                {isSaving ? '...' : 'SAVE'}
-                                                            </button>
+                                                        <div>
+                                                            <div className="d-flex align-items-center mb-1">
+                                                                <input 
+                                                                    autoFocus
+                                                                    maxLength={6}
+                                                                    disabled={isSaving}
+                                                                    className={`edit-input ${validationError ? 'border-danger' : ''}`}
+                                                                    value={tempValue}
+                                                                    onChange={(e) => {
+                                                                        setTempValue(e.target.value);
+                                                                        setValidationError(''); // Clear error on input change
+                                                                    }}
+                                                                    onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, 'cmbd_board_no')}
+                                                                />
+                                                                <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, 'cmbd_board_no')}>
+                                                                    {isSaving ? '...' : 'SAVE'}
+                                                                </button>
+                                                            </div>
+                                                            {validationError && editingCell?.key === 'cmbd_board_no' && (
+                                                                <div className="text-danger small fw-bold">
+                                                                    <i className="bi bi-exclamation-triangle-fill me-1"></i>
+                                                                    {validationError}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     ) : (
                                                         <div className="d-flex align-items-center justify-content-between">
@@ -582,19 +660,30 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                 </td>
                                                 <td>
                                                     {editingCell?.logId === item.id && editingCell?.key === 'lrbd_board_no' ? (
-                                                        <div className="d-flex align-items-center">
-                                                            <input 
-                                                                autoFocus
-                                                                maxLength={6}
-                                                                disabled={isSaving}
-                                                                className="edit-input"
-                                                                value={tempValue}
-                                                                onChange={(e) => setTempValue(e.target.value)}
-                                                                onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, 'lrbd_board_no')}
-                                                            />
-                                                            <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, 'lrbd_board_no')}>
-                                                                {isSaving ? '...' : 'SAVE'}
-                                                            </button>
+                                                        <div>
+                                                            <div className="d-flex align-items-center mb-1">
+                                                                <input 
+                                                                    autoFocus
+                                                                    maxLength={6}
+                                                                    disabled={isSaving}
+                                                                    className={`edit-input ${validationError ? 'border-danger' : ''}`}
+                                                                    value={tempValue}
+                                                                    onChange={(e) => {
+                                                                        setTempValue(e.target.value);
+                                                                        setValidationError(''); // Clear error on input change
+                                                                    }}
+                                                                    onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, 'lrbd_board_no')}
+                                                                />
+                                                                <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, 'lrbd_board_no')}>
+                                                                    {isSaving ? '...' : 'SAVE'}
+                                                                </button>
+                                                            </div>
+                                                            {validationError && editingCell?.key === 'lrbd_board_no' && (
+                                                                <div className="text-danger small fw-bold">
+                                                                    <i className="bi bi-exclamation-triangle-fill me-1"></i>
+                                                                    {validationError}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     ) : (
                                                         <div className="d-flex align-items-center justify-content-between">
@@ -609,19 +698,30 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                 </td>
                                                 <td>
                                                     {editingCell?.logId === item.id && editingCell?.key === 'pqbd_board_no' ? (
-                                                        <div className="d-flex align-items-center">
-                                                            <input 
-                                                                autoFocus
-                                                                maxLength={6}
-                                                                disabled={isSaving}
-                                                                className="edit-input"
-                                                                value={tempValue}
-                                                                onChange={(e) => setTempValue(e.target.value)}
-                                                                onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, 'pqbd_board_no')}
-                                                            />
-                                                            <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, 'pqbd_board_no')}>
-                                                                {isSaving ? '...' : 'SAVE'}
-                                                            </button>
+                                                        <div>
+                                                            <div className="d-flex align-items-center mb-1">
+                                                                <input 
+                                                                    autoFocus
+                                                                    maxLength={6}
+                                                                    disabled={isSaving}
+                                                                    className={`edit-input ${validationError ? 'border-danger' : ''}`}
+                                                                    value={tempValue}
+                                                                    onChange={(e) => {
+                                                                        setTempValue(e.target.value);
+                                                                        setValidationError(''); // Clear error on input change
+                                                                    }}
+                                                                    onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, 'pqbd_board_no')}
+                                                                />
+                                                                <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, 'pqbd_board_no')}>
+                                                                    {isSaving ? '...' : 'SAVE'}
+                                                                </button>
+                                                            </div>
+                                                            {validationError && editingCell?.key === 'pqbd_board_no' && (
+                                                                <div className="text-danger small fw-bold">
+                                                                    <i className="bi bi-exclamation-triangle-fill me-1"></i>
+                                                                    {validationError}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     ) : (
                                                         <div className="d-flex align-items-center justify-content-between">
@@ -636,19 +736,30 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                 </td>
                                                 <td>
                                                     {editingCell?.logId === item.id && editingCell?.key === 'bkbd_board_no' ? (
-                                                        <div className="d-flex align-items-center">
-                                                            <input 
-                                                                autoFocus
-                                                                maxLength={6}
-                                                                disabled={isSaving}
-                                                                className="edit-input"
-                                                                value={tempValue}
-                                                                onChange={(e) => setTempValue(e.target.value)}
-                                                                onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, 'bkbd_board_no')}
-                                                            />
-                                                            <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, 'bkbd_board_no')}>
-                                                                {isSaving ? '...' : 'SAVE'}
-                                                            </button>
+                                                        <div>
+                                                            <div className="d-flex align-items-center mb-1">
+                                                                <input 
+                                                                    autoFocus
+                                                                    maxLength={6}
+                                                                    disabled={isSaving}
+                                                                    className={`edit-input ${validationError ? 'border-danger' : ''}`}
+                                                                    value={tempValue}
+                                                                    onChange={(e) => {
+                                                                        setTempValue(e.target.value);
+                                                                        setValidationError(''); // Clear error on input change
+                                                                    }}
+                                                                    onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, 'bkbd_board_no')}
+                                                                />
+                                                                <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, 'bkbd_board_no')}>
+                                                                    {isSaving ? '...' : 'SAVE'}
+                                                                </button>
+                                                            </div>
+                                                            {validationError && editingCell?.key === 'bkbd_board_no' && (
+                                                                <div className="text-danger small fw-bold">
+                                                                    <i className="bi bi-exclamation-triangle-fill me-1"></i>
+                                                                    {validationError}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     ) : (
                                                         <div className="d-flex align-items-center justify-content-between">
@@ -665,19 +776,30 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                         ) : (
                                             <td>
                                                 {editingCell?.logId === item.id && editingCell?.key === selectedModelKey ? (
-                                                    <div className="d-flex align-items-center">
-                                                        <input 
-                                                            autoFocus
-                                                            maxLength={6}
-                                                            disabled={isSaving}
-                                                            className="edit-input"
-                                                            value={tempValue}
-                                                            onChange={(e) => setTempValue(e.target.value)}
-                                                            onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, selectedModelKey)}
-                                                        />
-                                                        <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, selectedModelKey)}>
-                                                            {isSaving ? '...' : 'SAVE'}
-                                                        </button>
+                                                    <div>
+                                                        <div className="d-flex align-items-center mb-1">
+                                                            <input 
+                                                                autoFocus
+                                                                maxLength={6}
+                                                                disabled={isSaving}
+                                                                className={`edit-input ${validationError ? 'border-danger' : ''}`}
+                                                                value={tempValue}
+                                                                onChange={(e) => {
+                                                                    setTempValue(e.target.value);
+                                                                    setValidationError(''); // Clear error on input change
+                                                                }}
+                                                                onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, selectedModelKey)}
+                                                            />
+                                                            <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, selectedModelKey)}>
+                                                                {isSaving ? '...' : 'SAVE'}
+                                                            </button>
+                                                        </div>
+                                                        {validationError && editingCell?.key === selectedModelKey && (
+                                                            <div className="text-danger small fw-bold">
+                                                                <i className="bi bi-exclamation-triangle-fill me-1"></i>
+                                                                {validationError}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ) : (
                                                     <div className="d-flex align-items-center justify-content-between">
@@ -724,6 +846,62 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                     <div className="empty-state-title">No Matching Records Found</div>
                     <p className="text-muted mt-2">Try adjusting your search criteria</p>
                 </div>
+            )}
+            
+            {/* Confirmation Modal */}
+            {showConfirmModal && ReactDOM.createPortal(
+                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.5)', zIndex: 9999 }}>
+                    <div className="bg-white rounded-3 shadow-lg p-0" style={{ width: '90%', maxWidth: '400px' }}>
+                        <div className="modal-header border-bottom p-3">
+                            <h5 className="modal-title fw-bold text-dark">
+                                <i className="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+                                Confirm Update
+                            </h5>
+                        </div>
+                        <div className="modal-body p-4">
+                            <p className="mb-3">Are you sure you want to update this serial number?</p>
+                            <div className="alert alert-light border">
+                                <div className="row g-2">
+                                    <div className="col-4"><strong>Assembly:</strong></div>
+                                    <div className="col-8">{pendingSave?.assemblyNo || 'N/A'}</div>
+                                    <div className="col-4"><strong>Board:</strong></div>
+                                    <div className="col-8">{pendingSave?.boardName || 'N/A'}</div>
+                                    <div className="col-4"><strong>New Value:</strong></div>
+                                    <div className="col-8">
+                                        <code className="bg-light px-2 py-1 rounded">{tempValue || '(empty)'}</code>
+                                    </div>
+                                </div>
+                            </div>
+                            <p className="text-muted small mb-0">This action will update the database immediately.</p>
+                        </div>
+                        <div className="modal-footer border-top p-3">
+                            <button 
+                                type="button" 
+                                className="btn btn-secondary" 
+                                onClick={cancelSave}
+                                disabled={isSaving}
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                type="button" 
+                                className="btn btn-primary" 
+                                onClick={confirmSave}
+                                disabled={isSaving}
+                            >
+                                {isSaving ? (
+                                    <>
+                                        <span className="spinner-border spinner-border-sm me-2" role="status"></span>
+                                        Saving...
+                                    </>
+                                ) : (
+                                    'Yes, Save Changes'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
             )}
         </div>
     );

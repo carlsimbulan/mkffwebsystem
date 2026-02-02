@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import logo from './icon.ico'; 
@@ -52,7 +52,30 @@ export default function Login({ onLogin }) {
     const [showPassword, setShowPassword] = useState(false);
     const [loginStatus, setLoginStatus] = useState('idle'); 
     const [statusMessage, setStatusMessage] = useState("");
+    const [inputError, setInputError] = useState(false);
+    
+    const [suffixOffset, setSuffixOffset] = useState(0);
+    const hiddenTextRef = useRef(null);
     const navigate = useNavigate();
+
+    // Sinusukat ang lapad ng text para laging nakadikit ang suffix
+    useEffect(() => {
+        if (hiddenTextRef.current) {
+            setSuffixOffset(hiddenTextRef.current.offsetWidth);
+        }
+    }, [username]);
+
+    const handleUsernameChange = (e) => {
+        const value = e.target.value;
+        // Bawal mag-type ng @ para hindi mag-double ang suffix
+        if (value.includes('@')) {
+            setInputError(true);
+            setTimeout(() => setInputError(false), 3000);
+            return;
+        }
+        setInputError(false);
+        setUsername(value);
+    };
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -60,7 +83,14 @@ export default function Login({ onLogin }) {
         setStatusMessage("Authenticating with secure server...");
 
         try {
-            const res = await axios.post(`${API_BASE_URL}/login.php`, { username, password });
+            // Pinagsasama ang username + @mkff.com bago i-send sa login.php
+            const fullUsernameForDB = `${username.trim()}@mkff.com`;
+
+            const res = await axios.post(`${API_BASE_URL}/login.php`, { 
+                username: fullUsernameForDB, 
+                password: password 
+            });
+
             if (res.data.status === "ok") {
                 setLoginStatus('success');
                 setStatusMessage(`Identity verified. Redirecting to ${res.data.user.role} workspace...`);
@@ -89,8 +119,9 @@ export default function Login({ onLogin }) {
             <style>
                 {`
                 @keyframes scrollLeft { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
-                .form-control { border: 1px solid #e2e8f0; padding: 12px; font-size: 0.9rem; border-radius: 8px; }
+                .form-control { border: 1px solid #e2e8f0; padding: 12px; font-size: 0.9rem; border-radius: 8px; color: #212529; }
                 .form-control:focus { border-color: #107c55; box-shadow: 0 0 0 3px rgba(16, 124, 85, 0.1); }
+                .form-control.is-invalid { border-color: #dc3545; }
                 .btn-submit { background: #107c55; border: none; padding: 13px; font-weight: 700; border-radius: 8px; letter-spacing: 0.5px; }
                 .btn-submit:hover { background: #0d6646; }
                 .left-panel { background: #0f172a; color: white; position: relative; }
@@ -106,17 +137,41 @@ export default function Login({ onLogin }) {
                     color: #107c55;
                     margin-bottom: 10px;
                 }
+                .username-wrapper { position: relative; display: flex; align-items: center; cursor: text; }
+                .username-suffix {
+                    position: absolute;
+                    pointer-events: none;
+                    color: #212529; 
+                    font-size: 0.9rem;
+                    white-space: nowrap;
+                    left: 13px;
+                    font-weight: 400;
+                }
+                .text-measurer {
+                    position: absolute;
+                    visibility: hidden;
+                    height: 0;
+                    white-space: pre;
+                    font-size: 0.9rem;
+                    font-family: inherit;
+                }
+                .error-note {
+                    color: #dc3545;
+                    font-size: 0.7rem;
+                    font-weight: 600;
+                    margin-top: 4px;
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                }
                 `}
             </style>
 
             <div className="row g-0 vh-100">
-                {/* LEFT PANEL */}
                 <div className="col-lg-6 d-flex flex-column justify-content-center align-items-center left-panel p-5 text-center">
                     <img src={logo} alt="Logo" className="mb-4" style={{ height: "130px", width: "auto" }} />
-                    
                     <h1 className="fw-bold mb-1 h2 tracking-tight">Edge Sensor Assembly Process</h1>
                     <p className="text-secondary small opacity-75">Precision Management & Monitoring</p>
-                    
                     <div className="scroller-container">
                         <div style={{ animation: "scrollLeft 20s linear infinite", whiteSpace: "nowrap", fontSize: "0.65rem", color: "#475569", fontWeight: "600", textTransform: "uppercase", letterSpacing: "1.5px" }}>
                             • SYSTEM SECURED • AUTHORIZED ACCESS ONLY • ALL IP ADDRESSES LOGGED • ENCRYPTED SESSION • 
@@ -124,14 +179,10 @@ export default function Login({ onLogin }) {
                     </div>
                 </div>
 
-                {/* RIGHT PANEL */}
                 <div className="col-lg-6 d-flex align-items-center justify-content-center bg-white">
                     <div style={{ width: "100%", maxWidth: "380px", padding: "30px" }}>
-                        
                         <div className="text-center mb-4">
-                            <div className="lock-icon-header">
-                                <i className="bi bi-shield-lock-fill"></i>
-                            </div>
+                            <div className="lock-icon-header"><i className="bi bi-shield-lock-fill"></i></div>
                             <h3 className="fw-bold text-dark mb-1">Secure Portal Access</h3>
                             <p className="text-muted small">Authentication required to proceed</p>
                         </div>
@@ -139,12 +190,36 @@ export default function Login({ onLogin }) {
                         <form onSubmit={handleLogin}>
                             <div className="mb-3">
                                 <label className="form-label small fw-bold text-muted mb-1">USER IDENTITY</label>
-                                <input
-                                    type="text" className="form-control"
-                                    placeholder="Username" value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
-                                    required disabled={loginStatus !== 'idle'}
-                                />
+                                <div className="username-wrapper">
+                                    <span ref={hiddenTextRef} className="text-measurer">{username}</span>
+                                    
+                                    <input
+                                        type="text" 
+                                        className={`form-control w-100 ${inputError ? 'is-invalid' : ''}`}
+                                        placeholder={username === "" ? "Username" : ""} 
+                                        value={username}
+                                        onChange={handleUsernameChange}
+                                        required 
+                                        disabled={loginStatus !== 'idle'}
+                                        autoComplete="off"
+                                    />
+                                    
+                                    <span 
+                                        className="username-suffix" 
+                                        style={{ 
+                                            transform: `translateX(${suffixOffset}px)`,
+                                            display: username === "" ? 'none' : 'block' 
+                                        }}
+                                    >
+                                        @mkff.com
+                                    </span>
+                                </div>
+                                {inputError && (
+                                    <div className="error-note">
+                                        <i className="bi bi-exclamation-circle-fill"></i>
+                                        DO NOT TYPE "@". Suffix is automatically appended.
+                                    </div>
+                                )}
                             </div>
 
                             <div className="mb-4">
@@ -153,9 +228,11 @@ export default function Login({ onLogin }) {
                                     <input
                                         type={showPassword ? "text" : "password"}
                                         className="form-control border-end-0"
-                                        placeholder="••••••••" value={password}
+                                        placeholder="••••••••" 
+                                        value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        required disabled={loginStatus !== 'idle'}
+                                        required 
+                                        disabled={loginStatus !== 'idle'}
                                     />
                                     <button 
                                         type="button"
