@@ -400,6 +400,9 @@ export function Dashboard({
                     checklist_values.s1_leads_properly_soldered = log.s1_leads_properly_soldered;
                     if (log.s1_header_seated_90_deg === 'NO GO' || log.s1_header_seated_90_deg === 'FAIL') checklist_errors.push('S1: Header seating failure');
                     if (log.s1_leads_properly_soldered === 'NO GO' || log.s1_leads_properly_soldered === 'FAIL') checklist_errors.push('S1: Soldering defects');
+                    // Check for Empty/null values
+                    if (!log.s1_header_seated_90_deg || log.s1_header_seated_90_deg === '' || log.s1_header_seated_90_deg === null) checklist_errors.push('S1: Documentation Gap - Header seating');
+                    if (!log.s1_leads_properly_soldered || log.s1_leads_properly_soldered === '' || log.s1_leads_properly_soldered === null) checklist_errors.push('S1: Documentation Gap - Soldering');
                 }
                 
                 if (worstStation.id.includes('Station2') || worstStation.id.includes('Station 2')) {
@@ -407,10 +410,14 @@ export function Dashboard({
                     checklist_values.s2_go_no_go = log.s2_go_no_go;
                     if (log.s2_voltage && (log.s2_voltage < voltage_tolerance.min || log.s2_voltage > voltage_tolerance.max)) checklist_errors.push('S2: Voltage out of tolerance');
                     if (log.s2_go_no_go === 'NO GO' || log.s2_go_no_go === 'FAIL') checklist_errors.push('S2: Final test failure');
+                    // Check for Empty/null values
+                    if (!log.s2_voltage || log.s2_voltage === '' || log.s2_voltage === null) checklist_errors.push('S2: Documentation Gap - Voltage');
+                    if (!log.s2_go_no_go || log.s2_go_no_go === '' || log.s2_go_no_go === null) checklist_errors.push('S2: Documentation Gap - Test result');
                 }
                 
                 // Generic checks for other stations
                 if (log.remarks && log.remarks.toLowerCase().includes('error')) checklist_errors.push('Remarks indicate error condition');
+                if (!log.remarks || log.remarks === '' || log.remarks === null) checklist_errors.push('Documentation Gap - Remarks');
                 
                 return {
                     assembly_no: log.assembly_no,
@@ -424,42 +431,35 @@ export function Dashboard({
             });
 
             const prompt = `You are an AI Industrial Engineer specializing in real-time production optimization at MKFF Laserteknique International inc.
-PREDICTIVE MANUFACTURING ANALYSIS: Analyze current bottleneck and forecast production line status.
 
-STATION PERFORMANCE METRICS:
-Station: ${worstStation.name} (${worstStation.id}) | Takt Time Threshold: ${thresholdMinutes}min
-Current WIP: ${worstStation.totalWIP} units | Bottleneck Units: ${worstStation.stuckUnits} units | Avg Cycle Time: ${worstStation.avgDelay.toFixed(1)}min
+CRITICAL BOTTLENECK ANALYSIS: Focus on the primary reason for the bottleneck.
 
-VELOCITY & TREND INTELLIGENCE:
-Processing Velocity: ${velocity}
-Historical Throughput (Last 5 Units): ${trendData.length} completed
-${trendData.length > 0 ? `
-Throughput Analysis:
-${trendData.map((unit, idx) => `
-  ${idx + 1}. ${unit.assembly_no} - ${unit.timestamp} 
-     Cycle Time: ${unit.processing_time_minutes ? unit.processing_time_minutes.toFixed(1) + ' min' : 'N/A'}
-     Status: ${unit.status}`).join('')}
+STATION PERFORMANCE:
+Station: ${worstStation.name} (${worstStation.id}) | Threshold: ${thresholdMinutes}min
+WIP: ${worstStation.totalWIP} units | Bottleneck Units: ${worstStation.stuckUnits} units | Avg Delay: ${worstStation.avgDelay.toFixed(1)}min
 
-Velocity States:
-- SPEEDING_UP: Takt time improvement >15% (Process Acceleration)
-- SLOWING_DOWN: Takt time degradation >15% (Bottleneck Propagation Risk)
-- STABLE: Consistent cycle time ±15% (Steady State)
-` : 'Insufficient throughput data for velocity analysis'}
-
-BOTTLENECK UNIT ANALYSIS:
+BOTTLENECK UNIT DATA:
 ${JSON.stringify(delayedContext, null, 2)}
 
-INDUSTRIAL ENGINEERING DIRECTIVE:
-Analyze bottleneck propagation risk, forecast line impact, and recommend resource reallocation strategies.
+CRITICAL INSTRUCTIONS:
+- Scan for 'Empty' or 'null' values in bottleneck units
+- If found, diagnose as 'Documentation Gap'
+- Focus ONLY on the primary bottleneck cause
+- Provide ONLY bullet points (Max 2 per section)
 
 REQUIRED OUTPUT FORMAT (STRICT):
-[DIAGNOSIS]: Current root cause using manufacturing terminology (Takt Time violation, Quality escape, Resource constraint, etc.)
+[DIAGNOSIS]: Primary bottleneck reason (Max 2 bullets)
+Example: • High NG count due to Voltage breaches
 
-[FORECAST]: Predict production line status for next 2-4 hours based on velocity trend (${velocity}) and current WIP (${worstStation.totalWIP} units). Include bottleneck propagation risk assessment.
+[FORECAST]: Production line status prediction (Max 1 bullet)
+Example: • Risk of 30% slowdown in 2 hours
 
-[PRESCRIPTION]: Provide exactly 2 actionable steps for production supervisor focusing on resource reallocation, takt time optimization, or bottleneck mitigation.
+[PRESCRIPTION]: Actionable steps (Max 2 bullets)
+Example: • Recalibrate Station 2 test rig
 
-USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Reallocation, Cycle Time Variance, Throughput Optimization, Capacity Constraint, Process Flow Disruption`;
+EXECUTIVE SUMMARY: Exactly one sentence (Max 10 words)
+
+CRITICAL: Use only bullet points. No paragraphs. No long explanations.`;
 
             // Step 3: Generate AI analysis
             const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
@@ -586,6 +586,33 @@ USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Re
                     padding: 14px 16px; 
                     background: #fafffe;
                 }
+
+                /* Compact AI Display Cards */
+                .compact-ai-card {
+                    max-height: 120px;
+                    overflow-y: auto;
+                    font-size: 0.75rem;
+                    line-height: 1.3;
+                }
+                .compact-ai-card::-webkit-scrollbar {
+                    width: 3px;
+                }
+                .compact-ai-card::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .compact-ai-card::-webkit-scrollbar-thumb {
+                    background: #cbd5e1;
+                    border-radius: 3px;
+                }
+                
+                /* Keyword Highlighting */
+                .highlight-voltage { color: #dc2626; font-weight: 700; }
+                .highlight-empty { color: #dc2626; font-weight: 700; }
+                .highlight-critical { color: #dc2626; font-weight: 700; }
+                .highlight-bottleneck { color: #dc2626; font-weight: 700; }
+                
+                /* Empty text styling */
+                .empty-text { color: #dc2626; font-weight: 600; }
             `}</style>
 
             <div className="d-flex justify-content-between align-items-center mb-4 px-2">
@@ -851,7 +878,24 @@ USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Re
                                         {(() => {
                                             const cleanedAnalysis = criticalStationAnalysis.replace(/\*\*/g, '');
                                             
-                                            // ... rest of the code remains the same ...
+                                            // Keyword highlighting function
+                                            const highlightKeywords = (text) => {
+                                                return text
+                                                    .replace(/\bVoltage\b/g, '<span class="highlight-voltage">Voltage</span>')
+                                                    .replace(/\bEmpty\b/g, '<span class="highlight-empty">Empty</span>')
+                                                    .replace(/\bCritical\b/g, '<span class="highlight-critical">Critical</span>')
+                                                    .replace(/\bBottleneck\b/g, '<span class="highlight-bottleneck">Bottleneck</span>');
+                                            };
+                                            
+                                            // Process bullet points
+                                            const processBullets = (text) => {
+                                                return text
+                                                    .split('\n')
+                                                    .filter(line => line.trim())
+                                                    .map(line => line.replace(/^[-•*]\s*/, '• ').trim())
+                                                    .join('<br>');
+                                            };
+                                            
                                             // Try different patterns to extract the sections
                                             let diagnosis = '';
                                             let forecast = '';
@@ -896,8 +940,8 @@ USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Re
                                                             <div className="analytics-card-header">
                                                                 <div className="label-caps mb-0">🔍 DIAGNOSIS</div>
                                                             </div>
-                                                            <div className="analytics-card-body">
-                                                                <div>{diagnosis}</div>
+                                                            <div className="analytics-card-body compact-ai-card">
+                                                                <div dangerouslySetInnerHTML={{ __html: highlightKeywords(processBullets(diagnosis)) }}></div>
                                                             </div>
                                                         </div>
                                                     )}
@@ -906,8 +950,8 @@ USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Re
                                                             <div className="predictive-insight-header">
                                                                 <div className="label-caps mb-0">📈 PREDICTIVE INSIGHT</div>
                                                             </div>
-                                                            <div className="predictive-insight-body">
-                                                                <div>{forecast}</div>
+                                                            <div className="predictive-insight-body compact-ai-card">
+                                                                <div dangerouslySetInnerHTML={{ __html: highlightKeywords(processBullets(forecast)) }}></div>
                                                             </div>
                                                         </div>
                                                     )}
@@ -916,8 +960,8 @@ USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Re
                                                             <div className="smart-recommendation-header">
                                                                 <div className="label-caps mb-0">💡 SMART RECOMMENDATION</div>
                                                             </div>
-                                                            <div className="smart-recommendation-body">
-                                                                <div>{prescription}</div>
+                                                            <div className="smart-recommendation-body compact-ai-card">
+                                                                <div dangerouslySetInnerHTML={{ __html: highlightKeywords(processBullets(prescription)) }}></div>
                                                             </div>
                                                         </div>
                                                     )}
@@ -926,8 +970,8 @@ USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Re
                                                             <div className="analytics-card-header">
                                                                 <div className="label-caps mb-0">Analysis Result</div>
                                                             </div>
-                                                            <div className="analytics-card-body">
-                                                                <div>{cleanedAnalysis}</div>
+                                                            <div className="analytics-card-body compact-ai-card">
+                                                                <div dangerouslySetInnerHTML={{ __html: highlightKeywords(processBullets(cleanedAnalysis)) }}></div>
                                                             </div>
                                                         </div>
                                                     )}

@@ -69,13 +69,36 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
         return duplicateInfo.duplicateBoards;
     };
 
-    // Get status based on GLOBAL duplicate detection
+    // Get status based on duplicate detection (respects model selection)
     const getStatusBadge = (log) => {
-        const duplicateInfo = hasDuplicate(log, pcbaLogs);
-        if (duplicateInfo.hasDuplicate) {
-            return <span className="badge bg-danger" title={`Duplicate boards: ${duplicateInfo.duplicateBoards.join(', ')}`}>DUP</span>;
+        if (selectedModelKey === 'all') {
+            // When "All Models" is selected, check for duplicates across ALL board types
+            const duplicateInfo = hasDuplicate(log, pcbaLogs);
+            if (duplicateInfo.hasDuplicate) {
+                return <span className="badge bg-danger" title={`Duplicate boards: ${duplicateInfo.duplicateBoards.join(', ')}`}>DUP</span>;
+            } else {
+                return <span className="badge bg-success">NO DUP</span>;
+            }
         } else {
-            return <span className="badge bg-success">NO DUP</span>;
+            // When a specific model is selected, only check for duplicates within that board type
+            const boardValue = log[selectedModelKey];
+            if (!boardValue || boardValue === '000000' || boardValue === '') {
+                return <span className="badge bg-success">NO DUP</span>;
+            }
+            
+            // Check if this specific board value exists in any other unit
+            const isDuplicate = pcbaLogs.some(otherItem => {
+                if (otherItem.id === log.id) return false;
+                return otherItem[selectedModelKey] === boardValue;
+            });
+            
+            if (isDuplicate) {
+                const boardInfo = pcbaMapping.find(m => m.dbKey === selectedModelKey);
+                const boardName = boardInfo ? boardInfo.displayName : selectedModelKey;
+                return <span className="badge bg-danger" title={`Duplicate ${boardName} board`}>DUP</span>;
+            } else {
+                return <span className="badge bg-success">NO DUP</span>;
+            }
         }
     };
 
@@ -146,11 +169,28 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
         
         // Filter to show only duplicates if the toggle is on
         if (showOnlyDuplicates) {
-            logs = logs.filter(log => hasDuplicate(log, pcbaLogs).hasDuplicate);
+            if (selectedModelKey === 'all') {
+                // When "All Models" is selected, show units with duplicates across ANY board type
+                logs = logs.filter(log => hasDuplicate(log, pcbaLogs).hasDuplicate);
+            } else {
+                // When a specific model is selected, only show units with duplicates in that board type
+                logs = logs.filter(log => {
+                    const boardValue = log[selectedModelKey];
+                    if (!boardValue || boardValue === '000000' || boardValue === '') {
+                        return false; // Skip empty boards
+                    }
+                    
+                    // Check if this specific board value exists in any other unit
+                    return pcbaLogs.some(otherItem => {
+                        if (otherItem.id === log.id) return false;
+                        return otherItem[selectedModelKey] === boardValue;
+                    });
+                });
+            }
         }
         
         return logs;
-    }, [pcbaLogs, searchTerm, showOnlyDuplicates]);
+    }, [pcbaLogs, searchTerm, showOnlyDuplicates, selectedModelKey]);
 
     const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
     const paginatedLogs = useMemo(() => {

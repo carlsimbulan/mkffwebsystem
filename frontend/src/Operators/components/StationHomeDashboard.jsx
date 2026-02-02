@@ -60,6 +60,20 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
         }
     }, [dynamicTargetTimes, currentStation, previousTargetTime]);
 
+    // 🔑 Get current task based on station
+    const getCurrentTask = (stationId) => {
+        const stationTasks = {
+            'Station 1': 'Header Seating Check',
+            'Station 2': 'Soldering Inspection',
+            'Station 3': 'Component Testing',
+            'Station 4': 'Quality Control',
+            'Station 5': 'Final Assembly',
+            'Station 6': 'Voltage Calibration',
+            'Station 7': 'Packaging Inspection'
+        };
+        return stationTasks[stationId] || 'Processing Task';
+    };
+
     // 🔑 Handle note change for delayed unit
     const handleNoteChange = (unitId, note) => {
         setDelayedUnitNotes(prev => ({
@@ -230,72 +244,61 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
                                             <tr>
                                                 <th className="px-4">MODEL</th>
                                                 <th>ASSEMBLY NO</th>
-                                                <th>REMARKS</th>
+                                                <th>CURRENT TASK</th>
                                                 <th>DELAY TIME</th>
                                                 <th>STATUS</th>
-                                                <th>CHECKLIST NOTES</th>
                                                 <th className="text-end px-4">ACTIONS</th>
                                             </tr>
                                         </thead>
                                         <tbody style={{ fontSize: '0.85rem' }}>
-                                            {delayedUnits.map((unit) => (
-                                                <tr key={unit.id}>
-                                                    {/* Binago: log.model_id o log.model depende sa source */}
-                                                    <td className="px-4 fw-bold text-dark">{unit.model || unit.model_id}</td>
-                                                    {/* PINAKAMAHALAGA: ASSEMBLY NO FIX (underscore dapat) */}
-                                                    <td className="fw-bold text-primary">
-                                                        <code style={{fontSize: '0.9rem'}}>{unit.assembly_no || unit.assemblyNo}</code>
-                                                    </td>
-                                                    <td className="text-muted" style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                        {unit.remarks || <span className="opacity-50 italic">No remarks</span>}
-                                                    </td>
-                                                    <td>
-                                                        <div className="text-danger fw-bold d-flex align-items-center gap-1">
-                                                            <i className="bi bi-alarm-fill"></i> {unit.delayMinutes}m Over
-                                                        </div>
-                                                        <div className="small text-muted">
-                                                            Target: {dynamicTargetTimes[currentStation] || 10}m
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <span className={`badge ${
-                                                            unit.status === 'In Progress' 
-                                                                ? 'bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25' 
-                                                                : 'bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25'
-                                                        } px-2 rounded-pill`}>
-                                                            {unit.status === 'In Progress' ? 'IN PROGRESS' : 'NO GOOD (NG)'}
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ minWidth: '200px' }}>
-                                                        <input
-                                                            type="text"
-                                                            className="form-control form-control-sm"
-                                                            placeholder="Add required checklist notes..."
-                                                            value={delayedUnitNotes[unit.id] || ''}
-                                                            onChange={(e) => handleNoteChange(unit.id, e.target.value)}
-                                                            style={{ fontSize: '0.8rem' }}
-                                                        />
-                                                        {delayedUnitNotes[unit.id] && (
-                                                            <div className="small text-muted mt-1">
-                                                                <i className="bi bi-check-circle-fill text-success"></i> Notes added
+                                            {delayedUnits.map((unit) => {
+                                                const delay = checkUnitDelay(currentStation, unit.updated_at || unit.created_at);
+                                                const isCritical = delay.level === 'CRITICAL';
+                                                return (
+                                                    <tr key={unit.id} className={isCritical ? 'critical-delay-row' : ''}>
+                                                        {/* Binago: log.model_id o log.model depende sa source */}
+                                                        <td className="px-4 fw-bold text-dark">{unit.model || unit.model_id}</td>
+                                                        {/* PINAKAMAHALAGA: ASSEMBLY NO FIX (underscore dapat) */}
+                                                        <td className="fw-bold text-primary">
+                                                            <code style={{fontSize: '0.9rem', fontFamily: 'Monaco, Consolas, "Courier New", monospace'}}>{unit.assembly_no || unit.assemblyNo}</code>
+                                                        </td>
+                                                        <td className="fw-bold text-info">
+                                                            <i className="bi bi-tools me-1"></i>
+                                                            {getCurrentTask(currentStation)}
+                                                        </td>
+                                                        <td>
+                                                            <div className="text-danger fw-bold d-flex align-items-center gap-1">
+                                                                <i className="bi bi-alarm-fill"></i> {unit.delayMinutes}m Over
                                                             </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="text-end px-4">
-                                                        <button className="btn btn-sm btn-dark rounded-pill px-3 fw-bold" onClick={() => setActiveTab('in_progress')}>
-                                                            MANAGE
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                                            <div className="small text-muted">
+                                                                Target: {dynamicTargetTimes[currentStation] || 10}m
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <span className={`badge ${
+                                                                unit.status === 'In Progress' 
+                                                                    ? 'bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25' 
+                                                                    : 'bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25'
+                                                            } px-2 rounded-pill`}>
+                                                                {unit.status === 'In Progress' ? 'IN PROGRESS' : 'NO GOOD (NG)'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="text-end px-4">
+                                                            <button className="btn btn-sm btn-primary rounded-pill px-3 fw-bold" onClick={() => setActiveTab('in_progress')}>
+                                                                <i className="bi bi-arrow-right-circle me-1"></i> MANAGE
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
                             ) : (
                                 <div className="text-center py-5">
                                     <i className="bi bi-check2-all text-success display-4 mb-3"></i>
-                                    <h5 className="fw-bold">No Delays Detected</h5>
-                                    <p className="text-muted small">All units are currently within the standard processing time.</p>
+                                    <h5 className="fw-bold">LINE CLEAR</h5>
+                                    <p className="text-muted small">All units are operating within Takt Time efficiency.</p>
                                 </div>
                             )}
                         </div>
@@ -325,6 +328,27 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
                 }
                 .target-time-update {
                     animation: targetTimePulse 0.6s ease-in-out;
+                }
+                
+                /* Critical delay row styling */
+                .critical-delay-row {
+                    background-color: rgba(220, 38, 38, 0.1) !important;
+                    animation: criticalPulse 2s infinite;
+                }
+                
+                @keyframes criticalPulse {
+                    0% { 
+                        background-color: rgba(220, 38, 38, 0.1);
+                        box-shadow: none;
+                    }
+                    50% { 
+                        background-color: rgba(220, 38, 38, 0.15);
+                        box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.3);
+                    }
+                    100% { 
+                        background-color: rgba(220, 38, 38, 0.1);
+                        box-shadow: none;
+                    }
                 }
             `}</style>
         </div>

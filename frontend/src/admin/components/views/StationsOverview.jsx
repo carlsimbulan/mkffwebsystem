@@ -421,7 +421,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                         <div class="analysis-header">
                             <span class="analysis-title">DIAGNOSIS</span>
                         </div>
-                        <div class="analysis-content">${diagnosis}</div>
+                        <div class="analysis-content">${diagnosis.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
                     </div>
                 ` : ''}
                 ${forecast ? `
@@ -429,7 +429,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                         <div class="analysis-header">
                             <span class="analysis-title">FORECAST</span>
                         </div>
-                        <div class="analysis-content">${forecast}</div>
+                        <div class="analysis-content">${forecast.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
                     </div>
                 ` : ''}
                 ${prescription ? `
@@ -437,12 +437,12 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                         <div class="analysis-header">
                             <span class="analysis-title">PRESCRIPTION</span>
                         </div>
-                        <div class="analysis-content">${prescription}</div>
+                        <div class="analysis-content">${prescription.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
                     </div>
                 ` : ''}
                 ${!diagnosis && !forecast && !prescription ? `
                     <div class="fallback-analysis">
-                        <div class="analysis-content">${cleanedAnalysis}</div>
+                        <div class="analysis-content">${cleanedAnalysis.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
                     </div>
                 ` : ''}
             </div>
@@ -606,15 +606,26 @@ ANALYSIS INSTRUCTIONS:
 
 REQUIRED OUTPUT FORMAT (STRICT):
 [DIAGNOSIS]: Current root cause using manufacturing terminology, referencing specific checklist failures
+- Maximum 2 bullet points
+- Each bullet must be exactly one sentence
+- Example: • Voltage breach detected at Station 2.
 
 [FORECAST]: Predict station status for next 2-4 hours based on current conditions and error patterns
+- Maximum 1 bullet point
+- Each bullet must be exactly one sentence
+- Example: • Risk of 30% slowdown in 2 hours.
 
 [PRESCRIPTION]: Provide exactly 2 actionable steps for production supervisor based on specific checklist errors found
+- Maximum 2 bullet points
+- Each bullet must be exactly one sentence
+- Example: • Recalibrate Station 2 test rig.
 - For voltage issues: suggest electrical equipment calibration
 - For quality failures: suggest specific process adjustments
 - For process-driven delays: suggest workflow optimization
 
-USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Reallocation, Cycle Time Variance`;
+EXECUTIVE SUMMARY: Strictly maximum of 10 words only.
+
+CRITICAL: Use only one-sentence bullet points. No paragraphs. No long explanations.`;
 
             const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
                 method: 'POST',
@@ -713,8 +724,8 @@ USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Re
                 
                 .analysis-content { 
                     padding: 16px; 
-                    font-size: 0.9rem; 
-                    line-height: 1.6; 
+                    font-size: 0.8rem; 
+                    line-height: 1.4; 
                     font-weight: 500;
                 }
                 .diagnosis-card .analysis-content { color: #7f1d1d; }
@@ -1085,7 +1096,7 @@ export function StationsOverview({
                         <div class="hub-header">
                             <span class="hub-title">DIAGNOSIS</span>
                         </div>
-                        <div class="hub-content">${diagnosis}</div>
+                        <div class="hub-content">${diagnosis.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
                     </div>
                 ` : ''}
                 ${forecast ? `
@@ -1093,7 +1104,7 @@ export function StationsOverview({
                         <div class="hub-header">
                             <span class="hub-title">FORECAST</span>
                         </div>
-                        <div class="hub-content">${forecast}</div>
+                        <div class="hub-content">${forecast.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
                     </div>
                 ` : ''}
                 ${prescription ? `
@@ -1101,12 +1112,12 @@ export function StationsOverview({
                         <div class="hub-header">
                             <span class="hub-title">PRESCRIPTION</span>
                         </div>
-                        <div class="hub-content">${prescription}</div>
+                        <div class="hub-content">${prescription.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
                     </div>
                 ` : ''}
                 ${!diagnosis && !forecast && !prescription ? `
                     <div class="fallback-hub-analysis">
-                        <div class="hub-content">${cleanedAnalysis}</div>
+                        <div class="hub-content">${cleanedAnalysis.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
                     </div>
                 ` : ''}
             </div>
@@ -1301,12 +1312,23 @@ VALIDATION CRITERIA:
 
 REQUIRED OUTPUT FORMAT (STRICT):
 [DIAGNOSIS]: Current root cause analysis across all hotspot stations using manufacturing terminology, referencing specific checklist failures and cross-station relationships
+- Maximum 2 bullet points
+- Each bullet must be exactly one sentence
+- Example: • Voltage breach detected at Station 2.
 
 [FORECAST]: Predict production line status for next 2-4 hours based on current bottlenecks and their propagation risk across stations
+- Maximum 1 bullet point
+- Each bullet must be exactly one sentence
+- Example: • Risk of 30% slowdown in 2 hours.
 
 [PRESCRIPTION]: Provide exactly 2 actionable steps for production supervisor focusing on resource reallocation and bottleneck mitigation, addressing the specific cross-station issues found
+- Maximum 2 bullet points
+- Each bullet must be exactly one sentence
+- Example: • Recalibrate Station 2 test rig.
 
-USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Reallocation, Throughput Optimization, Upstream-Downstream Dependencies`;
+EXECUTIVE SUMMARY: Strictly maximum of 10 words only.
+
+CRITICAL: Use only one-sentence bullet points. No paragraphs. No long explanations.`;
 
             const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
                 method: 'POST',
@@ -1563,8 +1585,8 @@ USE INDUSTRIAL ENGINEERING TERMS: Takt Time, Bottleneck Propagation, Resource Re
                 
                 .hub-content { 
                     padding: 16px; 
-                    font-size: 0.9rem; 
-                    line-height: 1.6; 
+                    font-size: 0.8rem; 
+                    line-height: 1.4; 
                     font-weight: 500;
                 }
                 .diagnosis-hub-card .hub-content { color: #7f1d1d; }

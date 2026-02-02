@@ -132,7 +132,8 @@ const setActiveTab = (tab) => {
     const [scanInput, setScanInput] = useState("");
     const [processStatus, setProcessStatus] = useState('idle'); 
     const [statusMessage, setStatusMessage] = useState("");
-    const [unitList, setUnitList] = useState([]);
+    const [unitList, setUnitList] = useState([]); // For tab-specific content
+    const [globalUnitList, setGlobalUnitList] = useState([]); // For sidebar badges - never cleared
     const [historyList, setHistoryList] = useState([]); 
     const [listLoading, setListLoading] = useState(false);
     const [listError, setListError] = useState(null);
@@ -141,6 +142,7 @@ const setActiveTab = (tab) => {
 
     // 🔑 REF for Previous Unit List (used for status change detection)
     const prevUnitListRef = useRef([]);
+    const prevGlobalUnitListRef = useRef([]); // For global data comparison
 
     const [formData, setFormData] = useState({
         model: "", revision: "", baseUnitKittingNo: "", assemblyNo: "",
@@ -222,10 +224,12 @@ useEffect(() => {
     fetchUserData();
 }, [user.username]); // Dependency sa username
     
-    // --- HOOKED FUNCTIONS: FETCH UNIT LIST (Retained polling and ref update logic) ---
-    const fetchUnits = useCallback(async (status) => { 
-    if (activeTab !== 'home') {
-        setListLoading(true); setListError(null);
+    // --- HOOKED FUNCTIONS: FETCH UNIT LIST (Refactored for universal polling) ---
+    const fetchUnits = useCallback(async (status, isBackgroundPoll = false) => { 
+    // Only show loading state for initial loads, not background polling
+    if (!isBackgroundPoll && activeTab !== 'home') {
+        setListLoading(true); 
+        setListError(null);
     }
     
     let dbStatus = status.replace(/_/g, ' ').replace(' unit', '');
@@ -258,15 +262,67 @@ useEffect(() => {
             assemblyNo: unit.assembly_no
         }));
 
-        setUnitList(newUnitList);
-        prevUnitListRef.current = newUnitList;
+        // 🔑 SILENT FETCHING: Only update state if data actually changed during background poll
+        if (isBackgroundPoll) {
+            // Check if data has changed by comparing with previous state
+            const currentData = JSON.stringify(prevUnitListRef.current);
+            const newData = JSON.stringify(newUnitList);
+            
+            if (currentData !== newData) {
+                // Only update if data is different
+                setUnitList(newUnitList);
+                prevUnitListRef.current = newUnitList;
+            }
+        } else {
+            // Always update for non-background polls
+            setUnitList(newUnitList);
+            prevUnitListRef.current = newUnitList;
+        }
 
     } catch (err) {
         setListError(`Failed to load data: ${err.message}`);
     } finally {
-        if (activeTab !== 'home') setListLoading(false);
+        if (!isBackgroundPoll && activeTab !== 'home') setListLoading(false);
     }
 }, [currentStation, activeTab]); 
+
+    // --- 🔑 HOOKED FUNCTIONS: FETCH GLOBAL UNITS FOR SIDEBAR (Never cleared) ---
+    const fetchGlobalUnits = useCallback(async (isBackgroundPoll = false) => {
+        try {
+            const res = await axios.get(UNITS_ENDPOINT, {
+                params: {
+                    station: currentStation,
+                    status: '' // Get all units for sidebar counts
+                }
+            });
+            
+            const rawData = Array.isArray(res.data) ? res.data : [];
+            const newGlobalUnitList = rawData.map(unit => ({
+                ...unit,
+                deviceSerialNo: unit.device_serial_no,
+                accessoryKittingNo: unit.accessory_kitting_no,
+                baseUnitKittingNo: unit.base_unit_kitting_no,
+                assemblyNo: unit.assembly_no
+            }));
+
+            // 🔑 SILENT FETCHING: Only update if data actually changed during background poll
+            if (isBackgroundPoll) {
+                const currentData = JSON.stringify(prevGlobalUnitListRef.current);
+                const newData = JSON.stringify(newGlobalUnitList);
+                
+                if (currentData !== newData) {
+                    setGlobalUnitList(newGlobalUnitList);
+                    prevGlobalUnitListRef.current = newGlobalUnitList;
+                }
+            } else {
+                setGlobalUnitList(newGlobalUnitList);
+                prevGlobalUnitListRef.current = newGlobalUnitList;
+            }
+
+        } catch (err) {
+            console.error("Failed to fetch global units:", err);
+        }
+    }, [currentStation]); 
     
     // --- HOOKED FUNCTIONS: FETCH HISTORY (Unchanged) ---
     const fetchHistory = useCallback(async () => {
@@ -344,12 +400,36 @@ useEffect(() => {
     }, [fetchAnnouncements]);
     // --- END ANNOUNCEMENT POLLING EFFECT ---
 
-    // --- 🔑 POLLING EFFECT FOR UNIT STATUS CHECK (1 second) ---
+    // --- GLOBAL POLLING EFFECT FOR SIDEBAR COUNTERS (2 seconds) ---
+    useEffect(() => {
+        // Initial fetch for sidebar
+        fetchGlobalUnits(false);
+        
+        // This effect runs regardless of activeTab to keep sidebar badges updated
+        const intervalId = setInterval(() => {
+            fetchGlobalUnits(true); // Fetch all units for sidebar, mark as background poll
+        }, 2000);
+
+        return () => {
+            if (intervalId) clearInterval(intervalId);
+        };
+    }, [fetchGlobalUnits]); // Only depends on fetchGlobalUnits
+
+    // --- UNIVERSAL POLLING EFFECT FOR UNIT STATUS CHECK (1 second) ---
     useEffect(() => {
         let intervalId;
-        if (activeTab === 'home') {
-             fetchUnits(activeTab);
-             intervalId = setInterval(() => fetchUnits(activeTab), 1000); 
+        
+        // Define monitoring tabs that need real-time updates
+        const monitoringTabs = ['home', 'in_progress', 'completed', 'no_good', 'pending'];
+        
+        if (monitoringTabs.includes(activeTab)) {
+            // Initial fetch for current tab
+            fetchUnits(activeTab === 'home' ? '' : activeTab, false);
+            
+            // Start polling every 1 second for real-time updates
+            intervalId = setInterval(() => {
+                fetchUnits(activeTab === 'home' ? '' : activeTab, true); // Mark as background poll
+            }, 1000);
         }
 
         return () => {
@@ -680,10 +760,7 @@ const handleSubmit = async (e, checklist_data = null) => {
         else if (activeTab === 'home') {
             // Initial fetch handled by the unit polling effect above
         }
-        else { 
-            setUnitList([]); 
-            setHistoryList([]); 
-        }
+        // 🔑 REMOVED: setUnitList([]) to prevent sidebar flickering
     }, [activeTab, fetchUnits, fetchHistory, fetchAnnouncements, announcements.length, handleMarkAsRead]);
 
     // --- USEEFFECT FOR SCANNER FOCUS (Unchanged) ---
@@ -699,6 +776,14 @@ const handleSubmit = async (e, checklist_data = null) => {
         completed: unitList.filter(u => u.status === 'Completed').length,
         inProgress: unitList.filter(u => u.status === 'In Progress').length,
         ng: unitList.filter(u => u.status === 'No Good (NG)').length,
+    };
+    
+    // 🔑 Calculate real-time counts for sidebar badges with fallback using global data
+    const sidebarCounts = {
+        inProgress: (globalUnitList || []).filter(u => u.status === 'In Progress').length,
+        completed: (globalUnitList || []).filter(u => u.status === 'Completed').length,
+        noGood: (globalUnitList || []).filter(u => u.status === 'No Good (NG)').length,
+        pending: (globalUnitList || []).filter(u => u.status === 'Pending Approval').length,
     };
     
     // 🔑 CALCULATE UNREAD COUNT based on lastReadId from Local Storage
@@ -945,20 +1030,32 @@ const todayAnnouncementsCount = announcements.filter(a => {
             <li className="text-uppercase small text-secondary mb-1 px-3" style={{fontSize: '0.6rem', letterSpacing: '1px', fontWeight: '500'}}>Monitoring</li>
             
             {[
-                { k: 'in_progress', i: 'bi-gear-wide-connected', l: 'In Progress' }, 
-                { k: 'completed', i: 'bi-check-circle', l: 'Completed' }, 
-                { k: 'no_good', i: 'bi-x-octagon', l: 'No Good (NG)' }, 
-                { k: 'pending', i: 'bi-clock-history', l: 'Pending' }
-            ].map(({ k, i, l }) => (
-                <li key={k} className="nav-item">
-                    <button 
-                        className={`btn w-100 text-start d-flex align-items-center px-3 py-2 nav-custom-btn ${activeTab === k ? 'active-glass' : ''}`} 
-                        onClick={() => setActiveTab(k)}
-                    >
-                        <i className={`bi ${i} me-3`}></i> {l}
-                    </button>
-                </li>
-            ))}
+                { k: 'in_progress', i: 'bi-gear-wide-connected', l: 'In Progress', countKey: 'inProgress', color: 'warning' }, 
+                { k: 'completed', i: 'bi-check-circle', l: 'Completed', countKey: 'completed', color: 'success' }, 
+                { k: 'no_good', i: 'bi-x-octagon', l: 'No Good (NG)', countKey: 'noGood', color: 'danger' }, 
+                { k: 'pending', i: 'bi-clock-history', l: 'Pending', countKey: 'pending', color: 'primary' }
+            ].map(({ k, i, l, countKey, color }) => {
+                const count = sidebarCounts[countKey];
+                
+                return (
+                    <li key={k} className="nav-item">
+                        <button 
+                            className={`btn w-100 text-start d-flex align-items-center justify-content-between px-3 py-2 nav-custom-btn ${activeTab === k ? 'active-glass' : ''}`} 
+                            onClick={() => setActiveTab(k)}
+                        >
+                            <div className="d-flex align-items-center">
+                                <i className={`bi ${i} me-3`}></i> 
+                                <span>{l}</span>
+                            </div>
+                            {count > 0 && (
+                                <span className={`badge bg-${color} rounded-pill`} style={{ fontSize: '0.7rem', fontWeight: '600' }}>
+                                    {count > 99 ? '99+' : count}
+                                </span>
+                            )}
+                        </button>
+                    </li>
+                );
+            })}
 
             <hr className="border-secondary my-2 opacity-25" />
             <li className="text-uppercase small text-secondary mb-1 px-3" style={{fontSize: '0.6rem', letterSpacing: '1px', fontWeight: '500'}}>Reports & Logs</li>
@@ -982,6 +1079,7 @@ const todayAnnouncementsCount = announcements.filter(a => {
 
     {/* Sidebar Footer */}
     <div className="mt-auto pt-3 border-top border-secondary text-center text-white-50 opacity-25" style={{ fontSize: '0.65rem' }}>
+        <span>2025 MKFF Laser Technique</span>
         <span>©2025 MKFF Laser Technique</span>
     </div>
 </div>
