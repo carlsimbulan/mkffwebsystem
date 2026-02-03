@@ -131,19 +131,26 @@ const TargetTimeModal = ({ onClose, onSave, API_BASE_URL }) => {
                         <button type="button" className="btn-close btn-close-white" onClick={onClose}></button>
                     </div>
 
-                    <div className="modal-body" style={{ overflowY: 'auto', flex: '1' }}>
+                    {/* FIXED DESCRIPTION CONTAINER */}
+                    <div className="bg-light border-bottom" style={{ padding: '16px 20px' }}>
+                        <p className="text-muted mb-0">
+                            <i className="bi bi-info-circle me-2"></i>
+                            Configure target processing times for each station. Units exceeding these times will trigger delay alerts.
+                        </p>
+                    </div>
+
+                    {/* SCROLLABLE CONTENT */}
+                    <div className="modal-body" style={{ 
+                        overflowY: 'auto', 
+                        flex: '1',
+                        padding: '20px'
+                    }}>
                         {error && (
                             <div className="alert alert-danger">
                                 <i className="bi bi-exclamation-triangle me-2"></i>
                                 {error}
                             </div>
                         )}
-
-                        <div className="mb-3">
-                            <p className="text-muted">
-                                Configure target processing times for each station. Units exceeding these times will trigger delay alerts.
-                            </p>
-                        </div>
 
                         <div className="row g-3">
                             {Array.from({ length: 15 }, (_, i) => {

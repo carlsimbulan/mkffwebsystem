@@ -431,7 +431,7 @@ $baseSql = "SELECT
         if ($status) { $conditions[] = "u.status = :status"; $params['status'] = $status; }
         $sql = $baseSql;
         if (count($conditions) > 0) $sql .= " WHERE " . implode(" AND ", $conditions);
-        $sql .= " ORDER BY u.created_at DESC";
+        $sql .= " GROUP BY u.id ORDER BY u.created_at DESC";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
@@ -475,10 +475,44 @@ if (($stat === 'No Good (NG)' || $stat === 'Pending Approval') && empty($remarks
     $remarksText = "Set to $stat by system - No remarks provided.";
 }
 
-    // I-check kung nage-exist na ang unit
-    $check = $pdo->prepare("SELECT id, model FROM units WHERE assembly_no = ?");
-    $check->execute([$assy]);
-    $existingUnit = $check->fetch(PDO::FETCH_ASSOC);
+    // Check if this is an edit (has ID) or create operation
+    $unitId = $data['id'] ?? null;
+    
+    if ($unitId) {
+        // EDIT OPERATION: Find existing unit by ID
+        $check = $pdo->prepare("SELECT id, model, assembly_no FROM units WHERE id = ?");
+        $check->execute([$unitId]);
+        $existingUnit = $check->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$existingUnit) {
+            throw new Exception("Unit not found for editing.");
+        }
+        
+        $modelForLog = $existingUnit['model'];
+        $assy = $existingUnit['assembly_no']; // Use existing assembly_no for consistency
+        $action = 'UNIT_EDITED';
+        
+    } else {
+        // CREATE OPERATION: Check if assembly_no already exists
+        if (empty($assy)) {
+            throw new Exception("Assembly number is required for new units.");
+        }
+        
+        $check = $pdo->prepare("SELECT id, model FROM units WHERE assembly_no = ?");
+        $check->execute([$assy]);
+        $existingUnit = $check->fetch(PDO::FETCH_ASSOC);
+
+        if ($existingUnit) {
+            $unitId = $existingUnit['id'];
+            $modelForLog = $existingUnit['model'];
+            $action = 'STATION_UPDATE';
+        } else {
+            // Create new unit - only allow POST method for creation
+            if ($method !== 'POST') {
+                throw new Exception("Unit not found. Use POST method to create new units.");
+            }
+        }
+    }
 
     if ($existingUnit) {
         $unitId = $existingUnit['id'];
@@ -570,28 +604,60 @@ if ($cleanStn === 'Station1' && !empty($unitId)) {
             $val = getNullIfEmpty($data[$reactKey] ?? '');
             if (!$val) continue; // Laktawan kung walang pinasang serial
 
-            // Duplicate Check
-            $stmt = $pdo->prepare("SELECT assembly_no FROM unit_pcba_details WHERE $dbColumn = ? AND unit_id != ?");
-            $stmt->execute([$val, $unitId]);
-            if ($stmt->fetch()) {
-                throw new Exception("Error: Board serial '$val' is already registered.");
+            // Duplicate Check - Modified to allow editing existing unit with same serial
+            $stmt = $pdo->prepare("SELECT assembly_no, unit_id FROM unit_pcba_details WHERE $dbColumn = ?");
+            $stmt->execute([$val]);
+            $existingBoard = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($existingBoard && $existingBoard['unit_id'] != $unitId) {
+                throw new Exception("Error: Board serial '$val' is already registered to another unit.");
             }
         }
 
-        // Save lang kung may mnbd_no sa request
-        if (isset($data['mnbd_no'])) {
+        // Check if PCBA record already exists for this unit
+        $checkPCBA = $pdo->prepare("SELECT id FROM unit_pcba_details WHERE unit_id = ?");
+        $checkPCBA->execute([$unitId]);
+        $existingPCBA = $checkPCBA->fetch(PDO::FETCH_ASSOC);
+        
+        if ($existingPCBA) {
+            // Update existing record
+            $sqlPCBA = "UPDATE unit_pcba_details SET 
+                        assembly_no = ?, 
+                        mnbd_board_no = ?, 
+                        cmbd_board_no = ?, 
+                        lrbd_board_no = ?, 
+                        pqbd_board_no = ?, 
+                        bkbd_board_no = ? 
+                        WHERE unit_id = ?";
+            $pdo->prepare($sqlPCBA)->execute([
+                $assy, 
+                getNullIfEmpty($data['mnbd_no'] ?? ''), 
+                getNullIfEmpty($data['cmbd_no'] ?? ''), 
+                getNullIfEmpty($data['lrbd_no'] ?? ''), 
+                getNullIfEmpty($data['pqbd_no'] ?? ''), 
+                getNullIfEmpty($data['bkbd_no'] ?? ''),
+                $unitId
+            ]);
+        } else {
+            // Insert new record
             $sqlPCBA = "INSERT INTO unit_pcba_details (unit_id, assembly_no, mnbd_board_no, cmbd_board_no, lrbd_board_no, pqbd_board_no, bkbd_board_no) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE 
-                        mnbd_board_no=VALUES(mnbd_board_no), cmbd_board_no=VALUES(cmbd_board_no), 
-                        lrbd_board_no=VALUES(lrbd_board_no), pqbd_board_no=VALUES(pqbd_board_no), bkbd_board_no=VALUES(bkbd_board_no)";
-            $pdo->prepare($sqlPCBA)->execute([$unitId, $assy, getNullIfEmpty($data['mnbd_no']??''), getNullIfEmpty($data['cmbd_no']??''), getNullIfEmpty($data['lrbd_no']??''), getNullIfEmpty($data['pqbd_no']??''), getNullIfEmpty($data['bkbd_no']??'')]);
+                        VALUES (?, ?, ?, ?, ?, ?, ?)";
+            $pdo->prepare($sqlPCBA)->execute([
+                $unitId, 
+                $assy, 
+                getNullIfEmpty($data['mnbd_no'] ?? ''), 
+                getNullIfEmpty($data['cmbd_no'] ?? ''), 
+                getNullIfEmpty($data['lrbd_no'] ?? ''), 
+                getNullIfEmpty($data['pqbd_no'] ?? ''), 
+                getNullIfEmpty($data['bkbd_no'] ?? '')
+            ]);
         }
     } else if ($stat === 'No Good (NG)') {
         // Linisin ang boards kung nag-fail sa Station 1
         $pdo->prepare("DELETE FROM unit_pcba_details WHERE unit_id = ?")->execute([$unitId]);
     }
 }
-    // Final History Log
+// ... (rest of the code remains the same)
     if ($unitId) {
         logUnitAction($pdo, $unitId, $modelForLog ?? ($data['model'] ?? ''), $assy, $stn, $stat, $action, $remarksText, $user_name);
     }

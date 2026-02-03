@@ -31,7 +31,21 @@ $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'GET') {
     // --- FETCH LOGIC ---
     try {
-        $sql = "SELECT * FROM unit_pcba_details ORDER BY created_at DESC";
+        // Fix duplicates by getting unique records per unit_id
+        $sql = "SELECT DISTINCT 
+                    ud.id,
+                    ud.unit_id,
+                    ud.assembly_no,
+                    ud.mnbd_board_no,
+                    ud.cmbd_board_no,
+                    ud.lrbd_board_no,
+                    ud.pqbd_board_no,
+                    ud.bkbd_board_no,
+                    ud.created_at,
+                    u.status as unit_status
+                FROM unit_pcba_details ud
+                LEFT JOIN units u ON ud.unit_id = u.id
+                ORDER BY ud.created_at DESC";
         $stmt = $pdo->prepare($sql);
         $stmt->execute();
         $inventory = $stmt->fetchAll(PDO::FETCH_ASSOC);
