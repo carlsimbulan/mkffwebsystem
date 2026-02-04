@@ -1196,8 +1196,8 @@ export function StationsOverview({
         setIsDelayHotspotsAiLoading(true);
         setDelayHotspotsAi(null);
         try {
-            // Data Sync: Create hotspotDetailedPayload with checklist data for each station
-            const hotspotDetailedPayload = delayHotspots.map(station => {
+            // Data Extraction: Create hotspotDetailedPayload with checklist data and historical performance for each station
+            const hotspotDetailedPayload = await Promise.all(delayHotspots.map(async (station) => {
                 const stationMetrics = calculateMetrics(station.id);
                 const stationLogs = stationMetrics.stationLogs || [];
                 
@@ -1207,6 +1207,37 @@ export function StationsOverview({
                     const isInProgressOrNG = log.status === 'In Progress' || statusText.includes('no good') || statusText.includes('ng');
                     return isInProgressOrNG && checkUnitDelay(station.id, log.updated_at || log.created_at, dynamicDelayThresholds).isDelayed;
                 });
+
+                // Get unique operators currently active at the station
+                const activeOperators = [...new Set(delayedUnits.map(log => log.action_by).filter(Boolean))];
+                
+                // Fetch 3-year historical performance for each active operator
+                const historicalPerformance = await Promise.all(activeOperators.map(async (operatorId) => {
+                    try {
+                        const performanceRes = await fetch(`http://localhost/mkffwebsystem/backend/api/operator_performance.php`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                action: 'get_operator_performance',
+                                operator_id: operatorId,
+                                station_id: station.id,
+                                years: 3
+                            })
+                        });
+                        
+                        if (performanceRes.ok) {
+                            const performanceData = await performanceRes.json();
+                            return {
+                                operator_id: operatorId,
+                                performance_data: performanceData.data || []
+                            };
+                        }
+                        return { operator_id: operatorId, performance_data: [] };
+                    } catch (err) {
+                        console.warn(`Failed to fetch performance for operator ${operatorId}:`, err);
+                        return { operator_id: operatorId, performance_data: [] };
+                    }
+                }));
 
                 // Capture checklist data for each delayed unit
                 const delayedUnitsWithChecklist = delayedUnits.map(log => {
@@ -1264,6 +1295,7 @@ export function StationsOverview({
                         model: log.model,
                         station: log.station,
                         status: log.status,
+                        action_by: log.action_by,
                         minutes_in_station: Math.max(0, (new Date().getTime() - new Date(log.updated_at || log.created_at).getTime()) / (1000 * 60)),
                         checklist_data: checklistData
                     };
@@ -1274,9 +1306,11 @@ export function StationsOverview({
                     station_name: station.name,
                     delayed_units_count: delayedUnits.length,
                     avg_delay_minutes: station.avgDelayMinutes,
+                    active_operators: activeOperators,
+                    historical_performance: historicalPerformance,
                     delayed_units_with_checklist: delayedUnitsWithChecklist
                 };
-            });
+            }));
 
             const modelRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
                 method: 'POST',
@@ -1293,17 +1327,25 @@ export function StationsOverview({
                 throw new Error('No model returned from backend');
             }
 
-            const prompt = `You are an AI Industrial Engineer specializing in real-time production optimization at MKFF Laserteknique International inc.
+            const prompt = `You are a Senior Industrial AI Systems Engineer specializing in predictive manufacturing intelligence at MKFF Laserteknique International inc.
 
-MANUFACTURING HOTSPOTS ANALYSIS WITH DETAILED CHECKLIST DATA:
+LONGITUDINAL MANUFACTURING ANALYSIS WITH 3-YEAR HISTORICAL CORRELATION:
 ${JSON.stringify(hotspotDetailedPayload, null, 2)}
 
-CROSS-STATION ANALYSIS INSTRUCTIONS:
-1. Look for patterns across DIFFERENT stations (e.g., 'If Station 1 has soldering issues, is it causing the delay in Station 2?')
-2. Identify voltage tolerance breaches (outside 113.85V-116.15V) in technical stations (2, 6)
-3. Analyze quality-driven delays (NO GO, FAIL, NOT DETECTED) vs process-driven delays
-4. Look for upstream-downstream relationships between stations
-5. Identify if issues in early stations (1-5) are causing bottlenecks in later stations (6-15)
+ANALYSIS FRAMEWORK:
+1. LONGITUDINAL CORRELATION: Compare current NG counts and processing times against historical values in operator_performance_logs for the same month across previous years (e.g., comparing Jan 2026 data to Jan 2024/2025 records)
+2. SKILLS GAP ATTRIBUTION: Determine if delays are human-centric:
+   - If an operator's historical total_ng is consistently high during this season, diagnose as 'Skills Gap'
+   - If errors are unique to current voltage readings but historical performance was good, diagnose as 'Equipment Wear'
+3. Cross-station impact analysis and seasonal pattern recognition
+
+HISTORICAL DATA STRUCTURE:
+- operator_id: Matches action_by in unit_history
+- station_id: Station identifier (e.g., 'Station2')
+- total_passed: Successful units count
+- total_ng: Defective units count
+- avg_processing_time: Processing time in minutes
+- month_year: Monthly aggregation date (e.g., '2026-01-01')
 
 VALIDATION CRITERIA:
 - Voltage Tolerance: 115V ±1% (113.85V - 116.15V)
@@ -1311,24 +1353,24 @@ VALIDATION CRITERIA:
 - Quality Status: 'NO GO', 'FAIL', 'NOT DETECTED' = BAD
 
 REQUIRED OUTPUT FORMAT (STRICT):
-[DIAGNOSIS]: Current root cause analysis across all hotspot stations using manufacturing terminology, referencing specific checklist failures and cross-station relationships
+[DIAGNOSIS]: Identify root causes linking current bottlenecks to 3-year operator and station patterns with skills gap vs equipment wear attribution
 - Maximum 2 bullet points
 - Each bullet must be exactly one sentence
-- Example: • Voltage breach detected at Station 2.
+- Must reference historical performance patterns
 
-[FORECAST]: Predict production line status for next 2-4 hours based on current bottlenecks and their propagation risk across stations
+[FORECAST]: Predict production line risks for the next 6-12 months based on longitudinal trends and seasonal patterns
 - Maximum 1 bullet point
 - Each bullet must be exactly one sentence
-- Example: • Risk of 30% slowdown in 2 hours.
+- Must include probabilistic risk assessment
 
-[PRESCRIPTION]: Provide exactly 2 actionable steps for production supervisor focusing on resource reallocation and bottleneck mitigation, addressing the specific cross-station issues found
+[PRESCRIPTION]: Provide strategic steps such as 'Targeted Operator Retraining' or 'Scheduled Equipment Replacement' based on diagnosis
 - Maximum 2 bullet points
 - Each bullet must be exactly one sentence
-- Example: • Recalibrate Station 2 test rig.
+- Must align with skills gap vs equipment wear findings
 
 EXECUTIVE SUMMARY: Strictly maximum of 10 words only.
 
-CRITICAL: Use only one-sentence bullet points. No paragraphs. No long explanations.`;
+CRITICAL: Use only one-sentence bullet points. No paragraphs. No long explanations. Focus on actionable intelligence with historical context.`;
 
             const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
                 method: 'POST',
