@@ -292,6 +292,152 @@ export function Dashboard({
         return { completed, ng, processed, pct };
     }, [overallMetrics]);
 
+    // 🚨 Line Health Status Calculation
+    const lineHealthStatus = useMemo(() => {
+        const fpyValue = fpy.pct;
+        const criticalDelays = cycleTimePerStation.filter(station => 
+            station.exceedsThreshold && station.exceedsPct > 50
+        ).length;
+        const multipleCriticalDelays = cycleTimePerStation.filter(station => 
+            station.exceedsThreshold && station.exceedsPct > 100
+        ).length;
+
+        if (fpyValue > 95 && criticalDelays === 0) {
+            return { status: 'STABLE', color: 'success', pulse: true };
+        } else if (criticalDelays === 1) {
+            return { status: 'AT RISK', color: 'warning', pulse: true };
+        } else if (multipleCriticalDelays > 0) {
+            return { status: 'BOTTLENECKED', color: 'danger', pulse: true };
+        } else {
+            return { status: 'MONITORING', color: 'info', pulse: false };
+        }
+    }, [fpy.pct, cycleTimePerStation]);
+
+    // ⌨️ Typewriter Effect Component
+    const TypewriterText = ({ text, className = '' }) => {
+        const [displayedText, setDisplayedText] = useState('');
+        const [currentIndex, setCurrentIndex] = useState(0);
+        const [isTyping, setIsTyping] = useState(true);
+
+        useEffect(() => {
+            if (!text) {
+                setDisplayedText('');
+                setCurrentIndex(0);
+                return;
+            }
+
+            if (currentIndex < text.length) {
+                const timeout = setTimeout(() => {
+                    setDisplayedText(prev => prev + text[currentIndex]);
+                    setCurrentIndex(prev => prev + 1);
+                }, 30 + Math.random() * 20); // Variable typing speed
+
+                return () => clearTimeout(timeout);
+            } else {
+                setIsTyping(false);
+            }
+        }, [currentIndex, text]);
+
+        return (
+            <div className={`font-monospace ${className}`}>
+                <pre className="mb-0" style={{ 
+                    fontFamily: 'Courier New, monospace',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    fontSize: '0.85rem',
+                    lineHeight: '1.4'
+                }}>
+                    {displayedText}
+                    {isTyping && <span className="blinking-cursor">|</span>}
+                </pre>
+                <style>{`
+                    .blinking-cursor {
+                        animation: blink 1s infinite;
+                        color: #10b981;
+                        font-weight: bold;
+                    }
+                    @keyframes blink {
+                        0%, 50% { opacity: 1; }
+                        51%, 100% { opacity: 0; }
+                    }
+                `}</style>
+            </div>
+        );
+    };
+
+    // 📊 PDF Export Function
+    const generateShiftReport = async () => {
+        try {
+            // Dynamic imports to avoid bundling issues
+            const html2canvas = (await import('html2canvas')).default;
+            const { jsPDF } = await import('jspdf');
+            
+            const dashboardElement = document.getElementById('dashboard-content');
+            if (!dashboardElement) {
+                alert('Dashboard content not found');
+                return;
+            }
+
+            // Show loading state
+            const originalButton = document.getElementById('export-btn');
+            if (originalButton) {
+                originalButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating...';
+                originalButton.disabled = true;
+            }
+
+            // Capture the dashboard
+            const canvas = await html2canvas(dashboardElement, {
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff'
+            });
+
+            // Create PDF
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 210;
+            const pageHeight = 295;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            let heightLeft = imgHeight;
+            let position = 0;
+
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            while (heightLeft >= 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+
+            // Add timestamp and metadata
+            const timestamp = new Date().toLocaleString();
+            pdf.setPage(1);
+            pdf.setFontSize(10);
+            pdf.setTextColor(100);
+            pdf.text(`Generated: ${timestamp}`, 10, pageHeight - 10);
+            pdf.text(`Line Health: ${lineHealthStatus.status}`, 10, pageHeight - 5);
+            pdf.text(`FPY: ${fpy.pct.toFixed(1)}%`, 70, pageHeight - 5);
+            pdf.text(`Worst Station: ${worstStation?.name || 'N/A'}`, 120, pageHeight - 5);
+
+            // Save the PDF
+            pdf.save(`shift-report-${new Date().toISOString().split('T')[0]}.pdf`);
+
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            alert('Failed to generate report. Please try again.');
+        } finally {
+            // Restore button
+            const originalButton = document.getElementById('export-btn');
+            if (originalButton) {
+                originalButton.innerHTML = '<i class="bi bi-download me-2"></i>Generate Shift Report';
+                originalButton.disabled = false;
+            }
+        }
+    };
+
     const handleGoToStation = (unit) => {
         if (!unit.station) return;
         setHighlightedUnitId?.(unit.id); 
@@ -613,6 +759,24 @@ CRITICAL: Use only bullet points. No paragraphs. No long explanations.`;
                 
                 /* Empty text styling */
                 .empty-text { color: #dc2626; font-weight: 600; }
+                
+                /* Line Health Pulse Animation */
+                .pulse-animation {
+                    animation: pulse-glow 2s infinite;
+                }
+                .status-dot-pulse {
+                    animation: dot-pulse 1.5s infinite;
+                }
+                @keyframes pulse-glow {
+                    0% { box-shadow: 0 0 20px rgba(255,255,255,0.3); }
+                    50% { box-shadow: 0 0 30px rgba(255,255,255,0.6); }
+                    100% { box-shadow: 0 0 20px rgba(255,255,255,0.3); }
+                }
+                @keyframes dot-pulse {
+                    0% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.7; transform: scale(1.2); }
+                    100% { opacity: 1; transform: scale(1); }
+                }
             `}</style>
 
             <div className="d-flex justify-content-between align-items-center mb-4 px-2">
@@ -621,6 +785,43 @@ CRITICAL: Use only bullet points. No paragraphs. No long explanations.`;
                     <p className="text-muted small mb-0">Live Manufacturing Lifecycle Monitoring</p>
                 </div>
                 <div className="d-flex gap-3 align-items-center">
+                    {/* Compact Status Badge */}
+                    <div className={`d-flex align-items-center px-3 py-2 rounded-pill shadow-sm ${
+                        lineHealthStatus.pulse ? 'pulse-animation' : ''
+                    }`} style={{
+                        background: `linear-gradient(135deg, ${
+                            lineHealthStatus.color === 'success' ? '#10b981' :
+                            lineHealthStatus.color === 'warning' ? '#f59e0b' :
+                            lineHealthStatus.color === 'danger' ? '#ef4444' : '#3b82f6'
+                        } 0%, ${
+                            lineHealthStatus.color === 'success' ? '#059669' :
+                            lineHealthStatus.color === 'warning' ? '#d97706' :
+                            lineHealthStatus.color === 'danger' ? '#dc2626' : '#2563eb'
+                        } 100%)`,
+                        color: 'white',
+                        fontSize: '0.85rem',
+                        fontWeight: 'bold',
+                        letterSpacing: '0.3px',
+                        minWidth: '140px',
+                        height: '36px'
+                    }}>
+                        <div className={`me-2 ${lineHealthStatus.pulse ? 'status-dot-pulse' : ''}`} style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            backgroundColor: 'white',
+                            boxShadow: '0 0 6px rgba(255,255,255,0.8)'
+                        }}></div>
+                        <span>{lineHealthStatus.status}</span>
+                        <button 
+                            id="export-btn"
+                            onClick={generateShiftReport}
+                            className="btn btn-sm btn-light ms-2 rounded-pill px-2 py-1"
+                            style={{ fontSize: '0.7rem', height: '28px' }}
+                        >
+                            <i className="bi bi-download me-1"></i>Generate
+                        </button>
+                    </div>
                     {newReportsToday > 0 && (
                         <div className="d-flex align-items-center bg-danger text-white px-3 py-1 rounded-pill shadow-sm" style={{ cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', height: '36px' }} onClick={() => setActiveTab('reports')}>
                             <i className="bi bi-file-earmark-text-fill me-2"></i> {newReportsToday} NEW REPORT TODAY
@@ -647,6 +848,7 @@ CRITICAL: Use only bullet points. No paragraphs. No long explanations.`;
                 </div>
             </div>
 
+            <div id="dashboard-content">
             <div className="row g-4 mb-5">
                 <div className="col-md-4">
                     <div className="stat-card-pro">
@@ -858,126 +1060,31 @@ CRITICAL: Use only bullet points. No paragraphs. No long explanations.`;
                             </div>
                         )}
                         
-                        {/* Simple AI Result Display */}
+                        {/* Enhanced AI Result Display with Typewriter Effect */}
                         {criticalStationAnalysis && (
                             <div className="px-3 pb-3">
-                                <div className="analytics-card p-3" style={{ border: 'none' }}>
+                                <div className="analytics-card p-3" style={{ 
+                                    border: 'none',
+                                    background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+                                    color: '#00ff00'
+                                }}>
                                     <div className="d-flex justify-content-between align-items-center mb-2">
-                                        <div className="fw-semibold text-dark fs-6">
-                                            Analysis Result
+                                        <div className="fw-semibold text-light fs-6">
+                                            <i className="bi bi-cpu me-2"></i>AI Terminal Analysis
                                         </div>
                                         <button 
-                                            className="btn btn-sm"
+                                            className="btn btn-sm text-light"
                                             onClick={() => setCriticalStationAnalysis('')}
-                                            style={{ border: 'none', background: 'none', padding: '4px' }}
+                                            style={{ border: '1px solid #00ff00', background: 'none', padding: '4px' }}
                                         >
                                             <i className="bi bi-x"></i>
                                         </button>
                                     </div>
-                                    <div className="text-dark" style={{ fontSize: '0.85rem', lineHeight: '1.4', fontWeight: '500' }}>
-                                        {(() => {
-                                            const cleanedAnalysis = criticalStationAnalysis.replace(/\*\*/g, '');
-                                            
-                                            // Keyword highlighting function
-                                            const highlightKeywords = (text) => {
-                                                return text
-                                                    .replace(/\bVoltage\b/g, '<span class="highlight-voltage">Voltage</span>')
-                                                    .replace(/\bEmpty\b/g, '<span class="highlight-empty">Empty</span>')
-                                                    .replace(/\bCritical\b/g, '<span class="highlight-critical">Critical</span>')
-                                                    .replace(/\bBottleneck\b/g, '<span class="highlight-bottleneck">Bottleneck</span>');
-                                            };
-                                            
-                                            // Process bullet points
-                                            const processBullets = (text) => {
-                                                return text
-                                                    .split('\n')
-                                                    .filter(line => line.trim())
-                                                    .map(line => line.replace(/^[-•*]\s*/, '• ').trim())
-                                                    .join('<br>');
-                                            };
-                                            
-                                            // Try different patterns to extract the sections
-                                            let diagnosis = '';
-                                            let forecast = '';
-                                            let prescription = '';
-                                            
-                                            // Pattern 1: Look for bracketed sections
-                                            const diagnosisMatch = cleanedAnalysis.match(/\[DIAGNOSIS\]\s*[:\-]?\s*(.+?)(?=\[FORECAST\]|$)/s);
-                                            const forecastMatch = cleanedAnalysis.match(/\[FORECAST\]\s*[:\-]?\s*(.+?)(?=\[PRESCRIPTION\]|$)/s);
-                                            const prescriptionMatch = cleanedAnalysis.match(/\[PRESCRIPTION\]\s*[:\-]?\s*(.+?)(?=$)/s);
-                                            
-                                            // Pattern 2: Look for sections without brackets
-                                            const diagnosisMatch2 = cleanedAnalysis.match(/DIAGNOSIS\s*[:\-]\s*(.+?)(?=FORECAST|$)/s);
-                                            const forecastMatch2 = cleanedAnalysis.match(/FORECAST\s*[:\-]\s*(.+?)(?=PRESCRIPTION|$)/s);
-                                            const prescriptionMatch2 = cleanedAnalysis.match(/PRESCRIPTION\s*[:\-]\s*(.+?)(?=$)/s);
-                                            
-                                            // Use the first pattern that matches
-                                            diagnosis = diagnosisMatch?.[1]?.trim() || diagnosisMatch2?.[1]?.trim() || '';
-                                            forecast = forecastMatch?.[1]?.trim() || forecastMatch2?.[1]?.trim() || '';
-                                            prescription = prescriptionMatch?.[1]?.trim() || prescriptionMatch2?.[1]?.trim() || '';
-                                            
-                                            // If still no sections found, try to split by common patterns
-                                            if (!diagnosis && !forecast && !prescription) {
-                                                const lines = cleanedAnalysis.split('\n').filter(line => line.trim());
-                                                for (let i = 0; i < lines.length; i++) {
-                                                    const line = lines[i].trim();
-                                                    if (line.toLowerCase().includes('diagnosis') && i < lines.length - 1) {
-                                                        diagnosis = lines[i + 1]?.trim() || '';
-                                                    }
-                                                    if (line.toLowerCase().includes('forecast') && i < lines.length - 1) {
-                                                        forecast = lines[i + 1]?.trim() || '';
-                                                    }
-                                                    if (line.toLowerCase().includes('prescription') && i < lines.length - 1) {
-                                                        prescription = lines[i + 1]?.trim() || '';
-                                                    }
-                                                }
-                                            }
-                                            
-                                            return (
-                                                <div>
-                                                    {diagnosis && (
-                                                        <div className="analytics-card mb-3">
-                                                            <div className="analytics-card-header">
-                                                                <div className="label-caps mb-0">🔍 DIAGNOSIS</div>
-                                                            </div>
-                                                            <div className="analytics-card-body compact-ai-card">
-                                                                <div dangerouslySetInnerHTML={{ __html: highlightKeywords(processBullets(diagnosis)) }}></div>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {forecast && (
-                                                        <div className="predictive-insight-card mb-3">
-                                                            <div className="predictive-insight-header">
-                                                                <div className="label-caps mb-0">📈 PREDICTIVE INSIGHT</div>
-                                                            </div>
-                                                            <div className="predictive-insight-body compact-ai-card">
-                                                                <div dangerouslySetInnerHTML={{ __html: highlightKeywords(processBullets(forecast)) }}></div>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {prescription && (
-                                                        <div className="smart-recommendation-card">
-                                                            <div className="smart-recommendation-header">
-                                                                <div className="label-caps mb-0">💡 SMART RECOMMENDATION</div>
-                                                            </div>
-                                                            <div className="smart-recommendation-body compact-ai-card">
-                                                                <div dangerouslySetInnerHTML={{ __html: highlightKeywords(processBullets(prescription)) }}></div>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {!diagnosis && !forecast && !prescription && (
-                                                        <div className="analytics-card">
-                                                            <div className="analytics-card-header">
-                                                                <div className="label-caps mb-0">Analysis Result</div>
-                                                            </div>
-                                                            <div className="analytics-card-body compact-ai-card">
-                                                                <div dangerouslySetInnerHTML={{ __html: highlightKeywords(processBullets(cleanedAnalysis)) }}></div>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })()}
+                                    <div className="terminal-output">
+                                        <TypewriterText 
+                                            text={criticalStationAnalysis}
+                                            className="text-success"
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -1100,6 +1207,7 @@ CRITICAL: Use only bullet points. No paragraphs. No long explanations.`;
                     </div>
                 </div>
             )}
+            </div>
         </div>
     );
 }
