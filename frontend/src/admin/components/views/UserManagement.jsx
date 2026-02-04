@@ -455,7 +455,7 @@ export function UserManagement({
                                     {!isAssigned ? (
                                         <span className="pending-deployment-badge">
                                             <i className="bi bi-clock me-1"></i>
-                                            PENDING DEPLOYMENT
+                                            NOT APPLICABLE
                                         </span>
                                     ) : (
                                         <div className="small fw-bold text-dark">
