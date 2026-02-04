@@ -313,61 +313,79 @@ export function Dashboard({
         }
     }, [fpy.pct, cycleTimePerStation]);
 
-    // ⌨️ Typewriter Effect Component
-    const TypewriterText = ({ text, className = '' }) => {
-        const [displayedText, setDisplayedText] = useState('');
-        const [currentIndex, setCurrentIndex] = useState(0);
-        const [isTyping, setIsTyping] = useState(true);
-
-        useEffect(() => {
-            if (!text) {
-                setDisplayedText('');
-                setCurrentIndex(0);
-                return;
+    // Enhanced AI output formatting for new 3-section format (matching StationsOverview)
+    const formatCriticalStationOutput = (text) => {
+        if (!text) return '';
+        
+        const cleanedAnalysis = text.replace(/\*\*/g, '').replace(/\*/g, '');
+        
+        let diagnosis = '';
+        let forecast = '';
+        let prescription = '';
+        
+        const diagnosisMatch = cleanedAnalysis.match(/\[DIAGNOSIS\]\s*[:\-]?\s*(.+?)(?=\[FORECAST\]|$)/s);
+        const forecastMatch = cleanedAnalysis.match(/\[FORECAST\]\s*[:\-]?\s*(.+?)(?=\[PRESCRIPTION\]|$)/s);
+        const prescriptionMatch = cleanedAnalysis.match(/\[PRESCRIPTION\]\s*[:\-]?\s*(.+?)(?=$)/s);
+        
+        diagnosis = diagnosisMatch?.[1]?.trim() || '';
+        forecast = forecastMatch?.[1]?.trim() || '';
+        prescription = prescriptionMatch?.[1]?.trim() || '';
+        
+        if (!diagnosis && !forecast && !prescription) {
+            const lines = cleanedAnalysis.split('\n').filter(line => line.trim());
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (line.toLowerCase().includes('diagnosis') && i < lines.length - 1) {
+                    diagnosis = lines[i + 1]?.trim() || '';
+                }
+                if (line.toLowerCase().includes('forecast') && i < lines.length - 1) {
+                    forecast = lines[i + 1]?.trim() || '';
+                }
+                if (line.toLowerCase().includes('prescription') && i < lines.length - 1) {
+                    prescription = lines[i + 1]?.trim() || '';
+                }
             }
-
-            if (currentIndex < text.length) {
-                const timeout = setTimeout(() => {
-                    setDisplayedText(prev => prev + text[currentIndex]);
-                    setCurrentIndex(prev => prev + 1);
-                }, 30 + Math.random() * 20); // Variable typing speed
-
-                return () => clearTimeout(timeout);
-            } else {
-                setIsTyping(false);
-            }
-        }, [currentIndex, text]);
-
-        return (
-            <div className={`font-monospace ${className}`}>
-                <pre className="mb-0" style={{ 
-                    fontFamily: 'Courier New, monospace',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                    fontSize: '0.85rem',
-                    lineHeight: '1.4'
-                }}>
-                    {displayedText}
-                    {isTyping && <span className="blinking-cursor">|</span>}
-                </pre>
-                <style>{`
-                    .blinking-cursor {
-                        animation: blink 1s infinite;
-                        color: #10b981;
-                        font-weight: bold;
-                    }
-                    @keyframes blink {
-                        0%, 50% { opacity: 1; }
-                        51%, 100% { opacity: 0; }
-                    }
-                `}</style>
+        }
+        
+        return `
+            <div class="intelligence-hub-container">
+                ${diagnosis ? `
+                    <div class="diagnosis-hub-card">
+                        <div class="hub-header">
+                            <span class="hub-title">DIAGNOSIS</span>
+                        </div>
+                        <div class="hub-content">${diagnosis.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
+                    </div>
+                ` : ''}
+                ${forecast ? `
+                    <div class="forecast-hub-card">
+                        <div class="hub-header">
+                            <span class="hub-title">FORECAST</span>
+                        </div>
+                        <div class="hub-content">${forecast.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
+                    </div>
+                ` : ''}
+                ${prescription ? `
+                    <div class="prescription-hub-card">
+                        <div class="hub-header">
+                            <span class="hub-title">PRESCRIPTION</span>
+                        </div>
+                        <div class="hub-content">${prescription.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
+                    </div>
+                ` : ''}
+                ${!diagnosis && !forecast && !prescription ? `
+                    <div class="fallback-hub-analysis">
+                        <div class="hub-content">${cleanedAnalysis.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
+                    </div>
+                ` : ''}
             </div>
-        );
+        `;
     };
 
     // 📊 PDF Export Function
     const generateShiftReport = async () => {
         try {
+            // ... (rest of the code remains the same)
             // Dynamic imports to avoid bundling issues
             const html2canvas = (await import('html2canvas')).default;
             const { jsPDF } = await import('jspdf');
@@ -777,6 +795,76 @@ CRITICAL: Use only bullet points. No paragraphs. No long explanations.`;
                     50% { opacity: 0.7; transform: scale(1.2); }
                     100% { opacity: 1; transform: scale(1); }
                 }
+
+                /* Intelligence Hub Container (matching StationsOverview) */
+                .intelligence-hub-container {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                }
+                .diagnosis-hub-card, .forecast-hub-card, .prescription-hub-card {
+                    background: #ffffff;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 12px;
+                    overflow: hidden;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+                }
+                .diagnosis-hub-card {
+                    border-left: 4px solid #ef4444;
+                }
+                .forecast-hub-card {
+                    border-left: 4px solid #3b82f6;
+                }
+                .prescription-hub-card {
+                    border-left: 4px solid #10b981;
+                }
+                .hub-header {
+                    padding: 10px 14px;
+                    background: #f8fafc;
+                    border-bottom: 1px solid #e2e8f0;
+                }
+                .hub-title {
+                    font-size: 0.7rem;
+                    font-weight: 800;
+                    letter-spacing: 0.05em;
+                    text-transform: uppercase;
+                    color: #64748b;
+                }
+                .diagnosis-hub-card .hub-title {
+                    color: #ef4444;
+                }
+                .forecast-hub-card .hub-title {
+                    color: #3b82f6;
+                }
+                .prescription-hub-card .hub-title {
+                    color: #10b981;
+                }
+                .hub-content {
+                    padding: 12px 14px;
+                    font-size: 0.8rem;
+                    line-height: 1.5;
+                    color: #374151;
+                }
+                .fallback-hub-analysis {
+                    background: #f8fafc;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 12px;
+                    padding: 14px;
+                }
+                .ai-analysis-output {
+                    max-height: 300px;
+                    overflow-y: auto;
+                }
+                .ai-analysis-output::-webkit-scrollbar {
+                    width: 4px;
+                }
+                .ai-analysis-output::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .ai-analysis-output::-webkit-scrollbar-thumb {
+                    background: #cbd5e1;
+                    border-radius: 4px;
+                }
             `}</style>
 
             <div className="d-flex justify-content-between align-items-center mb-4 px-2">
@@ -1060,30 +1148,29 @@ CRITICAL: Use only bullet points. No paragraphs. No long explanations.`;
                             </div>
                         )}
                         
-                        {/* Enhanced AI Result Display with Typewriter Effect */}
+                        {/* Enhanced AI Result Display with 3-section format (matching StationsOverview) */}
                         {criticalStationAnalysis && (
                             <div className="px-3 pb-3">
                                 <div className="analytics-card p-3" style={{ 
                                     border: 'none',
-                                    background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
-                                    color: '#00ff00'
+                                    background: '#ffffff'
                                 }}>
-                                    <div className="d-flex justify-content-between align-items-center mb-2">
-                                        <div className="fw-semibold text-light fs-6">
-                                            <i className="bi bi-cpu me-2"></i>AI Terminal Analysis
+                                    <div className="d-flex justify-content-between align-items-center mb-3">
+                                        <div className="fw-semibold text-dark fs-6">
+                                            <i className="bi bi-cpu me-2"></i>AI Critical Station Analysis
                                         </div>
                                         <button 
-                                            className="btn btn-sm text-light"
+                                            className="btn btn-sm text-dark"
                                             onClick={() => setCriticalStationAnalysis('')}
-                                            style={{ border: '1px solid #00ff00', background: 'none', padding: '4px' }}
+                                            style={{ border: '1px solid #64748b', background: 'none', padding: '4px' }}
                                         >
                                             <i className="bi bi-x"></i>
                                         </button>
                                     </div>
-                                    <div className="terminal-output">
-                                        <TypewriterText 
-                                            text={criticalStationAnalysis}
-                                            className="text-success"
+                                    <div className="ai-analysis-output">
+                                        <div 
+                                            className="text-dark" 
+                                            dangerouslySetInnerHTML={{ __html: formatCriticalStationOutput(criticalStationAnalysis) }}
                                         />
                                     </div>
                                 </div>
