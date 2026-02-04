@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 
 export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => {
@@ -13,6 +13,12 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [pendingSave, setPendingSave] = useState(null);
     const [validationError, setValidationError] = useState('');
+    const [pendingRequests, setPendingRequests] = useState([]); // State for pending board edit requests
+    const [loadingPending, setLoadingPending] = useState(false);
+    const [showRejectModal, setShowRejectModal] = useState(false);
+    const [rejectingRequestId, setRejectingRequestId] = useState(null);
+    const [showApproveModal, setShowApproveModal] = useState(false);
+    const [approvingRequest, setApprovingRequest] = useState(null);
     const itemsPerPage = 15; 
 
     const pcbaMapping = [
@@ -108,6 +114,22 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
         return pcbaMapping.find(m => m.dbKey === selectedModelKey);
     };
 
+    // Convert assembly number from numeric to letter format (1 -> A, 2 -> B, ..., Z -> Z)
+    const formatAssemblyNumber = (assemblyNo) => {
+        if (!assemblyNo) return 'Unknown';
+        
+        // Extract the number from "Assembly X" format
+        const match = assemblyNo.match(/Assembly\s*(\d+)/i);
+        if (!match) return assemblyNo; // Return original if no match
+        
+        const num = parseInt(match[1]);
+        if (isNaN(num) || num < 1 || num > 26) return assemblyNo; // Return original if invalid
+        
+        // Convert 1-26 to A-Z
+        const letter = String.fromCharCode(64 + num); // 65 = 'A', so 64 + num
+        return `Assembly ${letter}`;
+    };
+
     // Format board display with prefix and serial
     const formatBoardValue = (value, boardKey) => {
         if (!value || value === '000000' || value === '') {
@@ -117,10 +139,28 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
         // Always show prefix + serial for proper context
         const modelInfo = pcbaMapping.find(m => m.dbKey === boardKey);
         if (modelInfo) {
-            return { text: `${modelInfo.prefix}${value}`, className: 'text-dark fw-bold' };
+            return { text: `${modelInfo.prefix}${value}`, className: 'text-primary fw-bold' };
         }
         
-        return { text: value, className: 'text-dark fw-bold' };
+        return { text: value, className: 'text-primary fw-bold' };
+    };
+
+    // Format board display with highlighting
+    const formatBoardValueWithHighlight = (value, boardKey, searchTerm) => {
+        const formatted = formatBoardValue(value, boardKey);
+        return { ...formatted, text: highlightText(formatted.text, searchTerm) };
+    };
+
+    // Function to highlight search term in text
+    const highlightText = (text, searchTerm) => {
+        if (!searchTerm || !text) return text;
+        
+        const parts = text.split(new RegExp(`(${searchTerm})`, 'gi'));
+        return parts.map((part, index) => 
+            part.toLowerCase() === searchTerm.toLowerCase() ? 
+                <span key={index} style={{ backgroundColor: '#fef08a', color: '#713f12', fontWeight: 'bold', padding: '2px' }}>{part}</span> : 
+                part
+        );
     };
 
     // Check if a specific board cell should be colored red (because it's causing duplicates)
@@ -191,6 +231,159 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
         
         return logs;
     }, [pcbaLogs, searchTerm, showOnlyDuplicates, selectedModelKey]);
+
+    // Fetch pending board edit requests
+    useEffect(() => {
+        fetchPendingRequests();
+    }, []);
+
+    const fetchPendingRequests = async () => {
+        setLoadingPending(true);
+        try {
+            const response = await fetch('http://localhost/mkffwebsystem/backend/api/inventory.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'get_pending_requests'
+                })
+            });
+            
+            const result = await response.json();
+            if (result.status === 'success') {
+                setPendingRequests(result.requests || []);
+            } else {
+                console.error('Failed to fetch pending requests:', result.message);
+            }
+        } catch (error) {
+            console.error('Error fetching pending requests:', error);
+        } finally {
+            setLoadingPending(false);
+        }
+    };
+
+    // Generate unique board number for admin editing
+    const generateUniqueBoardNumber = async (boardKey) => {
+        try {
+            // Map database key to board type for backend
+            const boardMapping = pcbaMapping.find(board => board.dbKey === boardKey);
+            const boardType = boardMapping ? boardMapping.displayName : boardKey;
+            
+            const response = await fetch('http://localhost/mkffwebsystem/backend/api/inventory.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'generate_board_number',
+                    boardType: boardType
+                })
+            });
+            
+            const result = await response.json();
+            if (result.status === 'success') {
+                setTempValue(result.generatedNumber);
+                setValidationError(''); // Clear any validation error
+            } else {
+                alert('❌ Error: ' + (result.message || 'Failed to generate board number'));
+            }
+        } catch (error) {
+            console.error('Error generating board number:', error);
+            alert('❌ Connection Error: Failed to generate board number. Please check your connection.');
+        }
+    };
+
+    // Handle approval of pending request
+    const handleApproveRequest = (requestId, unitId, column, newValue) => {
+        setApprovingRequest({ requestId, unitId, column, newValue });
+        setShowApproveModal(true);
+    };
+
+    // Confirm approval of pending request
+    const confirmApproveRequest = async () => {
+        if (!approvingRequest) return;
+        
+        try {
+            const response = await fetch('http://localhost/mkffwebsystem/backend/api/inventory.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'approve_request',
+                    requestId: approvingRequest.requestId,
+                    unitId: approvingRequest.unitId,
+                    column: approvingRequest.column,
+                    newValue: approvingRequest.newValue
+                })
+            });
+            
+            const result = await response.json();
+            if (result.status === 'success') {
+                alert('✅ Board edit request approved successfully!');
+                // Refresh pending requests and update the main data
+                fetchPendingRequests();
+                if (onUpdateSerial) {
+                    onUpdateSerial(); // Refresh the main inventory data
+                }
+                // Notify other components that pending requests have changed
+                window.dispatchEvent(new CustomEvent('pendingRequestsChanged', { 
+                    detail: { action: 'approved', requestId: approvingRequest.requestId }
+                }));
+            } else {
+                alert('❌ Error: ' + (result.message || 'Failed to approve request'));
+            }
+        } catch (error) {
+            console.error('Error approving request:', error);
+            alert('❌ Connection Error: Failed to approve request. Please check your connection.');
+        } finally {
+            setShowApproveModal(false);
+            setApprovingRequest(null);
+        }
+    };
+
+    // Cancel approval modal
+    const cancelApproveModal = () => {
+        setShowApproveModal(false);
+        setApprovingRequest(null);
+    };
+
+    // Handle rejection of pending request
+    const handleRejectRequest = (requestId) => {
+        setRejectingRequestId(requestId);
+        setShowRejectModal(true);
+    };
+
+    // Confirm rejection of pending request
+    const confirmRejectRequest = async () => {
+        if (!rejectingRequestId) return;
+        
+        try {
+            const response = await fetch('http://localhost/mkffwebsystem/backend/api/inventory.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'reject_request',
+                    requestId: rejectingRequestId
+                })
+            });
+            
+            const result = await response.json();
+            if (result.status === 'success') {
+                alert('✅ Board edit request rejected successfully!');
+                fetchPendingRequests();
+            } else {
+                alert('❌ Error: ' + (result.message || 'Failed to reject request'));
+            }
+        } catch (error) {
+            console.error('Error rejecting request:', error);
+            alert('❌ Connection Error: Failed to reject request. Please check your connection.');
+        } finally {
+            setShowRejectModal(false);
+            setRejectingRequestId(null);
+        }
+    };
+
+    // Cancel rejection modal
+    const cancelRejectModal = () => {
+        setShowRejectModal(false);
+        setRejectingRequestId(null);
+    };
 
     const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
     const paginatedLogs = useMemo(() => {
@@ -591,6 +784,97 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                 </div>
             </div>
             
+            {/* Pending Board Edit Requests Section */}
+            {pendingRequests.length > 0 && (
+                <div className="mb-4">
+                    <div className="card border-warning">
+                        <div className="card-header bg-warning text-dark">
+                            <h5 className="mb-0">
+                                <i className="bi bi-clock-history me-2"></i>
+                                Pending Board Edit Requests ({pendingRequests.length})
+                            </h5>
+                        </div>
+                        <div className="card-body p-0">
+                            <div className="table-responsive">
+                                <table className="table table-hover mb-0">
+                                    <thead className="table-light">
+                                        <tr>
+                                            <th>Assembly No.</th>
+                                            <th>Board Type</th>
+                                            <th>Old Value</th>
+                                            <th>New Value</th>
+                                            <th>Requested By</th>
+                                            <th>Remarks</th>
+                                            <th>Requested At</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {pendingRequests.map((request) => {
+                                            const boardInfo = pcbaMapping.find(m => m.dbKey === request.column_name);
+                                            const boardPrefix = boardInfo ? boardInfo.prefix : '';
+                                            
+                                            return (
+                                                <tr key={request.id}>
+                                                    <td>
+                                                        <code className="text-dark fw-bold">{formatAssemblyNumber(request.assembly_no)}</code>
+                                                    </td>
+                                                    <td>
+                                                        <span className="badge bg-info">{request.board_type}</span>
+                                                    </td>
+                                                    <td>
+                                                        <code className="text-muted">
+                                                            {request.old_value ? `${boardPrefix}${request.old_value}` : 'Empty'}
+                                                        </code>
+                                                    </td>
+                                                    <td>
+                                                        <code className="text-success fw-bold">
+                                                            {boardPrefix}{request.new_value}
+                                                        </code>
+                                                    </td>
+                                                    <td>{request.requested_by}</td>
+                                                    <td>
+                                                        <small className="text-muted">{request.remarks || 'No remarks'}</small>
+                                                    </td>
+                                                    <td>
+                                                        <small className="text-muted">
+                                                            {new Date(request.requested_at).toLocaleString()}
+                                                        </small>
+                                                    </td>
+                                                    <td>
+                                                        <div className="btn-group" role="group">
+                                                            <button 
+                                                                className="btn btn-sm btn-success"
+                                                                onClick={() => handleApproveRequest(
+                                                                    request.id, 
+                                                                    request.unit_id, 
+                                                                    request.column_name, 
+                                                                    request.new_value
+                                                                )}
+                                                                title="Approve Request"
+                                                            >
+                                                                <i className="bi bi-check-lg"></i>
+                                                            </button>
+                                                            <button 
+                                                                className="btn btn-sm btn-danger"
+                                                                onClick={() => handleRejectRequest(request.id)}
+                                                                title="Reject Request"
+                                                            >
+                                                                <i className="bi bi-x-lg"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
             {paginatedLogs.length > 0 ? (
                 <>
                     <div className="traceability-table">
@@ -607,18 +891,18 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                             <th style={{ width: '17%' }}>BKBD Board</th>
                                         </>
                                     ) : (
-                                        <th style={{ width: '50%' }}>
+                                        <th style={{ width: '60%' }}>
                                             {getSelectedModelInfo()?.displayName} Board
                                         </th>
                                     )}
-                                    <th style={{ width: '10%' }}>Status</th>
+                                    <th style={{ width: '15%' }}>Date/Time</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {paginatedLogs.map((item) => (
                                     <tr key={item.id} onClick={() => handleRowClick(item)}>
                                         <td>
-                                            <div className="assembly-number">{item.assembly_no}</div>
+                                            <div className="assembly-number">{highlightText(formatAssemblyNumber(item.assembly_no), searchTerm)}</div>
                                         </td>
                                         {selectedModelKey === 'all' ? (
                                             <>
@@ -629,7 +913,7 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                                 <input 
                                                                     autoFocus
                                                                     maxLength={6}
-                                                                    disabled={isSaving}
+                                                                    disabled={true}
                                                                     className={`edit-input ${validationError ? 'border-danger' : ''}`}
                                                                     value={tempValue}
                                                                     onChange={(e) => {
@@ -637,9 +921,30 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                                         setValidationError(''); // Clear error on input change
                                                                     }}
                                                                     onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, 'mnbd_board_no')}
+                                                                    placeholder="Click generate button"
+                                                                    title="Manual typing disabled - use generate button"
                                                                 />
-                                                                <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, 'mnbd_board_no')}>
+                                                                <button 
+                                                                    className="btn btn-sm btn-outline-primary me-1" 
+                                                                    onClick={() => generateUniqueBoardNumber('mnbd_board_no')}
+                                                                    disabled={isSaving}
+                                                                    title="Generate unique board number"
+                                                                >
+                                                                    <i className="bi bi-magic"></i>
+                                                                </button>
+                                                                <button className="save-btn me-1" disabled={isSaving} onClick={() => handleSave(item.id, 'mnbd_board_no')}>
                                                                     {isSaving ? '...' : 'SAVE'}
+                                                                </button>
+                                                                <button 
+                                                                    className="btn btn-sm btn-secondary" 
+                                                                    onClick={() => {
+                                                                        setEditingCell(null);
+                                                                        setTempValue('');
+                                                                        setValidationError('');
+                                                                    }}
+                                                                    disabled={isSaving}
+                                                                >
+                                                                    CANCEL
                                                                 </button>
                                                             </div>
                                                             {validationError && editingCell?.key === 'mnbd_board_no' && (
@@ -652,7 +957,7 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                     ) : (
                                                         <div className="d-flex align-items-center justify-content-between">
                                                             <span className={`board-value ${getBoardCellClass(item.mnbd_board_no, item, pcbaLogs)}`}>
-                                                                {formatBoardValue(item.mnbd_board_no, 'mnbd_board_no').text}
+                                                                {formatBoardValueWithHighlight(item.mnbd_board_no, 'mnbd_board_no', searchTerm).text}
                                                             </span>
                                                             <button className="edit-btn" onClick={(e) => { e.stopPropagation(); handleEdit(item.id, 'mnbd_board_no', item.mnbd_board_no); }}>
                                                                 EDIT
@@ -667,7 +972,7 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                                 <input 
                                                                     autoFocus
                                                                     maxLength={6}
-                                                                    disabled={isSaving}
+                                                                    disabled={true}
                                                                     className={`edit-input ${validationError ? 'border-danger' : ''}`}
                                                                     value={tempValue}
                                                                     onChange={(e) => {
@@ -675,9 +980,30 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                                         setValidationError(''); // Clear error on input change
                                                                     }}
                                                                     onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, 'cmbd_board_no')}
+                                                                    placeholder="Click generate button"
+                                                                    title="Manual typing disabled - use generate button"
                                                                 />
-                                                                <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, 'cmbd_board_no')}>
+                                                                <button 
+                                                                    className="btn btn-sm btn-outline-primary me-1" 
+                                                                    onClick={() => generateUniqueBoardNumber('cmbd_board_no')}
+                                                                    disabled={isSaving}
+                                                                    title="Generate unique board number"
+                                                                >
+                                                                    <i className="bi bi-magic"></i>
+                                                                </button>
+                                                                <button className="save-btn me-1" disabled={isSaving} onClick={() => handleSave(item.id, 'cmbd_board_no')}>
                                                                     {isSaving ? '...' : 'SAVE'}
+                                                                </button>
+                                                                <button 
+                                                                    className="btn btn-sm btn-secondary" 
+                                                                    onClick={() => {
+                                                                        setEditingCell(null);
+                                                                        setTempValue('');
+                                                                        setValidationError('');
+                                                                    }}
+                                                                    disabled={isSaving}
+                                                                >
+                                                                    CANCEL
                                                                 </button>
                                                             </div>
                                                             {validationError && editingCell?.key === 'cmbd_board_no' && (
@@ -690,7 +1016,7 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                     ) : (
                                                         <div className="d-flex align-items-center justify-content-between">
                                                             <span className={`board-value ${getBoardCellClass(item.cmbd_board_no, item, pcbaLogs)}`}>
-                                                                {formatBoardValue(item.cmbd_board_no, 'cmbd_board_no').text}
+                                                                {formatBoardValueWithHighlight(item.cmbd_board_no, 'cmbd_board_no', searchTerm).text}
                                                             </span>
                                                             <button className="edit-btn" onClick={(e) => { e.stopPropagation(); handleEdit(item.id, 'cmbd_board_no', item.cmbd_board_no); }}>
                                                                 EDIT
@@ -705,7 +1031,7 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                                 <input 
                                                                     autoFocus
                                                                     maxLength={6}
-                                                                    disabled={isSaving}
+                                                                    disabled={true}
                                                                     className={`edit-input ${validationError ? 'border-danger' : ''}`}
                                                                     value={tempValue}
                                                                     onChange={(e) => {
@@ -713,9 +1039,30 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                                         setValidationError(''); // Clear error on input change
                                                                     }}
                                                                     onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, 'lrbd_board_no')}
+                                                                    placeholder="Click generate button"
+                                                                    title="Manual typing disabled - use generate button"
                                                                 />
-                                                                <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, 'lrbd_board_no')}>
+                                                                <button 
+                                                                    className="btn btn-sm btn-outline-primary me-1" 
+                                                                    onClick={() => generateUniqueBoardNumber('lrbd_board_no')}
+                                                                    disabled={isSaving}
+                                                                    title="Generate unique board number"
+                                                                >
+                                                                    <i className="bi bi-magic"></i>
+                                                                </button>
+                                                                <button className="save-btn me-1" disabled={isSaving} onClick={() => handleSave(item.id, 'lrbd_board_no')}>
                                                                     {isSaving ? '...' : 'SAVE'}
+                                                                </button>
+                                                                <button 
+                                                                    className="btn btn-sm btn-secondary" 
+                                                                    onClick={() => {
+                                                                        setEditingCell(null);
+                                                                        setTempValue('');
+                                                                        setValidationError('');
+                                                                    }}
+                                                                    disabled={isSaving}
+                                                                >
+                                                                    CANCEL
                                                                 </button>
                                                             </div>
                                                             {validationError && editingCell?.key === 'lrbd_board_no' && (
@@ -728,7 +1075,7 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                     ) : (
                                                         <div className="d-flex align-items-center justify-content-between">
                                                             <span className={`board-value ${getBoardCellClass(item.lrbd_board_no, item, pcbaLogs)}`}>
-                                                                {formatBoardValue(item.lrbd_board_no, 'lrbd_board_no').text}
+                                                                {formatBoardValueWithHighlight(item.lrbd_board_no, 'lrbd_board_no', searchTerm).text}
                                                             </span>
                                                             <button className="edit-btn" onClick={(e) => { e.stopPropagation(); handleEdit(item.id, 'lrbd_board_no', item.lrbd_board_no); }}>
                                                                 EDIT
@@ -743,7 +1090,7 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                                 <input 
                                                                     autoFocus
                                                                     maxLength={6}
-                                                                    disabled={isSaving}
+                                                                    disabled={true}
                                                                     className={`edit-input ${validationError ? 'border-danger' : ''}`}
                                                                     value={tempValue}
                                                                     onChange={(e) => {
@@ -751,9 +1098,30 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                                         setValidationError(''); // Clear error on input change
                                                                     }}
                                                                     onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, 'pqbd_board_no')}
+                                                                    placeholder="Click generate button"
+                                                                    title="Manual typing disabled - use generate button"
                                                                 />
-                                                                <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, 'pqbd_board_no')}>
+                                                                <button 
+                                                                    className="btn btn-sm btn-outline-primary me-1" 
+                                                                    onClick={() => generateUniqueBoardNumber('pqbd_board_no')}
+                                                                    disabled={isSaving}
+                                                                    title="Generate unique board number"
+                                                                >
+                                                                    <i className="bi bi-magic"></i>
+                                                                </button>
+                                                                <button className="save-btn me-1" disabled={isSaving} onClick={() => handleSave(item.id, 'pqbd_board_no')}>
                                                                     {isSaving ? '...' : 'SAVE'}
+                                                                </button>
+                                                                <button 
+                                                                    className="btn btn-sm btn-secondary" 
+                                                                    onClick={() => {
+                                                                        setEditingCell(null);
+                                                                        setTempValue('');
+                                                                        setValidationError('');
+                                                                    }}
+                                                                    disabled={isSaving}
+                                                                >
+                                                                    CANCEL
                                                                 </button>
                                                             </div>
                                                             {validationError && editingCell?.key === 'pqbd_board_no' && (
@@ -766,7 +1134,7 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                     ) : (
                                                         <div className="d-flex align-items-center justify-content-between">
                                                             <span className={`board-value ${getBoardCellClass(item.pqbd_board_no, item, pcbaLogs)}`}>
-                                                                {formatBoardValue(item.pqbd_board_no, 'pqbd_board_no').text}
+                                                                {formatBoardValueWithHighlight(item.pqbd_board_no, 'pqbd_board_no', searchTerm).text}
                                                             </span>
                                                             <button className="edit-btn" onClick={(e) => { e.stopPropagation(); handleEdit(item.id, 'pqbd_board_no', item.pqbd_board_no); }}>
                                                                 EDIT
@@ -781,7 +1149,7 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                                 <input 
                                                                     autoFocus
                                                                     maxLength={6}
-                                                                    disabled={isSaving}
+                                                                    disabled={true}
                                                                     className={`edit-input ${validationError ? 'border-danger' : ''}`}
                                                                     value={tempValue}
                                                                     onChange={(e) => {
@@ -789,9 +1157,30 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                                         setValidationError(''); // Clear error on input change
                                                                     }}
                                                                     onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, 'bkbd_board_no')}
+                                                                    placeholder="Click generate button"
+                                                                    title="Manual typing disabled - use generate button"
                                                                 />
-                                                                <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, 'bkbd_board_no')}>
+                                                                <button 
+                                                                    className="btn btn-sm btn-outline-primary me-1" 
+                                                                    onClick={() => generateUniqueBoardNumber('bkbd_board_no')}
+                                                                    disabled={isSaving}
+                                                                    title="Generate unique board number"
+                                                                >
+                                                                    <i className="bi bi-magic"></i>
+                                                                </button>
+                                                                <button className="save-btn me-1" disabled={isSaving} onClick={() => handleSave(item.id, 'bkbd_board_no')}>
                                                                     {isSaving ? '...' : 'SAVE'}
+                                                                </button>
+                                                                <button 
+                                                                    className="btn btn-sm btn-secondary" 
+                                                                    onClick={() => {
+                                                                        setEditingCell(null);
+                                                                        setTempValue('');
+                                                                        setValidationError('');
+                                                                    }}
+                                                                    disabled={isSaving}
+                                                                >
+                                                                    CANCEL
                                                                 </button>
                                                             </div>
                                                             {validationError && editingCell?.key === 'bkbd_board_no' && (
@@ -804,9 +1193,47 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                     ) : (
                                                         <div className="d-flex align-items-center justify-content-between">
                                                             <span className={`board-value ${getBoardCellClass(item.bkbd_board_no, item, pcbaLogs)}`}>
-                                                                {formatBoardValue(item.bkbd_board_no, 'bkbd_board_no').text}
+                                                                {formatBoardValueWithHighlight(item.bkbd_board_no, 'bkbd_board_no', searchTerm).text}
                                                             </span>
                                                             <button className="edit-btn" onClick={(e) => { e.stopPropagation(); handleEdit(item.id, 'bkbd_board_no', item.bkbd_board_no); }}>
+                                                                EDIT
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td>
+                                                    {editingCell?.logId === item.id && editingCell?.key === selectedModelKey ? (
+                                                        <div>
+                                                            <div className="d-flex align-items-center mb-1">
+                                                                <input 
+                                                                    autoFocus
+                                                                    maxLength={6}
+                                                                    disabled={isSaving}
+                                                                    className={`edit-input ${validationError ? 'border-danger' : ''}`}
+                                                                    value={tempValue}
+                                                                    onChange={(e) => {
+                                                                        setTempValue(e.target.value);
+                                                                        setValidationError(''); // Clear error on input change
+                                                                    }}
+                                                                    onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, selectedModelKey)}
+                                                                />
+                                                                <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, selectedModelKey)}>
+                                                                    {isSaving ? '...' : 'SAVE'}
+                                                                </button>
+                                                            </div>
+                                                            {validationError && editingCell?.key === selectedModelKey && (
+                                                                <div className="text-danger small fw-bold">
+                                                                    <i className="bi bi-exclamation-triangle-fill me-1"></i>
+                                                                    {validationError}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="d-flex align-items-center justify-content-between">
+                                                            <span className={`board-value ${getBoardCellClass(item[selectedModelKey], item, pcbaLogs)}`}>
+                                                                {formatBoardValue(item[selectedModelKey], selectedModelKey).text}
+                                                            </span>
+                                                            <button className="edit-btn" onClick={(e) => { e.stopPropagation(); handleEdit(item.id, selectedModelKey, item[selectedModelKey]); }}>
                                                                 EDIT
                                                             </button>
                                                         </div>
@@ -853,11 +1280,6 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                 )}
                                             </td>
                                         )}
-                                        <td>
-                                            <div className="status-badge">
-                                                {getStatusBadge(item)}
-                                            </div>
-                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -937,6 +1359,96 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                 ) : (
                                     'Yes, Save Changes'
                                 )}
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+            
+            {/* Approval Modal */}
+            {showApproveModal && ReactDOM.createPortal(
+                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.5)', zIndex: 9999 }}>
+                    <div className="bg-white rounded-3 shadow-lg p-0" style={{ width: '90%', maxWidth: '400px' }}>
+                        <div className="modal-header border-bottom p-3">
+                            <h5 className="modal-title fw-bold text-success">
+                                <i className="bi bi-check-circle-fill me-2"></i>
+                                Approve Board Edit Request
+                            </h5>
+                        </div>
+                        <div className="modal-body p-4">
+                            <p className="mb-3">Are you sure you want to approve this board edit request?</p>
+                            <div className="alert alert-light border">
+                                <div className="row g-2">
+                                    <div className="col-4"><strong>Assembly:</strong></div>
+                                    <div className="col-8">{approvingRequest ? formatAssemblyNumber(pendingRequests.find(r => r.id === approvingRequest.requestId)?.assembly_no || 'Unknown') : 'N/A'}</div>
+                                    <div className="col-4"><strong>Board:</strong></div>
+                                    <div className="col-8">{approvingRequest ? pcbaMapping.find(m => m.dbKey === approvingRequest.column)?.displayName : 'N/A'}</div>
+                                    <div className="col-4"><strong>New Value:</strong></div>
+                                    <div className="col-8">
+                                        <code className="bg-success bg-opacity-10 text-success px-2 py-1 rounded">{approvingRequest?.newValue || '(empty)'}</code>
+                                    </div>
+                                </div>
+                            </div>
+                            <p className="text-muted small mb-0">This action will update the board number immediately.</p>
+                        </div>
+                        <div className="modal-footer border-top p-3">
+                            <button 
+                                type="button" 
+                                className="btn btn-secondary" 
+                                onClick={cancelApproveModal}
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                type="button" 
+                                className="btn btn-success" 
+                                onClick={confirmApproveRequest}
+                            >
+                                <i className="bi bi-check-lg me-2"></i>
+                                Approve Request
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+            
+            {/* Rejection Modal */}
+            {showRejectModal && ReactDOM.createPortal(
+                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.5)', zIndex: 9999 }}>
+                    <div className="bg-white rounded-3 shadow-lg p-0" style={{ width: '90%', maxWidth: '400px' }}>
+                        <div className="modal-header border-bottom p-3">
+                            <h5 className="modal-title fw-bold text-danger">
+                                <i className="bi bi-x-circle-fill me-2"></i>
+                                Reject Board Edit Request
+                            </h5>
+                        </div>
+                        <div className="modal-body p-4">
+                            <p className="mb-3">Are you sure you want to reject this board edit request?</p>
+                            <div className="alert alert-warning border">
+                                <div className="d-flex align-items-center">
+                                    <i className="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+                                    <span>This action cannot be undone. The request will be permanently rejected.</span>
+                                </div>
+                            </div>
+                            <p className="text-muted small mb-0">The operator will need to submit a new request if needed.</p>
+                        </div>
+                        <div className="modal-footer border-top p-3">
+                            <button 
+                                type="button" 
+                                className="btn btn-secondary" 
+                                onClick={cancelRejectModal}
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                type="button" 
+                                className="btn btn-danger" 
+                                onClick={confirmRejectRequest}
+                            >
+                                <i className="bi bi-x-lg me-2"></i>
+                                Reject Request
                             </button>
                         </div>
                     </div>

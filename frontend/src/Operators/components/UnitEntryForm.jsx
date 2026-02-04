@@ -22,6 +22,60 @@ export function UnitEntryForm({
     const isStation6 = stn.toLowerCase() === 'station6';
     const isStation11 = stn.toLowerCase() === 'station11';
 
+    // Check if PCBA details exist in database for this unit
+    const unitInDb = allUnits?.find(u => u.assembly_no === formData.assemblyNo);
+    const hasPcbaDetails = unitInDb && (
+        unitInDb.mnbd_board_no || unitInDb.cmbd_board_no || 
+        unitInDb.lrbd_board_no || unitInDb.pqbd_board_no || unitInDb.bkbd_board_no
+    );
+
+    // Debug: Log the unit data and board numbers
+    if (unitInDb) {
+        console.log("Unit found:", unitInDb.assembly_no);
+        console.log("Board numbers:", {
+            mnbd: unitInDb.mnbd_board_no,
+            cmbd: unitInDb.cmbd_board_no,
+            lrbd: unitInDb.lrbd_board_no,
+            pqbd: unitInDb.pqbd_board_no,
+            bkbd: unitInDb.bkbd_board_no
+        });
+    }
+
+    // 🔑 FUNCTION: Search board serial from inventory
+    const searchBoardSerial = async (sixDigitCode) => {
+        try {
+            const response = await fetch(`http://localhost:3001/mkffwebsystem/backend/api/inventory.php?search&code=${sixDigitCode}`);
+            const result = await response.json();
+            
+            if (result.status === 'success' && result.data) {
+                const data = result.data;
+                console.log('Found board data:', data);
+                
+                // Auto-populate all board fields from the found record
+                const updates = {};
+                
+                if (data.mnbd_board_no) updates.mnbd_no = data.mnbd_board_no;
+                if (data.cmbd_board_no) updates.cmbd_no = data.cmbd_board_no;
+                if (data.lrbd_board_no) updates.lrbd_no = data.lrbd_board_no;
+                if (data.pqbd_board_no) updates.pqbd_no = data.pqbd_board_no;
+                if (data.bkbd_board_no) updates.bkbd_no = data.bkbd_board_no;
+                
+                // Update form with all found board numbers
+                if (Object.keys(updates).length > 0) {
+                    setFormData(prev => ({ ...prev, ...updates }));
+                    console.log('Auto-populated board numbers:', updates);
+                    return true;
+                }
+            } else {
+                console.log('No board found with code:', sixDigitCode);
+            }
+            return false;
+        } catch (error) {
+            console.error('Error searching board serial:', error);
+            return false;
+        }
+    };
+
     // 🔑 HELPER: Generate Unique Identifier and check against database records
     const generateUniqueID = (prefix, length = 6) => {
         const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -77,6 +131,16 @@ export function UnitEntryForm({
                 if (!formData.baseUnitKittingNo && unitInDb.base_unit_kitting_no) {
                     updates.baseUnitKittingNo = unitInDb.base_unit_kitting_no;
                 }
+                
+                // Auto-populate PCBA board numbers from database - ALWAYS populate if available
+                PCBA_FIXED_DATA.forEach(board => {
+                    const dbKey = board.key.replace('_no', '_board_no'); // Convert mnbd_no to mnbd_board_no
+                    
+                    // ALWAYS set the board number if it exists in database, regardless of current form state
+                    if (unitInDb[dbKey]) {
+                        updates[board.key] = unitInDb[dbKey];
+                    }
+                });
             }
 
             // 2. SMART GENERATION: Only generate if the field is empty in BOTH the form AND the database
@@ -111,6 +175,52 @@ export function UnitEntryForm({
             return () => window.removeEventListener('click', handleGlobalClick);
         }
     }, [isScannerEnabled, processStatus, scannerInputRef, formData.assemblyNo, stn, allUnits]);
+
+    // 🔑 FUNCTION: Handle board serial input change with auto-population from current unit
+    const handleBoardSerialChange = async (boardKey, value) => {
+        // Update the form field first
+        setFormData(prev => ({ ...prev, [boardKey]: value.toUpperCase() }));
+        
+        // If exactly 6 digits are entered, check if we can auto-populate from current unit data
+        if (value.length === 6 && /^[0-9A-Z]{6}$/.test(value)) {
+            console.log(`Board serial entered: ${value}`);
+            
+            // Check if this 6-digit code matches any board in the current unit
+            const unitInDb = allUnits?.find(u => u.assembly_no === formData.assemblyNo);
+            if (unitInDb) {
+                const updates = {};
+                
+                // Check if the entered code matches any board in the current unit
+                if (unitInDb.mnbd_board_no === value) updates.mnbd_no = unitInDb.mnbd_board_no;
+                if (unitInDb.cmbd_board_no === value) updates.cmbd_no = unitInDb.cmbd_board_no;
+                if (unitInDb.lrbd_board_no === value) updates.lrbd_no = unitInDb.lrbd_board_no;
+                if (unitInDb.pqbd_board_no === value) updates.pqbd_no = unitInDb.pqbd_board_no;
+                if (unitInDb.bkbd_board_no === value) updates.bkbd_no = unitInDb.bkbd_board_no;
+                
+                // Auto-populate all board fields from current unit if we found a match
+                if (Object.keys(updates).length > 0) {
+                    // Populate all board fields from the current unit
+                    const allBoardUpdates = {};
+                    if (unitInDb.mnbd_board_no) allBoardUpdates.mnbd_no = unitInDb.mnbd_board_no;
+                    if (unitInDb.cmbd_board_no) allBoardUpdates.cmbd_no = unitInDb.cmbd_board_no;
+                    if (unitInDb.lrbd_board_no) allBoardUpdates.lrbd_no = unitInDb.lrbd_board_no;
+                    if (unitInDb.pqbd_board_no) allBoardUpdates.pqbd_no = unitInDb.pqbd_board_no;
+                    if (unitInDb.bkbd_board_no) allBoardUpdates.bkbd_no = unitInDb.bkbd_board_no;
+                    
+                    setFormData(prev => ({ ...prev, ...allBoardUpdates }));
+                    console.log('Auto-populated all board numbers from current unit:', allBoardUpdates);
+                } else {
+                    // If no match found, try searching inventory as fallback
+                    console.log('No match in current unit, searching inventory...');
+                    await searchBoardSerial(value);
+                }
+            } else {
+                // If no current unit data, search inventory
+                console.log('No current unit data, searching inventory...');
+                await searchBoardSerial(value);
+            }
+        }
+    };
 
     const handleStatusChange = (e) => {
         const newStatus = e.target.value;
@@ -234,21 +344,28 @@ export function UnitEntryForm({
                             </div>
                         </div>
 
-                        {isStation1 && (
-                            <div className="col-12 mb-4 animate-in slide-in">
-                                <div className="p-3 border rounded bg-white shadow-sm" style={{ borderTop: '4px solid #0d6efd' }}>
-                                    <h6 className="fw-bold text-primary mb-3 small"><i className="bi bi-cpu-fill me-2"></i>PCBA BOARD DETAILS (REQUIRED)</h6>
-                                    <div className="table-responsive">
-                                        <table className="table table-sm table-bordered align-middle text-center small" style={{ fontSize: '0.7rem' }}>
-                                            <thead className="table-light">
-                                                <tr>
-                                                    <th>PCBA MODEL</th>
-                                                    <th>PARTS CODE</th>
-                                                    <th className="bg-primary-subtle text-primary">BOARD SERIAL (6 DIGITS)</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {PCBA_FIXED_DATA.map((board) => (
+                        <div className="col-12 mb-4 animate-in slide-in">
+                            <div className={`p-3 border rounded bg-white shadow-sm ${hasPcbaDetails ? 'border-success' : ''}`} style={{ borderTop: hasPcbaDetails ? '4px solid #198754' : '4px solid #0d6efd' }}>
+                                <h6 className={`fw-bold mb-3 small ${hasPcbaDetails ? 'text-success' : 'text-primary'}`}>
+                                    <i className="bi bi-cpu-fill me-2"></i>
+                                    BOARD SERIAL (6 DIGITS) {hasPcbaDetails ? '(FROM DATABASE)' : '(VIEW ONLY)'}
+                                </h6>
+                                <div className="table-responsive">
+                                    <table className="table table-sm table-bordered align-middle text-center small" style={{ fontSize: '0.7rem' }}>
+                                        <thead className="table-light">
+                                            <tr>
+                                                <th>PCBA MODEL</th>
+                                                <th>PARTS CODE</th>
+                                                <th className={`${hasPcbaDetails ? 'bg-success-subtle text-success' : 'bg-primary-subtle text-primary'}`}>
+                                                    BOARD SERIAL (6 DIGITS) {hasPcbaDetails && <i className="bi bi-lock-fill ms-1"></i>}
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {PCBA_FIXED_DATA.map((board) => {
+                                                const dbKey = board.key.replace('_no', '_board_no');
+                                                const hasDbValue = unitInDb && unitInDb[dbKey];
+                                                return (
                                                     <tr key={board.key}>
                                                         <td className="fw-semibold text-start ps-3">{board.model}</td>
                                                         <td className="text-muted">{board.code}</td>
@@ -256,23 +373,31 @@ export function UnitEntryForm({
                                                             <div className="input-group input-group-sm">
                                                                 <span className="input-group-text bg-light border-primary-subtle" style={{ fontSize: '0.6rem' }}>{board.prefix}</span>
                                                                 <input 
-                                                                    type="text" maxLength="6"
-                                                                    className="form-control form-control-sm fw-bold border-primary text-primary" 
+                                                                    type="text" 
+                                                                    maxLength="6"
+                                                                    className={`form-control form-control-sm fw-bold ${hasDbValue ? 'border-success bg-light text-success' : 'border-primary text-primary'}`} 
                                                                     placeholder="000000"
-                                                                    value={formData[board.key] || ''}
-                                                                    onChange={(e) => setFormData({...formData, [board.key]: e.target.value.toUpperCase()})}
+                                                                    value={hasDbValue ? unitInDb[dbKey] : (formData[board.key] || '')}
+                                                                    onChange={(e) => hasDbValue ? null : handleBoardSerialChange(board.key, e.target.value)}
+                                                                    readOnly={hasDbValue}
+                                                                    title={hasDbValue ? 'Board number from database (read-only)' : 'Enter 6-digit board number (auto-searches inventory)'}
                                                                 />
                                                             </div>
                                                         </td>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div className="mt-1 small text-muted italic">* Input the 6 handwritten digits from the card.</div>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div className="mt-1 small text-muted italic">
+                                    {hasPcbaDetails 
+                                        ? '* Board numbers automatically loaded from database. These cannot be edited.'
+                                        : '* Input the 6 handwritten digits from the card. Auto-searches inventory when 6 digits are entered.'
+                                    }
                                 </div>
                             </div>
-                        )}
+                        </div>
 
                         <div className="row g-3">
                             <div className="col-md-4">

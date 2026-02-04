@@ -134,6 +134,7 @@ const setActiveTab = (tab) => {
     const [statusMessage, setStatusMessage] = useState("");
     const [unitList, setUnitList] = useState([]); // For tab-specific content
     const [globalUnitList, setGlobalUnitList] = useState([]); // For sidebar badges - never cleared
+    const [allUnitsForPcba, setAllUnitsForPcba] = useState([]); // For PCBA auto-population - ALL units
     const [historyList, setHistoryList] = useState([]); 
     const [listLoading, setListLoading] = useState(false);
     const [listError, setListError] = useState(null);
@@ -324,6 +325,32 @@ useEffect(() => {
         }
     }, [currentStation]); 
     
+    // --- 🔑 HOOKED FUNCTIONS: FETCH ALL UNITS FOR PCBA AUTO-POPULATION ---
+    const fetchAllUnitsForPcba = useCallback(async () => {
+        try {
+            const res = await axios.get(UNITS_ENDPOINT, {
+                params: {
+                    station: '', // Get ALL units regardless of station
+                    status: ''   // Get ALL units regardless of status
+                }
+            });
+            
+            const rawData = Array.isArray(res.data) ? res.data : [];
+            const newAllUnitsList = rawData.map(unit => ({
+                ...unit,
+                deviceSerialNo: unit.device_serial_no,
+                accessoryKittingNo: unit.accessory_kitting_no,
+                baseUnitKittingNo: unit.base_unit_kitting_no,
+                assemblyNo: unit.assembly_no
+            }));
+            
+            setAllUnitsForPcba(newAllUnitsList);
+            console.log("Fetched ALL units for PCBA:", newAllUnitsList.length, "units");
+        } catch (err) {
+            console.error("Failed to fetch all units for PCBA:", err);
+        }
+    }, []); // No dependencies - fetches all units regardless
+    
     // --- HOOKED FUNCTIONS: FETCH HISTORY (Unchanged) ---
     const fetchHistory = useCallback(async () => {
         setListLoading(true); setListError(null); setHistoryList([]);
@@ -415,6 +442,14 @@ useEffect(() => {
         };
     }, [fetchGlobalUnits]); // Only depends on fetchGlobalUnits
 
+    // --- EFFECT: FETCH ALL UNITS FOR PCBA AUTO-POPULATION ---
+    useEffect(() => {
+        fetchAllUnitsForPcba(); // Initial fetch
+        // Optional: Refresh every 30 seconds to keep data fresh
+        const intervalId = setInterval(fetchAllUnitsForPcba, 30000);
+        return () => clearInterval(intervalId);
+    }, [fetchAllUnitsForPcba]);
+
     // --- UNIVERSAL POLLING EFFECT FOR UNIT STATUS CHECK (1 second) ---
     useEffect(() => {
         let intervalId;
@@ -457,9 +492,10 @@ useEffect(() => {
             return;
         }
 
-        // QR Format: MODEL|REV|BASE|ASSEMBLY|SERIAL|ACC
+        // QR Format: MODEL|REV|BASE|ASSEMBLY|MNBD|CMBD|LRBD|PQBD|BKBD|ACC
         const scannedAssembly = parts[3].trim();
-        const scannedSerial = parts[4].trim();
+        const scannedSerial = parts.length >= 10 ? parts[9].trim() : ''; // ACC is at index 9
+        const hasBoardNumbers = parts.length >= 9; // Check if board numbers are present
         
         const myStationName = currentStation; 
         const myStationIndex = STATION_ORDER.indexOf(myStationName);
@@ -517,8 +553,8 @@ else {
             revision: parts[1].trim(),
             baseUnitKittingNo: parts[2].trim(),
             assemblyNo: parts[3].trim(),
-            deviceSerialNo: parts[4].trim(),
-            accessoryKittingNo: parts[5]?.trim() || "",
+            deviceSerialNo: hasBoardNumbers ? '' : parts[4]?.trim() || '', // Empty if board numbers present
+            accessoryKittingNo: hasBoardNumbers ? parts[9]?.trim() : parts[5]?.trim() || '', // ACC is at index 9 if board numbers present
             status: "In Progress"
         }));
         setProcessStatus('idle');
@@ -830,6 +866,7 @@ const todayAnnouncementsCount = announcements.filter(a => {
                         resetForm={resetForm}
                         scannedUnitId={scannedUnitId}
                         currentStation={currentStation}
+                        allUnits={allUnitsForPcba} // Use ALL units for PCBA auto-population
                     />
                 );
 
@@ -856,6 +893,7 @@ const todayAnnouncementsCount = announcements.filter(a => {
                         loading={listLoading}
                         error={listError}
                         onEdit={handleEditClick}
+                        dynamicTargetTimes={dynamicTargetTimes}
                     />
                 );
                 

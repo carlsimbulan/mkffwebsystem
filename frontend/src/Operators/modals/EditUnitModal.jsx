@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export const EditUnitModal = ({ unit, onClose, onSave }) => {
+export const EditUnitModal = ({ unit, onClose, onSave, isDetailsOnly = false }) => {
     const isReopening = unit.status === 'Completed' || unit.status === 'No Good (NG)';
     const initialStatus = isReopening ? 'Pending Approval' : unit.status;
     

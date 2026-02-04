@@ -370,39 +370,108 @@ export default function ITAssistantPage({ user, onLogout }) {
         setInventoryCurrentPage(1);
     }, [inventorySearch]);
 
-    const handleGenerateQR = (e) => {
+    const handleGenerateQR = async (e) => {
         e.preventDefault();
         const quantity = parseInt(qrFormData.quantity, 10);
         if (quantity < 1 || quantity > MAX_QR_COUNT) return;
-        const newQRList = [];
-        let currentAssembly = nextAssemblyNo;
-        for (let i = 0; i < quantity; i++) {
-            const assyNum = `ASSY-${formatSerial(currentAssembly)}`;
-            const qrString = `${qrFormData.model}|${qrFormData.revision}|${qrFormData.baseKit}|${assyNum}||${qrFormData.accKit}`;
-            newQRList.push({ 
-                assembly_no: assyNum, model: qrFormData.model, revision: qrFormData.revision, 
-                base_unit_kitting_no: qrFormData.baseKit, accessory_kitting_no: qrFormData.accKit, 
-                qr_url: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrString)}`, 
-                status: 'For Scanning' 
-            });
-            currentAssembly++;
+        
+        setProcessStatus('loading');
+        setStatusMessage("Generating unique board numbers...");
+        
+        try {
+            // Fetch unique board numbers from API
+            const boardResponse = await axios.get(`${UNITS_ENDPOINT}?generate_board_numbers&quantity=${quantity}`);
+            
+            if (boardResponse.data.status !== 'success') {
+                throw new Error('Failed to generate board numbers');
+            }
+            
+            const boardNumbers = boardResponse.data.board_numbers;
+            const newQRList = [];
+            let currentAssembly = nextAssemblyNo;
+            
+            for (let i = 0; i < quantity; i++) {
+                const assyNum = `ASSY-${formatSerial(currentAssembly)}`;
+                const boards = boardNumbers[i];
+                
+                // Create QR string with assembly and board numbers
+                const qrString = `${qrFormData.model}|${qrFormData.revision}|${qrFormData.baseKit}|${assyNum}|${boards.mnbd_no}|${boards.cmbd_no}|${boards.lrbd_no}|${boards.pqbd_no}|${boards.bkbd_no}|${qrFormData.accKit}`;
+                
+                newQRList.push({ 
+                    assembly_no: assyNum, 
+                    model: qrFormData.model, 
+                    revision: qrFormData.revision, 
+                    base_unit_kitting_no: qrFormData.baseKit, 
+                    accessory_kitting_no: qrFormData.accKit,
+                    // Add board numbers
+                    mnbd_board_no: boards.mnbd_no,
+                    cmbd_board_no: boards.cmbd_no,
+                    lrbd_board_no: boards.lrbd_no,
+                    pqbd_board_no: boards.pqbd_no,
+                    bkbd_board_no: boards.bkbd_no,
+                    qr_url: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrString)}`, 
+                    status: 'For Scanning' 
+                });
+                currentAssembly++;
+            }
+            
+            setGeneratedQRList(newQRList);
+            setProcessStatus('success');
+            setStatusMessage("QR codes generated successfully with board numbers!");
+            setTimeout(() => setProcessStatus('idle'), 2000);
+            
+        } catch (error) {
+            setProcessStatus('error');
+            setStatusMessage("Failed to generate QR codes with board numbers.");
+            setTimeout(() => setProcessStatus('idle'), 3000);
         }
-        setGeneratedQRList(newQRList);
     };
 
     const handleSaveToDB = async () => {
         setProcessStatus('loading');
         setStatusMessage("Saving QR Batch to database...");
         try {
-            await Promise.all(generatedQRList.map(unit => axios.post(UNITS_ENDPOINT, { ...unit, action: 'create', username: user.username, station: 'N/A' })));
+            // First save units to main units table with 'For Scanning' status and 'N/A' station
+            await Promise.all(generatedQRList.map(unit => axios.post(UNITS_ENDPOINT, { 
+                ...unit, 
+                action: 'create', 
+                username: user.username, 
+                station: 'N/A',
+                status: 'For Scanning'
+            })));
+            
+            // Then save board numbers to unit_pcba_details table
+            for (const unit of generatedQRList) {
+                // Get the unit ID from the created unit
+                const unitResponse = await axios.get(`${UNITS_ENDPOINT}?search_assembly=${unit.assembly_no}`);
+                if (unitResponse.data.length > 0) {
+                    const unitId = unitResponse.data[0].id;
+                    
+                    // Save board numbers directly to unit_pcba_details table
+                    await axios.post(`${UNITS_ENDPOINT}?method=PUT`, {
+                        id: unitId,
+                        assembly_no: unit.assembly_no,
+                        status: 'For Scanning', // Keep as For Scanning
+                        station: 'N/A', // Keep as N/A
+                        username: user.username,
+                        // Include board numbers
+                        mnbd_no: unit.mnbd_board_no,
+                        cmbd_no: unit.cmbd_board_no,
+                        lrbd_no: unit.lrbd_board_no,
+                        pqbd_no: unit.pqbd_board_no,
+                        bkbd_no: unit.bkbd_board_no
+                    });
+                }
+            }
+            
             setProcessStatus('success');
-            setStatusMessage("Batch saved successfully!");
+            setStatusMessage("Batch saved successfully with board numbers!");
             setGeneratedQRList([]); 
             fetchUnitData(false);
             setTimeout(() => setProcessStatus('idle'), 2000);
         } catch (error) {
             setProcessStatus('error');
-            setStatusMessage("Failed to save batch.");
+            setStatusMessage("Failed to save batch: " + (error.response?.data?.error || error.message));
             setTimeout(() => setProcessStatus('idle'), 3000);
         }
     };

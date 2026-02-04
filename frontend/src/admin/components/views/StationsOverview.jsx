@@ -859,7 +859,7 @@ CRITICAL: Use only one-sentence bullet points. No paragraphs. No long explanatio
                                     ? checkUnitDelay(stationMonitorId, lastTs, dynamicDelayThresholds)
                                     : { isDelayed: false, minutes: minutesInStation, level: 'NORMAL' };
 
-                                const delayMinutes = Math.max(0, minutesInStation - thresholdMinutes);
+                                const delayMinutes = delay.minutes; // Use actual minutes from checkUnitDelay
                                 return (
                                     <tr 
                                         key={log.id} 

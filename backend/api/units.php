@@ -316,6 +316,55 @@ if ($method === 'POST' && isset($_GET['method']) && strtoupper($_GET['method']) 
 $data = json_decode(file_get_contents("php://input"), true);
 
 // ==========================================================
+// SPECIAL ENDPOINT: GENERATE UNIQUE BOARD NUMBERS
+// ==========================================================
+if ($method === 'GET' && isset($_GET['generate_board_numbers'])) {
+    try {
+        $quantity = isset($_GET['quantity']) ? (int)$_GET['quantity'] : 5;
+        $quantity = max(1, min($quantity, 100)); // Limit between 1-100
+        
+        $boardTypes = ['mnbd_board_no', 'cmbd_board_no', 'lrbd_board_no', 'pqbd_board_no', 'bkbd_board_no'];
+        $generatedNumbers = [];
+        
+        // Get all existing board numbers from database
+        $existingNumbers = [];
+        foreach ($boardTypes as $boardType) {
+            $stmt = $pdo->prepare("SELECT DISTINCT $boardType FROM unit_pcba_details WHERE $boardType IS NOT NULL");
+            $stmt->execute();
+            $results = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            $existingNumbers = array_merge($existingNumbers, $results);
+        }
+        $existingNumbers = array_unique($existingNumbers);
+        
+        // Generate unique numbers
+        for ($i = 0; $i < $quantity; $i++) {
+            $boardSet = [];
+            foreach ($boardTypes as $boardType) {
+                $attempts = 0;
+                do {
+                    $number = str_pad(mt_rand(0, 999999), 6, '0', STR_PAD_LEFT);
+                    $attempts++;
+                } while (in_array($number, $existingNumbers) && $attempts < 1000);
+                
+                $boardSet[substr($boardType, 0, -9) . '_no'] = $number; // Convert back to frontend format
+                $existingNumbers[] = $number; // Add to existing to avoid duplicates in this batch
+            }
+            $generatedNumbers[] = $boardSet;
+        }
+        
+        echo json_encode([
+            'status' => 'success',
+            'board_numbers' => $generatedNumbers
+        ]);
+        exit;
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['error' => $e->getMessage()]);
+        exit;
+    }
+}
+
+// ==========================================================
 // 1. GET REQUESTS
 // ==========================================================
 if ($method === 'GET') {
@@ -460,7 +509,7 @@ try {
     $pdo->beginTransaction();
 
     $stat = $data['status'] ?? 'In Progress';
-    $stn = $data['station'] ?? 'Station 1';
+    $stn = $data['station'] ?? 'N/A'; // Changed default from 'Station 1' to 'N/A'
     $user_name = $data['username'] ?? 'System';
     $cleanStn = str_replace(' ', '', $stn);
     
@@ -589,8 +638,8 @@ if (($stat === 'No Good (NG)' || $stat === 'Pending Approval') && empty($remarks
     }
 
     // PCBA INVENTORY HANDLER
-    // PCBA INVENTORY HANDLER - STATION 1 ONLY
-if ($cleanStn === 'Station1' && !empty($unitId)) {
+    // PCBA INVENTORY HANDLER - ALL STATIONS (not just Station1)
+    if (!empty($unitId)) {
     $boardMapping = [
         'mnbd_no' => 'mnbd_board_no',
         'cmbd_no' => 'cmbd_board_no',
@@ -599,7 +648,8 @@ if ($cleanStn === 'Station1' && !empty($unitId)) {
         'bkbd_no' => 'bkbd_board_no'
     ];
 
-    if ($stat === 'In Progress') {
+    // Save PCBA details for any status (not just 'In Progress')
+    if (!empty($data['mnbd_no']) || !empty($data['cmbd_no']) || !empty($data['lrbd_no']) || !empty($data['pqbd_no']) || !empty($data['bkbd_no'])) {
         foreach ($boardMapping as $reactKey => $dbColumn) {
             $val = getNullIfEmpty($data[$reactKey] ?? '');
             if (!$val) continue; // Laktawan kung walang pinasang serial
