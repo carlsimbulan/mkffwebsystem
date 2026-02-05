@@ -247,6 +247,17 @@ switch ($method) {
         // Check if this is a Profile Update from the Operator Modal
         if (isset($data['action']) && $data['action'] === 'update_profile') {
             handleProfileUpdate($pdo, $data, $file);
+        } elseif (isset($data['action']) && $data['action'] === 'get_all_users') {
+            // Return all users with their station assignments
+            try {
+                $stmt = $pdo->prepare("SELECT id, username, password, role, full_name, station, avatar_url, created_at FROM users ORDER BY id ASC");
+                $stmt->execute();
+                $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                echo json_encode(["status" => "success", "users" => $users]);
+            } catch (PDOException $e) {
+                http_response_code(500);
+                echo json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
+            }
         } else {
             addUser($pdo, $data, $file);
         }

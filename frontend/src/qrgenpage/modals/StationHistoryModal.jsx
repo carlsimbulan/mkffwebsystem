@@ -2,6 +2,34 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
  
 const HISTORY_ENDPOINT = "http://localhost/mkffwebsystem/backend/api/unit_history.php";
+
+// Fallback utility function for operator name lookup
+const getOperatorDisplayName = (actionBy) => {
+    if (!actionBy) return 'System';
+    if (actionBy.toLowerCase() === 'system') return 'System';
+    
+    // Try to use global function first
+    if (window.getOperatorDisplayName) {
+        return window.getOperatorDisplayName(actionBy);
+    }
+    
+    // Fallback: try to use cached data directly
+    const users = window.cachedUsersData || [];
+    const operatorMap = {};
+    users.forEach(user => {
+        if (user.username && user.full_name) {
+            operatorMap[user.username] = user.full_name;
+        }
+        if (user.email && user.full_name) {
+            operatorMap[user.email] = user.full_name;
+        }
+        if (user.id && user.full_name) {
+            operatorMap[user.id.toString()] = user.full_name;
+        }
+    });
+    
+    return operatorMap[actionBy] || actionBy;
+};
  
 const getTodayDate = () => new Date().toISOString().split('T')[0];
  
@@ -119,7 +147,9 @@ const StationHistoryModal = ({ stationId, onClose, user, highlightedUnitId }) =>
                                                 <td className="text-primary fw-bold">{log.assembly_no}</td>
                                                 <td>{log.action_type || 'UPDATE'}</td>
                                                 <td className="text-center"><span className={`badge rounded-pill px-3 py-2 ${getStatusClass(log.status_after)}`}>{log.status_after}</span></td>
-                                                <td>{log.action_by || 'System'}</td>
+                                                <td>
+                                                    {getOperatorDisplayName(log.action_by)}
+                                                </td>
                                                 <td className="text-end pe-3 small">{new Date(log.timestamp).toLocaleString()}</td>
                                             </tr>
                                         ))}

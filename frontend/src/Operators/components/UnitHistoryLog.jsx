@@ -1,6 +1,34 @@
 import React, { useState, useMemo } from 'react';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
+// Fallback utility function for operator name lookup
+const getOperatorDisplayName = (actionBy) => {
+    if (!actionBy) return 'SYSTEM';
+    if (actionBy.toLowerCase() === 'system') return 'SYSTEM';
+    
+    // Try to use global function first
+    if (window.getOperatorDisplayName) {
+        return window.getOperatorDisplayName(actionBy);
+    }
+    
+    // Fallback: try to use cached data directly
+    const users = window.cachedUsersData || [];
+    const operatorMap = {};
+    users.forEach(user => {
+        if (user.username && user.full_name) {
+            operatorMap[user.username] = user.full_name;
+        }
+        if (user.email && user.full_name) {
+            operatorMap[user.email] = user.full_name;
+        }
+        if (user.id && user.full_name) {
+            operatorMap[user.id.toString()] = user.full_name;
+        }
+    });
+    
+    return operatorMap[actionBy] || actionBy;
+};
+
 const getStatusBadgeClass = (status) => {
     switch (status) {
         case 'Completed': return 'bg-success-subtle text-success border border-success-subtle';
@@ -58,7 +86,9 @@ const UnitHistoryTable = ({ historyLogs, loading, error }) => {
                                         {log.status_after}
                                     </span>
                                 </td>
-                                <td className="small fw-bold">{log.action_by}</td>
+                                <td className="small fw-bold">
+                                    {getOperatorDisplayName(log.action_by)}
+                                </td>
                                 <td className="pe-4 text-end text-muted font-monospace" style={{ fontSize: '0.75rem' }}>
                                     {new Date(log.timestamp).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                 </td>

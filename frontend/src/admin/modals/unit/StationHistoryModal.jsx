@@ -1,6 +1,34 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 
+// Fallback utility function for operator name lookup
+const getOperatorDisplayName = (actionBy) => {
+    if (!actionBy) return 'SYSTEM';
+    if (actionBy.toLowerCase() === 'system') return 'SYSTEM';
+    
+    // Try to use global function first
+    if (window.getOperatorDisplayName) {
+        return window.getOperatorDisplayName(actionBy);
+    }
+    
+    // Fallback: try to use cached data directly
+    const users = window.cachedUsersData || [];
+    const operatorMap = {};
+    users.forEach(user => {
+        if (user.username && user.full_name) {
+            operatorMap[user.username] = user.full_name;
+        }
+        if (user.email && user.full_name) {
+            operatorMap[user.email] = user.full_name;
+        }
+        if (user.id && user.full_name) {
+            operatorMap[user.id.toString()] = user.full_name;
+        }
+    });
+    
+    return operatorMap[actionBy] || actionBy;
+};
+
 export const StationHistoryModal = ({ stationId, onClose, HISTORY_ENDPOINT, highlightedUnitId }) => {
     const [historyLogs, setHistoryLogs] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -122,7 +150,9 @@ export const StationHistoryModal = ({ stationId, onClose, HISTORY_ENDPOINT, high
                                                         {log.status_after || log.status}
                                                     </span>
                                                 </td>
-                                                <td className="small fw-bold">{log.action_by || 'SYSTEM'}</td>
+                                                <td className="small fw-bold">
+                                                    {getOperatorDisplayName(log.action_by)}
+                                                </td>
                                                 <td className="small">
                                                     {new Date(log.timestamp || log.created_at).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}
                                                 </td>
