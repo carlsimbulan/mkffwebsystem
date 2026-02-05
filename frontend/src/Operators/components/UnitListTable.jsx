@@ -513,9 +513,9 @@ export const UnitListTable = ({ units, listStatus, loading, error, onEdit, dynam
             <div className="table-responsive shadow-sm rounded animate-in fade-in">
                 <h4 className="mb-4"><i className="bi bi-list-columns-reverse me-2 text-primary"></i>{displayTitle} Units</h4>
                 <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem' }}>
-                    <thead>
+                    <thead className="table-dark">
                         <tr>
-                            <th className="ps-4">MODEL</th>
+                            <th>MODEL</th>
                             <th>REVISION</th>
                             <th>BASE UNIT</th>
                             <th>ASSEMBLY</th>

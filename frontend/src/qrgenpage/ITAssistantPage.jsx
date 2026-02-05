@@ -376,7 +376,7 @@ export default function ITAssistantPage({ user, onLogout }) {
         if (quantity < 1 || quantity > MAX_QR_COUNT) return;
         
         setProcessStatus('loading');
-        setStatusMessage("Generating unique board numbers...");
+        setStatusMessage("Generating QR codes...");
         
         try {
             // Fetch unique board numbers from API
@@ -416,20 +416,18 @@ export default function ITAssistantPage({ user, onLogout }) {
             }
             
             setGeneratedQRList(newQRList);
-            setProcessStatus('success');
-            setStatusMessage("QR codes generated successfully with board numbers!");
-            setTimeout(() => setProcessStatus('idle'), 2000);
+            setProcessStatus('idle'); // Just set to idle, no success message
             
         } catch (error) {
             setProcessStatus('error');
-            setStatusMessage("Failed to generate QR codes with board numbers.");
+            setStatusMessage("Failed to generate QR codes.");
             setTimeout(() => setProcessStatus('idle'), 3000);
         }
     };
 
     const handleSaveToDB = async () => {
         setProcessStatus('loading');
-        setStatusMessage("Saving QR Batch to database...");
+        setStatusMessage("Saving batch to database...");
         try {
             // First save units to main units table with 'For Scanning' status and 'N/A' station
             await Promise.all(generatedQRList.map(unit => axios.post(UNITS_ENDPOINT, { 
@@ -465,7 +463,7 @@ export default function ITAssistantPage({ user, onLogout }) {
             }
             
             setProcessStatus('success');
-            setStatusMessage("Batch saved successfully with board numbers!");
+            setStatusMessage("Batch saved successfully!");
             setGeneratedQRList([]); 
             fetchUnitData(false);
             setTimeout(() => setProcessStatus('idle'), 2000);
@@ -712,18 +710,68 @@ export default function ITAssistantPage({ user, onLogout }) {
                 );
             case "qr_generator":
                 return (
-                    <div className="card border">
-                        <div className="card-header bg-dark text-white py-3"><h5 className="mb-0 fw-bold">Batch Generator</h5></div>
+                    <div className="card border-0 shadow-sm">
+                        <div className="card-header bg-primary text-white py-3 border-0">
+                            <h6 className="mb-0 fw-bold">QR Code Batch Generator</h6>
+                        </div>
                         <div className="card-body p-4">
                             <form onSubmit={handleGenerateQR}>
                                 <div className="row g-3">
-                                    <div className="col-md-12"><label className="fw-bold small text-muted">BATCH QUANTITY</label><input type="number" className="form-control" value={qrFormData.quantity} onChange={(e) => setQrFormData({...qrFormData, quantity: e.target.value})} required /></div>
-                                    <div className="col-md-6"><label className="small fw-bold text-muted">MODEL</label><input type="text" className="form-control" value={qrFormData.model} onChange={(e) => setQrFormData({...qrFormData, model: e.target.value})} /></div>
-                                    <div className="col-md-6"><label className="small fw-bold text-muted">REVISION</label><input type="text" className="form-control" value={qrFormData.revision} onChange={(e) => setQrFormData({...qrFormData, revision: e.target.value})} /></div>
+                                    <div className="col-md-12">
+                                        <label className="form-label fw-bold text-muted">Batch Quantity</label>
+                                        <input 
+                                            type="number" 
+                                            className="form-control" 
+                                            value={qrFormData.quantity} 
+                                            onChange={(e) => setQrFormData({...qrFormData, quantity: e.target.value})} 
+                                            required 
+                                            min="1"
+                                            max={MAX_QR_COUNT}
+                                        />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-bold text-muted">Model</label>
+                                        <input 
+                                            type="text" 
+                                            className="form-control" 
+                                            value={qrFormData.model} 
+                                            onChange={(e) => setQrFormData({...qrFormData, model: e.target.value})} 
+                                        />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label className="form-label fw-bold text-muted">Revision</label>
+                                        <input 
+                                            type="text" 
+                                            className="form-control" 
+                                            value={qrFormData.revision} 
+                                            onChange={(e) => setQrFormData({...qrFormData, revision: e.target.value})} 
+                                        />
+                                    </div>
                                 </div>
-                                <button type="submit" className="btn btn-primary mt-4 fw-bold px-4">Generate QR Batch</button>
+                                <button 
+                                    type="submit" 
+                                    className="btn btn-primary mt-4 fw-bold px-4"
+                                    disabled={processStatus === 'loading'}
+                                >
+                                    {processStatus === 'loading' ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-2"></span>
+                                            Generating...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <i className="bi bi-qr-code me-2"></i>
+                                            Generate QR Batch
+                                        </>
+                                    )}
+                                </button>
                             </form>
-                            <GeneratedQRList list={generatedQRList} onSave={handleSaveToDB} onDiscard={() => setGeneratedQRList([])} isSaving={isSaving} />
+                            <GeneratedQRList 
+                                list={generatedQRList} 
+                                onSave={handleSaveToDB} 
+                                onDiscard={() => setGeneratedQRList([])} 
+                                isSaving={processStatus === 'loading'} 
+                            />
                         </div>
                     </div>
                 );
@@ -762,40 +810,76 @@ export default function ITAssistantPage({ user, onLogout }) {
             case "approvals":
                 return (
                     <>
-                        <div className="card border shadow-sm">
-                            <div className="card-header bg-danger text-white fw-bold d-flex justify-content-between align-items-center">
-                                <span>APPROVALS QUEUE</span>
-                                <span className="badge bg-white text-danger">
-                                    {unitLogs.filter(u => u.status === 'Pending Approval').length} Units
-                                </span>
+                        <div className="card border-0 shadow-sm">
+                            <div className="card-header bg-dark text-white py-3 border-0">
+                                <div className="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 className="mb-0 fw-bold text-uppercase" style={{ fontSize: '0.85rem', letterSpacing: '0.5px' }}>
+                                            Approvals Queue
+                                        </h6>
+                                        <small className="text-light opacity-75" style={{ fontSize: '0.7rem' }}>
+                                            Units pending quality assurance approval
+                                        </small>
+                                    </div>
+                                    <span className="badge bg-light text-dark px-3 py-2" style={{ fontSize: '0.7rem', fontWeight: '600' }}>
+                                        {unitLogs.filter(u => u.status === 'Pending Approval').length} Units
+                                    </span>
+                                </div>
                             </div>
                             <div className="card-body p-0">
                                 <div className="table-responsive">
-                                    <table className="table table-hover table-bordered table-sm mb-0 uppercase" style={{ fontSize: '0.75rem' }}>
-                                        <thead className="table-dark">
+                                    <table className="table table-hover mb-0" style={{ fontSize: '0.8rem' }}>
+                                        <thead className="bg-light">
                                             <tr>
-                                                <th>MODEL</th><th>REVISION</th><th>BASE UNIT</th><th>ASSEMBLY</th><th>DEVICE SERIAL</th><th>STATUS</th><th>REMARKS</th><th>TIMESTAMP</th>
-                                                <th className="text-center bg-primary">ACTIONS</th>
+                                                <th className="border-0 py-3 px-4 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>MODEL</th>
+                                                <th className="border-0 py-3 px-4 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>REVISION</th>
+                                                <th className="border-0 py-3 px-4 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>BASE UNIT</th>
+                                                <th className="border-0 py-3 px-4 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>ASSEMBLY</th>
+                                                <th className="border-0 py-3 px-4 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>DEVICE SERIAL</th>
+                                                <th className="border-0 py-3 px-4 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>STATUS</th>
+                                                <th className="border-0 py-3 px-4 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>REMARKS</th>
+                                                <th className="border-0 py-3 px-4 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>TIMESTAMP</th>
+                                                <th className="border-0 py-3 px-4 text-muted fw-bold text-center" style={{ fontSize: '0.75rem' }}>ACTIONS</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {unitLogs.filter(u => u.status === 'Pending Approval').map(u => (
-                                                <tr key={u.id} className="align-middle">
-                                                    <td>{u.model}</td><td>{u.revision}</td><td>{u.base_unit_kitting_no}</td>
-                                                    <td className="fw-bold text-primary">{u.assembly_no}</td><td>{u.device_serial_no || 'N/A'}</td>
-                                                    <td><span className="badge bg-warning text-dark">{u.status}</span></td>
-                                                    <td>{u.remarks || '---'}</td>
-                                                    <td>{u.created_at}</td>
-                                                    <td className="text-center">
-                                                        <button 
-                                                            className="btn btn-success btn-sm fw-bold px-3 rounded-pill shadow-sm"
-                                                            onClick={() => handleApproveButtonClick(u)} 
-                                                        >
-                                                            <i className="bi bi-check-circle-fill me-1"></i> APPROVE
-                                                        </button>
+                                            {unitLogs.filter(u => u.status === 'Pending Approval').length === 0 ? (
+                                                <tr>
+                                                    <td colSpan="9" className="text-center py-5 text-muted">
+                                                        <i className="bi bi-inbox display-6 d-block mb-3 opacity-25"></i>
+                                                        <div style={{ fontSize: '0.9rem' }}>No units pending approval</div>
+                                                        <small className="text-muted">All units are currently in production or completed</small>
                                                     </td>
                                                 </tr>
-                                            ))}
+                                            ) : (
+                                                unitLogs.filter(u => u.status === 'Pending Approval').map(u => (
+                                                    <tr key={u.id} className="align-middle border-bottom">
+                                                        <td className="px-4 py-3">{u.model}</td>
+                                                        <td className="px-4 py-3">{u.revision}</td>
+                                                        <td className="px-4 py-3">{u.base_unit_kitting_no}</td>
+                                                        <td className="px-4 py-3">
+                                                            <code className="bg-light px-2 py-1 rounded text-dark fw-bold">{u.assembly_no}</code>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-muted">{u.device_serial_no || 'N/A'}</td>
+                                                        <td className="px-4 py-3">
+                                                            <span className="badge bg-warning bg-opacity-10 text-warning border border-warning px-2 py-1" style={{ fontSize: '0.7rem' }}>
+                                                                {u.status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-muted">{u.remarks || '---'}</td>
+                                                        <td className="px-4 py-3 text-muted" style={{ fontSize: '0.75rem' }}>{u.created_at}</td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <button 
+                                                                className="btn btn-dark btn-sm px-3 py-2 fw-bold"
+                                                                onClick={() => handleApproveButtonClick(u)} 
+                                                                style={{ fontSize: '0.7rem', letterSpacing: '0.3px' }}
+                                                            >
+                                                                <i className="bi bi-check-lg me-1"></i> APPROVE
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>

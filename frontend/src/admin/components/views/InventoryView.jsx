@@ -29,6 +29,34 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
         { model: 'EE-405-BKBD-PCBA-A4', partsCode: '001-00-000041', prefix: 'MK001034-2502-', dbKey: 'bkbd_board_no', displayName: 'BKBD' }
     ];
 
+    // Format date for display
+    const formatDateTime = (dateString) => {
+        if (!dateString || dateString === '' || dateString === null || dateString === undefined) {
+            return { text: '-', className: 'text-muted small' };
+        }
+        
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) {
+                return { text: '-', className: 'text-muted small' };
+            }
+            
+            // Format as MM/DD/YYYY HH:MM
+            const formatted = date.toLocaleString('en-US', {
+                month: '2-digit',
+                day: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
+            
+            return { text: formatted, className: 'text-dark small fw-bold' };
+        } catch (error) {
+            return { text: '-', className: 'text-muted small' };
+        }
+    };
+
     // Check for GLOBAL duplicate board numbers across all units
     const hasDuplicate = (currentItem, allLogs) => {
         const currentBoards = pcbaMapping.map(board => ({
@@ -1201,44 +1229,6 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                         </div>
                                                     )}
                                                 </td>
-                                                <td>
-                                                    {editingCell?.logId === item.id && editingCell?.key === selectedModelKey ? (
-                                                        <div>
-                                                            <div className="d-flex align-items-center mb-1">
-                                                                <input 
-                                                                    autoFocus
-                                                                    maxLength={6}
-                                                                    disabled={isSaving}
-                                                                    className={`edit-input ${validationError ? 'border-danger' : ''}`}
-                                                                    value={tempValue}
-                                                                    onChange={(e) => {
-                                                                        setTempValue(e.target.value);
-                                                                        setValidationError(''); // Clear error on input change
-                                                                    }}
-                                                                    onKeyDown={(e) => e.key === 'Enter' && handleSave(item.id, selectedModelKey)}
-                                                                />
-                                                                <button className="save-btn" disabled={isSaving} onClick={() => handleSave(item.id, selectedModelKey)}>
-                                                                    {isSaving ? '...' : 'SAVE'}
-                                                                </button>
-                                                            </div>
-                                                            {validationError && editingCell?.key === selectedModelKey && (
-                                                                <div className="text-danger small fw-bold">
-                                                                    <i className="bi bi-exclamation-triangle-fill me-1"></i>
-                                                                    {validationError}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        <div className="d-flex align-items-center justify-content-between">
-                                                            <span className={`board-value ${getBoardCellClass(item[selectedModelKey], item, pcbaLogs)}`}>
-                                                                {formatBoardValue(item[selectedModelKey], selectedModelKey).text}
-                                                            </span>
-                                                            <button className="edit-btn" onClick={(e) => { e.stopPropagation(); handleEdit(item.id, selectedModelKey, item[selectedModelKey]); }}>
-                                                                EDIT
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </td>
                                             </>
                                         ) : (
                                             <td>
@@ -1280,12 +1270,106 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                 )}
                                             </td>
                                         )}
+                                        <td>
+                                            <span className={formatDateTime(item.created_at).className}>
+                                                {formatDateTime(item.created_at).text || '-'}
+                                            </span>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
 
+                    {/* Approval Modal */}
+                    {showApproveModal && ReactDOM.createPortal(
+                        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.5)', zIndex: 9999 }}>
+                            <div className="bg-white rounded-3 shadow-lg p-0" style={{ width: '90%', maxWidth: '400px' }}>
+                                <div className="modal-header border-bottom p-3">
+                                    <h5 className="modal-title fw-bold text-success">
+                                        <i className="bi bi-check-circle-fill me-2"></i>
+                                        Approve Board Edit Request
+                                    </h5>
+                                </div>
+                                <div className="modal-body p-4">
+                                    <p className="mb-3">Are you sure you want to approve this board edit request?</p>
+                                    <div className="alert alert-light border">
+                                        <div className="row g-2">
+                                            <div className="col-4"><strong>Assembly:</strong></div>
+                                            <div className="col-8">{approvingRequest ? formatAssemblyNumber(pendingRequests.find(r => r.id === approvingRequest.requestId)?.assembly_no || 'Unknown') : 'N/A'}</div>
+                                            <div className="col-4"><strong>Board:</strong></div>
+                                            <div className="col-8">{approvingRequest ? pcbaMapping.find(m => m.dbKey === approvingRequest.column)?.displayName : 'N/A'}</div>
+                                            <div className="col-4"><strong>New Value:</strong></div>
+                                            <div className="col-8">
+                                                <code className="bg-success bg-opacity-10 text-success px-2 py-1 rounded">{approvingRequest?.newValue || '(empty)'}</code>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p className="text-muted small mb-0">This action will update the board number immediately.</p>
+                                </div>
+                                <div className="modal-footer border-top p-3">
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-secondary" 
+                                        onClick={cancelApproveModal}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-success" 
+                                        onClick={confirmApproveRequest}
+                                    >
+                                        <i className="bi bi-check-lg me-2"></i>
+                                        Approve Request
+                                    </button>
+                                </div>
+                            </div>
+                        </div>,
+                        document.body
+                    )}
+                    
+                    {/* Rejection Modal */}
+                    {showRejectModal && ReactDOM.createPortal(
+                        <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.5)', zIndex: 9999 }}>
+                            <div className="bg-white rounded-3 shadow-lg p-0" style={{ width: '90%', maxWidth: '400px' }}>
+                                <div className="modal-header border-bottom p-3">
+                                    <h5 className="modal-title fw-bold text-danger">
+                                        <i className="bi bi-x-circle-fill me-2"></i>
+                                        Reject Board Edit Request
+                                    </h5>
+                                </div>
+                                <div className="modal-body p-4">
+                                    <p className="mb-3">Are you sure you want to reject this board edit request?</p>
+                                    <div className="alert alert-warning border">
+                                        <div className="d-flex align-items-center">
+                                            <i className="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+                                            <span>This action cannot be undone. The request will be permanently rejected.</span>
+                                        </div>
+                                    </div>
+                                    <p className="text-muted small mb-0">The operator will need to submit a new request if needed.</p>
+                                </div>
+                                <div className="modal-footer border-top p-3">
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-secondary" 
+                                        onClick={cancelRejectModal}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-danger" 
+                                        onClick={confirmRejectRequest}
+                                    >
+                                        <i className="bi bi-x-lg me-2"></i>
+                                        Reject Request
+                                    </button>
+                                </div>
+                            </div>
+                        </div>,
+                        document.body
+                    )}
                     <div className="pagination-container">
                         <div className="pagination-info">
                             Showing {paginatedLogs.length} of {filteredLogs.length} Records

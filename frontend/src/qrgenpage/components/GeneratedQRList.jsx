@@ -34,22 +34,49 @@ const GeneratedQRList = ({ list, onSave, onDiscard, isSaving }) => {
     };
     
     return (
-        <div className="mt-4 border-top pt-4 animate-in fade-in">
-            <h5 className="fw-bold mb-3 text-dark"><i className="bi bi-file-earmark-check me-2 text-success"></i>Generated Batch Preview ({list.length} units)</h5>
+        <div className="mt-4 border-top pt-4">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h6 className="fw-bold mb-0">Generated Batch Preview</h6>
+                    <small className="text-muted">{list.length} units ready</small>
+                </div>
+            </div>
 
-            <div className="d-flex mb-3 gap-3">
-                <button className="btn btn-primary fw-bold flex-grow-1 rounded-pill px-4" onClick={handlePrint}>
-                    <i className="bi bi-printer me-2"></i> Print All Labels
+            <div className="d-flex mb-3 gap-2">
+                <button 
+                    className="btn btn-outline-primary fw-bold flex-grow-1" 
+                    onClick={handlePrint}
+                    disabled={isSaving}
+                >
+                    <i className="bi bi-printer me-2"></i> Print Labels
                 </button>
-                <button className="btn btn-success fw-bold flex-grow-1 rounded-pill px-4" onClick={onSave} disabled={isSaving}>
-                    {isSaving ? <span><span className="spinner-border spinner-border-sm me-2"></span>Saving...</span> : <span><i className="bi bi-database-add me-2"></i> Save Batch to DB</span>}
+                <button 
+                    className="btn btn-success fw-bold flex-grow-1" 
+                    onClick={onSave} 
+                    disabled={isSaving}
+                >
+                    {isSaving ? (
+                        <>
+                            <span className="spinner-border spinner-border-sm me-2"></span>
+                            Saving...
+                        </>
+                    ) : (
+                        <>
+                            <i className="bi bi-database-add me-2"></i> 
+                            Save to Database
+                        </>
+                    )}
                 </button>
-                <button className="btn btn-outline-secondary rounded-pill px-4" onClick={onDiscard} disabled={isSaving}>
-                    <i className="bi bi-trash"></i> Discard
+                <button 
+                    className="btn btn-outline-secondary" 
+                    onClick={onDiscard} 
+                    disabled={isSaving}
+                >
+                    <i className="bi bi-trash"></i>
                 </button>
             </div>
 
-            <div className="bg-light p-3 border rounded shadow-sm" style={{ maxHeight: '500px', overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+            <div className="bg-light p-3 border rounded" style={{ maxHeight: '500px', overflowY: 'auto', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                 <div id="qr-print-area-wrapper" style={{ display: 'none' }}>
                      {list.map((unit, index) => (
                         <div key={index} className="qr-item-label">
@@ -64,9 +91,10 @@ const GeneratedQRList = ({ list, onSave, onDiscard, isSaving }) => {
                 </div>
                 
                 {list.map((unit, index) => (
-                    <div key={index} className="bg-white border rounded p-2 text-center" style={{ flex: '0 0 calc(25% - 5px)', minWidth: '150px' }}>
-                        <img src={unit.qr_url} alt="QR" style={{ maxWidth: '80px' }} />
-                        <div className="small mt-1"><strong>{unit.assembly_no}</strong></div>
+                    <div key={index} className="bg-white border rounded p-3 text-center" style={{ flex: '0 0 calc(20% - 10px)', minWidth: '150px' }}>
+                        <img src={unit.qr_url} alt="QR" style={{ maxWidth: '100px', height: 'auto' }} />
+                        <div className="small mt-2 fw-bold text-dark">{unit.assembly_no}</div>
+                        <div className="small text-muted">{unit.model}</div>
                     </div>
                 ))}
             </div>
