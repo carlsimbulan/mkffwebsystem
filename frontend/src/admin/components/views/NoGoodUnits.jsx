@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
 const processStations = [
@@ -10,9 +10,6 @@ const processStations = [
 ];
 
 const NoGoodUnits = ({ logs, handleEditClick }) => {
-    const [selectedUnit, setSelectedUnit] = useState(null);
-    const [expandedStepIdx, setExpandedStepIdx] = useState(null);
-
     const allNoGoodLogs = useMemo(() => {
         return (logs || []).filter(log => {
             const status = log.status?.toLowerCase() || '';
@@ -29,178 +26,146 @@ const NoGoodUnits = ({ logs, handleEditClick }) => {
         });
     };
 
-    const getStationIndex = (log) => {
-        const stationName = log.station_name || log.station;
-        return processStations.findIndex(s => s === stationName);
-    };
-
     return (
         <div className="pb-5">
-            <div className="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3 px-2">
-                <div>
-                    <h3 className="fw-bold text-dark mb-0">No Good (NG) Units</h3>
-                    <p className="text-muted small mb-0">Master list of all non-conforming units across stations</p>
+            <div className="d-flex justify-content-between align-items-center mb-4">
+                <h4 className="mb-0 fw-bold text-dark">
+                    <i className="bi bi-x-circle me-2 text-danger"></i>
+                    No Good (NG) Units
+                </h4>
+                <div className="badge bg-danger bg-opacity-10 text-danger px-3 py-2">
+                    <i className="bi bi-hash me-1"></i>
+                    {allNoGoodLogs.length} Units
                 </div>
-                <span className="badge bg-danger rounded-pill px-3 py-2">Total: {allNoGoodLogs.length}</span>
             </div>
 
-            <div className="bg-white border rounded-2 overflow-hidden shadow-sm mx-2">
-                <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem' }}>
-                    <thead className="table-dark">
-                        <tr>
-                            <th className="ps-4">MODEL</th>
-                            <th>REVISION</th>
-                            <th>BASE UNIT</th>
-                            <th>ASSEMBLY</th>
-                            <th>DEVICE SERIAL</th>
-                            <th>ACCESSORY</th>
-                            <th className="text-danger">ERROR STATION</th>
-                            <th>STATUS</th>
-                            <th>LAST MOVEMENT</th>
-                            <th className="text-center pe-4">ACTIONS</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {allNoGoodLogs.map(log => (
-                            <tr key={log.id}>
-                                <td className="ps-4 fw-bold">{log.model}</td>
-                                <td className="text-muted">{log.revision || '---'}</td>
-                                <td>{log.base_unit_kitting_no || '---'}</td>
-                                <td>
-                                    <code className="text-primary fw-bold">{log.assembly_no}</code>
-                                </td>
-                                <td className="fw-bold">{log.device_serial_no}</td>
-                                <td>{log.accessory_kitting_no || '---'}</td>
-                                <td>
-                                    <span className="fw-bold text-danger">
-                                        <i className="bi bi-geo-alt-fill me-1"></i>
-                                        {log.station_name || log.station || 'N/A'}
-                                    </span>
-                                </td>
-                                <td>
-                                    <span className="badge bg-danger text-white rounded-1 px-3">
-                                        {log.status}
-                                    </span>
-                                </td>
-                                <td className="small text-muted">
-                                    {formatTimestamp(log.updated_at || log.created_at)}
-                                </td>
-                                <td className="text-center pe-4">
-                                    <div className="d-flex gap-1 justify-content-center">
-                                        <button className="btn btn-sm btn-primary px-3 fw-bold" onClick={() => setSelectedUnit(log)}>DETAILS</button>
-                                        <button className="btn btn-sm btn-outline-danger px-3 fw-bold" onClick={() => handleEditClick(log)}>MANAGE</button>
-                                    </div>
-                                </td>
+            <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
+                <div className="table-responsive">
+                    <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem' }}>
+                        <thead className="bg-primary text-white">
+                            <tr>
+                                <th className="border-0 px-4 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    MODEL
+                                </th>
+                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    REVISION
+                                </th>
+                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    BASE UNIT
+                                </th>
+                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    ASSEMBLY
+                                </th>
+                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    DEVICE SERIAL
+                                </th>
+                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    ACCESSORY
+                                </th>
+                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    ERROR STATION
+                                </th>
+                                <th className="border-0 px-3 py-3 text-center fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    STATUS
+                                </th>
+                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    LAST MOVEMENT
+                                </th>
+                                <th className="border-0 px-4 py-3 text-center fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    ACTIONS
+                                </th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-
-            {selectedUnit && (
-                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.4)', zIndex: 1050 }}>
-                    <div className="bg-white rounded-3 shadow-xl p-0 overflow-hidden border-0" style={{ width: '95%', maxWidth: '850px' }}>
-                        <div className="p-4 d-flex justify-content-between align-items-center text-white bg-danger shadow-sm">
-                            <div><h5 className="mb-0 fw-bold">Unit Analysis | SN: {selectedUnit.device_serial_no}</h5></div>
-                            <button className="btn-close btn-close-white shadow-none" onClick={() => setSelectedUnit(null)}></button>
-                        </div>
-
-                        <div className="p-4" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
-                            <div className="process-timeline mt-4 ps-2">
-                                {processStations.map((station, idx) => {
-                                    const currentStationIdx = getStationIndex(selectedUnit);
-                                    const isNGPoint = idx === currentStationIdx;
-                                    const isDone = idx < currentStationIdx;
-                                    const isExpanded = expandedStepIdx === idx;
-
-                                    let stationData = null;
-                                    if (idx === 0 && selectedUnit.header_seated_90_deg) {
-                                        stationData = { "Header Seated": selectedUnit.header_seated_90_deg, "Soldering": selectedUnit.leads_properly_soldered };
-                                    } else if (idx === 1 && selectedUnit.integrated_board_level_test1) {
-                                        stationData = { "Board 1": selectedUnit.integrated_board_level_test1, "Board 2": selectedUnit.integrated_board_level_test2, "Board 3": selectedUnit.integrated_board_level_test3 };
-                                    } else if (idx === 5 && selectedUnit.voltage) {
-                                        stationData = { 
-                                            "LoRa": selectedUnit.lora_module, 
-                                            "Meter": selectedUnit.energy_meter, 
-                                            "PwrGood": selectedUnit.power_good_test,
-                                            "Volt": selectedUnit.voltage,
-                                            "L1": selectedUnit.line1,
-                                            "L2": selectedUnit.line2,
-                                            "L3": selectedUnit.line3,
-                                            "Temp": selectedUnit.temp_reading,
-                                            "Freq": selectedUnit.freq_reading,
-                                            "4G": selectedUnit.led_status_4g,
-                                            "Blink": selectedUnit.led_status_fast_blink,
-                                            "Verdict": selectedUnit.go_no_go 
-                                        };
-                                    } else if (isNGPoint) {
-                                        stationData = { "Station": station, "Status": "NO GOOD", "Defect Code": selectedUnit.defect_code || "GEN-01" };
-                                    }
-
-                                    return (
-                                        <div key={idx} className={`modal-step ${isNGPoint ? 'active-ng' : (isDone ? 'done' : '')}`} onClick={() => stationData && setExpandedStepIdx(isExpanded ? null : idx)}>
-                                            <div className="modal-dot"></div>
-                                            <div className="d-flex justify-content-between align-items-center">
-                                                <div>
-                                                    <div className="fw-bold small">{idx + 1}. {station}</div>
-                                                    <div className="fw-bold text-uppercase" style={{fontSize: '0.6rem', color: isNGPoint ? '#ef4444' : (isDone ? '#22c55e' : '#94a3b8')}}>
-                                                        {isNGPoint ? 'FAILED HERE' : (isDone ? 'COMPLETED' : 'PENDING')}
-                                                    </div>
-                                                </div>
-                                                {stationData && <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'} text-muted`}></i>}
+                        </thead>
+                        <tbody>
+                            {allNoGoodLogs.map(log => (
+                                <tr key={log.id} className="border-bottom hover-bg-primary hover-bg-opacity-5 transition-all">
+                                    <td className="ps-4 py-3">
+                                        <div className="fw-bold text-dark">{log.model}</div>
+                                    </td>
+                                    <td className="px-3 py-3">
+                                        <span className="badge bg-light text-dark rounded-pill px-2 py-1" style={{ fontSize: '0.7rem' }}>
+                                            {log.revision || 'N/A'}
+                                        </span>
+                                    </td>
+                                    <td className="px-3 py-3">
+                                        <span className="text-muted small fst-italic">{log.base_unit_kitting_no || '---'}</span>
+                                    </td>
+                                    <td className="px-3 py-3">
+                                        <code className="text-primary fw-bold bg-light px-2 py-1 rounded" style={{ fontSize: '0.8rem' }}>
+                                            {log.assembly_no}
+                                        </code>
+                                    </td>
+                                    <td className="px-3 py-3">
+                                        <span className="text-muted small">{log.device_serial_no || '---'}</span>
+                                    </td>
+                                    <td className="px-3 py-3">
+                                        <span className="text-muted small">{log.accessory_kitting_no || '---'}</span>
+                                    </td>
+                                    <td className="px-3 py-3">
+                                        <div className="d-flex align-items-center">
+                                            <div className="bg-danger bg-opacity-10 rounded-circle p-1 me-2">
+                                                <i className="bi bi-geo-alt-fill text-danger" style={{ fontSize: '0.7rem' }}></i>
                                             </div>
-
-                                            {isExpanded && stationData && (
-                                                <div className="tracker-checklist-box shadow-sm animate-in fade-in">
-                                                    <table className="tracker-table">
-                                                        <thead><tr>{Object.keys(stationData).map(k => <th key={k}>{k}</th>)}</tr></thead>
-                                                        <tbody>
-                                                            <tr>
-                                                                {Object.entries(stationData).map(([key, value], i) => {
-                                                                    const val = String(value).toUpperCase().trim();
-                                                                    let isFail = false;
-                                                                    const failureWords = ["NO GO", "FAIL", "NO GOOD", "NG", "NOT DETECTED", "FALSE"];
-    
-                                                                    if (failureWords.includes(val)) isFail = true;
-
-                                                                    if (["Volt", "L1", "L2", "L3"].includes(key)) {
-                                                                        const num = parseFloat(value);
-                                                                        if (!isNaN(num) && (num < 113.85 || num > 116.15)) isFail = true;
-                                                                    }
-
-                                                                    return (
-                                                                        <td key={i} className={isFail ? 'text-danger' : 'text-success'}>
-                                                                            {value || 'N/A'}
-                                                                            {["Volt", "L1", "L2", "L3"].includes(key) && value ? 'V' : ''}
-                                                                        </td>
-                                                                    );
-                                                                })}
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            )}
+                                            <span className="fw-bold text-danger small">
+                                                {log.station_name || log.station || 'N/A'}
+                                            </span>
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        <div className="p-3 bg-light border-top text-end">
-                            <button className="btn btn-secondary px-5 fw-bold" onClick={() => setSelectedUnit(null)}>CLOSE ANALYSIS</button>
-                        </div>
-                    </div>
+                                    </td>
+                                    <td className="px-3 py-3 text-center">
+                                        <span className="badge bg-danger px-3 py-2 rounded-1 fw-semibold" style={{ fontSize: '0.75rem' }}>
+                                            {log.status}
+                                        </span>
+                                    </td>
+                                    <td className="px-3 py-3">
+                                        <div className="text-muted small">
+                                            <i className="bi bi-clock me-1"></i>
+                                            {formatTimestamp(log.updated_at || log.created_at)}
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        <div className="d-flex gap-1 justify-content-center">
+                                            <button 
+                                                className="btn btn-sm btn-outline-danger rounded p-2 transition-all" 
+                                                onClick={() => handleEditClick(log)}
+                                                title="Manage"
+                                            >
+                                                <i className="bi bi-gear"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
-            )}
+            </div>
 
             <style>{`
-                .modal-step { padding: 15px 20px; border-left: 2px solid #e9ecef; position: relative; cursor: pointer; }
-                .modal-dot { position: absolute; left: -7px; top: 22px; width: 12px; height: 12px; border-radius: 50%; background: #dee2e6; border: 2px solid white; z-index: 2; }
-                .done .modal-dot { background: #198754; }
-                .active-ng .modal-dot { background: #dc3545; }
-                .tracker-checklist-box { background: #f8fafc; border-radius: 8px; margin-top: 10px; }
-                .tracker-table th { background: #f1f5f9; padding: 8px; border-bottom: 1px solid #cbd5e1; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; }
-                .tracker-table td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; font-weight: 700; }
+                .hover-bg-primary:hover {
+                    background-color: rgba(13, 110, 253, 0.03) !important;
+                }
+                
+                .transition-all {
+                    transition: all 0.15s ease;
+                }
+                
+                .border-bottom {
+                    border-bottom: 1px solid rgba(0, 0, 0, 0.03) !important;
+                }
+                
+                .badge {
+                    font-weight: 500;
+                    letter-spacing: 0.2px;
+                }
+                
+                .table {
+                    border-collapse: separate;
+                    border-spacing: 0;
+                }
+                
+                .shadow-sm {
+                    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+                }
             `}</style>
         </div>
     );

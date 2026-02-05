@@ -1,32 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 
-// Fallback utility function for operator name lookup
-const getOperatorDisplayName = (actionBy) => {
+// Simplified operator name function using database full_name
+const getOperatorDisplayName = (actionBy, userFullName) => {
     if (!actionBy) return 'SYSTEM';
     if (actionBy.toLowerCase() === 'system') return 'SYSTEM';
     
-    // Try to use global function first
-    if (window.getOperatorDisplayName) {
-        return window.getOperatorDisplayName(actionBy);
+    // Use full_name from database if available
+    if (userFullName && userFullName.trim()) {
+        return userFullName;
     }
     
-    // Fallback: try to use cached data directly
-    const users = window.cachedUsersData || [];
-    const operatorMap = {};
-    users.forEach(user => {
-        if (user.username && user.full_name) {
-            operatorMap[user.username] = user.full_name;
-        }
-        if (user.email && user.full_name) {
-            operatorMap[user.email] = user.full_name;
-        }
-        if (user.id && user.full_name) {
-            operatorMap[user.id.toString()] = user.full_name;
-        }
-    });
-    
-    return operatorMap[actionBy] || actionBy;
+    // Fallback to action_by if no full_name
+    return actionBy;
 };
 
 const getStatusBadgeClass = (status) => {
@@ -87,7 +73,7 @@ const UnitHistoryTable = ({ historyLogs, loading, error }) => {
                                     </span>
                                 </td>
                                 <td className="small fw-bold">
-                                    {getOperatorDisplayName(log.action_by)}
+                                    {getOperatorDisplayName(log.action_by, log.user_full_name)}
                                 </td>
                                 <td className="pe-4 text-end text-muted font-monospace" style={{ fontSize: '0.75rem' }}>
                                     {new Date(log.timestamp).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -104,6 +90,8 @@ const UnitHistoryTable = ({ historyLogs, loading, error }) => {
 export function UnitHistoryLog({ currentStation, historyList, listLoading, listError }) {
     const [searchAssembly, setSearchAssembly] = useState('');
     const [filterDate, setFilterDate] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
 
     const filteredHistory = useMemo(() => {
         if (!historyList) return [];
@@ -117,6 +105,23 @@ export function UnitHistoryLog({ currentStation, historyList, listLoading, listE
             return matchesAssembly && matchesDate;
         });
     }, [historyList, searchAssembly, filterDate]);
+
+    // Reset to page 1 when filters change
+    useMemo(() => {
+        setCurrentPage(1);
+    }, [searchAssembly, filterDate]);
+
+    // Calculate paginated data
+    const paginatedHistory = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return filteredHistory.slice(startIndex, endIndex);
+    }, [filteredHistory, currentPage]);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(filteredHistory.length / itemsPerPage);
+    const startItem = (currentPage - 1) * itemsPerPage + 1;
+    const endItem = Math.min(currentPage * itemsPerPage, filteredHistory.length);
 
     return (
         <div className="container-fluid px-0 py-2 animate-in fade-in">
@@ -211,10 +216,51 @@ export function UnitHistoryLog({ currentStation, historyList, listLoading, listE
 
             {/* TABLE */}
             <UnitHistoryTable 
-                historyLogs={filteredHistory} 
+                historyLogs={paginatedHistory} 
                 loading={listLoading} 
                 error={listError} 
             />
+
+            {/* PAGINATION */}
+            {totalPages > 1 && (
+                <div className="d-flex justify-content-between align-items-center mt-4 px-2">
+                    <div className="text-muted small">
+                        Showing {startItem} to {endItem} of {filteredHistory.length} entries
+                    </div>
+                    <nav>
+                        <ul className="pagination pagination-sm mb-0">
+                            <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                                <button 
+                                    className="page-link" 
+                                    onClick={() => setCurrentPage(currentPage - 1)}
+                                    disabled={currentPage === 1}
+                                >
+                                    <i className="bi bi-chevron-left"></i>
+                                </button>
+                            </li>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                                <li key={page} className={`page-item ${currentPage === page ? 'active' : ''}`}>
+                                    <button 
+                                        className="page-link" 
+                                        onClick={() => setCurrentPage(page)}
+                                    >
+                                        {page}
+                                    </button>
+                                </li>
+                            ))}
+                            <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                                <button 
+                                    className="page-link" 
+                                    onClick={() => setCurrentPage(currentPage + 1)}
+                                    disabled={currentPage === totalPages}
+                                >
+                                    <i className="bi bi-chevron-right"></i>
+                                </button>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            )}
         </div>
     );
 }

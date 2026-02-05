@@ -125,73 +125,6 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
                     <h2 className="fw-bold text-dark mb-0" style={{ letterSpacing: '-1px' }}>Station Overview</h2>
                 </div>
                 
-                <div className="d-flex gap-2">
-                   {announcementCount > 0 && (
-    <button className="btn btn-warning shadow-sm d-flex align-items-center gap-2 px-3 rounded-pill fw-bold animate-pulse" 
-            onClick={() => setActiveTab('announcements')} 
-            style={{ fontSize: '0.8rem' }}>
-        <i className="bi bi-megaphone-fill"></i>
-        {announcementCount} NEW {announcementCount === 1 ? 'UPDATE' : 'UPDATES'} TODAY
-    </button>
-)}
-                    <button className="btn btn-primary shadow-sm d-flex align-items-center gap-2 px-4 rounded-pill fw-bold" 
-                            onClick={() => setActiveTab('input_unit')} style={{ fontSize: '0.8rem' }}>
-                        <i className="bi bi-qr-code-scan"></i> NEW ENTRY
-                    </button>
-                </div>
-            </div>
-
-            {/* --- STATION TARGET TIME INFO --- */}
-            <div className="row mb-4">
-                <div className="col-12">
-                    <div className="card border-0 shadow-sm target-time-card" style={{ borderRadius: '12px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-                        <div className="card-body py-3 px-4">
-                            <div className="d-flex justify-content-between align-items-center text-white">
-                                <div className="d-flex align-items-center">
-                                    <div className="me-3">
-                                        <i className="bi bi-clock-history display-6"></i>
-                                    </div>
-                                    <div>
-                                        <h5 className="mb-1 fw-bold">Station Target Time</h5>
-                                        <p className="mb-0 opacity-75 small">Current processing time limit for {currentStation}</p>
-                                    </div>
-                                </div>
-                                <div className="text-end">
-                                    {isTargetTimeLoading ? (
-                                        <div className="display-4 fw-bold text-light">
-                                            <div className="spinner-border spinner-border-sm me-2" role="status"></div>
-                                            Updating...
-                                        </div>
-                                    ) : (
-                                        <div className={`display-4 fw-bold ${showTargetTimeUpdate ? 'target-time-update' : ''}`}>
-                                            {(() => {
-                                                const targetMinutes = dynamicTargetTimes[currentStation] || 10;
-                                                if (targetMinutes >= 60) {
-                                                    const hours = Math.floor(targetMinutes / 60);
-                                                    const mins = targetMinutes % 60;
-                                                    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-                                                }
-                                                return `${targetMinutes}m`;
-                                            })()}
-                                        </div>
-                                    )}
-                                    <div className="small opacity-75">
-                                        <i className="bi bi-info-circle me-1"></i>
-                                        Units exceeding this time will trigger alerts
-                                        {showTargetTimeUpdate && !isTargetTimeLoading && (
-                                            <div className="mt-1">
-                                                <span className="badge bg-light text-dark rounded-pill px-2 py-1">
-                                                    <i className="bi bi-arrow-clockwise me-1"></i>
-                                                    Updated by Admin
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             {/* --- STAT CARDS ROW --- */}
@@ -229,10 +162,39 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
                     <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '16px' }}>
                         <div className="card-header bg-white py-4 px-4 border-0">
                             <div className="d-flex justify-content-between align-items-center">
-                                <h5 className="mb-0 fw-bold text-dark">
-                                    <i className="bi bi-list-task me-2 text-primary"></i> 
-                                    {delayedUnits.length > 0 ? 'Critical Delay Tracking' : 'Current Operations'}
-                                </h5>
+                                <div>
+                                    <h5 className="mb-0 fw-bold text-dark">
+                                        <i className="bi bi-list-task me-2"></i> 
+                                        {delayedUnits.length > 0 ? 'Critical Delay Tracking' : 'Current Operations'}
+                                    </h5>
+                                    <div className="d-flex align-items-center mt-2">
+                                        <span className="text-muted small me-2">Target Time Per Unit:</span>
+                                        {isTargetTimeLoading ? (
+                                            <span className="text-primary small fw-bold">
+                                                <div className="spinner-border spinner-border-sm me-1" role="status"></div>
+                                                Updating...
+                                            </span>
+                                        ) : (
+                                            <span className={`text-primary small fw-bold ${showTargetTimeUpdate ? 'target-time-update' : ''}`}>
+                                                {(() => {
+                                                    const targetMinutes = dynamicTargetTimes[currentStation] || 10;
+                                                    if (targetMinutes >= 60) {
+                                                        const hours = Math.floor(targetMinutes / 60);
+                                                        const mins = targetMinutes % 60;
+                                                        return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+                                                    }
+                                                    return `${targetMinutes}m`;
+                                                })()}
+                                                {showTargetTimeUpdate && !isTargetTimeLoading && (
+                                                    <span className="badge bg-light text-dark rounded-pill px-2 py-1 ms-2" style={{ fontSize: '0.6rem' }}>
+                                                        <i className="bi bi-arrow-clockwise me-1"></i>
+                                                        Updated
+                                                    </span>
+                                                )}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
                                 {delayedUnits.length > 0 && <span className="badge bg-danger rounded-pill px-3">Attention Required</span>}
                             </div>
                         </div>
@@ -247,7 +209,6 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
                                                 <th>CURRENT TASK</th>
                                                 <th>DELAY TIME</th>
                                                 <th>STATUS</th>
-                                                <th className="text-end px-4">ACTIONS</th>
                                             </tr>
                                         </thead>
                                         <tbody style={{ fontSize: '0.85rem' }}>
@@ -256,37 +217,22 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
                                                 const isCritical = delay.level === 'CRITICAL';
                                                 return (
                                                     <tr key={unit.id} className={isCritical ? 'critical-delay-row' : ''}>
-                                                        {/* Binago: log.model_id o log.model depende sa source */}
-                                                        <td className="px-4 fw-bold text-dark">{unit.model || unit.model_id}</td>
-                                                        {/* PINAKAMAHALAGA: ASSEMBLY NO FIX (underscore dapat) */}
-                                                        <td className="fw-bold text-primary">
-                                                            <code style={{fontSize: '0.9rem', fontFamily: 'Monaco, Consolas, "Courier New", monospace'}}>{unit.assembly_no || unit.assemblyNo}</code>
+                                                        <td className="px-4">{unit.model || unit.model_id}</td>
+                                                        <td>
+                                                            {unit.assembly_no || unit.assemblyNo}
                                                         </td>
-                                                        <td className="fw-bold text-info">
-                                                            <i className="bi bi-tools me-1"></i>
+                                                        <td>
                                                             {getCurrentTask(currentStation)}
                                                         </td>
                                                         <td>
-                                                            <div className="text-danger fw-bold d-flex align-items-center gap-1">
-                                                                <i className="bi bi-alarm-fill"></i> {unit.delayMinutes}m Over
-                                                            </div>
-                                                            <div className="small text-muted">
-                                                                Target: {dynamicTargetTimes[currentStation] || 10}m
+                                                            <div>
+                                                                {unit.delayMinutes}m Over
                                                             </div>
                                                         </td>
                                                         <td>
-                                                            <span className={`badge ${
-                                                                unit.status === 'In Progress' 
-                                                                    ? 'bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25' 
-                                                                    : 'bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25'
-                                                            } px-2 rounded-pill`}>
+                                                            <span className="badge bg-secondary px-2 rounded-pill">
                                                                 {unit.status === 'In Progress' ? 'IN PROGRESS' : 'NO GOOD (NG)'}
                                                             </span>
-                                                        </td>
-                                                        <td className="text-end px-4">
-                                                            <button className="btn btn-sm btn-primary rounded-pill px-3 fw-bold" onClick={() => setActiveTab('in_progress')}>
-                                                                <i className="bi bi-arrow-right-circle me-1"></i> MANAGE
-                                                            </button>
                                                         </td>
                                                     </tr>
                                                 );
@@ -333,22 +279,6 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
                 /* Critical delay row styling */
                 .critical-delay-row {
                     background-color: rgba(220, 38, 38, 0.1) !important;
-                    animation: criticalPulse 2s infinite;
-                }
-                
-                @keyframes criticalPulse {
-                    0% { 
-                        background-color: rgba(220, 38, 38, 0.1);
-                        box-shadow: none;
-                    }
-                    50% { 
-                        background-color: rgba(220, 38, 38, 0.15);
-                        box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.3);
-                    }
-                    100% { 
-                        background-color: rgba(220, 38, 38, 0.1);
-                        box-shadow: none;
-                    }
                 }
             `}</style>
         </div>

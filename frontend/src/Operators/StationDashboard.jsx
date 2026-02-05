@@ -493,9 +493,21 @@ useEffect(() => {
         }
 
         // QR Format: MODEL|REV|BASE|ASSEMBLY|MNBD|CMBD|LRBD|PQBD|BKBD|ACC
+        // Actual format from ITAssistantPage: MODEL|REV|BASE|ASSEMBLY|MNBD|CMBD|LRBD|PQBD|BKBD|ACC (10 parts)
         const scannedAssembly = parts[3].trim();
-        const scannedSerial = parts.length >= 10 ? parts[9].trim() : ''; // ACC is at index 9
-        const hasBoardNumbers = parts.length >= 9; // Check if board numbers are present
+        const scannedDeviceSerial = ''; // Device serial is NOT in QR code - will be auto-generated at Station 6
+        const scannedAccessory = parts.length >= 10 ? parts[9].trim() : ''; // ACC is at index 9
+        const hasBoardNumbers = parts.length >= 10; // Check if board numbers are present (10 parts means boards included)
+        
+        // Debug logging to understand QR format
+        console.log('QR Debug:', {
+            partsLength: parts.length,
+            parts: parts,
+            scannedAssembly,
+            scannedDeviceSerial,
+            scannedAccessory,
+            hasBoardNumbers
+        });
         
         const myStationName = currentStation; 
         const myStationIndex = STATION_ORDER.indexOf(myStationName);
@@ -510,14 +522,14 @@ useEffect(() => {
         }
 
         try {
-            // 1. SEARCH LOGIC: Hanapin ang unit by Serial or Assembly
+            // 1. SEARCH LOGIC: Hanapin ang unit by Accessory or Assembly
             let response;
-            if (scannedSerial) {
-                response = await axios.get(UNITS_ENDPOINT, { params: { search_serial: scannedSerial } });
+            if (scannedAccessory) {
+                response = await axios.get(UNITS_ENDPOINT, { params: { search_serial: scannedAccessory } });
             } else if (scannedAssembly) {
                 response = await axios.get(UNITS_ENDPOINT, { params: { search_assembly: scannedAssembly } });
             } else {
-                throw new Error("Invalid QR: No Serial or Assembly Number found.");
+                throw new Error("Invalid QR: No Accessory or Assembly Number found.");
             }
 
             const dbUnit = response.data && response.data.length > 0 ? response.data[0] : null;
@@ -553,8 +565,8 @@ else {
             revision: parts[1].trim(),
             baseUnitKittingNo: parts[2].trim(),
             assemblyNo: parts[3].trim(),
-            deviceSerialNo: hasBoardNumbers ? '' : parts[4]?.trim() || '', // Empty if board numbers present
-            accessoryKittingNo: hasBoardNumbers ? parts[9]?.trim() : parts[5]?.trim() || '', // ACC is at index 9 if board numbers present
+            deviceSerialNo: '', // Device serial not in QR - will be auto-generated at Station 6
+            accessoryKittingNo: scannedAccessory || '', // Use actual accessory from QR (index 9)
             status: "In Progress"
         }));
         setProcessStatus('idle');
@@ -611,8 +623,8 @@ setFormData(prev => ({
     // 🔑 HILAHIN ANG DATA MULA SA DATABASE (dbUnit) PARA HINDI MAG-NULL
     baseUnitKittingNo: dbUnit?.base_unit_kitting_no || parts[2]?.trim() || "",
     assemblyNo: dbUnit?.assembly_no || parts[3]?.trim() || "",
-    deviceSerialNo: dbUnit?.device_serial_no || parts[4]?.trim() || "", 
-    accessoryKittingNo: dbUnit?.accessory_kitting_no || parts[5]?.trim() || "",
+    deviceSerialNo: dbUnit?.device_serial_no || '', // Device serial not in QR - will be auto-generated at Station 6
+    accessoryKittingNo: dbUnit?.accessory_kitting_no || (parts.length >= 10 ? parts[9]?.trim() : '') || '',
     status: "In Progress", 
     remarks: dbUnit?.remarks || ""
 }));
@@ -1086,7 +1098,7 @@ const todayAnnouncementsCount = announcements.filter(a => {
                                 <span>{l}</span>
                             </div>
                             {count > 0 && (
-                                <span className={`badge bg-${color} rounded-pill`} style={{ fontSize: '0.7rem', fontWeight: '600' }}>
+                                <span className="text-white fw-bold" style={{ fontSize: '0.8rem' }}>
                                     {count > 99 ? '99+' : count}
                                 </span>
                             )}
@@ -1105,10 +1117,18 @@ const todayAnnouncementsCount = announcements.filter(a => {
             ].map(({ k, i, l }) => (
                 <li key={k} className="nav-item">
                     <button 
-                        className={`btn w-100 text-start d-flex align-items-center px-3 py-2 nav-custom-btn ${activeTab === k ? 'active-glass' : ''}`} 
+                        className={`btn w-100 text-start d-flex align-items-center justify-content-between px-3 py-2 nav-custom-btn ${activeTab === k ? 'active-glass' : ''}`} 
                         onClick={() => setActiveTab(k)}
                     >
-                        <i className={`bi ${i} me-3`}></i> {l}
+                        <div className="d-flex align-items-center">
+                            <i className={`bi ${i} me-3`}></i> 
+                            <span>{l}</span>
+                        </div>
+                        {k === 'announcements' && todayAnnouncementsCount > 0 && (
+                            <span className="text-white fw-bold" style={{ fontSize: '0.8rem' }}>
+                                {todayAnnouncementsCount}
+                            </span>
+                        )}
                     </button>
                 </li>
             ))}
@@ -1117,7 +1137,7 @@ const todayAnnouncementsCount = announcements.filter(a => {
 
     {/* Sidebar Footer */}
     <div className="mt-auto pt-3 border-top border-secondary text-center text-white-50 opacity-25" style={{ fontSize: '0.65rem' }}>
-        <span>2025 MKFF Laser Technique</span>
+        
         <span>©2025 MKFF Laser Technique</span>
     </div>
 </div>

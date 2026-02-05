@@ -670,23 +670,50 @@ CRITICAL: Use only one-sentence bullet points. No paragraphs. No long explanatio
                 }
 
                 .stat-card-pro { 
-                    background: #fff; 
+                    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); 
                     border: 1px solid #e2e8f0; 
-                    border-radius: 8px; 
-                    padding: 22px; 
+                    border-radius: 16px; 
+                    padding: 24px; 
                     height: 100%; 
-                    border-left: 5px solid #198754; 
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
                 }
 
-                .table thead th { 
-                    background-color: #1e293b !important; 
-                    color: #ffffff !important; 
-                    font-weight: 600; 
-                    padding: 12px 15px; 
+                .hover-bg-primary:hover {
+                    background-color: rgba(13, 110, 253, 0.03) !important;
+                }
+                
+                .transition-all {
+                    transition: all 0.15s ease;
+                }
+                
+                .border-bottom {
+                    border-bottom: 1px solid rgba(0, 0, 0, 0.03) !important;
+                }
+                
+                .bg-danger.bg-opacity-5 {
+                    background-color: rgba(220, 53, 69, 0.03) !important;
+                }
+                
+                .badge {
+                    font-weight: 500;
+                    letter-spacing: 0.2px;
+                }
+                
+                .table {
+                    border-collapse: separate;
+                    border-spacing: 0;
+                }
+                
+                .shadow-sm {
+                    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+                }
+                
+                .shadow-lg {
+                    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
                 }
 
                 .diagnostic-card-minimal { 
-                    background: #f8fafc; 
+                    background: #ffffff; 
                     border-radius: 8px; 
                     border: 1px solid #e2e8f0; 
                 }
@@ -696,17 +723,26 @@ CRITICAL: Use only one-sentence bullet points. No paragraphs. No long explanatio
                 }
 
                 /* Enhanced AI Analysis Styling */
-                .intelligent-analysis-container { margin-top: 16px; }
+                .intelligent-analysis-container { 
+                    margin-top: 16px; 
+                    display: flex; 
+                    gap: 16px; 
+                    flex-wrap: wrap;
+                }
+                .intelligent-analysis-container > div {
+                    flex: 1;
+                    min-width: 300px;
+                }
                 .diagnosis-card, .forecast-card, .prescription-card, .fallback-analysis { 
-                    margin-bottom: 16px; 
+                    margin-bottom: 0; 
                     border-radius: 12px; 
                     overflow: hidden; 
-                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
                 }
-                .diagnosis-card { border: 2px solid #dc2626; background: #fef2f2; }
-                .forecast-card { border: 2px solid #2563eb; background: #eff6ff; }
-                .prescription-card { border: 2px solid #16a34a; background: #f0fdf4; }
-                .fallback-analysis { border: 2px solid #64748b; background: #f8fafc; }
+                .diagnosis-card { border: 1px solid #e2e8f0; background: #ffffff; }
+                .forecast-card { border: 1px solid #e2e8f0; background: #ffffff; }
+                .prescription-card { border: 1px solid #e2e8f0; background: #ffffff; }
+                .fallback-analysis { border: 1px solid #e2e8f0; background: #ffffff; }
                 
                 .analysis-header { 
                     padding: 12px 16px; 
@@ -716,22 +752,18 @@ CRITICAL: Use only one-sentence bullet points. No paragraphs. No long explanatio
                     letter-spacing: 0.05em; 
                     display: flex; 
                     align-items: center;
+                    background: #f8fafc;
+                    color: #374151;
+                    border-bottom: 1px solid #e2e8f0;
                 }
-                .diagnosis-card .analysis-header { background: #dc2626; color: white; }
-                .forecast-card .analysis-header { background: #2563eb; color: white; }
-                .prescription-card .analysis-header { background: #16a34a; color: white; }
-                .fallback-analysis .analysis-header { background: #64748b; color: white; }
                 
                 .analysis-content { 
                     padding: 16px; 
                     font-size: 0.8rem; 
                     line-height: 1.4; 
                     font-weight: 500;
+                    color: #374151;
                 }
-                .diagnosis-card .analysis-content { color: #7f1d1d; }
-                .forecast-card .analysis-content { color: #1e3a8a; }
-                .prescription-card .analysis-content { color: #14532d; }
-                .fallback-analysis .analysis-content { color: #334155; }
 
                 /* Takt Time Badge Styling */
                 .takt-time-badge { 
@@ -793,56 +825,131 @@ CRITICAL: Use only one-sentence bullet points. No paragraphs. No long explanatio
             <div className="row g-4 mb-4">
                 <div className="col-md-6 col-xl-3">
                     <div className="stat-card-pro">
-                        <span className="text-muted small fw-bold uppercase">Completed</span>
-                        <h3 className="fw-bold text-success mt-1">{monitorMetrics.completedUnits}</h3>
+                        <div className="d-flex align-items-center justify-content-between mb-2">
+                            <div className="bg-success bg-opacity-10 rounded-circle p-2">
+                                <i className="bi bi-check-circle text-success"></i>
+                            </div>
+                            <span className="text-success small fw-bold">+12%</span>
+                        </div>
+                        <span className="text-muted small fw-bold d-block mb-1">COMPLETED UNITS</span>
+                        <h3 className="fw-bold text-success mt-1 mb-0">{monitorMetrics.completedUnits}</h3>
                     </div>
                 </div>
                 <div className="col-md-6 col-xl-3">
-                    <div className="stat-card-pro" style={{borderLeftColor: '#0d6efd'}}>
-                        <span className="text-muted small fw-bold uppercase">Yield Rate</span>
-                        <h3 className="fw-bold text-primary mt-1">{monitorMetrics.yieldRate}%</h3>
+                    <div className="stat-card-pro">
+                        <div className="d-flex align-items-center justify-content-between mb-2">
+                            <div className="bg-primary bg-opacity-10 rounded-circle p-2">
+                                <i className="bi bi-graph-up text-primary"></i>
+                            </div>
+                            <span className="text-primary small fw-bold">+5%</span>
+                        </div>
+                        <span className="text-muted small fw-bold d-block mb-1">YIELD RATE</span>
+                        <h3 className="fw-bold text-primary mt-1 mb-0">{monitorMetrics.yieldRate}%</h3>
                     </div>
                 </div>
                 <div className="col-md-6 col-xl-3">
-                    <div className="stat-card-pro" style={{borderLeftColor: '#ffc107'}}>
-                        <span className="text-muted small fw-bold uppercase">In Progress</span>
-                        <h3 className="fw-bold text-warning mt-1">{monitorMetrics.pendingUnits}</h3>
+                    <div className="stat-card-pro">
+                        <div className="d-flex align-items-center justify-content-between mb-2">
+                            <div className="bg-warning bg-opacity-10 rounded-circle p-2">
+                                <i className="bi bi-clock text-warning"></i>
+                            </div>
+                            <span className="text-warning small fw-bold">-3%</span>
+                        </div>
+                        <span className="text-muted small fw-bold d-block mb-1">IN PROGRESS</span>
+                        <h3 className="fw-bold text-warning mt-1 mb-0">{monitorMetrics.pendingUnits}</h3>
                     </div>
                 </div>
                 <div className="col-md-6 col-xl-3">
-                    <div className="stat-card-pro" style={{borderLeftColor: '#dc3545'}}>
-                        <span className="text-muted small fw-bold uppercase">No Good (NG)</span>
-                        <h3 className="fw-bold text-danger mt-1">{monitorMetrics.ngUnits}</h3>
+                    <div className="stat-card-pro">
+                        <div className="d-flex align-items-center justify-content-between mb-2">
+                            <div className="bg-danger bg-opacity-10 rounded-circle p-2">
+                                <i className="bi bi-x-circle text-danger"></i>
+                            </div>
+                            <span className="text-danger small fw-bold">-8%</span>
+                        </div>
+                        <span className="text-muted small fw-bold d-block mb-1">NO GOOD (NG)</span>
+                        <h3 className="fw-bold text-danger mt-1 mb-0">{monitorMetrics.ngUnits}</h3>
                     </div>
                 </div>
             </div>
 
-            <div className="bg-white border rounded-2 overflow-hidden shadow-sm">
-                <div className="p-3 border-bottom d-flex justify-content-between align-items-center bg-light">
-                    <span className="fw-bold small text-muted text-uppercase">Station Logs</span>
-                    <div className="d-flex gap-2">
-                        <select className="form-select form-select-sm" style={{width:'160px'}} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <div className="d-flex justify-content-between align-items-center mb-4">
+                <h4 className="mb-0 fw-bold text-dark">
+                    <i className="bi bi-list-columns-reverse me-2 text-primary"></i>
+                    Station Logs
+                </h4>
+                <div className="d-flex gap-3 align-items-center">
+                    <div className="d-flex align-items-center gap-2">
+                        <i className="bi bi-funnel text-muted"></i>
+                        <select 
+                            className="form-select form-select-sm border-0 bg-light" 
+                            style={{width:'160px', borderRadius: '8px'}} 
+                            value={statusFilter} 
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                        >
                             {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
-                        <input type="text" className="form-control form-control-sm" style={{width:'200px'}} placeholder="Search ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                        <button className="btn btn-secondary btn-sm px-3 fw-bold" onClick={() => {setSearchTerm(''); setStatusFilter('All'); fetchData();}}>RESET</button>
                     </div>
+                    <div className="d-flex align-items-center gap-2">
+                        <i className="bi bi-search text-muted"></i>
+                        <input 
+                            type="text" 
+                            className="form-control form-control-sm border-0 bg-light" 
+                            style={{width:'200px', borderRadius: '8px'}} 
+                            placeholder="Search Assembly ID..." 
+                            value={searchTerm} 
+                            onChange={(e) => setSearchTerm(e.target.value)} 
+                        />
+                    </div>
+                    <button 
+                        className="btn btn-outline-secondary btn-sm px-4 fw-bold d-flex align-items-center gap-2" 
+                        style={{borderRadius: '8px'}}
+                        onClick={() => {setSearchTerm(''); setStatusFilter('All'); fetchData();}}
+                    >
+                        <i className="bi bi-arrow-clockwise"></i>
+                        RESET
+                    </button>
                 </div>
+            </div>
+
+            <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
                 <div className="table-responsive">
                     <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem' }}>
-                        <thead>
+                        <thead className="bg-primary text-white">
                             <tr>
-                                <th className="ps-4">MODEL</th>
-                                <th>REVISION</th>
-                                <th>BASE UNIT</th>
-                                <th>ASSEMBLY</th>
-                                <th>DEVICE SERIAL</th>
-                                <th>ACCESSORY</th>
-                                <th className="text-center">STATUS</th>
-                                <th className="text-center">DELAY (MINS)</th>
-                                <th>REMARKS</th>
-                                <th>LAST UPDATE</th>
-                                <th className="text-center">ACTIONS</th>
+                                <th className="border-0 px-4 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    MODEL
+                                </th>
+                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    REVISION
+                                </th>
+                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    BASE UNIT
+                                </th>
+                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    ASSEMBLY
+                                </th>
+                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    DEVICE SERIAL
+                                </th>
+                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    ACCESSORY
+                                </th>
+                                <th className="border-0 px-3 py-3 text-center fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    STATUS
+                                </th>
+                                <th className="border-0 px-3 py-3 text-center fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    DELAY
+                                </th>
+                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    REMARKS
+                                </th>
+                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    LAST UPDATE
+                                </th>
+                                <th className="border-0 px-4 py-3 text-center fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                    ACTIONS
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
@@ -861,42 +968,97 @@ CRITICAL: Use only one-sentence bullet points. No paragraphs. No long explanatio
 
                                 const delayMinutes = delay.minutes; // Use actual minutes from checkUnitDelay
                                 return (
-                                    <tr 
+                                        <tr 
                                         key={log.id} 
-                                        className={`
-                                            ${delay.isDelayed ? 'delay-row' : ''} 
-                                            ${log.id === highlightedUnitId ? 'highlight-pulse' : ''}
-                                        `}
+                                        className={`border-bottom ${delay.isDelayed ? 'bg-danger bg-opacity-5' : 'hover-bg-primary hover-bg-opacity-5'} transition-all`}
                                     >
-                                        <td className="ps-4 fw-bold">{log.model}</td>
-                                        <td className="text-muted small">{log.revision || '---'}</td>
-                                        <td className="text-muted small">{log.base_unit_kitting_no || '---'}</td>
-                                        <td>
-                                            <code className="text-primary fw-bold">{log.assembly_no}</code>
-                                            {delay.isDelayed && <i className="bi bi-exclamation-triangle-fill text-danger ms-2" title={`Delayed: ${delay.level}`}></i>}
+                                        <td className="ps-4 py-3">
+                                            <div className="fw-bold text-dark">{log.model}</div>
                                         </td>
-                                        <td className="text-muted small">{log.device_serial_no || '---'}</td>
-                                        <td className="text-muted small">{log.accessory_kitting_no || '---'}</td>
-                                        <td className="text-center">
-                                            <span className={`badge rounded-1 px-3 py-1 ${getStatusBadgeClass(log.status)}`}>{log.status}</span>
+                                        <td className="px-3 py-3">
+                                            <span className="badge bg-light text-dark rounded-pill px-2 py-1" style={{ fontSize: '0.7rem' }}>
+                                                {log.revision || 'N/A'}
+                                            </span>
                                         </td>
-                                        <td className="text-center">
+                                        <td className="px-3 py-3">
+                                            <span className="text-muted small fst-italic">{log.base_unit_kitting_no || '---'}</span>
+                                        </td>
+                                        <td className="px-3 py-3">
+                                            <div className="d-flex align-items-center">
+                                                <code className="text-primary fw-bold bg-light px-2 py-1 rounded" style={{ fontSize: '0.8rem' }}>
+                                                    {log.assembly_no}
+                                                </code>
+                                                {delay.isDelayed && (
+                                                    <i className="bi bi-exclamation-triangle-fill text-danger ms-2" 
+                                                       title={`Delayed: ${delay.level}`}></i>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-3">
+                                            <span className="text-muted small">{log.device_serial_no || '---'}</span>
+                                        </td>
+                                        <td className="px-3 py-3">
+                                            <span className="text-muted small">{log.accessory_kitting_no || '---'}</span>
+                                        </td>
+                                        <td className="px-3 py-3 text-center">
+                                            <span className={`badge px-3 py-2 rounded-1 fw-semibold ${
+                                                log.status.includes('Progress') ? 'bg-warning text-dark' : 
+                                                log.status.includes('Completed') ? 'bg-success' : 
+                                                'bg-danger'
+                                            }`} style={{ fontSize: '0.75rem' }}>
+                                                {log.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-3 py-3 text-center">
                                             {isInProgressOrNG && delay.isDelayed ? (
-                                                <span className={`badge rounded-pill ${delay.level === 'CRITICAL' ? 'bg-danger' : 'bg-warning text-dark'}`}>
-                                                    +{Math.round(delayMinutes)}m
-                                                </span>
+                                                <div className="d-flex flex-column align-items-center">
+                                                    <span className={`badge rounded-pill px-2 py-1 fw-bold ${
+                                                        delay.level === 'CRITICAL' ? 'bg-danger' : 'bg-warning text-dark'
+                                                    }`} style={{ fontSize: '0.7rem' }}>
+                                                        +{Math.round(delayMinutes)}m
+                                                    </span>
+                                                    <small className="text-muted mt-1" style={{ fontSize: '0.6rem' }}>
+                                                        {delay.level}
+                                                    </small>
+                                                </div>
                                             ) : (
-                                                <span className="text-muted small">—</span>
+                                                <span className="text-muted small fst-italic">—</span>
                                             )}
                                         </td>
-                                        <td className="text-muted small italic">{log.remarks || '---'}</td>
-                                        <td className="small text-muted">{new Date(log.updated_at || log.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
-                                        <td className="text-center">
+                                        <td className="px-3 py-3">
+                                            <div className="text-muted small fst-italic" 
+                                                 style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} 
+                                                 title={log.remarks || 'No remarks'}>
+                                                {log.remarks || '---'}
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-3">
+                                            <div className="text-muted small">
+                                                <i className="bi bi-clock me-1"></i>
+                                                {new Date(log.updated_at || log.created_at).toLocaleString('en-US', { 
+                                                    month: 'short', 
+                                                    day: 'numeric', 
+                                                    hour: '2-digit', 
+                                                    minute: '2-digit' 
+                                                })}
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-center">
                                             <div className="d-flex gap-1 justify-content-center">
-                                                <button className="btn btn-sm btn-primary px-3 fw-bold" onClick={() => setSelectedUnit(log)}>
-                                                    DETAILS
+                                                <button 
+                                                    className="btn btn-sm btn-primary rounded p-2 transition-all" 
+                                                    onClick={() => setSelectedUnit(log)}
+                                                    title="Details"
+                                                >
+                                                    <i className="bi bi-eye"></i>
                                                 </button>
-                                                <button className="btn btn-sm btn-danger px-3 fw-bold" onClick={() => handleEditClick(log)}>EDIT</button>
+                                                <button 
+                                                    className="btn btn-sm btn-outline-primary rounded p-2 transition-all" 
+                                                    onClick={() => handleEditClick(log)}
+                                                    title="Edit"
+                                                >
+                                                    <i className="bi bi-pencil"></i>
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -2022,9 +2184,7 @@ return (
                 transition: all 0.3s ease;
             }
 
-            /* Visual Heatmap - Station Card Borders */
-            .station-card-delay-1-2 { border-top: 5px solid #fbbf24; }
-            .station-card-delay-3-plus { border-top: 5px solid #ef4444; }
+            /* Visual Heatmap - Station Card Borders - Removed */
             
             /* Critical Glow Animation for 5+ delayed units */
             @keyframes critical-glow {
@@ -2100,12 +2260,12 @@ return (
 
             /* AI Manufacturing Intelligence Hub Styling */
             .intelligence-hub { 
-                background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); 
-                border: 2px solid #e2e8f0; 
+                background: #ffffff; 
+                border: 1px solid #e2e8f0; 
                 border-radius: 16px; 
                 padding: 24px; 
                 margin-bottom: 32px;
-                box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
             }
             .intelligence-hub-header { 
                 display: flex; 
@@ -2126,22 +2286,25 @@ return (
                 margin-top: 4px;
             }
 
-            /* Intelligence Hub Cards */
+            /* Intelligence Hub Cards - Row Layout */
             .intelligence-hub-container { 
-                display: grid; 
-                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+                display: flex; 
                 gap: 16px; 
                 margin-top: 16px; 
+                flex-wrap: wrap;
+            }
+            .intelligence-hub-container > div {
+                flex: 1;
+                min-width: 300px;
             }
             .diagnosis-hub-card, .forecast-hub-card, .prescription-hub-card, .fallback-hub-analysis { 
                 border-radius: 12px; 
                 overflow: hidden; 
-                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+                border: 1px solid #e2e8f0;
+                background: #ffffff;
             }
-            .diagnosis-hub-card { border: 2px solid #dc2626; background: #fef2f2; }
-            .forecast-hub-card { border: 2px solid #2563eb; background: #eff6ff; }
-            .prescription-hub-card { border: 2px solid #16a34a; background: #f0fdf4; }
-            .fallback-hub-analysis { border: 2px solid #64748b; background: #f8fafc; }
+
             
             .hub-header { 
                 padding: 12px 16px; 
@@ -2151,22 +2314,18 @@ return (
                 letter-spacing: 0.05em; 
                 display: flex; 
                 align-items: center;
+                background: #f8fafc;
+                color: #374151;
+                border-bottom: 1px solid #e2e8f0;
             }
-            .diagnosis-hub-card .hub-header { background: #dc2626; color: white; }
-            .forecast-hub-card .hub-header { background: #2563eb; color: white; }
-            .prescription-hub-card .hub-header { background: #16a34a; color: white; }
-            .fallback-hub-analysis .hub-header { background: #64748b; color: white; }
             
             .hub-content { 
                 padding: 16px; 
                 font-size: 0.8rem; 
                 line-height: 1.4; 
                 font-weight: 500;
+                color: #374151;
             }
-            .diagnosis-hub-card .hub-content { color: #7f1d1d; }
-            .forecast-hub-card .hub-content { color: #1e3a8a; }
-            .prescription-hub-card .hub-content { color: #14532d; }
-            .fallback-hub-analysis .hub-content { color: #334155; }
 
             /* Historical Performance Indicators */
             .historical-indicator {
@@ -2269,11 +2428,7 @@ return (
                 // Determine card styling based on delayed units
                 let cardClass = 'station-card-flat shadow-sm';
                 if (delayedCount >= 5) {
-                    cardClass += ' station-card-critical station-card-delay-3-plus';
-                } else if (delayedCount >= 3) {
-                    cardClass += ' station-card-delay-3-plus';
-                } else if (delayedCount >= 1) {
-                    cardClass += ' station-card-delay-1-2';
+                    cardClass += ' station-card-critical';
                 }
 
                 return (

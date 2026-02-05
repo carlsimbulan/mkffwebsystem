@@ -873,48 +873,6 @@ CRITICAL: Use only bullet points. No paragraphs. No long explanations.`;
                     <p className="text-muted small mb-0">Live Manufacturing Lifecycle Monitoring</p>
                 </div>
                 <div className="d-flex gap-3 align-items-center">
-                    {/* Compact Status Badge */}
-                    <div className={`d-flex align-items-center px-3 py-2 rounded-pill shadow-sm ${
-                        lineHealthStatus.pulse ? 'pulse-animation' : ''
-                    }`} style={{
-                        background: `linear-gradient(135deg, ${
-                            lineHealthStatus.color === 'success' ? '#10b981' :
-                            lineHealthStatus.color === 'warning' ? '#f59e0b' :
-                            lineHealthStatus.color === 'danger' ? '#ef4444' : '#3b82f6'
-                        } 0%, ${
-                            lineHealthStatus.color === 'success' ? '#059669' :
-                            lineHealthStatus.color === 'warning' ? '#d97706' :
-                            lineHealthStatus.color === 'danger' ? '#dc2626' : '#2563eb'
-                        } 100%)`,
-                        color: 'white',
-                        fontSize: '0.85rem',
-                        fontWeight: 'bold',
-                        letterSpacing: '0.3px',
-                        minWidth: '140px',
-                        height: '36px'
-                    }}>
-                        <div className={`me-2 ${lineHealthStatus.pulse ? 'status-dot-pulse' : ''}`} style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: 'white',
-                            boxShadow: '0 0 6px rgba(255,255,255,0.8)'
-                        }}></div>
-                        <span>{lineHealthStatus.status}</span>
-                        <button 
-                            id="export-btn"
-                            onClick={generateShiftReport}
-                            className="btn btn-sm btn-light ms-2 rounded-pill px-2 py-1"
-                            style={{ fontSize: '0.7rem', height: '28px' }}
-                        >
-                            <i className="bi bi-download me-1"></i>Generate
-                        </button>
-                    </div>
-                    {newReportsToday > 0 && (
-                        <div className="d-flex align-items-center bg-danger text-white px-3 py-1 rounded-pill shadow-sm" style={{ cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', height: '36px' }} onClick={() => setActiveTab('reports')}>
-                            <i className="bi bi-file-earmark-text-fill me-2"></i> {newReportsToday} NEW REPORT TODAY
-                        </div>
-                    )}
                     <div className="position-relative" style={{width: '180px'}}>
                         <i className="bi bi-qr-code-scan position-absolute start-0 ms-3 top-50 translate-middle-y text-primary"></i>
                         <input type="text" className="form-control rounded-pill qr-input-pro" placeholder="Scan QR..." value={qrValue} onChange={(e) => handleQrInput(e.target.value)} />

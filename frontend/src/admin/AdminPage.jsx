@@ -147,6 +147,14 @@ const handleTabChange = (tabName) => {
     const [announcements, setAnnouncements] = useState([]); 
     const [showPostModal, setShowPostModal] = useState(false); 
 
+    // Calculate today's announcement count
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayAnnouncementsCount = announcements.filter(a => {
+        if (!a.created_at) return false;
+        const announcementDate = new Date(a.created_at).toISOString().split('T')[0];
+        return announcementDate === todayStr;
+    }).length; 
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -677,11 +685,21 @@ const handlePostAnnouncement = async (content) => {
     // Filter reports (Flexible filtering)
     const filteredReports = dailyReportsList.filter(report => {
         const reportDbDate = report.report_date ? report.report_date.split(' ')[0] : null;
-        // Normalize report station check
-        const reportStationNorm = report.station.replace(/\s+/g, '').toLowerCase();
-        const filterStationNorm = reportFilterStationId.replace(/\s+/g, '').toLowerCase();
+        
+        // Handle station filtering - check exact match first, then normalized
+        let stationMatch = false;
+        if (reportFilterStationId === 'All') {
+            stationMatch = true;
+        } else if (reportFilterStationId === 'overall') {
+            stationMatch = report.station === 'overall';
+        } else {
+            // Try exact match first, then case-insensitive match
+            stationMatch = report.station === reportFilterStationId || 
+                         report.station.toLowerCase() === reportFilterStationId.toLowerCase() ||
+                         stations.find(s => s.id === reportFilterStationId)?.name === report.station;
+        }
 
-        return (reportDbDate === reportDate) && (reportFilterStationId === 'All' || reportStationNorm === filterStationNorm);
+        return reportDbDate === reportDate && stationMatch;
     });
 
     const headerAvatarSrc = user.avatar_url ? `${AVATAR_UPLOAD_PATH}${user.avatar_url}` : DEFAULT_AVATAR_PATH;
@@ -952,7 +970,7 @@ return (
                     <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Approvals</span>
                 </div>
                 {logs.filter(l => l.status === 'Pending Approval').length > 0 && (
-                    <span className="badge bg-danger rounded-pill px-2 py-1" style={{ fontSize: '0.7rem', minWidth: '20px' }}>
+                    <span className="text-white fw-bold" style={{ fontSize: '0.8rem' }}>
                         {logs.filter(l => l.status === 'Pending Approval').length}
                     </span>
                 )}
@@ -969,7 +987,7 @@ return (
                     <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>No Good List</span>
                 </div>
                 {noGoodCount > 0 && (
-                    <span className="badge bg-danger rounded-pill" style={{ fontSize: '0.65rem' }}>
+                    <span className="text-white fw-bold" style={{ fontSize: '0.8rem' }}>
                         {noGoodCount}
                     </span>
                 )}
@@ -986,7 +1004,7 @@ return (
                     <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Shipment</span>
                 </div>
                 {shipmentCount > 0 && (
-                    <span className="badge bg-success rounded-pill" style={{ fontSize: '0.65rem' }}>
+                    <span className="text-white fw-bold" style={{ fontSize: '0.8rem' }}>
                         {shipmentCount}
                     </span>
                 )}
@@ -994,29 +1012,33 @@ return (
         </li>
         
         <li className="nav-item">
-    <button
-        className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${activeTab === "inventory" ? "active-glass" : ""}`}
-        onClick={() => handleTabChange("inventory")}
-    >
-        <i className="bi bi-box-seam"></i>
-        <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Inventory</span>
-    </button>
-</li>
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${activeTab === "inventory" ? "active-glass" : ""}`}
+                onClick={() => handleTabChange("inventory")}
+            >
+                <i className="bi bi-box-seam"></i>
+                <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Inventory</span>
+            </button>
+        </li>
 
         <hr className="border-secondary my-2 opacity-25" />
 
         <li className="nav-item">
             <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${activeTab === "reports" ? "active-glass" : ""}`}
+                className={`nav-link text-white w-100 d-flex align-items-center justify-content-between py-2 px-3 sidebar-btn ${activeTab === "reports" ? "active-glass" : ""}`}
                 onClick={() => handleTabChange("reports")}
             >
-                <i className="bi bi-file-text"></i>
-                <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Reports</span>
+                <div className="d-flex align-items-center gap-3">
+                    <i className="bi bi-file-text"></i>
+                    <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Reports</span>
+                </div>
+                {newReportsToday > 0 && (
+                    <span className="text-white fw-bold" style={{ fontSize: '0.8rem' }}>
+                        {newReportsToday}
+                    </span>
+                )}
             </button>
         </li>
-
-        
-
 
         <li className="nav-item">
             <button

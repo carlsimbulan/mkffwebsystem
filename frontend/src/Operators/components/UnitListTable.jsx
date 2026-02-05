@@ -510,89 +510,158 @@ export const UnitListTable = ({ units, listStatus, loading, error, onEdit, dynam
 
     return (
         <>
-            <div className="table-responsive shadow-sm rounded animate-in fade-in">
-                <h4 className="mb-4"><i className="bi bi-list-columns-reverse me-2 text-primary"></i>{displayTitle} Units</h4>
-                <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem' }}>
-                    <thead className="table-dark">
-                        <tr>
-                            <th>MODEL</th>
-                            <th>REVISION</th>
-                            <th>BASE UNIT</th>
-                            <th>ASSEMBLY</th>
-                            <th>DEVICE SERIAL</th>
-                            <th>ACCESSORY</th>
-                            <th className="text-center">STATUS</th>
-                            <th className="text-center">DELAY (MINS)</th>
-                            <th>REMARKS</th>
-                            <th>LAST UPDATE</th>
-                            <th className="text-center">ACTIONS</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {units.map((unit) => {
-                            const lastTs = unit.updated_at || unit.created_at;
-                            const minutesInStation = lastTs
-                                ? Math.max(0, (new Date().getTime() - new Date(lastTs).getTime()) / (1000 * 60))
-                                : 0;
-
-                            const stationId = unit.station?.replace(/\D/g, '');
-                            const thresholdMinutes = dynamicTargetTimes[`Station${stationId}`] || dynamicTargetTimes[`Station ${stationId}`] || 10;
-                            const statusText = (unit.status || '').toLowerCase();
-                            const isInProgressOrNG = unit.status === 'In Progress' || statusText.includes('no good') || statusText.includes('ng');
-                            const delay = isInProgressOrNG
-                                ? checkUnitDelay(stationId, lastTs, dynamicTargetTimes)
-                                : { isDelayed: false, minutes: minutesInStation, level: 'NORMAL' };
-
-                            const delayMinutes = delay.minutes; // Use actual minutes from checkUnitDelay
-                            return (
-                                <tr 
-                                    key={unit.id} 
-                                    className={delay.isDelayed ? 'delay-row' : ''}
-                                >
-                                    <td className="ps-4 fw-bold">{unit.model}</td>
-                                    <td className="text-muted small">{unit.revision || '---'}</td>
-                                    <td className="text-muted small">{unit.baseUnitKittingNo || '---'}</td>
-                                    <td>
-                                        <code className="text-primary fw-bold">{unit.assemblyNo}</code>
-                                        {delay.isDelayed && <i className="bi bi-exclamation-triangle-fill text-danger ms-2" title={`Delayed: ${delay.level}`}></i>}
-                                    </td>
-                                    <td className="text-muted small">{unit.deviceSerialNo || '---'}</td>
-                                    <td className="text-muted small">{unit.accessoryKittingNo || '---'}</td>
-                                    <td className="text-center">
-                                        <span className={`badge rounded-1 px-3 py-1 ${unit.status.includes('Progress') ? 'bg-warning text-dark' : unit.status.includes('Completed') ? 'bg-success' : 'bg-danger'}`}>{unit.status}</span>
-                                    </td>
-                                    <td className="text-center">
-                                        {isInProgressOrNG && delay.isDelayed ? (
-                                            <span className={`badge rounded-pill ${delay.level === 'CRITICAL' ? 'bg-danger' : 'bg-warning text-dark'}`}>
-                                                +{Math.round(delayMinutes)}m
-                                            </span>
-                                        ) : (
-                                            <span className="text-muted small">—</span>
-                                        )}
-                                    </td>
-                                    <td className="text-muted small italic">{unit.remarks || '---'}</td>
-                                    <td className="small text-muted">{new Date(unit.updated_at || unit.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
-                                    <td className="text-center">
-                                        <div className="d-flex gap-1 justify-content-center">
-                                            <button className="btn btn-sm btn-primary px-3 fw-bold" onClick={() => setDetailsUnit(unit)}>
-                                                DETAILS
-                                            </button>
-                                            {canEdit && (
-                                                <button className="btn btn-sm btn-danger px-3 fw-bold" onClick={() => onEdit(unit)}>EDIT</button>
-                                            )}
-                                        </div>
-                                    </td>
+            <div className="animate-in fade-in">
+                <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h4 className="mb-0 fw-bold text-dark">
+                        <i className="bi bi-list-columns-reverse me-2 text-primary"></i>
+                        {displayTitle} Units
+                    </h4>
+                    <div className="badge bg-primary bg-opacity-10 text-primary px-3 py-2">
+                        <i className="bi bi-hash me-1"></i>
+                        {units.length} Units
+                    </div>
+                </div>
+                
+                <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
+                    <div className="table-responsive">
+                        <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem' }}>
+                            <thead className="bg-primary text-white">
+                                <tr>
+                                    <th className="border-0 px-4 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>MODEL</th>
+                                    <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>REVISION</th>
+                                    <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>BASE UNIT</th>
+                                    <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>ASSEMBLY</th>
+                                    <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>DEVICE SERIAL</th>
+                                    <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>ACCESSORY</th>
+                                    <th className="border-0 px-3 py-3 text-center fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>STATUS</th>
+                                    <th className="border-0 px-3 py-3 text-center fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>DELAY</th>
+                                    <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>REMARKS</th>
+                                    <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>LAST UPDATE</th>
+                                    <th className="border-0 px-4 py-3 text-center fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>ACTIONS</th>
                                 </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+                            </thead>
+                            <tbody>
+                                {units.map((unit) => {
+                                    const lastTs = unit.updated_at || unit.created_at;
+                                    const minutesInStation = lastTs
+                                        ? Math.max(0, (new Date().getTime() - new Date(lastTs).getTime()) / (1000 * 60))
+                                        : 0;
+
+                                    const stationId = unit.station?.replace(/\D/g, '');
+                                    const thresholdMinutes = dynamicTargetTimes[`Station${stationId}`] || dynamicTargetTimes[`Station ${stationId}`] || 10;
+                                    const statusText = (unit.status || '').toLowerCase();
+                                    const isInProgressOrNG = unit.status === 'In Progress' || statusText.includes('no good') || statusText.includes('ng');
+                                    const delay = isInProgressOrNG
+                                        ? checkUnitDelay(stationId, lastTs, dynamicTargetTimes)
+                                        : { isDelayed: false, minutes: minutesInStation, level: 'NORMAL' };
+
+                                    const delayMinutes = delay.minutes; // Use actual minutes from checkUnitDelay
+                                    return (
+                                        <tr 
+                                            key={unit.id} 
+                                            className={`border-bottom ${delay.isDelayed ? 'bg-danger bg-opacity-5' : 'hover-bg-primary hover-bg-opacity-5'} transition-all`}
+                                        >
+                                            <td className="ps-4 py-3">
+                                                <div className="fw-bold text-dark">{unit.model}</div>
+                                            </td>
+                                            <td className="px-3 py-3">
+                                                <span className="badge bg-light text-dark rounded-pill px-2 py-1" style={{ fontSize: '0.7rem' }}>
+                                                    {unit.revision || 'N/A'}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-3">
+                                                <span className="text-muted small fst-italic">{unit.baseUnitKittingNo || '---'}</span>
+                                            </td>
+                                            <td className="px-3 py-3">
+                                                <div className="d-flex align-items-center">
+                                                    <code className="text-primary fw-bold bg-light px-2 py-1 rounded" style={{ fontSize: '0.8rem' }}>
+                                                        {unit.assemblyNo}
+                                                    </code>
+                                                    {delay.isDelayed && (
+                                                        <i className="bi bi-exclamation-triangle-fill text-danger ms-2" title={`Delayed: ${delay.level}`}></i>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-3 py-3">
+                                                <span className="text-muted small">{unit.deviceSerialNo || '---'}</span>
+                                            </td>
+                                            <td className="px-3 py-3">
+                                                <span className="text-muted small">{unit.accessoryKittingNo || '---'}</span>
+                                            </td>
+                                            <td className="px-3 py-3 text-center">
+                                                <span className={`badge px-3 py-2 rounded-1 fw-semibold ${
+                                                    unit.status.includes('Progress') ? 'bg-warning text-dark' : 
+                                                    unit.status.includes('Completed') ? 'bg-success' : 
+                                                    'bg-danger'
+                                                }`} style={{ fontSize: '0.75rem' }}>
+                                                    {unit.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-3 text-center">
+                                                {isInProgressOrNG && delay.isDelayed ? (
+                                                    <div className="d-flex flex-column align-items-center">
+                                                        <span className={`badge rounded-pill px-2 py-1 fw-bold ${
+                                                            delay.level === 'CRITICAL' ? 'bg-danger' : 'bg-warning text-dark'
+                                                        }`} style={{ fontSize: '0.7rem' }}>
+                                                            +{Math.round(delayMinutes)}m
+                                                        </span>
+                                                        <small className="text-muted mt-1" style={{ fontSize: '0.6rem' }}>
+                                                            {delay.level}
+                                                        </small>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-muted small fst-italic">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-3 py-3">
+                                                <div className="text-muted small fst-italic" style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={unit.remarks || 'No remarks'}>
+                                                    {unit.remarks || '---'}
+                                                </div>
+                                            </td>
+                                            <td className="px-3 py-3">
+                                                <div className="text-muted small">
+                                                    <i className="bi bi-clock me-1"></i>
+                                                    {new Date(unit.updated_at || unit.created_at).toLocaleString('en-US', { 
+                                                        month: 'short', 
+                                                        day: 'numeric', 
+                                                        hour: '2-digit', 
+                                                        minute: '2-digit' 
+                                                    })}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <div className="d-flex gap-1 justify-content-center">
+                                                    <button 
+                                                        className="btn btn-sm btn-primary rounded p-2 transition-all" 
+                                                        onClick={() => setDetailsUnit(unit)}
+                                                        title="Details"
+                                                    >
+                                                        <i className="bi bi-eye"></i>
+                                                    </button>
+                                                    {canEdit && (
+                                                        <button 
+                                                            className="btn btn-sm btn-outline-primary rounded p-2 transition-all" 
+                                                            onClick={() => onEdit(unit)}
+                                                            title="Edit"
+                                                        >
+                                                            <i className="bi bi-pencil"></i>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
             
             {/* Comprehensive Details Modal */}
             {detailsUnit && ReactDOM.createPortal(
                 <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.4)', zIndex: 9999 }}>
-                    <div className="bg-white rounded-3 shadow-xl p-0 overflow-hidden border-0" style={{ width: '95%', maxWidth: '1200px', maxHeight: '95vh', display: 'flex', flexDirection: 'column' }}>
+                    <div className="bg-white rounded-3 shadow-lg p-0 overflow-hidden border-0" style={{ width: '90%', maxWidth: '900px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
                         <div className="modal-content" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
                             <div className="modal-header bg-primary text-white flex-shrink-0 d-flex justify-content-between align-items-center p-3">
                                 <div className="d-flex flex-column">
@@ -941,4 +1010,50 @@ export const UnitListTable = ({ units, listStatus, loading, error, onEdit, dynam
             )}
         </>
     );
+}
+
+// Add custom styles
+const customStyles = `
+<style>
+.hover-bg-primary:hover {
+    background-color: rgba(13, 110, 253, 0.03) !important;
+}
+
+.transition-all {
+    transition: all 0.15s ease;
+}
+
+.border-bottom {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.03) !important;
+}
+
+.bg-danger.bg-opacity-5 {
+    background-color: rgba(220, 53, 69, 0.03) !important;
+}
+
+.badge {
+    font-weight: 500;
+    letter-spacing: 0.2px;
+}
+
+.table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.shadow-sm {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+}
+
+.shadow-lg {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+</style>
+`;
+
+// Inject styles into the document head
+if (typeof document !== 'undefined') {
+    const styleElement = document.createElement('div');
+    styleElement.innerHTML = customStyles;
+    document.head.appendChild(styleElement.firstElementChild);
 };

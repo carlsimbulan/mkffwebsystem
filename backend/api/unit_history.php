@@ -34,7 +34,7 @@ if ($method === 'GET') {
     // We assume the frontend sends the station name via a query parameter
     $station = $_GET['station'] ?? null;
     
-    $sql = "SELECT * FROM unit_history";
+    $sql = "SELECT uh.*, u.full_name as user_full_name FROM unit_history uh LEFT JOIN users u ON uh.action_by = u.username";
     $params = [];
     $conditions = [];
 
