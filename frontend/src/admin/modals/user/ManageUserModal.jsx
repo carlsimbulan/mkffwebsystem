@@ -50,13 +50,69 @@ export const ManageUserModal = ({
 
     const roleOptions = ["Administrator", "IT Assistant", "Operator"];
 
+    // Password strength validation function
+    const validatePasswordStrength = (password) => {
+        if (!password) return { isValid: true, errors: [] }; // Empty password is allowed (optional)
+
+        const errors = [];
+        const minLength = 8;
+        const hasUpperCase = /[A-Z]/.test(password);
+        const hasLowerCase = /[a-z]/.test(password);
+        const hasNumbers = /\d/.test(password);
+        const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+        const hasNoSpaces = !/\s/.test(password);
+
+        // Common weak patterns to avoid
+        const weakPatterns = [
+            /^(1234|password|admin|qwerty|abc123|123456)/i,
+            /^(.)\1{3,}/, // Repeated characters like "aaaa"
+            /^(012|123|234|345|456|567|678|789|890){2,}/, // Sequential numbers
+        ];
+
+        if (password.length < minLength) {
+            errors.push(`At least ${minLength} characters long`);
+        }
+        if (!hasUpperCase) {
+            errors.push('At least one uppercase letter (A-Z)');
+        }
+        if (!hasLowerCase) {
+            errors.push('At least one lowercase letter (a-z)');
+        }
+        if (!hasNumbers) {
+            errors.push('At least one number (0-9)');
+        }
+        if (!hasSpecialChar) {
+            errors.push('At least one special character (!@#$%^&*...)');
+        }
+        if (!hasNoSpaces) {
+            errors.push('No spaces allowed');
+        }
+
+        // Check for weak patterns
+        const hasWeakPattern = weakPatterns.some(pattern => pattern.test(password));
+        if (hasWeakPattern) {
+            errors.push('Avoid common patterns like "1234", "password", or repeated characters');
+        }
+
+        return {
+            isValid: errors.length === 0,
+            errors: errors
+        };
+    };
+
+    // Validation checks
+    const passwordValidation = validatePasswordStrength(formData.password);
+    const isPasswordWeak = formData.password && !passwordValidation.isValid;
+
     // --- NAVIGATION LOGIC WITH VALIDATION ---
     const validateStep = () => {
         setError('');
         if (currentStep === 1) {
             if (!formData.full_name.trim()) return "Full Name is required.";
             if (!formData.username || formData.username === DOMAIN) return "Username is required.";
-            if (!formData.password) return "Password is required.";
+            if (!passwordValidation.isValid) {
+                return "Password requirements not met:\n" + passwordValidation.errors.join('\n');
+            }
         }
         if (currentStep === 2) {
             if (formData.role === 'Operator' && !formData.station) return "Please assign a station for Operator role.";
@@ -188,16 +244,34 @@ export const ManageUserModal = ({
                                     <div className="mb-3">
                                         <label className="form-label fw-bold small text-secondary">Password <span className="text-danger">*</span></label>
                                         <div className="input-group shadow-sm">
-                                            <input type={showPassword ? "text" : "password"} className={`form-control ${error.includes('Password') ? 'is-invalid' : ''}`} name="password" value={formData.password} onChange={handleChange} placeholder="••••••••" />
+                                            <input type={showPassword ? "text" : "password"} className={`form-control ${error.includes('Password') ? 'is-invalid' : ''}`} name="password" value={formData.password} onChange={handleChange} placeholder="•••••" />
                                             <button className="btn btn-outline-secondary" type="button" onClick={() => setShowPassword(!showPassword)}>
                                                 <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
                                             </button>
                                         </div>
+                                        {/* Password strength requirements */}
+                                        {formData.password && (
+                                            <div className="mt-2">
+                                                <div className="small text-muted mb-1">Password Requirements:</div>
+                                                <div className="small">
+                                                    {passwordValidation.errors.map((error, index) => (
+                                                        <div key={index} className="text-danger">
+                                                            <i className="bi bi-x-circle-fill me-1"></i>{error}
+                                                        </div>
+                                                    ))}
+                                                    {passwordValidation.isValid && (
+                                                        <div className="text-success">
+                                                            <i className="bi bi-check-circle-fill me-1"></i>Strong password!
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
 
-                            {/* STEP 2: Access (Station Required if Operator) */}
+                            {/* STEP 2: Access */}
                             {currentStep === 2 && (
                                 <div className="fade-in">
                                     <div className="mb-4">

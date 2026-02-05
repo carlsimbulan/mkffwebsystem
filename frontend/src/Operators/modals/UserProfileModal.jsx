@@ -17,8 +17,60 @@ export const UserProfileModal = ({ user, currentAvatar, currentFullName, onClose
     const [avatarFile, setAvatarFile] = useState(null);
     const [previewUrl, setPreviewUrl] = useState(null);
 
-    // Validation check: Magiging true ito kung may laman ang Confirm Password pero hindi match sa New Password
+    // Password strength validation function
+    const validatePasswordStrength = (password) => {
+        if (!password) return { isValid: true, errors: [] }; // Empty password is allowed (optional)
+
+        const errors = [];
+        const minLength = 8;
+        const hasUpperCase = /[A-Z]/.test(password);
+        const hasLowerCase = /[a-z]/.test(password);
+        const hasNumbers = /\d/.test(password);
+        const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+        const hasNoSpaces = !/\s/.test(password);
+
+        // Common weak patterns to avoid
+        const weakPatterns = [
+            /^(1234|password|admin|qwerty|abc123|123456)/i,
+            /^(.)\1{3,}/, // Repeated characters like "aaaa"
+            /^(012|123|234|345|456|567|678|789|890){2,}/, // Sequential numbers
+        ];
+
+        if (password.length < minLength) {
+            errors.push(`At least ${minLength} characters long`);
+        }
+        if (!hasUpperCase) {
+            errors.push('At least one uppercase letter (A-Z)');
+        }
+        if (!hasLowerCase) {
+            errors.push('At least one lowercase letter (a-z)');
+        }
+        if (!hasNumbers) {
+            errors.push('At least one number (0-9)');
+        }
+        if (!hasSpecialChar) {
+            errors.push('At least one special character (!@#$%^&*...)');
+        }
+        if (!hasNoSpaces) {
+            errors.push('No spaces allowed');
+        }
+
+        // Check for weak patterns
+        const hasWeakPattern = weakPatterns.some(pattern => pattern.test(password));
+        if (hasWeakPattern) {
+            errors.push('Avoid common patterns like "1234", "password", or repeated characters');
+        }
+
+        return {
+            isValid: errors.length === 0,
+            errors: errors
+        };
+    };
+
+    // Validation checks
+    const passwordValidation = validatePasswordStrength(editData.newPassword);
     const isMismatch = editData.confirmPassword !== '' && editData.newPassword !== editData.confirmPassword;
+    const isPasswordWeak = editData.newPassword && !passwordValidation.isValid;
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
@@ -36,6 +88,13 @@ const handleSubmit = (e) => {
     // 1. Verification Logic
     if (editData.newPassword && !editData.oldPassword) {
         alert("Please enter your Current (Old) Password to verify identity.");
+        return;
+    }
+
+    // 2. Password strength validation
+    if (isPasswordWeak) {
+        alert("Password is too weak. Please follow the password requirements:\n\n" + 
+              passwordValidation.errors.join('\n'));
         return;
     }
 
@@ -113,6 +172,19 @@ formData.append('old_password', editData.oldPassword);
 
                             <hr className="my-4 opacity-25" />
                             <h6 className="fw-bold mb-3 small text-primary text-uppercase">Security Verification</h6>
+                            
+                            {/* Password Requirements Info */}
+                            <div className="alert alert-info py-2 px-3 mb-3" style={{fontSize: '0.85rem'}}>
+                                <i className="bi bi-info-circle-fill me-2"></i>
+                                <strong>Strong Password Requirements:</strong>
+                                <ul className="mb-0 mt-1 ps-3">
+                                    <li>At least 8 characters long</li>
+                                    <li>Include uppercase (A-Z) and lowercase (a-z) letters</li>
+                                    <li>Include at least one number (0-9)</li>
+                                    <li>Include at least one special character (!@#$%^&*...)</li>
+                                    <li>Avoid common patterns like "1234" or "password"</li>
+                                </ul>
+                            </div>
 
                             {/* Old Password with Show/Hide */}
                             <div className="mb-3">
@@ -139,7 +211,7 @@ formData.append('old_password', editData.oldPassword);
                                     <div className="input-group">
                                         <input 
                                             type={showNewPass ? "text" : "password"} 
-                                            className={`form-control ${isMismatch ? 'border-danger shadow-none' : ''}`}
+                                            className={`form-control ${isMismatch || isPasswordWeak ? 'border-danger shadow-none' : ''}`}
                                             placeholder="Optional"
                                             value={editData.newPassword}
                                             onChange={(e) => setEditData({...editData, newPassword: e.target.value})}
@@ -148,6 +220,24 @@ formData.append('old_password', editData.oldPassword);
                                             <i className={`bi ${showNewPass ? 'bi-eye-slash' : 'bi-eye'}`}></i>
                                         </button>
                                     </div>
+                                    {/* Password strength requirements */}
+                                    {editData.newPassword && (
+                                        <div className="mt-2">
+                                            <div className="small text-muted mb-1">Password Requirements:</div>
+                                            <div className="small">
+                                                {passwordValidation.errors.map((error, index) => (
+                                                    <div key={index} className="text-danger">
+                                                        <i className="bi bi-x-circle-fill me-1"></i>{error}
+                                                    </div>
+                                                ))}
+                                                {passwordValidation.isValid && (
+                                                    <div className="text-success">
+                                                        <i className="bi bi-check-circle-fill me-1"></i>Strong password!
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Confirm Password with Show/Hide and Red Border Validation */}
