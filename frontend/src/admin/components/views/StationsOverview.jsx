@@ -283,7 +283,6 @@ const renderStationChecklist = (stationNumber, unit) => {
         case 7:
         case 9:
         case 10:
-        case 12:
         case 13:
         case 14:
             return (
@@ -297,6 +296,23 @@ const renderStationChecklist = (stationNumber, unit) => {
                     <div className="col-md-6">
                         <small className="text-muted">Remarks:</small>
                         <div className="fw-bold">{formatDisplayValue(unit[`s${stationNumber}_remarks`])}</div>
+                    </div>
+                </div>
+            );
+        case 12:
+            return (
+                <div className="row g-2">
+                    <div className="col-md-6">
+                        <small className="text-muted">Stickers Attached:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s12_stickers_attached`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s12_stickers_attached`])}
+                        </div>
+                    </div>
+                    <div className="col-md-6">
+                        <small className="text-muted">Stickers Readable:</small>
+                        <div className={`fw-bold ${isErrorValue(unit[`s12_stickers_readable`]) ? 'text-danger' : 'text-success'}`}>
+                            {formatDisplayValue(unit[`s12_stickers_readable`])}
+                        </div>
                     </div>
                 </div>
             );

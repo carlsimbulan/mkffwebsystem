@@ -43,6 +43,12 @@ export const EditUnitModal = ({ unit, onClose, onSave, isDetailsOnly = false }) 
     const [s13Readings, setS13Readings] = useState({ requirements: "Passed", remarks: "" });
     const [s14Readings, setS14Readings] = useState({ requirements: "Passed", remarks: "" });
 
+    // --- STATION 12: STICKER ATTACHMENT ---
+    const [s12Readings, setS12Readings] = useState({
+        stickers_attached: "GO",
+        stickers_readable: "GO"
+    });
+
     // --- STATION 8: BURN-IN TESTING ---
     const [s8Readings, setS8Readings] = useState({
         power_unit_disable_lora: "Passed",
@@ -150,6 +156,11 @@ export const EditUnitModal = ({ unit, onClose, onSave, isDetailsOnly = false }) 
                    s11Readings.high_range !== "PASSED";
         }
 
+        // Station 12: Sticker attachment
+        if (stn === "Station12") {
+            return s12Readings.stickers_attached !== "GO" || s12Readings.stickers_readable !== "GO";
+        }
+
         return false;
     };
 
@@ -173,8 +184,28 @@ export const EditUnitModal = ({ unit, onClose, onSave, isDetailsOnly = false }) 
             return;
         }
 
+        // Validate checklist remarks for stations with requirements/remarks fields
+        const stn = unit.station.replace(/\s+/g, '');
+        const stationsRequiringRemarks = ['Station3', 'Station4', 'Station5', 'Station7', 'Station9', 'Station10', 'Station13', 'Station14'];
+        
+        if (stationsRequiringRemarks.includes(stn)) {
+            let checklistRemarks = '';
+            if (stn === 'Station3') checklistRemarks = s3Readings.remarks;
+            else if (stn === 'Station4') checklistRemarks = s4Readings.remarks;
+            else if (stn === 'Station5') checklistRemarks = s5Readings.remarks;
+            else if (stn === 'Station7') checklistRemarks = s7Readings.remarks;
+            else if (stn === 'Station9') checklistRemarks = s9Readings.remarks;
+            else if (stn === 'Station10') checklistRemarks = s10Readings.remarks;
+            else if (stn === 'Station13') checklistRemarks = s13Readings.remarks;
+            else if (stn === 'Station14') checklistRemarks = s14Readings.remarks;
+            
+            if (!checklistRemarks || checklistRemarks.trim() === '') {
+                alert(`⚠️ REQUIRED: Please fill in the checklist remarks field for ${unit.station}.`);
+                return;
+            }
+        }
+
         let finalChecklistData = null;
-        const stn = unit.station.replace(/\s+/g, ''); 
 
         if (stn === "Station1") finalChecklistData = s1Readings;
         else if (stn === "Station2") finalChecklistData = s2Readings;
@@ -188,6 +219,7 @@ export const EditUnitModal = ({ unit, onClose, onSave, isDetailsOnly = false }) 
         else if (stn === "Station9") finalChecklistData = s9Readings;
         else if (stn === "Station10") finalChecklistData = s10Readings;
         else if (stn === "Station11") finalChecklistData = s11Readings;
+        else if (stn === "Station12") finalChecklistData = s12Readings;
         else if (stn === "Station13") finalChecklistData = s13Readings;
         else if (stn === "Station14") finalChecklistData = s14Readings;
 
@@ -435,8 +467,8 @@ export const EditUnitModal = ({ unit, onClose, onSave, isDetailsOnly = false }) 
                                         </select>
                                     </div>
                                     <div className="col-md-6">
-                                        <label className="small fw-bold">Remarks</label>
-                                        <input type="text" className="form-control form-control-sm" value={s3Readings.remarks} onChange={(e) => setS3Readings({...s3Readings, remarks: e.target.value})} />
+                                        <label className="small fw-bold">Remarks <span className="text-danger">*</span></label>
+                                        <input type="text" className={`form-control form-control-sm ${!s3Readings.remarks || s3Readings.remarks.trim() === '' ? 'border-danger' : ''}`} value={s3Readings.remarks} onChange={(e) => setS3Readings({...s3Readings, remarks: e.target.value})} placeholder="Required: Enter remarks..." />
                                     </div>
                                 </div>
                             </div>
@@ -455,8 +487,8 @@ export const EditUnitModal = ({ unit, onClose, onSave, isDetailsOnly = false }) 
                                         </select>
                                     </div>
                                     <div className="col-md-6">
-                                        <label className="small fw-bold">Remarks</label>
-                                        <input type="text" className="form-control form-control-sm" value={s4Readings.remarks} onChange={(e) => setS4Readings({...s4Readings, remarks: e.target.value})} />
+                                        <label className="small fw-bold">Remarks <span className="text-danger">*</span></label>
+                                        <input type="text" className={`form-control form-control-sm ${!s4Readings.remarks || s4Readings.remarks.trim() === '' ? 'border-danger' : ''}`} value={s4Readings.remarks} onChange={(e) => setS4Readings({...s4Readings, remarks: e.target.value})} placeholder="Required: Enter remarks..." />
                                     </div>
                                 </div>
                             </div>
@@ -475,8 +507,8 @@ export const EditUnitModal = ({ unit, onClose, onSave, isDetailsOnly = false }) 
                                         </select>
                                     </div>
                                     <div className="col-md-6">
-                                        <label className="small fw-bold">Remarks</label>
-                                        <input type="text" className="form-control form-control-sm" value={s5Readings.remarks} onChange={(e) => setS5Readings({...s5Readings, remarks: e.target.value})} />
+                                        <label className="small fw-bold">Remarks <span className="text-danger">*</span></label>
+                                        <input type="text" className={`form-control form-control-sm ${!s5Readings.remarks || s5Readings.remarks.trim() === '' ? 'border-danger' : ''}`} value={s5Readings.remarks} onChange={(e) => setS5Readings({...s5Readings, remarks: e.target.value})} placeholder="Required: Enter remarks..." />
                                     </div>
                                 </div>
                             </div>
@@ -495,8 +527,8 @@ export const EditUnitModal = ({ unit, onClose, onSave, isDetailsOnly = false }) 
                                         </select>
                                     </div>
                                     <div className="col-md-6">
-                                        <label className="small fw-bold">Remarks</label>
-                                        <input type="text" className="form-control form-control-sm" value={s7Readings.remarks} onChange={(e) => setS7Readings({...s7Readings, remarks: e.target.value})} />
+                                        <label className="small fw-bold">Remarks <span className="text-danger">*</span></label>
+                                        <input type="text" className={`form-control form-control-sm ${!s7Readings.remarks || s7Readings.remarks.trim() === '' ? 'border-danger' : ''}`} value={s7Readings.remarks} onChange={(e) => setS7Readings({...s7Readings, remarks: e.target.value})} placeholder="Required: Enter remarks..." />
                                     </div>
                                 </div>
                             </div>
@@ -556,8 +588,8 @@ export const EditUnitModal = ({ unit, onClose, onSave, isDetailsOnly = false }) 
                                         </select>
                                     </div>
                                     <div className="col-md-6">
-                                        <label className="small fw-bold">Remarks</label>
-                                        <input type="text" className="form-control form-control-sm" value={s9Readings.remarks} onChange={(e) => setS9Readings({...s9Readings, remarks: e.target.value})} />
+                                        <label className="small fw-bold">Remarks <span className="text-danger">*</span></label>
+                                        <input type="text" className={`form-control form-control-sm ${!s9Readings.remarks || s9Readings.remarks.trim() === '' ? 'border-danger' : ''}`} value={s9Readings.remarks} onChange={(e) => setS9Readings({...s9Readings, remarks: e.target.value})} placeholder="Required: Enter remarks..." />
                                     </div>
                                 </div>
                             </div>
@@ -576,8 +608,8 @@ export const EditUnitModal = ({ unit, onClose, onSave, isDetailsOnly = false }) 
                                         </select>
                                     </div>
                                     <div className="col-md-6">
-                                        <label className="small fw-bold">Remarks</label>
-                                        <input type="text" className="form-control form-control-sm" value={s10Readings.remarks} onChange={(e) => setS10Readings({...s10Readings, remarks: e.target.value})} />
+                                        <label className="small fw-bold">Remarks <span className="text-danger">*</span></label>
+                                        <input type="text" className={`form-control form-control-sm ${!s10Readings.remarks || s10Readings.remarks.trim() === '' ? 'border-danger' : ''}`} value={s10Readings.remarks} onChange={(e) => setS10Readings({...s10Readings, remarks: e.target.value})} placeholder="Required: Enter remarks..." />
                                     </div>
                                 </div>
                             </div>
@@ -620,6 +652,29 @@ export const EditUnitModal = ({ unit, onClose, onSave, isDetailsOnly = false }) 
                             </div>
                         )}
 
+                        {/* --- STATION 12: STICKER ATTACHMENT --- */}
+                        {showChecklist && (unit.station === "Station 12" || unit.station === "Station12") && (
+                            <div className="mt-2 p-3 border rounded bg-white border-primary shadow-sm">
+                                <h6 className="fw-bold text-primary mb-3 border-bottom pb-2">STATION 12: Label Sticker Attachment</h6>
+                                <div className="row g-3">
+                                    <div className="col-md-6">
+                                        <label className="small fw-bold">Stickers Attached</label>
+                                        <select className="form-select form-select-sm" value={s12Readings.stickers_attached} onChange={(e) => setS12Readings({...s12Readings, stickers_attached: e.target.value})}>
+                                            <option value="GO">GO</option>
+                                            <option value="NO GO">NO GO</option>
+                                        </select>
+                                    </div>
+                                    <div className="col-md-6">
+                                        <label className="small fw-bold">Stickers Readable</label>
+                                        <select className="form-select form-select-sm" value={s12Readings.stickers_readable} onChange={(e) => setS12Readings({...s12Readings, stickers_readable: e.target.value})}>
+                                            <option value="GO">GO</option>
+                                            <option value="NO GO">NO GO</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* --- STATION 13: STANDARD CHECKLIST --- */}
                         {showChecklist && (unit.station === "Station 13" || unit.station === "Station13") && (
                             <div className="mt-2 p-3 border rounded bg-white border-primary shadow-sm">
@@ -633,8 +688,8 @@ export const EditUnitModal = ({ unit, onClose, onSave, isDetailsOnly = false }) 
                                         </select>
                                     </div>
                                     <div className="col-md-6">
-                                        <label className="small fw-bold">Remarks</label>
-                                        <input type="text" className="form-control form-control-sm" value={s13Readings.remarks} onChange={(e) => setS13Readings({...s13Readings, remarks: e.target.value})} />
+                                        <label className="small fw-bold">Remarks <span className="text-danger">*</span></label>
+                                        <input type="text" className={`form-control form-control-sm ${!s13Readings.remarks || s13Readings.remarks.trim() === '' ? 'border-danger' : ''}`} value={s13Readings.remarks} onChange={(e) => setS13Readings({...s13Readings, remarks: e.target.value})} placeholder="Required: Enter remarks..." />
                                     </div>
                                 </div>
                             </div>
@@ -653,8 +708,8 @@ export const EditUnitModal = ({ unit, onClose, onSave, isDetailsOnly = false }) 
                                         </select>
                                     </div>
                                     <div className="col-md-6">
-                                        <label className="small fw-bold">Remarks</label>
-                                        <input type="text" className="form-control form-control-sm" value={s14Readings.remarks} onChange={(e) => setS14Readings({...s14Readings, remarks: e.target.value})} />
+                                        <label className="small fw-bold">Remarks <span className="text-danger">*</span></label>
+                                        <input type="text" className={`form-control form-control-sm ${!s14Readings.remarks || s14Readings.remarks.trim() === '' ? 'border-danger' : ''}`} value={s14Readings.remarks} onChange={(e) => setS14Readings({...s14Readings, remarks: e.target.value})} placeholder="Required: Enter remarks..." />
                                     </div>
                                 </div>
                             </div>

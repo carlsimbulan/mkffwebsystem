@@ -126,7 +126,7 @@ formData.append('old_password', editData.oldPassword);
 
     return (
         <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 1080 }}>
-            <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-dialog modal-dialog-centered modal-lg">
                 <div className="modal-content border-0 shadow-lg">
                     
                     {/* Header */}
@@ -141,38 +141,60 @@ formData.append('old_password', editData.oldPassword);
                         <div className="modal-body p-4">
                             
                             {/* Avatar Section */}
-                            <div className="text-center mb-4">
-                                <div className="position-relative d-inline-block">
-                                    <img 
-                                        src={previewUrl || currentAvatar} 
-                                        className="rounded-circle border border-4 border-light shadow" 
-                                        style={{ width: '110px', height: '110px', objectFit: 'cover' }} 
-                                        alt="Profile Preview"
-                                    />
-                                    <label htmlFor="avatarUpload" className="position-absolute bottom-0 end-0 bg-primary text-white rounded-circle shadow p-2" style={{ cursor: 'pointer', width: '35px', height: '35px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <i className="bi bi-camera-fill small"></i>
-                                    </label>
-                                    <input type="file" id="avatarUpload" className="d-none" onChange={handleFileChange} accept="image/*" />
+                            <div className="row">
+                                <div className="col-md-4 text-center mb-4">
+                                    <div className="position-relative d-inline-block">
+                                        <img 
+                                            src={previewUrl || currentAvatar} 
+                                            className="rounded-circle border border-4 border-light shadow" 
+                                            style={{ width: '140px', height: '140px', objectFit: 'cover' }} 
+                                            alt="Profile Preview"
+                                        />
+                                        <label htmlFor="avatarUpload" className="position-absolute bottom-0 end-0 bg-primary text-white rounded-circle shadow p-2" style={{ cursor: 'pointer', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <i className="bi bi-camera-fill"></i>
+                                        </label>
+                                        <input type="file" id="avatarUpload" className="d-none" onChange={handleFileChange} accept="image/*" />
+                                    </div>
+                                    <h5 className="mt-3 mb-0 fw-bold text-dark">{currentFullName}</h5>
+                                    <p className="text-muted small mb-0">{user.station || "No Station Assigned"}</p>
                                 </div>
-                                <h5 className="mt-3 mb-0 fw-bold text-dark">{currentFullName}</h5>
-                                <p className="text-muted small mb-0">{user.station || "No Station Assigned"}</p>
+
+                                <div className="col-md-8">
+                                    {/* Email Section */}
+                                    <div className="mb-3">
+                                        <label className="form-label small fw-bold text-dark">Email / Username</label>
+                                        <input 
+                                            type="email" 
+                                            className="form-control" 
+                                            value={editData.email}
+                                            onChange={(e) => setEditData({...editData, email: e.target.value})}
+                                            required 
+                                        />
+                                    </div>
+
+                                    <hr className="my-3 opacity-25" />
+                                    <h6 className="fw-bold mb-2 small text-primary text-uppercase">Security Verification</h6>
+                                    
+                                    {/* Old Password with Show/Hide */}
+                                    <div className="mb-3">
+                                        <label className="form-label small fw-bold text-danger">Current (Old) Password *</label>
+                                        <div className="input-group">
+                                            <input 
+                                                type={showOldPass ? "text" : "password"} 
+                                                className="form-control"
+                                                placeholder="Required to save changes"
+                                                value={editData.oldPassword}
+                                                onChange={(e) => setEditData({...editData, oldPassword: e.target.value})}
+                                                required
+                                            />
+                                            <button className="btn btn-outline-secondary" type="button" onClick={() => setShowOldPass(!showOldPass)}>
+                                                <i className={`bi ${showOldPass ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            {/* Email Section */}
-                            <div className="mb-3">
-                                <label className="form-label small fw-bold text-dark">Email / Username</label>
-                                <input 
-                                    type="email" 
-                                    className="form-control" 
-                                    value={editData.email}
-                                    onChange={(e) => setEditData({...editData, email: e.target.value})}
-                                    required 
-                                />
-                            </div>
-
-                            <hr className="my-4 opacity-25" />
-                            <h6 className="fw-bold mb-3 small text-primary text-uppercase">Security Verification</h6>
-                            
                             {/* Password Requirements Info */}
                             <div className="alert alert-info py-2 px-3 mb-3" style={{fontSize: '0.85rem'}}>
                                 <i className="bi bi-info-circle-fill me-2"></i>
@@ -184,24 +206,6 @@ formData.append('old_password', editData.oldPassword);
                                     <li>Include at least one special character (!@#$%^&*...)</li>
                                     <li>Avoid common patterns like "1234" or "password"</li>
                                 </ul>
-                            </div>
-
-                            {/* Old Password with Show/Hide */}
-                            <div className="mb-3">
-                                <label className="form-label small fw-bold text-danger">Current (Old) Password *</label>
-                                <div className="input-group">
-                                    <input 
-                                        type={showOldPass ? "text" : "password"} 
-                                        className="form-control"
-                                        placeholder="Required to save changes"
-                                        value={editData.oldPassword}
-                                        onChange={(e) => setEditData({...editData, oldPassword: e.target.value})}
-                                        required
-                                    />
-                                    <button className="btn btn-outline-secondary" type="button" onClick={() => setShowOldPass(!showOldPass)}>
-                                        <i className={`bi ${showOldPass ? 'bi-eye-slash' : 'bi-eye'}`}></i>
-                                    </button>
-                                </div>
                             </div>
 
                             <div className="row g-2">

@@ -34,22 +34,29 @@ if ($method === 'GET') {
     // We assume the frontend sends the station name via a query parameter
     $station = $_GET['station'] ?? null;
     
-    $sql = "SELECT uh.*, u.full_name as user_full_name FROM unit_history uh LEFT JOIN users u ON uh.action_by = u.username";
-    $params = [];
-    $conditions = [];
-
     if ($station) {
-        // Fetch only history logs related to units that were processed at this station
-        $conditions[] = "station_name = :station";
-        $params['station'] = $station;
+        // Fetch ALL history for units that have passed through this station
+        // This includes all actions (not just actions at this station)
+        $sql = "SELECT DISTINCT uh.*, u.full_name as user_full_name 
+                FROM unit_history uh 
+                LEFT JOIN users u ON uh.action_by = u.username
+                WHERE uh.unit_id IN (
+                    SELECT DISTINCT unit_id 
+                    FROM unit_history 
+                    WHERE station_name = :station
+                )
+                ORDER BY uh.timestamp DESC";
+        
+        $params = ['station' => $station];
+    } else {
+        // No station filter - return all history
+        $sql = "SELECT uh.*, u.full_name as user_full_name 
+                FROM unit_history uh 
+                LEFT JOIN users u ON uh.action_by = u.username
+                ORDER BY uh.timestamp DESC";
+        
+        $params = [];
     }
-    
-    if (count($conditions) > 0) {
-        $sql .= " WHERE " . implode(" AND ", $conditions);
-    }
-    
-    // Order by timestamp descending (newest first)
-    $sql .= " ORDER BY timestamp DESC";
 
     try {
         $stmt = $pdo->prepare($sql);

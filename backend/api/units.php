@@ -44,7 +44,9 @@ function handleStation3Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
     try {
         $stmt = $pdo->prepare("SELECT id FROM station3_checklists WHERE unit_id = ?");
         $stmt->execute([$unitId]);
-        if ($stmt->fetch()) {
+        $exists = $stmt->fetch();
+
+        if ($exists) {
             $sql = "UPDATE station3_checklists SET assembly_no = ?, requirements = ?, remarks = ? WHERE unit_id = ?";
             $pdo->prepare($sql)->execute([$assemblyNo, $checklistData['requirements'] ?? 'Passed', $checklistData['remarks'] ?? '', $unitId]);
         } else {
@@ -59,7 +61,9 @@ function handleStation4Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
     try {
         $stmt = $pdo->prepare("SELECT id FROM station4_checklists WHERE unit_id = ?");
         $stmt->execute([$unitId]);
-        if ($stmt->fetch()) {
+        $exists = $stmt->fetch();
+
+        if ($exists) {
             $sql = "UPDATE station4_checklists SET assembly_no = ?, requirements = ?, remarks = ? WHERE unit_id = ?";
             $pdo->prepare($sql)->execute([$assemblyNo, $checklistData['requirements'] ?? 'Passed', $checklistData['remarks'] ?? '', $unitId]);
         } else {
@@ -74,7 +78,9 @@ function handleStation5Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
     try {
         $stmt = $pdo->prepare("SELECT id FROM station5_checklists WHERE unit_id = ?");
         $stmt->execute([$unitId]);
-        if ($stmt->fetch()) {
+        $exists = $stmt->fetch();
+
+        if ($exists) {
             $sql = "UPDATE station5_checklists SET assembly_no = ?, requirements = ?, remarks = ? WHERE unit_id = ?";
             $pdo->prepare($sql)->execute([$assemblyNo, $checklistData['requirements'] ?? 'Passed', $checklistData['remarks'] ?? '', $unitId]);
         } else {
@@ -89,7 +95,9 @@ function handleStation9Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
     try {
         $stmt = $pdo->prepare("SELECT id FROM station9_checklists WHERE unit_id = ?");
         $stmt->execute([$unitId]);
-        if ($stmt->fetch()) {
+        $exists = $stmt->fetch();
+
+        if ($exists) {
             $sql = "UPDATE station9_checklists SET assembly_no = ?, requirements = ?, remarks = ? WHERE unit_id = ?";
             $pdo->prepare($sql)->execute([$assemblyNo, $checklistData['requirements'] ?? 'Passed', $checklistData['remarks'] ?? '', $unitId]);
         } else {
@@ -104,7 +112,9 @@ function handleStation13Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
     try {
         $stmt = $pdo->prepare("SELECT id FROM station13_checklists WHERE unit_id = ?");
         $stmt->execute([$unitId]);
-        if ($stmt->fetch()) {
+        $exists = $stmt->fetch();
+
+        if ($exists) {
             $sql = "UPDATE station13_checklists SET assembly_no = ?, requirements = ?, remarks = ? WHERE unit_id = ?";
             $pdo->prepare($sql)->execute([$assemblyNo, $checklistData['requirements'] ?? 'Passed', $checklistData['remarks'] ?? '', $unitId]);
         } else {
@@ -119,7 +129,9 @@ function handleStation14Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
     try {
         $stmt = $pdo->prepare("SELECT id FROM station14_checklists WHERE unit_id = ?");
         $stmt->execute([$unitId]);
-        if ($stmt->fetch()) {
+        $exists = $stmt->fetch();
+
+        if ($exists) {
             $sql = "UPDATE station14_checklists SET assembly_no = ?, requirements = ?, remarks = ? WHERE unit_id = ?";
             $pdo->prepare($sql)->execute([$assemblyNo, $checklistData['requirements'] ?? 'Passed', $checklistData['remarks'] ?? '', $unitId]);
         } else {
@@ -134,12 +146,24 @@ function handleStation1Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
     try {
         $stmt = $pdo->prepare("SELECT id FROM station1_checklists WHERE unit_id = ?");
         $stmt->execute([$unitId]);
-        if ($stmt->fetch()) {
+        $exists = $stmt->fetch();
+
+        if ($exists) {
             $sql = "UPDATE station1_checklists SET assembly_no = ?, header_seated_90_deg = ?, leads_properly_soldered = ? WHERE unit_id = ?";
-            $pdo->prepare($sql)->execute([$assemblyNo, $checklistData['header_seated_90_deg'], $checklistData['leads_properly_soldered'], $unitId]);
+            $pdo->prepare($sql)->execute([
+                $assemblyNo, 
+                $checklistData['header_seated_90_deg'] ?? 'GO', 
+                $checklistData['leads_properly_soldered'] ?? 'GO',
+                $unitId
+            ]);
         } else {
             $sql = "INSERT INTO station1_checklists (unit_id, assembly_no, header_seated_90_deg, leads_properly_soldered) VALUES (?, ?, ?, ?)";
-            $pdo->prepare($sql)->execute([$unitId, $assemblyNo, $checklistData['header_seated_90_deg'], $checklistData['leads_properly_soldered']]);
+            $pdo->prepare($sql)->execute([
+                $unitId, 
+                $assemblyNo, 
+                $checklistData['header_seated_90_deg'] ?? 'GO', 
+                $checklistData['leads_properly_soldered'] ?? 'GO'
+            ]);
         }
     } catch (PDOException $e) { error_log("S1 Failed: " . $e->getMessage()); throw $e; }
 }
@@ -147,104 +171,184 @@ function handleStation1Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
 function handleStation2Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
     if (!$checklistData) return;
     try {
-        // Siguraduhin na ang 'lora_mesh_test' ay nakukuha mula sa React checklist_data
-        $params = [
-            $assemblyNo, 
-            $checklistData['lora_module'] ?? 'Not Detected', 
-            $checklistData['lora_mesh_test'] ?? 'Not Detected', // <--- ITO ANG FIX
-            $checklistData['energy_meter'] ?? 'Not Detected', 
-            $checklistData['power_good_test'] ?? 'Not Detected', 
-            (float)($checklistData['voltage'] ?? 0), 
-            (float)($checklistData['line1'] ?? 0), 
-            (float)($checklistData['line2'] ?? 0), 
-            (float)($checklistData['line3'] ?? 0), 
-            $checklistData['temp_reading'] ?? 'FAIL', 
-            $checklistData['freq_reading'] ?? 'NO GO', 
-            $checklistData['led_status_4g'] ?? 'NO GO', 
-            $checklistData['led_status_fast_blink'] ?? 'NO GO', 
-            $checklistData['go_no_go'] ?? 'NO GO', 
-            (int)($checklistData['sw1_off_to_led_off_duration'] ?? 0),
-            $unitId // Para sa WHERE clause
-        ];
-
         $stmt = $pdo->prepare("SELECT id FROM station2_checklists WHERE unit_id = ?");
         $stmt->execute([$unitId]);
-        
-        if ($stmt->fetch()) {
-            // UPDATE: Dapat 15 ang '?' dito bago ang unit_id
+        $exists = $stmt->fetch();
+
+        if ($exists) {
             $sql = "UPDATE station2_checklists SET 
-                    assembly_no = ?, lora_module = ?, lora_mesh_test = ?, energy_meter = ?, 
-                    power_good_test = ?, voltage = ?, line1 = ?, line2 = ?, line3 = ?, 
-                    temp_reading = ?, freq_reading = ?, led_status_4g = ?, 
-                    led_status_fast_blink = ?, go_no_go = ?, sw1_off_to_led_off_duration = ? 
+                    assembly_no = ?, lora_module = ?, lora_mesh_test = ?, energy_meter = ?, power_good_test = ?, 
+                    voltage = ?, line1 = ?, line2 = ?, line3 = ?, temp_reading = ?, freq_reading = ?, 
+                    led_status_4g = ?, led_status_fast_blink = ?, go_no_go = ?, sw1_off_to_led_off_duration = ?
                     WHERE unit_id = ?";
+            $pdo->prepare($sql)->execute([
+                $assemblyNo, 
+                $checklistData['lora_module'] ?? 'Detected', 
+                $checklistData['lora_mesh_test'] ?? 'Detected',
+                $checklistData['energy_meter'] ?? 'Detected', 
+                $checklistData['power_good_test'] ?? 'Detected', 
+                (float)($checklistData['voltage'] ?? 115), 
+                (float)($checklistData['line1'] ?? 115), 
+                (float)($checklistData['line2'] ?? 115), 
+                (float)($checklistData['line3'] ?? 115), 
+                $checklistData['temp_reading'] ?? 'PASS', 
+                $checklistData['freq_reading'] ?? 'GO', 
+                $checklistData['led_status_4g'] ?? 'GO', 
+                $checklistData['led_status_fast_blink'] ?? 'GO', 
+                $checklistData['go_no_go'] ?? 'GO', 
+                (int)($checklistData['sw1_off_to_led_off_duration'] ?? 0),
+                $unitId
+            ]);
         } else {
-            // INSERT: Dapat 16 ang columns at values
             $sql = "INSERT INTO station2_checklists 
-                    (assembly_no, lora_module, lora_mesh_test, energy_meter, power_good_test, 
+                    (unit_id, assembly_no, lora_module, lora_mesh_test, energy_meter, power_good_test, 
                      voltage, line1, line2, line3, temp_reading, freq_reading, 
-                     led_status_4g, led_status_fast_blink, go_no_go, sw1_off_to_led_off_duration, unit_id) 
+                     led_status_4g, led_status_fast_blink, go_no_go, sw1_off_to_led_off_duration) 
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $pdo->prepare($sql)->execute([
+                $unitId,
+                $assemblyNo, 
+                $checklistData['lora_module'] ?? 'Detected', 
+                $checklistData['lora_mesh_test'] ?? 'Detected',
+                $checklistData['energy_meter'] ?? 'Detected', 
+                $checklistData['power_good_test'] ?? 'Detected', 
+                (float)($checklistData['voltage'] ?? 115), 
+                (float)($checklistData['line1'] ?? 115), 
+                (float)($checklistData['line2'] ?? 115), 
+                (float)($checklistData['line3'] ?? 115), 
+                $checklistData['temp_reading'] ?? 'PASS', 
+                $checklistData['freq_reading'] ?? 'GO', 
+                $checklistData['led_status_4g'] ?? 'GO', 
+                $checklistData['led_status_fast_blink'] ?? 'GO', 
+                $checklistData['go_no_go'] ?? 'GO', 
+                (int)($checklistData['sw1_off_to_led_off_duration'] ?? 0)
+            ]);
         }
-        $pdo->prepare($sql)->execute($params);
     } catch (PDOException $e) { error_log("S2 Failed: " . $e->getMessage()); throw $e; }
 }
 
 function handleStation7Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
     if (!$checklistData) return;
     try {
-        $sql = "INSERT INTO station7_checklists (unit_id, assembly_no, performed_passed, result_recorded) VALUES (?, ?, ?, ?) 
-                ON DUPLICATE KEY UPDATE assembly_no=VALUES(assembly_no), performed_passed=VALUES(performed_passed), result_recorded=VALUES(result_recorded)";
-        $pdo->prepare($sql)->execute([$unitId, $assemblyNo, $checklistData['performed_passed'] ?? 'GO', $checklistData['result_recorded'] ?? 'GO']);
+        $stmt = $pdo->prepare("SELECT id FROM station7_checklists WHERE unit_id = ?");
+        $stmt->execute([$unitId]);
+        $exists = $stmt->fetch();
+
+        if ($exists) {
+            $sql = "UPDATE station7_checklists SET assembly_no = ?, requirements = ?, remarks = ? WHERE unit_id = ?";
+            $pdo->prepare($sql)->execute([$assemblyNo, $checklistData['requirements'] ?? 'Passed', $checklistData['remarks'] ?? '', $unitId]);
+        } else {
+            $sql = "INSERT INTO station7_checklists (unit_id, assembly_no, requirements, remarks) VALUES (?, ?, ?, ?)";
+            $pdo->prepare($sql)->execute([$unitId, $assemblyNo, $checklistData['requirements'] ?? 'Passed', $checklistData['remarks'] ?? '']);
+        }
     } catch (PDOException $e) { error_log("S7 Failed: " . $e->getMessage()); throw $e; }
 }
 
 function handleStation8Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
     if (!$checklistData) return;
     try {
-        $sql = "INSERT INTO station8_checklists (unit_id, assembly_no, power_unit_disable_lora, frequency_band, test_input_fields, rsso_testing, data_outage) VALUES (?, ?, ?, ?, ?, ?, ?) 
-                ON DUPLICATE KEY UPDATE assembly_no=VALUES(assembly_no), power_unit_disable_lora=VALUES(power_unit_disable_lora), frequency_band=VALUES(frequency_band), test_input_fields=VALUES(test_input_fields), rsso_testing=VALUES(rsso_testing), data_outage=VALUES(data_outage)";
-        $pdo->prepare($sql)->execute([
-            $unitId, 
-            $assemblyNo, 
-            $checklistData['power_unit_disable_lora'] ?? 'Passed', 
-            $checklistData['frequency_band'] ?? 'Complete', 
-            getNullIfEmpty($checklistData['start_testing'] ?? $checklistData['test_input_fields'] ?? ''), 
-            $checklistData['rsso_testing'] ?? 'Passed', 
-            $checklistData['data_outage'] ?? 'Passed'
-        ]);
+        $stmt = $pdo->prepare("SELECT id FROM station8_checklists WHERE unit_id = ?");
+        $stmt->execute([$unitId]);
+        $exists = $stmt->fetch();
+
+        if ($exists) {
+            $sql = "UPDATE station8_checklists SET assembly_no = ?, power_unit_disable_lora = ?, frequency_band = ?, test_input_fields = ?, rsso_testing = ?, data_outage = ? WHERE unit_id = ?";
+            $pdo->prepare($sql)->execute([
+                $assemblyNo, 
+                $checklistData['power_unit_disable_lora'] ?? 'Passed', 
+                $checklistData['frequency_band'] ?? 'Complete', 
+                getNullIfEmpty($checklistData['start_testing'] ?? $checklistData['test_input_fields'] ?? ''), 
+                $checklistData['rsso_testing'] ?? 'Passed', 
+                $checklistData['data_outage'] ?? 'Passed',
+                $unitId
+            ]);
+        } else {
+            $sql = "INSERT INTO station8_checklists (unit_id, assembly_no, power_unit_disable_lora, frequency_band, test_input_fields, rsso_testing, data_outage) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            $pdo->prepare($sql)->execute([
+                $unitId, 
+                $assemblyNo, 
+                $checklistData['power_unit_disable_lora'] ?? 'Passed', 
+                $checklistData['frequency_band'] ?? 'Complete', 
+                getNullIfEmpty($checklistData['start_testing'] ?? $checklistData['test_input_fields'] ?? ''), 
+                $checklistData['rsso_testing'] ?? 'Passed', 
+                $checklistData['data_outage'] ?? 'Passed'
+            ]);
+        }
     } catch (PDOException $e) { error_log("S8 Failed: " . $e->getMessage()); throw $e; }
 }
 
 function handleStation10Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
     if (!$checklistData) return;
     try {
-        $sql = "INSERT INTO station10_checklists (unit_id, assembly_no, post_performed_passed, post_result_recorded) VALUES (?, ?, ?, ?) 
-                ON DUPLICATE KEY UPDATE assembly_no=VALUES(assembly_no), post_performed_passed=VALUES(post_performed_passed), post_result_recorded=VALUES(post_result_recorded)";
-        $pdo->prepare($sql)->execute([$unitId, $assemblyNo, $checklistData['post_performed_passed'] ?? 'GO', $checklistData['post_result_recorded'] ?? 'GO']);
+        $stmt = $pdo->prepare("SELECT id FROM station10_checklists WHERE unit_id = ?");
+        $stmt->execute([$unitId]);
+        $exists = $stmt->fetch();
+
+        if ($exists) {
+            $sql = "UPDATE station10_checklists SET assembly_no = ?, requirements = ?, remarks = ? WHERE unit_id = ?";
+            $pdo->prepare($sql)->execute([$assemblyNo, $checklistData['requirements'] ?? 'Passed', $checklistData['remarks'] ?? '', $unitId]);
+        } else {
+            $sql = "INSERT INTO station10_checklists (unit_id, assembly_no, requirements, remarks) VALUES (?, ?, ?, ?)";
+            $pdo->prepare($sql)->execute([$unitId, $assemblyNo, $checklistData['requirements'] ?? 'Passed', $checklistData['remarks'] ?? '']);
+        }
     } catch (PDOException $e) { error_log("S10 Failed: " . $e->getMessage()); throw $e; }
 }
 
 function handleStation11Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
     if (!$checklistData) return;
     try {
-        $sql = "INSERT INTO station11_checklists (unit_id, assembly_no, functions_working, connectivity_passed) VALUES (?, ?, ?, ?) 
-                ON DUPLICATE KEY UPDATE assembly_no=VALUES(assembly_no), functions_working=VALUES(functions_working), connectivity_passed=VALUES(connectivity_passed)";
-        $pdo->prepare($sql)->execute([$unitId, $assemblyNo, $checklistData['functions_working'] ?? 'GO', $checklistData['connectivity_passed'] ?? 'GO']);
+        $stmt = $pdo->prepare("SELECT id FROM station11_checklists WHERE unit_id = ?");
+        $stmt->execute([$unitId]);
+        $exists = $stmt->fetch();
+
+        if ($exists) {
+            $sql = "UPDATE station11_checklists SET assembly_no = ?, led_status = ?, low_range = ?, medium_range = ?, high_range = ? WHERE unit_id = ?";
+            $pdo->prepare($sql)->execute([
+                $assemblyNo, 
+                $checklistData['led_status'] ?? 'Not Passed', 
+                $checklistData['low_range'] ?? 'Not Passed',
+                $checklistData['medium_range'] ?? 'Not Passed',
+                $checklistData['high_range'] ?? 'Not Passed',
+                $unitId
+            ]);
+        } else {
+            $sql = "INSERT INTO station11_checklists (unit_id, assembly_no, led_status, low_range, medium_range, high_range) VALUES (?, ?, ?, ?, ?, ?)";
+            $pdo->prepare($sql)->execute([
+                $unitId, 
+                $assemblyNo, 
+                $checklistData['led_status'] ?? 'Not Passed', 
+                $checklistData['low_range'] ?? 'Not Passed',
+                $checklistData['medium_range'] ?? 'Not Passed',
+                $checklistData['high_range'] ?? 'Not Passed'
+            ]);
+        }
     } catch (PDOException $e) { error_log("S11 Failed: " . $e->getMessage()); throw $e; }
 }
 
 function handleStation12Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
     if (!$checklistData) return;
     try {
-        $sql = "INSERT INTO station12_checklists (unit_id, assembly_no, stickers_attached, stickers_readable) VALUES (?, ?, ?, ?) 
-                ON DUPLICATE KEY UPDATE assembly_no=VALUES(assembly_no), stickers_attached=VALUES(stickers_attached), stickers_readable=VALUES(stickers_readable)";
-        $pdo->prepare($sql)->execute([
-            $unitId, 
-            $assemblyNo, 
-            $checklistData['stickers_attached'] ?? 'GO', 
-            $checklistData['stickers_readable'] ?? 'GO'
-        ]);
+        $stmt = $pdo->prepare("SELECT id FROM station12_checklists WHERE unit_id = ?");
+        $stmt->execute([$unitId]);
+        $exists = $stmt->fetch();
+
+        if ($exists) {
+            $sql = "UPDATE station12_checklists SET assembly_no = ?, stickers_attached = ?, stickers_readable = ? WHERE unit_id = ?";
+            $pdo->prepare($sql)->execute([
+                $assemblyNo, 
+                $checklistData['stickers_attached'] ?? 'GO', 
+                $checklistData['stickers_readable'] ?? 'GO',
+                $unitId
+            ]);
+        } else {
+            $sql = "INSERT INTO station12_checklists (unit_id, assembly_no, stickers_attached, stickers_readable) VALUES (?, ?, ?, ?)";
+            $pdo->prepare($sql)->execute([
+                $unitId, 
+                $assemblyNo, 
+                $checklistData['stickers_attached'] ?? 'GO', 
+                $checklistData['stickers_readable'] ?? 'GO'
+            ]);
+        }
     } catch (PDOException $e) { error_log("S12 Failed: " . $e->getMessage()); throw $e; }
 }
 
@@ -258,7 +362,8 @@ function handleStation6Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
         // Simplified params - only include fields that exist in database
         $params = [
             $assemblyNo, 
-            $checklistData['lora_module'] ?? 'Detected', 
+            $checklistData['lora_module'] ?? 'Detected',
+            $checklistData['lora_mesh_test'] ?? 'Detected',
             $checklistData['energy_meter'] ?? 'Detected', 
             $checklistData['power_good_test'] ?? 'Detected', 
             (float)($checklistData['voltage'] ?? 0), 
@@ -269,25 +374,26 @@ function handleStation6Checklist($pdo, $unitId, $assemblyNo, $checklistData) {
             $checklistData['freq_reading'] ?? 'GO', 
             $checklistData['led_status_4g'] ?? 'GO', 
             $checklistData['led_status_fast_blink'] ?? 'GO', 
-            $checklistData['go_no_go'] ?? 'GO', 
+            $checklistData['go_no_go'] ?? 'GO',
+            (int)($checklistData['sw1_off_to_led_off_duration'] ?? 0),
             $unitId
         ];
 
         if ($exists) {
             // UPDATE SQL - only existing columns
             $sql = "UPDATE station6_checklists SET 
-                    assembly_no = ?, lora_module = ?, energy_meter = ?, 
+                    assembly_no = ?, lora_module = ?, lora_mesh_test = ?, energy_meter = ?, 
                     power_good_test = ?, voltage = ?, line1 = ?, line2 = ?, line3 = ?, 
                     temp_reading = ?, freq_reading = ?, led_status_4g = ?, 
-                    led_status_fast_blink = ?, go_no_go = ? 
+                    led_status_fast_blink = ?, go_no_go = ?, sw1_off_to_led_off_duration = ?
                     WHERE unit_id = ?";
         } else {
             // INSERT SQL - only existing columns
             $sql = "INSERT INTO station6_checklists 
-                    (assembly_no, lora_module, energy_meter, power_good_test, 
+                    (assembly_no, lora_module, lora_mesh_test, energy_meter, power_good_test, 
                      voltage, line1, line2, line3, temp_reading, freq_reading, 
-                     led_status_4g, led_status_fast_blink, go_no_go, unit_id) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                     led_status_4g, led_status_fast_blink, go_no_go, sw1_off_to_led_off_duration, unit_id) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         }
         $pdo->prepare($sql)->execute($params);
     } catch (PDOException $e) { 
@@ -438,8 +544,8 @@ $baseSql = "SELECT
     s11.medium_range AS s11_medium_range,
     s11.high_range AS s11_high_range,
     -- Station 12 Columns
-    s12.stickers_attached AS s12_requirements, 
-    s12.stickers_readable AS s12_remarks,
+    s12.stickers_attached AS s12_stickers_attached, 
+    s12.stickers_readable AS s12_stickers_readable,
     -- Station 13 Columns
     s13.requirements AS s13_requirements,
     s13.remarks AS s13_remarks,
@@ -620,7 +726,11 @@ if (($stat === 'No Good (NG)' || $stat === 'Pending Approval') && empty($remarks
     }
 
     // Routing for checklists
-        if (isset($data['checklist_data']) && !empty($data['checklist_data']) && $unitId) {
+    if (isset($data['checklist_data']) && !empty($data['checklist_data']) && $unitId) {
+        // DEBUG: Log checklist data
+        error_log("CHECKLIST DEBUG - Station: $cleanStn");
+        error_log("CHECKLIST DEBUG - Data: " . json_encode($data['checklist_data']));
+        
         if ($cleanStn === 'Station1') handleStation1Checklist($pdo, $unitId, $assy, $data['checklist_data']);
         elseif ($cleanStn === 'Station2') handleStation2Checklist($pdo, $unitId, $assy, $data['checklist_data']);
         elseif ($cleanStn === 'Station3') handleStation3Checklist($pdo, $unitId, $assy, $data['checklist_data']);
@@ -702,10 +812,9 @@ if (($stat === 'No Good (NG)' || $stat === 'Pending Approval') && empty($remarks
                 getNullIfEmpty($data['bkbd_no'] ?? '')
             ]);
         }
-    } else if ($stat === 'No Good (NG)') {
-        // Linisin ang boards kung nag-fail sa Station 1
-        $pdo->prepare("DELETE FROM unit_pcba_details WHERE unit_id = ?")->execute([$unitId]);
     }
+    // REMOVED: Auto-delete of PCBA boards on NG status
+    // Board numbers should only be deleted if explicitly cleared by user
 }
 // ... (rest of the code remains the same)
     if ($unitId) {

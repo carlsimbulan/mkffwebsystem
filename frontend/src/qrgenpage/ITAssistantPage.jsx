@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import axios from 'axios';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import logo from '../logo.png';
@@ -22,7 +22,9 @@ import UnscannedUnitsTable from './components/UnscannedUnitsTable';
 import LiveMonitoringTable from './components/LiveMonitoringTable';
 import GeneratedQRList from './components/GeneratedQRList';
 import { UserProfileModal } from './modals/UserProfileModal';
-import ApprovalConfirmationModal from './modals/ApprovalConfirmationModal'; 
+import ApprovalConfirmationModal from './modals/ApprovalConfirmationModal';
+import { SubmitReportModal } from './modals/SubmitReportModal';
+import { ReportDetailModal } from './modals/ReportDetailModal';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useTargetTimes } from '../utils/targetTimeService';
 
@@ -45,6 +47,8 @@ const DEFAULT_AVATAR_PATH = `${API_BASE_URL}/uploads/avatars/default_avatar.png`
 
 const UNITS_ENDPOINT = `${API_BASE_URL}/units.php`;
 const USER_ENDPOINT = `${API_BASE_URL}/user_management.php`;
+const REPORTS_ENDPOINT = `${API_BASE_URL}/daily_reports.php`;
+const ANNOUNCEMENTS_ENDPOINT = `${API_BASE_URL}/announcements.php`;
 const MAX_QR_COUNT = 100;
 
 const PROCESS_STATIONS = [
@@ -100,6 +104,22 @@ export default function ITAssistantPage({ user, onLogout }) {
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [inventorySearch, setInventorySearch] = useState('');
     const [inventoryCurrentPage, setInventoryCurrentPage] = useState(1);
+    
+    // Reports and Announcements states
+    const [reports, setReports] = useState([]);
+    const [announcements, setAnnouncements] = useState([]);
+    const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
+    const [reportFilterStationId, setReportFilterStationId] = useState('All');
+    const [lastReadAnnouncementId, setLastReadAnnouncementId] = useState(0);
+    const [announcementSelectedDate, setAnnouncementSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [selectedReport, setSelectedReport] = useState(null);
+    
+    // Search and QR states
+    const [searchTerm, setSearchTerm] = useState('');
+    const [qrValue, setQrValue] = useState('');
+    const [selectedUnit, setSelectedUnit] = useState(null);
+    const stepperRef = useRef(null);
 
     // --- 📡 DATA SYNC ---
     useEffect(() => {
@@ -143,6 +163,24 @@ export default function ITAssistantPage({ user, onLogout }) {
         } 
     }, []);
 
+    const fetchReports = async () => {
+        try {
+            const res = await axios.get(REPORTS_ENDPOINT);
+            setReports(Array.isArray(res.data) ? res.data : []);
+        } catch (err) {
+            console.error("Failed to fetch reports:", err);
+        }
+    };
+
+    const fetchAnnouncements = async () => {
+        try {
+            const res = await axios.get(ANNOUNCEMENTS_ENDPOINT);
+            setAnnouncements(Array.isArray(res.data) ? res.data : []);
+        } catch (err) {
+            console.error("Failed to fetch announcements:", err);
+        }
+    };
+
     useEffect(() => {
         const mockStations = PROCESS_STATIONS.map((name, i) => ({
             id: `Station${i + 1}`, 
@@ -150,7 +188,16 @@ export default function ITAssistantPage({ user, onLogout }) {
         }));
         setStations(mockStations);
         fetchUnitData(true);
-        const interval = setInterval(() => fetchUnitData(false), 5000);
+        fetchReports();
+        fetchAnnouncements();
+        
+        // Real-time polling every 1 second for all data
+        const interval = setInterval(() => {
+            fetchUnitData(false);
+            fetchReports();
+            fetchAnnouncements();
+        }, 1000);
+        
         return () => clearInterval(interval);
     }, [fetchUnitData]);
 
@@ -238,6 +285,34 @@ export default function ITAssistantPage({ user, onLogout }) {
             pctNoGood: calcPct(counts.noGood),
             pctPending: calcPct(counts.pendingApproval)
         };
+    };
+
+    // QR Input Handler
+    const handleQrInput = (val) => {
+        setQrValue(val);
+        const parts = val.split(/[|]+/);
+        const assemblyFromQR = parts.find(p => p.trim().toUpperCase().startsWith('ASSY-'))?.trim();
+        if (assemblyFromQR) {
+            const matchedUnit = unitLogs.find(l => l.assembly_no?.toLowerCase() === assemblyFromQR.toLowerCase());
+            if (matchedUnit) {
+                setSelectedUnit(matchedUnit);
+                setQrValue('');
+            }
+        }
+    };
+
+    // Search Results
+    const searchResults = useMemo(() => {
+        if (!searchTerm.trim()) return [];
+        return unitLogs.filter(l => l.assembly_no?.toLowerCase().includes(searchTerm.toLowerCase())).slice(0, 8);
+    }, [unitLogs, searchTerm]);
+
+    // Stepper scroll
+    const scrollStepper = (direction) => {
+        if (stepperRef.current) {
+            const scrollAmount = 300;
+            stepperRef.current.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
+        }
     };
 
     const calculateStationMetrics = (stationLogs) => {
@@ -370,6 +445,47 @@ export default function ITAssistantPage({ user, onLogout }) {
         setInventoryCurrentPage(1);
     }, [inventorySearch]);
 
+    // Auto-mark announcements as read when viewing announcements tab
+    useEffect(() => {
+        if (activeTab === 'announcements' && announcements.length > 0) {
+            const latestId = Math.max(...announcements.map(a => parseInt(a.id) || 0));
+            const currentLastRead = parseInt(lastReadAnnouncementId) || 0;
+            if (latestId > currentLastRead) {
+                setLastReadAnnouncementId(latestId);
+            }
+        }
+    }, [activeTab, announcements, lastReadAnnouncementId]);
+
+    // Filtered reports
+    const filteredReports = useMemo(() => {
+        return reports.filter(report => {
+            const reportDate_obj = new Date(report.created_at);
+            const reportDateStr = reportDate_obj.toISOString().split('T')[0];
+            const matchesDate = reportDateStr === reportDate;
+            const matchesStation = reportFilterStationId === 'All' || report.station === reportFilterStationId;
+            return matchesDate && matchesStation;
+        });
+    }, [reports, reportDate, reportFilterStationId]);
+
+    // Calculate counts for badges
+    const pendingApprovalsCount = useMemo(() => {
+        return unitLogs.filter(u => u.status === 'Pending Approval').length;
+    }, [unitLogs]);
+
+    const todayReportsCount = useMemo(() => {
+        const today = new Date().toISOString().split('T')[0];
+        return reports.filter(report => {
+            const reportDate_obj = new Date(report.created_at);
+            const reportDateStr = reportDate_obj.toISOString().split('T')[0];
+            return reportDateStr === today;
+        }).length;
+    }, [reports]);
+
+    const unreadAnnouncementsCount = useMemo(() => {
+        const numericLastReadId = parseInt(lastReadAnnouncementId) || 0;
+        return announcements.filter(a => parseInt(a.id) > numericLastReadId).length;
+    }, [announcements, lastReadAnnouncementId]);
+
     const handleGenerateQR = async (e) => {
         e.preventDefault();
         const quantity = parseInt(qrFormData.quantity, 10);
@@ -476,29 +592,102 @@ export default function ITAssistantPage({ user, onLogout }) {
 
     const renderContent = () => {
         switch (activeTab) {
-            case "overview":
+            case "overview": {
                 const m = calculateMetrics(unitLogs);
                 return (
                     <div>
+                        {/* Search Bar */}
+                        <div className="d-flex justify-content-between align-items-center mb-4">
+                            <div>
+                                <h3 className="fw-bold text-dark mb-0">Production Intel</h3>
+                                <p className="text-muted small mb-0">Live Manufacturing Lifecycle Monitoring</p>
+                            </div>
+                            <div className="d-flex gap-3 align-items-center">
+                                <div className="position-relative" style={{width: '180px'}}>
+                                    <i className="bi bi-qr-code-scan position-absolute start-0 ms-3 top-50 translate-middle-y text-primary"></i>
+                                    <input 
+                                        type="text" 
+                                        className="form-control rounded-pill" 
+                                        placeholder="Scan QR..." 
+                                        value={qrValue} 
+                                        onChange={(e) => handleQrInput(e.target.value)}
+                                        style={{ paddingLeft: '2.5rem', fontSize: '0.85rem' }}
+                                    />
+                                </div>
+                                <div className="position-relative" style={{width: '280px'}}>
+                                    <i className="bi bi-search position-absolute start-0 ms-3 top-50 translate-middle-y text-muted"></i>
+                                    <input 
+                                        type="text" 
+                                        className="form-control rounded-pill" 
+                                        placeholder="Manual Search..." 
+                                        value={searchTerm} 
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        style={{ paddingLeft: '2.5rem', fontSize: '0.85rem' }}
+                                    />
+                                    {searchResults.length > 0 && (
+                                        <div className="position-absolute w-100 mt-2 bg-white border rounded-4 shadow-lg overflow-hidden" style={{ zIndex: 1100 }}>
+                                            {searchResults.map(unit => (
+                                                <div 
+                                                    key={unit.id} 
+                                                    className="p-3 border-bottom" 
+                                                    style={{cursor:'pointer'}} 
+                                                    onClick={() => { setSelectedUnit(unit); setSearchTerm(''); }}
+                                                >
+                                                    <div className="fw-bold text-dark d-flex justify-content-between">
+                                                        <span>{unit.assembly_no}</span>
+                                                        <i className="bi bi-chevron-right small text-muted"></i>
+                                                    </div>
+                                                    <div className="text-muted" style={{fontSize: '0.75rem'}}>
+                                                        {unit.model} • <span className={`fw-bold ${unit.status?.toLowerCase().includes('no good') ? 'text-danger' : 'text-primary'}`}>{unit.status}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="row g-3 mb-3">
                             <div className="col-md-4">
-                                <div className="card border-0 border-start border-4 border-dark shadow-sm p-3 bg-white">
-                                    <span className="text-muted fw-bold uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>Total Scanned Units</span>
-                                    <h2 className="fw-bold my-2">{m.totalTracked}</h2>
+                                <div className="card border-0 shadow-sm p-3 bg-white">
+                                    <div className="d-flex align-items-center mb-2">
+                                        <div className="icon-bg-box me-3" style={{ backgroundColor: '#f8fafc', color: '#334155', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <i className="bi bi-cpu" style={{ fontSize: '1.5rem' }}></i>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted fw-bold uppercase d-block" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>Total Scanned Units</span>
+                                            <h2 className="fw-bold mb-0">{m.totalTracked}</h2>
+                                        </div>
+                                    </div>
                                     <div className="badge bg-dark text-white p-2 d-inline-block" style={{ fontSize: '0.7rem', width: 'fit-content' }}>100.0% Share</div>
                                 </div>
                             </div>
                             <div className="col-md-4">
-                                <div className="card border-0 border-start border-4 border-info shadow-sm p-3 bg-white">
-                                    <span className="text-info fw-bold uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>For Scanning Queue</span>
-                                    <h2 className="fw-bold my-2">{m.forScanning}</h2>
+                                <div className="card border-0 shadow-sm p-3 bg-white">
+                                    <div className="d-flex align-items-center mb-2">
+                                        <div className="icon-bg-box me-3" style={{ backgroundColor: '#f0f9ff', color: '#0ea5e9', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <i className="bi bi-qr-code-scan" style={{ fontSize: '1.5rem' }}></i>
+                                        </div>
+                                        <div>
+                                            <span className="text-info fw-bold uppercase d-block" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>For Scanning Queue</span>
+                                            <h2 className="fw-bold mb-0">{m.forScanning}</h2>
+                                        </div>
+                                    </div>
                                     <div className="badge bg-info bg-opacity-10 text-info p-2" style={{ fontSize: '0.7rem', width: 'fit-content' }}>{m.pctForScanning}% Pending</div>
                                 </div>
                             </div>
                             <div className="col-md-4">
-                                <div className="card border-0 border-start border-4 border-warning shadow-sm p-3 bg-white">
-                                    <span className="text-warning fw-bold uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>In Progress (WIP)</span>
-                                    <h2 className="fw-bold my-2">{m.inProgress}</h2>
+                                <div className="card border-0 shadow-sm p-3 bg-white">
+                                    <div className="d-flex align-items-center mb-2">
+                                        <div className="icon-bg-box me-3" style={{ backgroundColor: '#fffbeb', color: '#d97706', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <i className="bi bi-clock-history" style={{ fontSize: '1.5rem' }}></i>
+                                        </div>
+                                        <div>
+                                            <span className="text-warning fw-bold uppercase d-block" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>In Progress (WIP)</span>
+                                            <h2 className="fw-bold mb-0">{m.inProgress}</h2>
+                                        </div>
+                                    </div>
                                     <div className="badge bg-warning bg-opacity-10 text-warning p-2" style={{ fontSize: '0.7rem', width: 'fit-content' }}>{m.pctInProgress}% Capacity</div>
                                 </div>
                             </div>
@@ -506,29 +695,48 @@ export default function ITAssistantPage({ user, onLogout }) {
 
                         <div className="row g-3 mb-4">
                             <div className="col-md-4">
-                                <div className="card border-0 border-start border-4 border-success shadow-sm p-3 bg-white">
-                                    <span className="text-success fw-bold uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>Completed (Yield)</span>
-                                    <h2 className="fw-bold my-2">{m.completed}</h2>
+                                <div className="card border-0 shadow-sm p-3 bg-white">
+                                    <div className="d-flex align-items-center mb-2">
+                                        <div className="icon-bg-box me-3" style={{ backgroundColor: '#f0fdf4', color: '#16a34a', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <i className="bi bi-check-circle" style={{ fontSize: '1.5rem' }}></i>
+                                        </div>
+                                        <div>
+                                            <span className="text-success fw-bold uppercase d-block" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>Completed (Yield)</span>
+                                            <h2 className="fw-bold mb-0">{m.completed}</h2>
+                                        </div>
+                                    </div>
                                     <div className="badge bg-success bg-opacity-10 text-success p-2" style={{ fontSize: '0.7rem', width: 'fit-content' }}>{m.pctCompleted}% Rate</div>
                                 </div>
                             </div>
                             <div className="col-md-4">
-                                <div className="card border-0 border-start border-4 border-danger shadow-sm p-3 bg-white">
-                                    <span className="text-danger fw-bold uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>Total Defects (NG)</span>
-                                    <h2 className="fw-bold my-2">{m.noGood}</h2>
+                                <div className="card border-0 shadow-sm p-3 bg-white">
+                                    <div className="d-flex align-items-center mb-2">
+                                        <div className="icon-bg-box me-3" style={{ backgroundColor: '#fef2f2', color: '#dc2626', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <i className="bi bi-exclamation-octagon" style={{ fontSize: '1.5rem' }}></i>
+                                        </div>
+                                        <div>
+                                            <span className="text-danger fw-bold uppercase d-block" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>Total Defects (NG)</span>
+                                            <h2 className="fw-bold mb-0">{m.noGood}</h2>
+                                        </div>
+                                    </div>
                                     <div className="badge bg-danger bg-opacity-10 text-danger p-2" style={{ fontSize: '0.7rem', width: 'fit-content' }}>{m.pctNoGood}% Failure</div>
                                 </div>
                             </div>
                             <div className="col-md-4">
-                                <div className="card border-0 border-start border-4 border-primary shadow-sm p-3 bg-white h-100">
+                                <div className="card border-0 shadow-sm p-3 bg-white h-100">
                                     <div className="d-flex justify-content-between align-items-start">
-                                        <div>
-                                            <span className="text-primary fw-bold uppercase" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>Pending QA Approval</span>
-                                            <h2 className="fw-bold my-2">{m.pendingApproval}</h2>
-                                            <div className="badge bg-primary bg-opacity-10 text-primary p-2" style={{ fontSize: '0.7rem', width: 'fit-content' }}>{m.pctPending}% Units</div>
+                                        <div className="d-flex align-items-center mb-2">
+                                            <div className="icon-bg-box me-3" style={{ backgroundColor: '#f5f3ff', color: '#8b5cf6', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <i className="bi bi-shield-check" style={{ fontSize: '1.5rem' }}></i>
+                                            </div>
+                                            <div>
+                                                <span className="text-primary fw-bold uppercase d-block" style={{ fontSize: '0.7rem', letterSpacing: '0.5px' }}>Pending QA Approval</span>
+                                                <h2 className="fw-bold mb-0">{m.pendingApproval}</h2>
+                                            </div>
                                         </div>
                                         <button className="btn btn-primary btn-sm rounded-pill px-3 fw-bold shadow-sm" style={{ fontSize: '0.7rem' }} onClick={() => setActiveTab('approvals')}>GO <i className="bi bi-chevron-right ms-1"></i></button>
                                     </div>
+                                    <div className="badge bg-primary bg-opacity-10 text-primary p-2" style={{ fontSize: '0.7rem', width: 'fit-content' }}>{m.pctPending}% Units</div>
                                 </div>
                             </div>
                         </div>
@@ -698,21 +906,90 @@ export default function ITAssistantPage({ user, onLogout }) {
                             </div>
                         </div>
 
-                        <div className="card border-0 shadow-sm mt-4">
-                            <div className="card-header bg-white py-3 border-bottom">
-                                <h6 className="fw-bold mb-0 uppercase text-dark" style={{ fontSize: '0.8rem' }}>Unscanned Units</h6>
+                        {/* Unit Tracker Modal */}
+                        {selectedUnit && (
+                            <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ zIndex: 1300, backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                                <div className="bg-white rounded-4 shadow-2xl overflow-hidden border-0" style={{ width: '90%', maxWidth: '950px' }}>
+                                    <div className="p-3 d-flex justify-content-between align-items-center bg-primary text-white">
+                                        <div>
+                                            <h6 className="mb-0 fw-bold">Unit Process Tracker</h6>
+                                            <p className="mb-0" style={{fontSize: '0.7rem', opacity: 0.8}}>{selectedUnit.assembly_no} • {selectedUnit.model}</p>
+                                        </div>
+                                        <button className="btn-close btn-close-white" onClick={() => setSelectedUnit(null)}></button>
+                                    </div>
+                                    <div className="p-4" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+                                        <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded-4 mb-4 border-0 shadow-sm">
+                                            <div>
+                                                <div className="text-uppercase fw-bold mb-1" style={{fontSize: '0.6rem', color: '#64748b'}}>Current Status</div>
+                                                <span className={`badge rounded-pill px-3 py-2 ${selectedUnit.status?.toLowerCase().includes('no good') ? 'bg-danger' : selectedUnit.status?.toLowerCase().includes('completed') ? 'bg-success' : 'bg-primary'}`}>
+                                                    {selectedUnit.status}
+                                                </span>
+                                            </div>
+                                            <div className="text-end">
+                                                <div className="text-uppercase fw-bold mb-1" style={{fontSize: '0.6rem', color: '#64748b'}}>Last Station</div>
+                                                <div className="fw-bold text-primary small">{selectedUnit.station || 'Pending'}</div>
+                                            </div>
+                                        </div>
+                                        <div className="position-relative">
+                                            <button 
+                                                className="btn btn-sm btn-light position-absolute start-0 top-50 translate-middle-y" 
+                                                style={{zIndex: 10}}
+                                                onClick={() => scrollStepper('left')}
+                                            >
+                                                <i className="bi bi-chevron-left"></i>
+                                            </button>
+                                            <div 
+                                                ref={stepperRef}
+                                                className="d-flex gap-3 overflow-auto pb-3" 
+                                                style={{ scrollBehavior: 'smooth', scrollbarWidth: 'thin' }}
+                                            >
+                                                {PROCESS_STATIONS.map((station, idx) => {
+                                                    const currentStationIdx = parseInt(selectedUnit.station?.replace('Station', '')) - 1;
+                                                    const unitStatus = selectedUnit.status?.toLowerCase() || '';
+                                                    const isNG = unitStatus.includes('no good') || unitStatus.includes('ng');
+                                                    const isDone = idx < currentStationIdx || (idx === currentStationIdx && (unitStatus.includes('completed') || unitStatus.includes('finished')));
+                                                    const isCurrent = idx === currentStationIdx;
+                                                    
+                                                    return (
+                                                        <div 
+                                                            key={idx} 
+                                                            className={`card border-0 shadow-sm p-3 ${isDone ? 'bg-success bg-opacity-10' : isCurrent ? (isNG ? 'bg-danger bg-opacity-10' : 'bg-primary bg-opacity-10') : ''}`}
+                                                            style={{ minWidth: '200px' }}
+                                                        >
+                                                            <div className={`fw-bold mb-2 ${isDone ? 'text-success' : isCurrent ? (isNG ? 'text-danger' : 'text-primary') : 'text-muted'}`}>
+                                                                {isDone ? <i className="bi bi-check-circle-fill me-2"></i> : `${idx + 1}.`} {station}
+                                                            </div>
+                                                            <small className="text-muted" style={{fontSize: '0.7rem'}}>
+                                                                {isDone ? 'Completed' : isCurrent ? 'Current Station' : 'Pending'}
+                                                            </small>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                            <button 
+                                                className="btn btn-sm btn-light position-absolute end-0 top-50 translate-middle-y" 
+                                                style={{zIndex: 10}}
+                                                onClick={() => scrollStepper('right')}
+                                            >
+                                                <i className="bi bi-chevron-right"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="p-3 bg-light border-top d-flex gap-2">
+                                        <button className="btn btn-outline-dark w-100 rounded-pill fw-bold py-2" style={{fontSize: '0.8rem'}} onClick={() => setSelectedUnit(null)}>DISMISS</button>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="card-body p-0">
-                                <UnscannedUnitsTable unscannedUnits={unitLogs.filter(u => u.status === 'For Scanning')} />
-                            </div>
-                        </div>
+                        )}
                     </div>
                 );
+            }
             case "qr_generator":
                 return (
                     <div className="card border-0 shadow-sm">
-                        <div className="card-header bg-primary text-white py-3 border-0">
-                            <h6 className="mb-0 fw-bold">QR Code Batch Generator</h6>
+                        <div className="card-header bg-white py-3 border-bottom">
+                            <h6 className="mb-0 fw-bold text-dark">QR Code Batch Generator</h6>
+                            <small className="text-muted">Generate QR codes for new units</small>
                         </div>
                         <div className="card-body p-4">
                             <form onSubmit={handleGenerateQR}>
@@ -775,13 +1052,28 @@ export default function ITAssistantPage({ user, onLogout }) {
                         </div>
                     </div>
                 );
-            case "station_monitor":
+            case "station_monitor": {
                 return (
                     <div className="container-fluid px-0">
                         <div className="row g-3">
                             {stations.map(s => {
                                 const stationUnits = unitLogs.filter(u => u.station?.toString().replace(/\s+/g, '') === s.id);
                                 const m = calculateStationMetrics(stationUnits);
+                                
+                                // Calculate target time metrics
+                                const thresholdMinutes = dynamicDelayThresholds[s.id] || 10;
+                                const inProgressLogs = stationUnits.filter(log => {
+                                    const statusText = (log.status || '').toLowerCase();
+                                    return log.status === 'In Progress' || statusText.includes('no good') || statusText.includes('ng');
+                                });
+                                
+                                const avgActualTime = inProgressLogs.length > 0 ? 
+                                    inProgressLogs.reduce((sum, log) => {
+                                        const lastUpdate = new Date(log.updated_at || log.created_at).getTime();
+                                        const minutesInStation = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
+                                        return sum + minutesInStation;
+                                    }, 0) / inProgressLogs.length : 0;
+                                
                                 return (
                                     <div key={s.id} className="col-md-3">
                                         <div className="card border h-100">
@@ -793,6 +1085,21 @@ export default function ITAssistantPage({ user, onLogout }) {
                                                     <div className="d-flex justify-content-between small mb-1"><span>IN PROGRESS</span><b>{m.inProgress}</b></div>
                                                     <div className="d-flex justify-content-between small text-danger"><span>NO GOOD (NG)</span><b>{m.noGood}</b></div>
                                                 </div>
+                                                
+                                                {/* Target Time */}
+                                                <div className="bg-light p-2 mb-3 border">
+                                                    <div className="d-flex justify-content-between small mb-1">
+                                                        <span>TARGET TIME</span>
+                                                        <b>{thresholdMinutes}m</b>
+                                                    </div>
+                                                    <div className="d-flex justify-content-between small">
+                                                        <span>AVG ACTUAL</span>
+                                                        <b className={avgActualTime > thresholdMinutes ? 'text-danger' : 'text-success'}>
+                                                            {avgActualTime.toFixed(1)}m
+                                                        </b>
+                                                    </div>
+                                                </div>
+                                                
                                                 <div className="d-flex gap-1">
                                                     <button className="btn btn-dark btn-sm flex-grow-1 fw-bold" onClick={() => { setActiveMonitorStationId(s.id); setActiveTab('station_details'); }}>MONITOR</button>
                                                     <button className="btn btn-light border btn-sm px-2" onClick={() => setActiveHistoryStation(s.id)}><i className="bi bi-clock-history"></i></button>
@@ -805,41 +1112,42 @@ export default function ITAssistantPage({ user, onLogout }) {
                         </div>
                     </div>
                 );
-            case "station_details":
-                return <LiveMonitoringTable stationId={activeMonitorStationId} units={unitLogs} onBack={() => setActiveTab('station_monitor')} calculateStationMetrics={calculateStationMetrics} />;
+            }
+            case "station_details": {
+                console.log('Station Details - stationId:', activeMonitorStationId);
+                console.log('Station Details - units count:', unitLogs.length);
+                console.log('Station Details - sample unit stations:', unitLogs.slice(0, 3).map(u => u.station));
+                return <LiveMonitoringTable stationId={activeMonitorStationId} units={unitLogs} onBack={() => { setActiveMonitorStationId(null); setActiveTab('station_monitor'); }} calculateStationMetrics={calculateStationMetrics} />;
+            }
             case "approvals":
                 return (
                     <>
                         <div className="card border-0 shadow-sm">
-                            <div className="card-header bg-dark text-white py-3 border-0">
+                            <div className="card-header bg-white py-3 border-bottom">
                                 <div className="d-flex justify-content-between align-items-center">
                                     <div>
-                                        <h6 className="mb-0 fw-bold text-uppercase" style={{ fontSize: '0.85rem', letterSpacing: '0.5px' }}>
-                                            Approvals Queue
-                                        </h6>
-                                        <small className="text-light opacity-75" style={{ fontSize: '0.7rem' }}>
-                                            Units pending quality assurance approval
-                                        </small>
+                                        <h6 className="mb-0 fw-bold text-dark">Approvals Queue</h6>
+                                        <small className="text-muted">Units pending quality assurance approval</small>
                                     </div>
-                                    <span className="badge bg-light text-dark px-3 py-2" style={{ fontSize: '0.7rem', fontWeight: '600' }}>
+                                    <span className="badge bg-primary rounded-pill px-3 py-2" style={{ fontSize: '0.7rem', fontWeight: '600' }}>
                                         {unitLogs.filter(u => u.status === 'Pending Approval').length} Units
                                     </span>
                                 </div>
                             </div>
                             <div className="card-body p-0">
                                 <div className="table-responsive">
-                                    <table className="table table-hover mb-0" style={{ fontSize: '0.8rem' }}>
-                                        <thead className="bg-light">
+                                    <table className="table table-hover mb-0 align-middle" style={{ fontSize: '0.85rem' }}>
+                                        <thead className="table-light">
                                             <tr>
-                                                <th className="border-0 py-3 px-4 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>MODEL</th>
-                                                <th className="border-0 py-3 px-4 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>REVISION</th>
-                                                <th className="border-0 py-3 px-4 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>BASE UNIT</th>
-                                                <th className="border-0 py-3 px-4 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>ASSEMBLY</th>
-                                                <th className="border-0 py-3 px-4 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>DEVICE SERIAL</th>
-                                                <th className="border-0 py-3 px-4 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>STATUS</th>
-                                                <th className="border-0 py-3 px-4 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>REMARKS</th>
-                                                <th className="border-0 py-3 px-4 text-muted fw-bold" style={{ fontSize: '0.75rem' }}>TIMESTAMP</th>
-                                                <th className="border-0 py-3 px-4 text-muted fw-bold text-center" style={{ fontSize: '0.75rem' }}>ACTIONS</th>
+                                                <th className="py-3 px-4 fw-bold text-muted">MODEL</th>
+                                                <th className="py-3 px-4 fw-bold text-muted">REVISION</th>
+                                                <th className="py-3 px-4 fw-bold text-muted">BASE UNIT</th>
+                                                <th className="py-3 px-4 fw-bold text-muted">ASSEMBLY</th>
+                                                <th className="py-3 px-4 fw-bold text-muted">DEVICE SERIAL</th>
+                                                <th className="py-3 px-4 fw-bold text-muted">STATUS</th>
+                                                <th className="py-3 px-4 fw-bold text-muted">REMARKS</th>
+                                                <th className="py-3 px-4 fw-bold text-muted">TIMESTAMP</th>
+                                                <th className="py-3 px-4 fw-bold text-muted text-center">ACTIONS</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -897,7 +1205,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                         )}
                     </>
                 );
-            case "inventory":
+            case "inventory": {
                 const getHistoryStatus = (status) => {
                     const statusLower = (status || '').toLowerCase();
                     if (statusLower.includes('dispatched')) {
@@ -936,10 +1244,10 @@ export default function ITAssistantPage({ user, onLogout }) {
                         <div className="card border-0 shadow-sm mb-4">
                             <div className="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 className="fw-bold mb-0 uppercase text-dark" style={{ fontSize: '0.85rem' }}>Unit Inventory</h6>
-                                    <small className="text-muted" style={{ fontSize: '0.7rem' }}>All generated units with generation history</small>
+                                    <h6 className="fw-bold mb-0 text-dark">Unit Inventory</h6>
+                                    <small className="text-muted">All generated units with generation history</small>
                                 </div>
-                                <span className="badge bg-primary rounded-pill px-3 py-2" style={{ fontSize: '0.7rem', fontWeight: '700' }}>
+                                <span className="badge bg-primary rounded-pill px-3 py-2" style={{ fontSize: '0.75rem', fontWeight: '600' }}>
                                     {filteredInventory.length} {filteredInventory.length === 1 ? 'Unit' : 'Units'}
                                 </span>
                             </div>
@@ -975,39 +1283,40 @@ export default function ITAssistantPage({ user, onLogout }) {
                         <div className="card border-0 shadow-sm">
                             <div className="card-body p-0">
                                 <div className="table-responsive">
-                                    <table className="table table-hover table-bordered mb-0 uppercase" style={{ fontSize: '0.75rem' }}>
-                                        <thead className="table-dark">
+                                    <table className="table table-hover mb-0 align-middle" style={{ fontSize: '0.85rem' }}>
+                                        <thead className="table-light">
                                             <tr>
-                                                <th style={{ width: '15%' }}>MODEL</th>
-                                                <th style={{ width: '18%' }}>ASSEMBLY NO</th>
-                                                <th style={{ width: '12%' }}>REVISION</th>
-                                                <th style={{ width: '15%' }}>BASE UNIT KIT</th>
-                                                <th style={{ width: '15%' }}>ACCESSORY KIT</th>
-                                                <th style={{ width: '18%' }}>GENERATION DATE & TIME</th>
-                                                <th style={{ width: '17%' }}>HISTORY</th>
+                                                <th className="py-3 px-4 fw-bold text-muted">MODEL</th>
+                                                <th className="py-3 px-4 fw-bold text-muted">ASSEMBLY NO</th>
+                                                <th className="py-3 px-4 fw-bold text-muted">REVISION</th>
+                                                <th className="py-3 px-4 fw-bold text-muted">BASE UNIT KIT</th>
+                                                <th className="py-3 px-4 fw-bold text-muted">ACCESSORY KIT</th>
+                                                <th className="py-3 px-4 fw-bold text-muted">GENERATION DATE & TIME</th>
+                                                <th className="py-3 px-4 fw-bold text-muted">STATUS</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {paginatedInventory.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan="7" className="text-center py-4 text-muted">
-                                                        {inventorySearch ? 'No units found matching your search.' : 'No units in inventory.'}
+                                                    <td colSpan="7" className="text-center py-5 text-muted">
+                                                        <i className="bi bi-inbox display-6 d-block mb-3 opacity-25"></i>
+                                                        <div>{inventorySearch ? 'No units found matching your search.' : 'No units in inventory.'}</div>
                                                     </td>
                                                 </tr>
                                             ) : (
                                                 paginatedInventory.map(u => (
-                                                    <tr key={u.id} className="align-middle">
-                                                        <td className="fw-bold">{u.model || 'N/A'}</td>
-                                                        <td className="fw-bold text-primary">{u.assembly_no || 'N/A'}</td>
-                                                        <td>{u.revision || 'N/A'}</td>
-                                                        <td>{u.base_unit_kitting_no || 'N/A'}</td>
-                                                        <td>{u.accessory_kitting_no || 'N/A'}</td>
-                                                        <td>
-                                                            <div className="small">
-                                                                <div className="fw-bold">{formatDateTime(u.created_at)}</div>
-                                                            </div>
+                                                    <tr key={u.id}>
+                                                        <td className="px-4 py-3">{u.model || 'N/A'}</td>
+                                                        <td className="px-4 py-3">
+                                                            <code className="bg-light px-2 py-1 rounded text-primary fw-bold">{u.assembly_no || 'N/A'}</code>
                                                         </td>
-                                                        <td>{getHistoryStatus(u.status)}</td>
+                                                        <td className="px-4 py-3">{u.revision || 'N/A'}</td>
+                                                        <td className="px-4 py-3">{u.base_unit_kitting_no || 'N/A'}</td>
+                                                        <td className="px-4 py-3">{u.accessory_kitting_no || 'N/A'}</td>
+                                                        <td className="px-4 py-3">
+                                                            <div className="small text-muted">{formatDateTime(u.created_at)}</div>
+                                                        </td>
+                                                        <td className="px-4 py-3">{getHistoryStatus(u.status)}</td>
                                                     </tr>
                                                 ))
                                             )}
@@ -1057,6 +1366,264 @@ export default function ITAssistantPage({ user, onLogout }) {
                         </div>
                     </div>
                 );
+            }
+            case "reports": {
+                const calculateYieldRate = (report) => {
+                    const total = report.total_units_processed || 0;
+                    const ng = report.total_ng || 0;
+                    return total > 0 ? ((total - ng) / total * 100).toFixed(1) : '0.0';
+                };
+
+                const getTodayDate = () => {
+                    return new Intl.DateTimeFormat('en-CA', {
+                        timeZone: 'Asia/Manila',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit'
+                    }).format(new Date());
+                };
+
+                const enhancedFilterStations = [
+                    { id: 'All', name: 'ALL STATIONS' }, 
+                    { id: 'overall', name: 'OVERALL REPORTS' },
+                    ...stations.map(s => ({ ...s, name: s.name.toUpperCase() }))
+                ];
+
+                const handleViewReport = (report) => {
+                    setSelectedReport(report);
+                };
+
+                return (
+                    <div className="container-fluid px-0 py-2">
+                        <div className="d-flex justify-content-between align-items-center mb-4 px-3">
+                            <div>
+                                <h3 className="fw-bold text-dark mb-1">Reports Archive</h3>
+                                <p className="text-muted small mb-0 fw-bold">Manufacturing quality analytics and performance metrics</p>
+                            </div>
+                            <button className="btn btn-dark fw-bold px-4 rounded-pill" onClick={() => setShowReportModal(true)}>
+                                <i className="bi bi-plus-circle me-2"></i>
+                                CREATE ENTRY
+                            </button>
+                        </div>
+
+                        <div className="card border-0 shadow-sm mb-4">
+                            <div className="card-header bg-white py-3 border-bottom">
+                                <h6 className="mb-0 fw-bold text-dark">Filter Reports</h6>
+                            </div>
+                            <div className="card-body p-3">
+                                <div className="row g-3 align-items-end">
+                                    <div className="col-md-3">
+                                        <label className="form-label fw-bold text-muted" style={{fontSize: '0.75rem'}}>Target Date</label>
+                                        <input
+                                            type="date"
+                                            className="form-control"
+                                            value={reportDate}
+                                            onChange={(e) => setReportDate(e.target.value)}
+                                            max={getTodayDate()} 
+                                        />
+                                    </div>
+                                    <div className="col-md-4">
+                                        <label className="form-label fw-bold text-muted" style={{fontSize: '0.75rem'}}>Station Source</label>
+                                        <select
+                                            className="form-select"
+                                            value={reportFilterStationId}
+                                            onChange={(e) => setReportFilterStationId(e.target.value)}
+                                        >
+                                            {enhancedFilterStations.map(s => (
+                                                <option key={s.id} value={s.id}>{s.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="col text-end">
+                                        <span className="badge bg-primary rounded-pill px-3 py-2" style={{fontSize: '0.75rem'}}>
+                                            {filteredReports.length} RECORDS
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="card border-0 shadow-sm">
+                            <div className="card-body p-0">
+                                <div className="table-responsive">
+                                    <table className="table table-hover mb-0 align-middle" style={{ fontSize: '0.85rem' }}>
+                                        <thead className="table-light">
+                                            <tr>
+                                                <th className="py-3 px-4 fw-bold text-muted">SOURCE STATION</th>
+                                                <th className="py-3 px-4 fw-bold text-muted text-center">UNITS PROCESSED</th>
+                                                <th className="py-3 px-4 fw-bold text-muted text-center">TOTAL NG</th>
+                                                <th className="py-3 px-4 fw-bold text-muted text-center">YIELD RATE</th>
+                                                <th className="py-3 px-4 fw-bold text-muted">DATE & TIME</th>
+                                                <th className="py-3 px-4 fw-bold text-muted text-center">ACTIONS</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {filteredReports.length > 0 ? filteredReports.map(report => {
+                                                const yieldRate = calculateYieldRate(report);
+                                                const isYieldGood = parseFloat(yieldRate) >= 95;
+                                                
+                                                return (
+                                                    <tr key={report.id}>
+                                                        <td className="px-4 py-3 fw-bold text-uppercase">
+                                                            {report.station === 'overall' ? 'SYSTEM OVERALL' : 
+                                                             stations.find(s => s.id === report.station)?.name || report.station}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <span className="badge bg-light text-dark border px-3 py-2">
+                                                                {report.total_units_processed || 0}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            {(report.total_ng || 0) > 0 ? (
+                                                                <span className="badge bg-danger px-3 py-2">
+                                                                    {report.total_ng} NG
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-muted">0</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <span className={`fw-bold ${isYieldGood ? 'text-success' : 'text-danger'}`}>
+                                                                {yieldRate}%
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <div className="fw-bold text-dark" style={{fontSize: '0.85rem'}}>
+                                                                {new Date(report.created_at).toLocaleDateString('en-GB')}
+                                                            </div>
+                                                            <div className="text-muted" style={{ fontSize: '0.7rem' }}>
+                                                                {new Date(report.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <button 
+                                                                className="btn btn-primary btn-sm fw-bold px-3"
+                                                                onClick={() => handleViewReport(report)}
+                                                            >
+                                                                VIEW
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            }) : (
+                                                <tr>
+                                                    <td colSpan="6" className="text-center py-5 text-muted">
+                                                        <i className="bi bi-inbox display-6 d-block mb-3 opacity-25"></i>
+                                                        <div>No reports found for selected filters</div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+            case "announcements": {
+                const today = new Date().toISOString().split('T')[0];
+
+                const filteredAnnouncements = announcements.filter(announcement => {
+                    const announcementDate = new Date(announcement.created_at).toISOString().split('T')[0];
+                    return announcementDate === announcementSelectedDate;
+                });
+
+                const numericLastReadId = parseInt(lastReadAnnouncementId) || 0;
+
+                return (
+                    <div className="container-fluid px-0 py-2">
+                        <div className="d-flex justify-content-between align-items-end mb-4 px-2">
+                            <div>
+                                <h4 className="fw-bold text-dark mb-0">Bulletin Board</h4>
+                                <p className="text-muted small mb-0 fw-medium">Operational updates and system announcements</p>
+                            </div>
+
+                            <div className="d-flex align-items-center gap-3">
+                                <span className="fw-bold text-muted" style={{fontSize: '0.75rem'}}>FILTER DATE</span>
+                                <input
+                                    type="date"
+                                    className="form-control"
+                                    style={{width: '180px'}}
+                                    value={announcementSelectedDate}
+                                    onChange={(e) => setAnnouncementSelectedDate(e.target.value)}
+                                    max={today}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="card border-0 shadow-sm">
+                            <div className="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+                                <h6 className="mb-0 fw-bold text-dark">
+                                    Archive Feed: {announcementSelectedDate === today ? 'TODAY' : announcementSelectedDate}
+                                </h6>
+                                <span className="badge bg-dark rounded-pill px-3 py-2" style={{fontSize: '0.7rem'}}>
+                                    {filteredAnnouncements.length} MESSAGES
+                                </span>
+                            </div>
+
+                            <div className="card-body p-0">
+                                {filteredAnnouncements.length > 0 ? (
+                                    filteredAnnouncements.map((announcement) => {
+                                        const isUnread = parseInt(announcement.id) > numericLastReadId;
+                                        const postTime = new Date(announcement.created_at).toLocaleString('en-US', { 
+                                            hour: '2-digit', minute: '2-digit', hour12: true 
+                                        });
+                                        
+                                        const posterAvatar = announcement.poster_avatar 
+                                            ? `${AVATAR_UPLOAD_PATH}${announcement.poster_avatar}` 
+                                            : DEFAULT_AVATAR_PATH;
+
+                                        return (
+                                            <div key={announcement.id} className={`border-bottom p-4 ${isUnread ? 'bg-light bg-opacity-50' : ''}`}>
+                                                <div className="d-flex align-items-start">
+                                                    <div className="flex-shrink-0 me-3 position-relative">
+                                                        <img
+                                                            src={posterAvatar}
+                                                            className="rounded-circle"
+                                                            style={{width: '42px', height: '42px', objectFit: 'cover', border: '2px solid #fff', outline: '1px solid #e2e8f0'}}
+                                                            alt="User"
+                                                            onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
+                                                        />
+                                                        {isUnread && (
+                                                            <span className="position-absolute top-0 start-100 translate-middle p-1 bg-primary border border-white rounded-circle"></span>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex-grow-1">
+                                                        <div className="d-flex justify-content-between align-items-center mb-2">
+                                                            <div>
+                                                                <span className="fw-bold text-dark me-2" style={{fontSize: '0.9rem'}}>{announcement.poster_name}</span>
+                                                                <span className="badge bg-secondary bg-opacity-10 text-secondary border px-2" style={{fontSize: '0.65rem', fontWeight: '700'}}>
+                                                                    {announcement.poster_role.toUpperCase()}
+                                                                </span>
+                                                            </div>
+                                                            <div className="d-flex align-items-center text-muted">
+                                                                {!isUnread && <i className="bi bi-check2-all text-primary me-2"></i>}
+                                                                <span className="fw-bold" style={{fontSize: '0.7rem'}}>{postTime}</span>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="bg-light border rounded p-3" style={{fontSize: '0.95rem', color: '#334155', lineHeight: '1.6'}}>
+                                                            {announcement.content}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="text-center py-5 my-4">
+                                        <i className="bi bi-chat-left-dots text-muted display-1 opacity-25"></i>
+                                        <h6 className="fw-bold text-dark mt-3">No Records Found</h6>
+                                        <p className="text-muted small">There are no announcements for the selected date.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
             default: return null;
         }
     };
@@ -1127,14 +1694,65 @@ export default function ITAssistantPage({ user, onLogout }) {
                 <hr className="border-secondary opacity-25 mt-2" />
 
                 <div className="nav flex-column flex-grow-1 overflow-auto custom-scrollbar">
-                    <div className="sidebar-label">Main Navigation</div>
-                    <button className={`sidebar-link ${activeTab === 'overview' ? 'active-glass' : ''}`} onClick={() => setActiveTab('overview')}><i className="bi bi-grid-1x2"></i> OVERVIEW</button>
-                    <button className={`sidebar-link ${activeTab === 'qr_generator' ? 'active-glass' : ''}`} onClick={() => setActiveTab('qr_generator')}><i className="bi bi-qr-code-scan"></i> QR GENERATOR</button>
-                    <button className={`sidebar-link ${activeTab.includes('station') ? 'active-glass' : ''}`} onClick={() => setActiveTab('station_monitor')}><i className="bi bi-layers-half"></i> STATION MONITOR</button>
-                    <button className={`sidebar-link ${activeTab === 'inventory' ? 'active-glass' : ''}`} onClick={() => setActiveTab('inventory')}><i className="bi bi-box-seam"></i> INVENTORY</button>
-                    <button className={`sidebar-link ${activeTab === 'approvals' ? 'active-glass' : ''}`} onClick={() => setActiveTab('approvals')}><i className="bi bi-check-circle"></i> APPROVALS</button>
-                    <div className="sidebar-label">System</div>
-                    <button onClick={onLogout} className="sidebar-link" style={{ color: '#ef4444' }}><i className="bi bi-power"></i> LOGOUT SESSION</button>
+                    <button className={`sidebar-link ${activeTab === 'overview' ? 'active-glass' : ''}`} onClick={() => setActiveTab('overview')}>
+                        <i className="bi bi-grid-1x2"></i> 
+                        <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Overview</span>
+                    </button>
+                    <button className={`sidebar-link ${activeTab === 'qr_generator' ? 'active-glass' : ''}`} onClick={() => setActiveTab('qr_generator')}>
+                        <i className="bi bi-qr-code-scan"></i> 
+                        <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>QR Generator</span>
+                    </button>
+                    <button className={`sidebar-link ${activeTab.includes('station') ? 'active-glass' : ''}`} onClick={() => setActiveTab('station_monitor')}>
+                        <i className="bi bi-layers-half"></i> 
+                        <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Station Monitor</span>
+                    </button>
+                    <button className={`sidebar-link ${activeTab === 'inventory' ? 'active-glass' : ''}`} onClick={() => setActiveTab('inventory')}>
+                        <i className="bi bi-box-seam"></i> 
+                        <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Inventory</span>
+                    </button>
+                    
+                    <hr className="border-secondary my-2 opacity-25" />
+                    
+                    <button className={`sidebar-link ${activeTab === 'approvals' ? 'active-glass' : ''}`} onClick={() => setActiveTab('approvals')} style={{ justifyContent: 'space-between' }}>
+                        <div className="d-flex align-items-center gap-3">
+                            <i className="bi bi-check-circle"></i> 
+                            <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Approvals</span>
+                        </div>
+                        {pendingApprovalsCount > 0 && (
+                            <span className="text-white fw-bold" style={{ fontSize: '0.8rem' }}>
+                                {pendingApprovalsCount}
+                            </span>
+                        )}
+                    </button>
+                    <button className={`sidebar-link ${activeTab === 'reports' ? 'active-glass' : ''}`} onClick={() => setActiveTab('reports')} style={{ justifyContent: 'space-between' }}>
+                        <div className="d-flex align-items-center gap-3">
+                            <i className="bi bi-file-earmark-text"></i> 
+                            <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Reports</span>
+                        </div>
+                        {todayReportsCount > 0 && (
+                            <span className="text-white fw-bold" style={{ fontSize: '0.8rem' }}>
+                                {todayReportsCount}
+                            </span>
+                        )}
+                    </button>
+                    <button className={`sidebar-link ${activeTab === 'announcements' ? 'active-glass' : ''}`} onClick={() => setActiveTab('announcements')} style={{ justifyContent: 'space-between' }}>
+                        <div className="d-flex align-items-center gap-3">
+                            <i className="bi bi-megaphone"></i> 
+                            <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Announcements</span>
+                        </div>
+                        {unreadAnnouncementsCount > 0 && (
+                            <span className="text-white fw-bold" style={{ fontSize: '0.8rem' }}>
+                                {unreadAnnouncementsCount}
+                            </span>
+                        )}
+                    </button>
+                    
+                    <hr className="border-secondary my-2 opacity-25" />
+                    
+                    <button onClick={onLogout} className="sidebar-link" style={{ color: '#ef4444' }}>
+                        <i className="bi bi-power"></i> 
+                        <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Logout Session</span>
+                    </button>
                 </div>
             </div>
 
@@ -1153,6 +1771,27 @@ export default function ITAssistantPage({ user, onLogout }) {
 
                 {showProfileModal && (
                     <UserProfileModal user={user} currentAvatar={currentAvatar ? `${AVATAR_UPLOAD_PATH}${currentAvatar}` : DEFAULT_AVATAR_PATH} currentFullName={currentFullName} onClose={() => setShowProfileModal(false)} onSave={handleUpdateProfile} />
+                )}
+
+                {showReportModal && (
+                    <SubmitReportModal 
+                        user={user}
+                        stations={stations}
+                        onClose={() => setShowReportModal(false)}
+                        onSave={() => {
+                            fetchReports();
+                            setShowReportModal(false);
+                        }}
+                        REPORTS_ENDPOINT={REPORTS_ENDPOINT}
+                    />
+                )}
+
+                {selectedReport && (
+                    <ReportDetailModal 
+                        report={selectedReport}
+                        onClose={() => setSelectedReport(null)}
+                        API_BASE_URL={API_BASE_URL}
+                    />
                 )}
 
                 <LoadingOverlay status={processStatus} message={statusMessage} />

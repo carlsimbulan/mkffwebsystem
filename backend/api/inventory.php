@@ -310,6 +310,96 @@ if ($method === 'GET') {
         exit();
     }
     
+    // Check if this is a request to delete a unit
+    if (isset($input['action']) && $input['action'] === 'delete_unit') {
+        if (!isset($input['unitId'])) {
+            http_response_code(400);
+            echo json_encode(["status" => "error", "message" => "Missing unit ID"]);
+            exit();
+        }
+        
+        $unitId = $input['unitId'];
+        
+        try {
+            $pdo->beginTransaction();
+            
+            // First delete from unit_pcba_details
+            $deletePcbaSql = "DELETE FROM unit_pcba_details WHERE unit_id = :unitId";
+            $deletePcbaStmt = $pdo->prepare($deletePcbaSql);
+            $deletePcbaStmt->bindParam(':unitId', $unitId);
+            $deletePcbaStmt->execute();
+            
+            // Then delete from units table
+            $deleteUnitSql = "DELETE FROM units WHERE id = :unitId";
+            $deleteUnitStmt = $pdo->prepare($deleteUnitSql);
+            $deleteUnitStmt->bindParam(':unitId', $unitId);
+            $deleteUnitStmt->execute();
+            
+            $pdo->commit();
+            
+            echo json_encode([
+                "status" => "success", 
+                "message" => "Unit deleted successfully"
+            ]);
+        } catch (\PDOException $e) {
+            $pdo->rollBack();
+            http_response_code(500);
+            echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+        }
+        exit();
+    }
+    
+    // Check if this is a request to delete all units with boards
+    if (isset($input['action']) && $input['action'] === 'delete_all_with_boards') {
+        try {
+            $pdo->beginTransaction();
+            
+            // First, get all unit IDs that have boards
+            $getUnitsSql = "SELECT DISTINCT unit_id FROM unit_pcba_details WHERE 
+                           (mnbd_board_no IS NOT NULL AND mnbd_board_no != '' AND mnbd_board_no != '000000') OR
+                           (cmbd_board_no IS NOT NULL AND cmbd_board_no != '' AND cmbd_board_no != '000000') OR
+                           (lrbd_board_no IS NOT NULL AND lrbd_board_no != '' AND lrbd_board_no != '000000') OR
+                           (pqbd_board_no IS NOT NULL AND pqbd_board_no != '' AND pqbd_board_no != '000000') OR
+                           (bkbd_board_no IS NOT NULL AND bkbd_board_no != '' AND bkbd_board_no != '000000')";
+            
+            $getUnitsStmt = $pdo->prepare($getUnitsSql);
+            $getUnitsStmt->execute();
+            $unitIds = $getUnitsStmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            $deletedCount = 0;
+            
+            if (!empty($unitIds)) {
+                // Create placeholders for the IN clause
+                $placeholders = str_repeat('?,', count($unitIds) - 1) . '?';
+                
+                // Delete from unit_pcba_details
+                $deletePcbaSql = "DELETE FROM unit_pcba_details WHERE unit_id IN ($placeholders)";
+                $deletePcbaStmt = $pdo->prepare($deletePcbaSql);
+                $deletePcbaStmt->execute($unitIds);
+                
+                // Delete from units table
+                $deleteUnitSql = "DELETE FROM units WHERE id IN ($placeholders)";
+                $deleteUnitStmt = $pdo->prepare($deleteUnitSql);
+                $deleteUnitStmt->execute($unitIds);
+                
+                $deletedCount = count($unitIds);
+            }
+            
+            $pdo->commit();
+            
+            echo json_encode([
+                "status" => "success", 
+                "message" => "Units with boards deleted successfully",
+                "deletedCount" => $deletedCount
+            ]);
+        } catch (\PDOException $e) {
+            $pdo->rollBack();
+            http_response_code(500);
+            echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+        }
+        exit();
+    }
+    
     // Check if this is a board edit request for pending approval
     if (isset($input['action']) && $input['action'] === 'edit_board') {
         // Handle pending approval workflow

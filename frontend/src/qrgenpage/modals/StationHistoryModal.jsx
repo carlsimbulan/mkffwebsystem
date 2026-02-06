@@ -4,11 +4,16 @@ import axios from 'axios';
 const HISTORY_ENDPOINT = "http://localhost/mkffwebsystem/backend/api/unit_history.php";
 
 // Fallback utility function for operator name lookup
-const getOperatorDisplayName = (actionBy) => {
+const getOperatorDisplayName = (actionBy, userFullName) => {
+    // Prioritize the user_full_name from the JOIN query
+    if (userFullName && userFullName.trim() !== '') {
+        return userFullName;
+    }
+    
     if (!actionBy) return 'System';
     if (actionBy.toLowerCase() === 'system') return 'System';
     
-    // Try to use global function first
+    // Try to use global function
     if (window.getOperatorDisplayName) {
         return window.getOperatorDisplayName(actionBy);
     }
@@ -45,9 +50,25 @@ const StationHistoryModal = ({ stationId, onClose, user, highlightedUnitId }) =>
         setHistoryLoading(true);
         setHistoryError(null);
         try {
-            const response = await axios.get(HISTORY_ENDPOINT, { params: { station: stationId } });
-            const logs = Array.isArray(response.data) ? response.data.reverse() : [];
-            setHistoryLogs(logs);
+            // Try with space first (e.g., "Station 1")
+            const withSpace = stationId.replace(/Station(\d+)/i, 'Station $1');
+            const noSpace = stationId.replace(/\s+/g, ''); // e.g., "Station1"
+            
+            let response = await axios.get(HISTORY_ENDPOINT, { params: { station: withSpace } });
+            let data = Array.isArray(response.data) ? response.data : (response.data.data || []);
+            
+            // Retry without space if no data found
+            if (data.length === 0) {
+                response = await axios.get(HISTORY_ENDPOINT, { params: { station: noSpace } });
+                data = Array.isArray(response.data) ? response.data : (response.data.data || []);
+            }
+            
+            // Sort by timestamp descending (newest first)
+            const sortedLogs = data.sort((a, b) => 
+                new Date(b.timestamp || b.created_at) - new Date(a.timestamp || a.created_at)
+            );
+            
+            setHistoryLogs(sortedLogs);
         } catch (err) {
             setHistoryError(`Failed to fetch history: ${err.message}.`);
         } finally {
@@ -137,20 +158,21 @@ const StationHistoryModal = ({ stationId, onClose, user, highlightedUnitId }) =>
                                 <table className="table table-sm table-hover table-striped mb-0 align-middle small">
                                     <thead className="table-dark sticky-top">
                                         <tr>
-                                            <th>Unit / Model</th><th>Assembly No.</th><th>Action Type</th><th className="text-center">Status After</th><th>User</th><th className="text-end pe-3">Timestamp</th>
+                                            <th>Unit / Model</th><th>Assembly No.</th><th>Action Type</th><th>Station</th><th className="text-center">Status After</th><th>User</th><th className="text-end pe-3">Timestamp</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {filteredLogs.map(log => (
-                                            <tr key={log.id} className={log.id === highlightedUnitId ? "highlight-pulse" : ""}>
+                                            <tr key={log.history_id || log.id} className={log.unit_id === highlightedUnitId ? "highlight-pulse" : ""}>
                                                 <td className="ps-3 fw-bold">{log.model || 'N/A'}</td>
                                                 <td className="text-primary fw-bold">{log.assembly_no}</td>
                                                 <td>{log.action_type || 'UPDATE'}</td>
+                                                <td className="fw-bold">{log.station_name || log.station || 'N/A'}</td>
                                                 <td className="text-center"><span className={`badge rounded-pill px-3 py-2 ${getStatusClass(log.status_after)}`}>{log.status_after}</span></td>
                                                 <td>
-                                                    {getOperatorDisplayName(log.action_by)}
+                                                    {getOperatorDisplayName(log.action_by, log.user_full_name)}
                                                 </td>
-                                                <td className="text-end pe-3 small">{new Date(log.timestamp).toLocaleString()}</td>
+                                                <td className="text-end pe-3 small">{new Date(log.timestamp || log.created_at).toLocaleString()}</td>
                                             </tr>
                                         ))}
                                     </tbody>
