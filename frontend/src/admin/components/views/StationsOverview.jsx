@@ -2360,8 +2360,8 @@ return (
         
         <div className="d-flex justify-content-between align-items-center mb-4 px-2 border-bottom pb-3">
             <div>
-                <h4 className="fw-bold text-dark mb-0">Intelligent Decision Support System</h4>
-                <p className="text-muted small mb-0">AI-powered manufacturing intelligence and predictive analytics.</p>
+                <h4 className="fw-bold text-dark mb-0">Stations Overview</h4>
+                <p className="text-muted small mb-0"></p>
             </div>
             <div className="d-flex gap-2">
                 <button 
@@ -2381,8 +2381,7 @@ return (
             <div className="intelligence-hub mx-2">
                 <div className="intelligence-hub-header">
                     <div>
-                        <div className="intelligence-hub-title">AI Manufacturing Intelligence Hub</div>
-                        <div className="intelligence-hub-subtitle">Predictive analytics and actionable insights for production optimization</div>
+                        <div className="intelligence-hub-title">Diagnostic Root Cause Delay</div>
                     </div>
                     <button
                         className="btn btn-primary btn-sm fw-bold shadow-sm px-4 rounded-pill"

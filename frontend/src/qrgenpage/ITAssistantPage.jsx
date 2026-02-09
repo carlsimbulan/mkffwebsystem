@@ -234,6 +234,30 @@ export default function ITAssistantPage({ user, onLogout }) {
 
     const handleConfirmApproval = async (unit) => {
         setPendingUnit(null); 
+        
+        // Prevent duplicate submissions
+        if (processStatus === 'loading') {
+            return;
+        }
+        
+        // Check if this is a duplicate submission (same unit within 2 seconds)
+        const submissionKey = `approve-${unit.id}-${unit.status}`;
+        const now = Date.now();
+        if (window.lastApprovalSubmission && 
+            window.lastApprovalSubmission.key === submissionKey && 
+            (now - window.lastApprovalSubmission.time) < 2000) {
+            setProcessStatus('error');
+            setStatusMessage("⚠️ Duplicate approval detected. Please wait...");
+            setTimeout(() => setProcessStatus('idle'), 2000);
+            return;
+        }
+        
+        // Store submission tracking
+        window.lastApprovalSubmission = {
+            key: submissionKey,
+            time: now
+        };
+        
         setProcessStatus('loading');
         setStatusMessage(`Approving and Returning ${unit.assembly_no} to ${unit.station}...`);
 
@@ -267,13 +291,15 @@ export default function ITAssistantPage({ user, onLogout }) {
             if (s === 'For Scanning') {
                 counts.forScanning++;
             } else {
-                counts.totalTracked++; 
                 if (s === 'Completed') counts.completed++;
                 else if (s === 'In Progress') counts.inProgress++;
                 else if (s === 'No Good (NG)') counts.noGood++;
                 else if (s === 'Pending Approval') counts.pendingApproval++;
             }
         });
+        // Calculate totalTracked the same way as main dashboard: completed + inProgress + noGood + pendingApproval
+        counts.totalTracked = counts.completed + counts.inProgress + counts.noGood + counts.pendingApproval;
+        
         const totalGenerated = logs.length; 
         const calcPct = (val) => totalGenerated > 0 ? ((val / totalGenerated) * 100).toFixed(1) : 0;
         return { 

@@ -650,7 +650,7 @@ setFormData(prev => ({
         setScanInput(""); 
     };
 
-    // --- HANDLE UNIT SUBMISSION / UPDATE (Omitted for brevity, unchanged) ---
+    // --- HANDLE UNIT SUBMISSION / UPDATE ---
 const handleSubmit = async (e, checklist_data = null) => {
         e.preventDefault();
         if (!formData.assemblyNo) {
@@ -659,6 +659,29 @@ const handleSubmit = async (e, checklist_data = null) => {
             setTimeout(() => setProcessStatus('idle'), 3000); 
             return;
         }
+        
+        // Prevent duplicate submissions
+        if (processStatus === 'loading') {
+            return;
+        }
+        
+        // Check if this is a duplicate submission (same data within 2 seconds)
+        const submissionKey = `${formData.assemblyNo}-${currentStation}-${formData.status}`;
+        const now = Date.now();
+        if (window.lastSubmission && 
+            window.lastSubmission.key === submissionKey && 
+            (now - window.lastSubmission.time) < 2000) {
+            setProcessStatus('error');
+            setStatusMessage("⚠️ Duplicate submission detected. Please wait...");
+            setTimeout(() => setProcessStatus('idle'), 2000);
+            return;
+        }
+        
+        // Store submission tracking
+        window.lastSubmission = {
+            key: submissionKey,
+            time: now
+        };
         
         setProcessStatus('loading');
         setStatusMessage("Saving unit...");

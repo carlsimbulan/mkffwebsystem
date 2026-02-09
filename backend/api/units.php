@@ -673,6 +673,40 @@ if (($stat === 'No Good (NG)' || $stat === 'Pending Approval') && empty($remarks
         $unitId = $existingUnit['id'];
         $modelForLog = $existingUnit['model'];
         
+        // Enhanced duplicate prevention logic
+        $currentUnitState = $pdo->prepare("SELECT status, station, updated_at FROM units WHERE id = ? FOR UPDATE");
+        $currentUnitState->execute([$unitId]);
+        $currentState = $currentUnitState->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$currentState) {
+            throw new Exception("Unit not found or locked by another process.");
+        }
+        
+        // Validate station transition logic
+        if ($currentState['station'] !== $stn && $currentState['status'] === 'In Progress') {
+            // Only allow station change if unit is being completed or has NG status
+            if (!in_array($stat, ['Completed', 'No Good (NG)', 'Pending Approval'])) {
+                throw new Exception("Cannot move unit from '{$currentState['station']}' to '{$stn}' while status is '{$currentState['status']}'. Unit must be completed or marked as NG first.");
+            }
+        }
+        
+        // Prevent duplicate status updates (no actual change)
+        if ($currentState['status'] === $stat && $currentState['station'] === $stn) {
+            // Check if there are actual data changes (checklist, PCBA details)
+            $hasDataChanges = false;
+            if (isset($data['checklist_data']) && !empty($data['checklist_data'])) {
+                $hasDataChanges = true;
+            }
+            if (!empty($data['mnbd_no']) || !empty($data['cmbd_no']) || !empty($data['lrbd_no']) || 
+                !empty($data['pqbd_no']) || !empty($data['bkbd_no'])) {
+                $hasDataChanges = true;
+            }
+            
+            if (!$hasDataChanges) {
+                throw new Exception("No changes detected. Unit already has status '{$stat}' at station '{$stn}'.");
+            }
+        }
+        
         // SQL query to include generated numbers
         $updateSql = "UPDATE units SET 
                         status = :status, 
@@ -695,7 +729,12 @@ if (($stat === 'No Good (NG)' || $stat === 'Pending Approval') && empty($remarks
             'id'      => $unitId
         ];
 
-        $pdo->prepare($updateSql)->execute($params);
+        $updateResult = $pdo->prepare($updateSql)->execute($params);
+        
+        if (!$updateResult) {
+            throw new Exception("Failed to update unit. Possible duplicate or constraint violation.");
+        }
+        
         $action = 'STATION_UPDATE';
 
     } else {
