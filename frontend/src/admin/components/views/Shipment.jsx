@@ -9,6 +9,7 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
     const [authPin, setAuthPin] = useState('');
     const [authError, setAuthError] = useState('');
     const [isVerifying, setIsVerifying] = useState(false);
+    const [showAuthPin, setShowAuthPin] = useState(false);
     
     // Change PIN states
     const [currentPin, setCurrentPin] = useState('');
@@ -16,6 +17,9 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
     const [confirmNewPin, setConfirmNewPin] = useState('');
     const [pinError, setPinError] = useState('');
     const [isUpdatingPin, setIsUpdatingPin] = useState(false);
+    const [showCurrentPin, setShowCurrentPin] = useState(false);
+    const [showNewPin, setShowNewPin] = useState(false);
+    const [showConfirmNewPin, setShowConfirmNewPin] = useState(false);
     
     const [currentPage, setCurrentPage] = useState(1);
     const recordsPerPage = 5;
@@ -271,23 +275,33 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                                     <i className="bi bi-key me-1"></i>
                                     Release PIN
                                 </label>
-                                <input 
-                                    type="password" 
-                                    className={`form-control text-center ${authError ? 'is-invalid' : ''}`}
-                                    placeholder="Enter PIN"
-                                    value={authPin}
-                                    maxLength="10"
-                                    onChange={(e) => {
-                                        setAuthPin(e.target.value);
-                                        setAuthError('');
-                                    }}
-                                    onKeyPress={(e) => {
-                                        if (e.key === 'Enter' && authPin) {
-                                            handleExecuteDispatch();
-                                        }
-                                    }}
-                                    autoFocus
-                                />
+                                <div className="position-relative">
+                                    <input 
+                                        type={showAuthPin ? "text" : "password"}
+                                        className={`form-control text-center ${authError ? 'is-invalid' : ''}`}
+                                        placeholder="Enter PIN"
+                                        value={authPin}
+                                        maxLength="10"
+                                        onChange={(e) => {
+                                            setAuthPin(e.target.value);
+                                            setAuthError('');
+                                        }}
+                                        onKeyPress={(e) => {
+                                            if (e.key === 'Enter' && authPin) {
+                                                handleExecuteDispatch();
+                                            }
+                                        }}
+                                        autoFocus
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm position-absolute top-50 end-0 translate-middle-y me-2"
+                                        onClick={() => setShowAuthPin(!showAuthPin)}
+                                        style={{ background: 'none', border: 'none', padding: '0.25rem 0.5rem' }}
+                                    >
+                                        <i className={`bi ${showAuthPin ? 'bi-eye-slash' : 'bi-eye'} text-muted`}></i>
+                                    </button>
+                                </div>
                                 {authError && (
                                     <div className="invalid-feedback text-center d-block">
                                         <i className="bi bi-exclamation-circle me-1"></i>
@@ -334,7 +348,7 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
             {showChangePinModal && (
                 <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.4)', zIndex: 1050 }}>
                     <div className="bg-white rounded-3 shadow-lg p-0 overflow-hidden border-0" style={{ width: '90%', maxWidth: '450px' }}>
-                        <div className="modal-header bg-secondary text-white flex-shrink-0 d-flex justify-content-between align-items-center p-3">
+                        <div className="modal-header bg-primary text-white flex-shrink-0 d-flex justify-content-between align-items-center p-3">
                             <div>
                                 <h5 className="mb-0 fw-bold">Change Release PIN</h5>
                                 <small className="opacity-75">Update authorization PIN</small>
@@ -356,17 +370,27 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                                     <i className="bi bi-key me-1"></i>
                                     Current PIN
                                 </label>
-                                <input 
-                                    type="password" 
-                                    className="form-control"
-                                    placeholder="Enter current PIN"
-                                    value={currentPin}
-                                    maxLength="10"
-                                    onChange={(e) => {
-                                        setCurrentPin(e.target.value);
-                                        setPinError('');
-                                    }}
-                                />
+                                <div className="position-relative">
+                                    <input 
+                                        type={showCurrentPin ? "text" : "password"}
+                                        className="form-control"
+                                        placeholder="Enter current PIN"
+                                        value={currentPin}
+                                        maxLength="10"
+                                        onChange={(e) => {
+                                            setCurrentPin(e.target.value);
+                                            setPinError('');
+                                        }}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm position-absolute top-50 end-0 translate-middle-y me-2"
+                                        onClick={() => setShowCurrentPin(!showCurrentPin)}
+                                        style={{ background: 'none', border: 'none', padding: '0.25rem 0.5rem' }}
+                                    >
+                                        <i className={`bi ${showCurrentPin ? 'bi-eye-slash' : 'bi-eye'} text-muted`}></i>
+                                    </button>
+                                </div>
                             </div>
                             
                             <div className="mb-3">
@@ -374,17 +398,27 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                                     <i className="bi bi-key-fill me-1"></i>
                                     New PIN
                                 </label>
-                                <input 
-                                    type="password" 
-                                    className="form-control"
-                                    placeholder="Enter new PIN (min 4 digits)"
-                                    value={newPin}
-                                    maxLength="10"
-                                    onChange={(e) => {
-                                        setNewPin(e.target.value);
-                                        setPinError('');
-                                    }}
-                                />
+                                <div className="position-relative">
+                                    <input 
+                                        type={showNewPin ? "text" : "password"}
+                                        className="form-control"
+                                        placeholder="Enter new PIN (min 4 digits)"
+                                        value={newPin}
+                                        maxLength="10"
+                                        onChange={(e) => {
+                                            setNewPin(e.target.value);
+                                            setPinError('');
+                                        }}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm position-absolute top-50 end-0 translate-middle-y me-2"
+                                        onClick={() => setShowNewPin(!showNewPin)}
+                                        style={{ background: 'none', border: 'none', padding: '0.25rem 0.5rem' }}
+                                    >
+                                        <i className={`bi ${showNewPin ? 'bi-eye-slash' : 'bi-eye'} text-muted`}></i>
+                                    </button>
+                                </div>
                             </div>
                             
                             <div className="mb-3">
@@ -392,22 +426,32 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                                     <i className="bi bi-check-circle me-1"></i>
                                     Confirm New PIN
                                 </label>
-                                <input 
-                                    type="password" 
-                                    className="form-control"
-                                    placeholder="Re-enter new PIN"
-                                    value={confirmNewPin}
-                                    maxLength="10"
-                                    onChange={(e) => {
-                                        setConfirmNewPin(e.target.value);
-                                        setPinError('');
-                                    }}
-                                    onKeyPress={(e) => {
-                                        if (e.key === 'Enter' && currentPin && newPin && confirmNewPin) {
-                                            handleChangePin();
-                                        }
-                                    }}
-                                />
+                                <div className="position-relative">
+                                    <input 
+                                        type={showConfirmNewPin ? "text" : "password"}
+                                        className="form-control"
+                                        placeholder="Re-enter new PIN"
+                                        value={confirmNewPin}
+                                        maxLength="10"
+                                        onChange={(e) => {
+                                            setConfirmNewPin(e.target.value);
+                                            setPinError('');
+                                        }}
+                                        onKeyPress={(e) => {
+                                            if (e.key === 'Enter' && currentPin && newPin && confirmNewPin) {
+                                                handleChangePin();
+                                            }
+                                        }}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm position-absolute top-50 end-0 translate-middle-y me-2"
+                                        onClick={() => setShowConfirmNewPin(!showConfirmNewPin)}
+                                        style={{ background: 'none', border: 'none', padding: '0.25rem 0.5rem' }}
+                                    >
+                                        <i className={`bi ${showConfirmNewPin ? 'bi-eye-slash' : 'bi-eye'} text-muted`}></i>
+                                    </button>
+                                </div>
                             </div>
                             
                             {pinError && (
@@ -431,7 +475,7 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                                     Cancel
                                 </button>
                                 <button 
-                                    className="btn btn-secondary px-4 fw-bold shadow-sm" 
+                                    className="btn btn-primary px-4 fw-bold shadow-sm" 
                                     onClick={handleChangePin}
                                     disabled={!currentPin || !newPin || !confirmNewPin || isUpdatingPin}
                                 >
