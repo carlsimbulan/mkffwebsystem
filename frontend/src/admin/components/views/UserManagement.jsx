@@ -21,6 +21,11 @@ export function UserManagement({
     handleEditUser
 }) {
     const [searchTerm, setSearchTerm] = useState('');
+    const [showPinModal, setShowPinModal] = useState(false);
+    const [adminPassword, setAdminPassword] = useState('');
+    const [revealedPin, setRevealedPin] = useState('');
+    const [pinError, setPinError] = useState('');
+    const [isVerifying, setIsVerifying] = useState(false);
     
     // Compute metrics for summary cards
     const metrics = useMemo(() => {
@@ -73,6 +78,64 @@ export function UserManagement({
         });
     }, [userList, user.id, searchTerm]);
 
+    const handleViewReleasePin = async () => {
+        if (!adminPassword) {
+            setPinError('Password is required');
+            return;
+        }
+        
+        setIsVerifying(true);
+        setPinError('');
+        
+        try {
+            // Verify admin password
+            const verifyResponse = await fetch('http://localhost/mkffwebsystem/backend/api/login.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: user.username,
+                    password: adminPassword
+                })
+            });
+            
+            const verifyResult = await verifyResponse.json();
+            
+            if (verifyResult.status === 'ok') {
+                // Get the release PIN
+                const pinResponse = await fetch('http://localhost/mkffwebsystem/backend/api/units.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'get_release_pin'
+                    })
+                });
+                
+                const pinResult = await pinResponse.json();
+                
+                if (pinResult.status === 'success') {
+                    setRevealedPin(pinResult.pin);
+                    setPinError('');
+                } else {
+                    setPinError('Failed to retrieve PIN');
+                }
+            } else {
+                setPinError('Invalid password');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            setPinError('Connection error');
+        } finally {
+            setIsVerifying(false);
+        }
+    };
+
+    const handleClosePinModal = () => {
+        setShowPinModal(false);
+        setAdminPassword('');
+        setRevealedPin('');
+        setPinError('');
+    };
+
     return (
         <div className="pb-5">
             {/* --- HEADER SECTION --- */}
@@ -85,6 +148,14 @@ export function UserManagement({
                     <p className="text-muted small mb-0 mt-1">Personnel registry and access level administration</p>
                 </div>
                 <div className="d-flex gap-3 align-items-center">
+                    <button 
+                        className="btn btn-outline-secondary rounded p-2 px-3 shadow-sm transition-all" 
+                        onClick={() => setShowPinModal(true)}
+                        title="View Release PIN"
+                    >
+                        <i className="bi bi-key me-2"></i>
+                        View Release PIN
+                    </button>
                     <div className="search-container">
                         <i className="bi bi-search search-icon"></i>
                         <input 
@@ -219,6 +290,121 @@ export function UserManagement({
                     AVATAR_UPLOAD_PATH={AVATAR_UPLOAD_PATH}
                     DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH}
                 />
+            )}
+
+            {/* --- VIEW RELEASE PIN MODAL --- */}
+            {showPinModal && (
+                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.4)', zIndex: 1050 }}>
+                    <div className="bg-white rounded-3 shadow-lg p-0 overflow-hidden border-0" style={{ width: '90%', maxWidth: '450px' }}>
+                        <div className="modal-header bg-primary text-white flex-shrink-0 d-flex justify-content-between align-items-center p-3">
+                            <div>
+                                <h5 className="mb-0 fw-bold">View Release PIN</h5>
+                                <small className="opacity-75">Admin verification required</small>
+                            </div>
+                            <button 
+                                className="btn-close btn-close-white shadow-none" 
+                                onClick={handleClosePinModal}
+                            ></button>
+                        </div>
+                        <div className="modal-body p-4">
+                            {!revealedPin ? (
+                                <>
+                                    <div className="text-center mb-4">
+                                        <div className="bg-warning bg-opacity-10 text-warning rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style={{ width: '60px', height: '60px' }}>
+                                            <i className="bi bi-shield-lock fs-2"></i>
+                                        </div>
+                                        <h6 className="fw-bold text-dark mb-2">Security Verification</h6>
+                                        <p className="text-muted small mb-0">Enter your admin password to view the release PIN</p>
+                                    </div>
+                                    
+                                    <div className="mb-3">
+                                        <label className="form-label fw-bold text-muted small">
+                                            <i className="bi bi-lock me-1"></i>
+                                            Admin Password
+                                        </label>
+                                        <input 
+                                            type="password" 
+                                            className={`form-control ${pinError ? 'is-invalid' : ''}`}
+                                            placeholder="Enter your password"
+                                            value={adminPassword}
+                                            onChange={(e) => {
+                                                setAdminPassword(e.target.value);
+                                                setPinError('');
+                                            }}
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter' && adminPassword) {
+                                                    handleViewReleasePin();
+                                                }
+                                            }}
+                                            autoFocus
+                                        />
+                                        {pinError && (
+                                            <div className="invalid-feedback d-block">
+                                                <i className="bi bi-exclamation-circle me-1"></i>
+                                                {pinError}
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="d-flex gap-2 justify-content-end mt-4">
+                                        <button 
+                                            className="btn btn-light px-4 fw-bold" 
+                                            onClick={handleClosePinModal}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button 
+                                            className="btn btn-primary px-4 fw-bold shadow-sm" 
+                                            onClick={handleViewReleasePin}
+                                            disabled={!adminPassword || isVerifying}
+                                        >
+                                            {isVerifying ? (
+                                                <>
+                                                    <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                                    Verifying...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <i className="bi bi-unlock me-1"></i>
+                                                    Verify
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="text-center mb-4">
+                                        <div className="bg-success bg-opacity-10 text-success rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style={{ width: '60px', height: '60px' }}>
+                                            <i className="bi bi-check-circle fs-2"></i>
+                                        </div>
+                                        <h6 className="fw-bold text-dark mb-2">Current Release PIN</h6>
+                                        <p className="text-muted small mb-0">Keep this PIN secure and confidential</p>
+                                    </div>
+                                    
+                                    <div className="alert alert-primary d-flex align-items-center justify-content-center py-4 mb-4" style={{ fontSize: '2rem', letterSpacing: '0.5rem', fontWeight: 'bold', fontFamily: 'monospace' }}>
+                                        {revealedPin}
+                                    </div>
+                                    
+                                    <div className="alert alert-warning py-2 px-3 small mb-3">
+                                        <i className="bi bi-exclamation-triangle me-2"></i>
+                                        This PIN is used to authorize shipment releases. Do not share with unauthorized personnel.
+                                    </div>
+                                    
+                                    <div className="d-flex gap-2 justify-content-end">
+                                        <button 
+                                            className="btn btn-primary px-4 fw-bold" 
+                                            onClick={handleClosePinModal}
+                                        >
+                                            <i className="bi bi-check-lg me-1"></i>
+                                            Close
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

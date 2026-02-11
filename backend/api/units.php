@@ -595,6 +595,39 @@ $baseSql = "SELECT
 }
 
 // ==========================================================
+// SPECIAL ENDPOINT: GET RELEASE PIN
+// ==========================================================
+if ($method === 'POST' && isset($data['action']) && $data['action'] === 'get_release_pin') {
+    try {
+        // Get PIN from database
+        $stmt = $pdo->prepare("SELECT pin FROM release_pin WHERE id = 1");
+        $stmt->execute();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$result) {
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'PIN not configured in system'
+            ]);
+            exit;
+        }
+        
+        echo json_encode([
+            'status' => 'success',
+            'pin' => $result['pin']
+        ]);
+        exit;
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'System error: ' . $e->getMessage()
+        ]);
+        exit;
+    }
+}
+
+// ==========================================================
 // SPECIAL ENDPOINT: VERIFY RELEASE PIN
 // ==========================================================
 if ($method === 'POST' && isset($data['action']) && $data['action'] === 'verify_release_pin') {
