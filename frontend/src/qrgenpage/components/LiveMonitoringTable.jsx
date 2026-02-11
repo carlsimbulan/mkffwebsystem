@@ -33,7 +33,7 @@ const LiveMonitoringTable = ({ stationId, units, onBack, calculateStationMetrics
             
             <div className="row g-3 mb-4">
                 <div className="col-md-3">
-                    <div className="card border-0 shadow-sm border-start border-4 border-success">
+                    <div className="card border-0" style={{ boxShadow: '0 0.125rem 0.25rem rgba(0, 0, 0, 0.075)' }}>
                         <div className="card-body p-3">
                             <div className="d-flex align-items-center">
                                 <div className="flex-shrink-0">
@@ -48,7 +48,7 @@ const LiveMonitoringTable = ({ stationId, units, onBack, calculateStationMetrics
                     </div>
                 </div>
                 <div className="col-md-3">
-                    <div className="card border-0 shadow-sm border-start border-4 border-primary">
+                    <div className="card border-0" style={{ boxShadow: '0 0.125rem 0.25rem rgba(0, 0, 0, 0.075)' }}>
                         <div className="card-body p-3">
                             <div className="d-flex align-items-center">
                                 <div className="flex-shrink-0">
@@ -63,7 +63,7 @@ const LiveMonitoringTable = ({ stationId, units, onBack, calculateStationMetrics
                     </div>
                 </div>
                 <div className="col-md-3">
-                    <div className="card border-0 shadow-sm border-start border-4 border-danger">
+                    <div className="card border-0" style={{ boxShadow: '0 0.125rem 0.25rem rgba(0, 0, 0, 0.075)' }}>
                         <div className="card-body p-3">
                             <div className="d-flex align-items-center">
                                 <div className="flex-shrink-0">
@@ -78,7 +78,7 @@ const LiveMonitoringTable = ({ stationId, units, onBack, calculateStationMetrics
                     </div>
                 </div>
                 <div className="col-md-3">
-                    <div className="card border-0 shadow-sm border-start border-4 border-info">
+                    <div className="card border-0" style={{ boxShadow: '0 0.125rem 0.25rem rgba(0, 0, 0, 0.075)' }}>
                         <div className="card-body p-3">
                             <div className="d-flex align-items-center">
                                 <div className="flex-shrink-0">
