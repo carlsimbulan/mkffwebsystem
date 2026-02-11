@@ -247,6 +247,52 @@ switch ($method) {
         // Check if this is a Profile Update from the Operator Modal
         if (isset($data['action']) && $data['action'] === 'update_profile') {
             handleProfileUpdate($pdo, $data, $file);
+        } elseif (isset($data['action']) && $data['action'] === 'verify_password') {
+            // Verify user password for authentication
+            try {
+                if (!isset($data['username']) || !isset($data['password'])) {
+                    http_response_code(400);
+                    echo json_encode(["status" => "error", "message" => "Username and password are required"]);
+                    exit;
+                }
+                
+                $stmt = $pdo->prepare("SELECT username, password FROM users WHERE username = :username");
+                $stmt->execute([':username' => $data['username']]);
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$user) {
+                    echo json_encode([
+                        "status" => "error", 
+                        "verified" => false, 
+                        "message" => "User not found",
+                        "debug" => ["searched_username" => $data['username']]
+                    ]);
+                    exit;
+                }
+                
+                // Direct plain text comparison (same as login.php)
+                if ($data['password'] === $user['password']) {
+                    echo json_encode(["status" => "success", "verified" => true]);
+                } else {
+                    // Debug info (remove in production)
+                    echo json_encode([
+                        "status" => "error", 
+                        "verified" => false, 
+                        "message" => "Invalid password",
+                        "debug" => [
+                            "found_username" => $user['username'],
+                            "input_password" => $data['password'],
+                            "db_password" => $user['password'],
+                            "input_length" => strlen($data['password']),
+                            "db_length" => strlen($user['password']),
+                            "passwords_match" => ($data['password'] === $user['password']) ? 'yes' : 'no'
+                        ]
+                    ]);
+                }
+            } catch (PDOException $e) {
+                http_response_code(500);
+                echo json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
+            }
         } elseif (isset($data['action']) && $data['action'] === 'get_all_users') {
             // Return all users with their station assignments
             try {

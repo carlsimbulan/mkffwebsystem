@@ -5,6 +5,17 @@ const TARGET_STATION = 'Station15';
 export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
     const [confirmModal, setConfirmModal] = useState({ show: false, unitId: null, assemblyNo: '' });
     const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [showChangePinModal, setShowChangePinModal] = useState(false);
+    const [authPin, setAuthPin] = useState('');
+    const [authError, setAuthError] = useState('');
+    const [isVerifying, setIsVerifying] = useState(false);
+    
+    // Change PIN states
+    const [currentPin, setCurrentPin] = useState('');
+    const [newPin, setNewPin] = useState('');
+    const [confirmNewPin, setConfirmNewPin] = useState('');
+    const [pinError, setPinError] = useState('');
+    const [isUpdatingPin, setIsUpdatingPin] = useState(false);
     
     const [currentPage, setCurrentPage] = useState(1);
     const recordsPerPage = 5;
@@ -36,13 +47,99 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
 
     const handleOpenConfirm = (unit) => {
         setConfirmModal({ show: true, unitId: unit.id, assemblyNo: unit.assembly_no });
+        setAuthPin('');
+        setAuthError('');
     };
 
-    const handleExecuteDispatch = () => {
-        if (typeof onMarkAsShipped === 'function') {
-            onMarkAsShipped(confirmModal.unitId);
+    const handleExecuteDispatch = async () => {
+        if (!authPin) {
+            setAuthError('PIN is required');
+            return;
         }
-        setConfirmModal({ show: false, unitId: null, assemblyNo: '' });
+        
+        setIsVerifying(true);
+        setAuthError('');
+        
+        try {
+            const response = await fetch('http://localhost/mkffwebsystem/backend/api/units.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'verify_release_pin',
+                    pin: authPin
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.status === 'success' && result.verified === true) {
+                // PIN is correct, proceed with release
+                if (typeof onMarkAsShipped === 'function') {
+                    onMarkAsShipped(confirmModal.unitId);
+                }
+                setConfirmModal({ show: false, unitId: null, assemblyNo: '' });
+                setAuthPin('');
+                setAuthError('');
+            } else {
+                setAuthError('Invalid PIN. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error verifying PIN:', error);
+            setAuthError('Connection error. Please try again.');
+        } finally {
+            setIsVerifying(false);
+        }
+    };
+
+    const handleChangePin = async () => {
+        // Validation
+        if (!currentPin || !newPin || !confirmNewPin) {
+            setPinError('All fields are required');
+            return;
+        }
+        
+        if (newPin !== confirmNewPin) {
+            setPinError('New PIN and confirmation do not match');
+            return;
+        }
+        
+        if (newPin.length < 4) {
+            setPinError('PIN must be at least 4 digits');
+            return;
+        }
+        
+        setIsUpdatingPin(true);
+        setPinError('');
+        
+        try {
+            const response = await fetch('http://localhost/mkffwebsystem/backend/api/units.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'update_release_pin',
+                    current_pin: currentPin,
+                    new_pin: newPin
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                alert('✅ PIN updated successfully!');
+                setShowChangePinModal(false);
+                setCurrentPin('');
+                setNewPin('');
+                setConfirmNewPin('');
+                setPinError('');
+            } else {
+                setPinError(result.message || 'Failed to update PIN');
+            }
+        } catch (error) {
+            console.error('Error updating PIN:', error);
+            setPinError('Connection error. Please try again.');
+        } finally {
+            setIsUpdatingPin(false);
+        }
     };
 
     return (
@@ -57,7 +154,19 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                     <p className="text-muted small mb-0 mt-1">Verified units awaiting outbound release.</p>
                 </div>
                 <div className="d-flex align-items-center gap-3">
-                    <button className="btn btn-outline-primary rounded p-2 shadow-sm transition-all" onClick={() => setShowHistoryModal(true)} title="History">
+                    <button 
+                        className="btn btn-outline-secondary rounded p-2 px-3 shadow-sm transition-all" 
+                        onClick={() => setShowChangePinModal(true)} 
+                        title="Change Release PIN"
+                    >
+                        <i className="bi bi-key me-1"></i>
+                        Change PIN
+                    </button>
+                    <button 
+                        className="btn btn-outline-primary rounded p-2 shadow-sm transition-all" 
+                        onClick={() => setShowHistoryModal(true)} 
+                        title="History"
+                    >
                         <i className="bi bi-clock-history"></i>
                     </button>
                     <div className="badge rounded-pill bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}}>
@@ -115,7 +224,11 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-center">
-                                            <button className="btn btn-sm btn-primary rounded p-2 px-3 transition-all" onClick={() => handleOpenConfirm(unit)} title="Release">
+                                            <button 
+                                                className="btn btn-sm btn-primary rounded p-2 px-3 transition-all" 
+                                                onClick={() => handleOpenConfirm(unit)} 
+                                                title="Release"
+                                            >
                                                 <i className="bi bi-box-arrow-right"></i>
                                             </button>
                                         </td>
@@ -127,7 +240,7 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                 </div>
             </div>
 
-            {/* --- CONFIRMATION MODAL --- */}
+            {/* --- RELEASE CONFIRMATION MODAL --- */}
             {confirmModal.show && (
                 <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.4)', zIndex: 1050 }}>
                     <div className="bg-white rounded-3 shadow-lg p-0 overflow-hidden border-0" style={{ width: '90%', maxWidth: '400px' }}>
@@ -136,17 +249,204 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                                 <h5 className="mb-0 fw-bold">Final Authorization</h5>
                                 <small className="opacity-75">Confirm unit release</small>
                             </div>
-                            <button className="btn-close btn-close-white shadow-none" onClick={() => setConfirmModal({ show: false, unitId: null, assemblyNo: '' })}></button>
+                            <button 
+                                className="btn-close btn-close-white shadow-none" 
+                                onClick={() => {
+                                    setConfirmModal({ show: false, unitId: null, assemblyNo: '' });
+                                    setAuthPin('');
+                                    setAuthError('');
+                                }}
+                            ></button>
                         </div>
                         <div className="modal-body p-4 text-center">
                             <div className="bg-primary bg-opacity-10 text-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style={{ width: '60px', height: '60px' }}>
                                 <i className="bi bi-shield-check fs-2"></i>
                             </div>
                             <h6 className="fw-bold text-dark mb-2">Confirm Release</h6>
-                            <p className="text-muted small mb-4">Unit: <strong className="text-primary">{confirmModal.assemblyNo}</strong></p>
+                            <p className="text-muted small mb-3">Unit: <strong className="text-primary">{confirmModal.assemblyNo}</strong></p>
+                            
+                            {/* PIN Input */}
+                            <div className="mb-4">
+                                <label className="form-label text-start d-block fw-bold text-muted small mb-2">
+                                    <i className="bi bi-key me-1"></i>
+                                    Release PIN
+                                </label>
+                                <input 
+                                    type="password" 
+                                    className={`form-control text-center ${authError ? 'is-invalid' : ''}`}
+                                    placeholder="Enter PIN"
+                                    value={authPin}
+                                    maxLength="10"
+                                    onChange={(e) => {
+                                        setAuthPin(e.target.value);
+                                        setAuthError('');
+                                    }}
+                                    onKeyPress={(e) => {
+                                        if (e.key === 'Enter' && authPin) {
+                                            handleExecuteDispatch();
+                                        }
+                                    }}
+                                    autoFocus
+                                />
+                                {authError && (
+                                    <div className="invalid-feedback text-center d-block">
+                                        <i className="bi bi-exclamation-circle me-1"></i>
+                                        {authError}
+                                    </div>
+                                )}
+                            </div>
+                            
                             <div className="d-flex gap-2 justify-content-center">
-                                <button className="btn btn-light px-4 fw-bold text-muted" onClick={() => setConfirmModal({ show: false, unitId: null, assemblyNo: '' })}>Cancel</button>
-                                <button className="btn btn-primary px-4 fw-bold shadow-sm" onClick={handleExecuteDispatch}>Release</button>
+                                <button 
+                                    className="btn btn-light px-4 fw-bold text-muted" 
+                                    onClick={() => {
+                                        setConfirmModal({ show: false, unitId: null, assemblyNo: '' });
+                                        setAuthPin('');
+                                        setAuthError('');
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    className="btn btn-primary px-4 fw-bold shadow-sm" 
+                                    onClick={handleExecuteDispatch}
+                                    disabled={!authPin || isVerifying}
+                                >
+                                    {isVerifying ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                            Verifying...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <i className="bi bi-unlock me-1"></i>
+                                            Release
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- CHANGE PIN MODAL --- */}
+            {showChangePinModal && (
+                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.4)', zIndex: 1050 }}>
+                    <div className="bg-white rounded-3 shadow-lg p-0 overflow-hidden border-0" style={{ width: '90%', maxWidth: '450px' }}>
+                        <div className="modal-header bg-secondary text-white flex-shrink-0 d-flex justify-content-between align-items-center p-3">
+                            <div>
+                                <h5 className="mb-0 fw-bold">Change Release PIN</h5>
+                                <small className="opacity-75">Update authorization PIN</small>
+                            </div>
+                            <button 
+                                className="btn-close btn-close-white shadow-none" 
+                                onClick={() => {
+                                    setShowChangePinModal(false);
+                                    setCurrentPin('');
+                                    setNewPin('');
+                                    setConfirmNewPin('');
+                                    setPinError('');
+                                }}
+                            ></button>
+                        </div>
+                        <div className="modal-body p-4">
+                            <div className="mb-3">
+                                <label className="form-label fw-bold text-muted small">
+                                    <i className="bi bi-key me-1"></i>
+                                    Current PIN
+                                </label>
+                                <input 
+                                    type="password" 
+                                    className="form-control"
+                                    placeholder="Enter current PIN"
+                                    value={currentPin}
+                                    maxLength="10"
+                                    onChange={(e) => {
+                                        setCurrentPin(e.target.value);
+                                        setPinError('');
+                                    }}
+                                />
+                            </div>
+                            
+                            <div className="mb-3">
+                                <label className="form-label fw-bold text-muted small">
+                                    <i className="bi bi-key-fill me-1"></i>
+                                    New PIN
+                                </label>
+                                <input 
+                                    type="password" 
+                                    className="form-control"
+                                    placeholder="Enter new PIN (min 4 digits)"
+                                    value={newPin}
+                                    maxLength="10"
+                                    onChange={(e) => {
+                                        setNewPin(e.target.value);
+                                        setPinError('');
+                                    }}
+                                />
+                            </div>
+                            
+                            <div className="mb-3">
+                                <label className="form-label fw-bold text-muted small">
+                                    <i className="bi bi-check-circle me-1"></i>
+                                    Confirm New PIN
+                                </label>
+                                <input 
+                                    type="password" 
+                                    className="form-control"
+                                    placeholder="Re-enter new PIN"
+                                    value={confirmNewPin}
+                                    maxLength="10"
+                                    onChange={(e) => {
+                                        setConfirmNewPin(e.target.value);
+                                        setPinError('');
+                                    }}
+                                    onKeyPress={(e) => {
+                                        if (e.key === 'Enter' && currentPin && newPin && confirmNewPin) {
+                                            handleChangePin();
+                                        }
+                                    }}
+                                />
+                            </div>
+                            
+                            {pinError && (
+                                <div className="alert alert-danger py-2 px-3 small">
+                                    <i className="bi bi-exclamation-circle me-1"></i>
+                                    {pinError}
+                                </div>
+                            )}
+                            
+                            <div className="d-flex gap-2 justify-content-end mt-4">
+                                <button 
+                                    className="btn btn-light px-4 fw-bold" 
+                                    onClick={() => {
+                                        setShowChangePinModal(false);
+                                        setCurrentPin('');
+                                        setNewPin('');
+                                        setConfirmNewPin('');
+                                        setPinError('');
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    className="btn btn-secondary px-4 fw-bold shadow-sm" 
+                                    onClick={handleChangePin}
+                                    disabled={!currentPin || !newPin || !confirmNewPin || isUpdatingPin}
+                                >
+                                    {isUpdatingPin ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                            Updating...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <i className="bi bi-check-lg me-1"></i>
+                                            Update PIN
+                                        </>
+                                    )}
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -218,10 +518,18 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                                 Entry {indexOfFirstRecord + 1} to {Math.min(indexOfLastRecord, dispatchedUnits.length)}
                             </div>
                             <div className="d-flex gap-2">
-                                <button className="btn btn-sm btn-outline-primary rounded px-3 fw-bold" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
+                                <button 
+                                    className="btn btn-sm btn-outline-primary rounded px-3 fw-bold" 
+                                    disabled={currentPage === 1} 
+                                    onClick={() => setCurrentPage(p => p - 1)}
+                                >
                                     <i className="bi bi-chevron-left me-1"></i>PREV
                                 </button>
-                                <button className="btn btn-sm btn-outline-primary rounded px-3 fw-bold" disabled={currentPage === totalPages || totalPages === 0} onClick={() => setCurrentPage(p => p + 1)}>
+                                <button 
+                                    className="btn btn-sm btn-outline-primary rounded px-3 fw-bold" 
+                                    disabled={currentPage === totalPages || totalPages === 0} 
+                                    onClick={() => setCurrentPage(p => p + 1)}
+                                >
                                     NEXT<i className="bi bi-chevron-right ms-1"></i>
                                 </button>
                             </div>

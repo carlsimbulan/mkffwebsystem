@@ -595,6 +595,118 @@ $baseSql = "SELECT
 }
 
 // ==========================================================
+// SPECIAL ENDPOINT: VERIFY RELEASE PIN
+// ==========================================================
+if ($method === 'POST' && isset($data['action']) && $data['action'] === 'verify_release_pin') {
+    try {
+        $inputPin = $data['pin'] ?? '';
+        
+        if (empty($inputPin)) {
+            echo json_encode([
+                'status' => 'error',
+                'verified' => false,
+                'message' => 'PIN is required'
+            ]);
+            exit;
+        }
+        
+        // Get PIN from database
+        $stmt = $pdo->prepare("SELECT pin FROM release_pin WHERE id = 1");
+        $stmt->execute();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$result) {
+            echo json_encode([
+                'status' => 'error',
+                'verified' => false,
+                'message' => 'PIN not configured in system'
+            ]);
+            exit;
+        }
+        
+        // Compare PINs
+        if ($inputPin === $result['pin']) {
+            echo json_encode([
+                'status' => 'success',
+                'verified' => true,
+                'message' => 'PIN verified successfully'
+            ]);
+        } else {
+            echo json_encode([
+                'status' => 'error',
+                'verified' => false,
+                'message' => 'Invalid PIN'
+            ]);
+        }
+        exit;
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode([
+            'status' => 'error',
+            'verified' => false,
+            'message' => 'System error: ' . $e->getMessage()
+        ]);
+        exit;
+    }
+}
+
+// ==========================================================
+// SPECIAL ENDPOINT: UPDATE RELEASE PIN
+// ==========================================================
+if ($method === 'POST' && isset($data['action']) && $data['action'] === 'update_release_pin') {
+    try {
+        $currentPin = $data['current_pin'] ?? '';
+        $newPin = $data['new_pin'] ?? '';
+        
+        if (empty($currentPin) || empty($newPin)) {
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Current PIN and new PIN are required'
+            ]);
+            exit;
+        }
+        
+        // Verify current PIN first
+        $stmt = $pdo->prepare("SELECT pin FROM release_pin WHERE id = 1");
+        $stmt->execute();
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$result) {
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'PIN not configured in system'
+            ]);
+            exit;
+        }
+        
+        if ($currentPin !== $result['pin']) {
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Current PIN is incorrect'
+            ]);
+            exit;
+        }
+        
+        // Update to new PIN
+        $updateStmt = $pdo->prepare("UPDATE release_pin SET pin = ?, updated_at = CURRENT_TIMESTAMP, updated_by = ? WHERE id = 1");
+        $updateStmt->execute([$newPin, $data['username'] ?? 'Admin']);
+        
+        echo json_encode([
+            'status' => 'success',
+            'message' => 'PIN updated successfully'
+        ]);
+        exit;
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'System error: ' . $e->getMessage()
+        ]);
+        exit;
+    }
+}
+
+// ==========================================================
 // 2. PUT / POST REQUEST HANDLER (Main Logic)
 // ==========================================================
 
