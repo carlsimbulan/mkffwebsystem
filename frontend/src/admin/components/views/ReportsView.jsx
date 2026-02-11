@@ -1,5 +1,4 @@
 import React from 'react';
-import 'bootstrap-icons/font/bootstrap-icons.css';
 
 // 🔑 PINALITAN: Siguradong Philippine Time (Asia/Manila)
 const getTodayDate = () => {

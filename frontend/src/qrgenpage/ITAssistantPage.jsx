@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import axios from 'axios';
-import 'bootstrap-icons/font/bootstrap-icons.css';
 import logo from '../logo.png';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import {
@@ -25,6 +24,8 @@ import { UserProfileModal } from './modals/UserProfileModal';
 import ApprovalConfirmationModal from './modals/ApprovalConfirmationModal';
 import { SubmitReportModal } from './modals/SubmitReportModal';
 import { ReportDetailModal } from './modals/ReportDetailModal';
+import { NotificationBell } from './components/notifications/NotificationBell';
+import { NotificationContent } from './components/notifications/NotificationContent';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useTargetTimes } from '../utils/targetTimeService';
 
@@ -102,6 +103,8 @@ export default function ITAssistantPage({ user, onLogout }) {
     const [activeMonitorStationId, setActiveMonitorStationId] = useState(null);
     const [activeHistoryStation, setActiveHistoryStation] = useState(null);
     const [showProfileModal, setShowProfileModal] = useState(false);
+    const [showUserDropdown, setShowUserDropdown] = useState(false);
+    const [notifications, setNotifications] = useState([]);
     const [inventorySearch, setInventorySearch] = useState('');
     const [inventoryCurrentPage, setInventoryCurrentPage] = useState(1);
     
@@ -507,10 +510,113 @@ export default function ITAssistantPage({ user, onLogout }) {
         }).length;
     }, [reports]);
 
-    const unreadAnnouncementsCount = useMemo(() => {
-        const numericLastReadId = parseInt(lastReadAnnouncementId) || 0;
-        return announcements.filter(a => parseInt(a.id) > numericLastReadId).length;
-    }, [announcements, lastReadAnnouncementId]);
+    const todayAnnouncementsCount = useMemo(() => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        return announcements.filter(a => {
+            if (!a.created_at) return false;
+            const announcementDate = new Date(a.created_at).toISOString().split('T')[0];
+            return announcementDate === todayStr;
+        }).length;
+    }, [announcements]);
+
+    // --- USEEFFECT FOR DROPDOWN CLICK OUTSIDE ---
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showUserDropdown && !event.target.closest('.user-dropdown-container')) {
+                setShowUserDropdown(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showUserDropdown]);
+
+    // --- CHECK DELAYED UNITS FOR NOTIFICATIONS (ALL STATIONS) ---
+    const checkDelayedUnitsForNotifications = useCallback(() => {
+        const now = new Date();
+        const newDelayedNotifications = [];
+
+        // Check ALL units across ALL stations for delays
+        const validDelayedUnits = unitLogs.filter(unit => {
+            const status = (unit.status || '').trim();
+            // Check units that are In Progress or No Good
+            return status === 'In Progress' || 
+                   status.toLowerCase().includes('no good') || 
+                   status.toLowerCase() === 'ng';
+        });
+
+        validDelayedUnits.forEach(unit => {
+            const stationId = unit.station;
+            // Use dynamic thresholds
+            const thresholdMinutes = dynamicDelayThresholds[stationId] || 
+                                    dynamicDelayThresholds[stationId.replace(' ', '')] || 
+                                    0;
+            
+            // Only check if threshold is greater than 0
+            if (thresholdMinutes > 0) {
+                const startTime = new Date(unit.updated_at || unit.created_at);
+                const elapsedMinutes = Math.floor((now.getTime() - startTime.getTime()) / (1000 * 60));
+
+                // Only create notification if actually delayed
+                if (elapsedMinutes >= thresholdMinutes) {
+                    // Determine if NG or normal delay for title
+                    const isNG = unit.status.toLowerCase().includes('ng') || unit.status.toLowerCase().includes('no good');
+                    const alertTitle = isNG ? `🚨 Quality Alert (NG) at ${stationId}` : `⚠️ Unit Delay Alert at ${stationId}`;
+
+                    newDelayedNotifications.push({
+                        id: `delayed-${unit.id}`,
+                        type: 'DelayedUnit',
+                        unitId: unit.id,
+                        title: alertTitle,
+                        message: `Unit ${unit.assembly_no || unit.device_serial_no} (${unit.status}) - ${elapsedMinutes} mins (Limit: ${thresholdMinutes} mins).`,
+                        timestamp: now.toISOString(),
+                        stationId: stationId,
+                        assemblyNo: unit.assembly_no,
+                        deviceSerialNo: unit.device_serial_no,
+                        status: unit.status,
+                        elapsedMinutes,
+                        thresholdMinutes
+                    });
+                }
+            }
+        });
+
+        // Only update notifications if there's a change
+        setNotifications(prev => {
+            const prevIds = prev.map(n => n.id).sort().join(',');
+            const newIds = newDelayedNotifications.map(n => n.id).sort().join(',');
+            
+            if (prevIds === newIds) return prev;
+            return newDelayedNotifications;
+        });
+    }, [unitLogs, dynamicDelayThresholds]);
+
+    // --- REAL-TIME NOTIFICATION CHECK EFFECT (Every 1 second) ---
+    useEffect(() => {
+        // Initial check
+        if (unitLogs.length > 0) {
+            checkDelayedUnitsForNotifications();
+        }
+
+        // Set up interval for real-time checking every 1 second
+        const notificationInterval = setInterval(() => {
+            if (unitLogs.length > 0) {
+                checkDelayedUnitsForNotifications();
+            }
+        }, 1000);
+
+        return () => clearInterval(notificationInterval);
+    }, [unitLogs, checkDelayedUnitsForNotifications]);
+
+    // --- NOTIFICATION HANDLERS ---
+    const handleBellClick = () => { setActiveTab('notifications'); };
+    const handleNotificationClick = (notification) => {
+        if (notification.type === 'DelayedUnit') {
+            // Navigate to specific station details (not just the grid)
+            setActiveMonitorStationId(notification.stationId);
+            setActiveTab('station_details'); // Changed from 'station_monitor' to 'station_details'
+        }
+    };
 
     const handleGenerateQR = async (e) => {
         e.preventDefault();
@@ -686,7 +792,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                                             <h2 className="fw-bold mb-0">{m.totalTracked}</h2>
                                         </div>
                                     </div>
-                                    <div className="badge bg-dark text-white p-2 d-inline-block" style={{ fontSize: '0.7rem', width: 'fit-content' }}>100.0% Share</div>
+                                    <div className="text-muted" style={{ fontSize: '0.75rem' }}>100.0% Share</div>
                                 </div>
                             </div>
                             <div className="col-md-4">
@@ -700,7 +806,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                                             <h2 className="fw-bold mb-0">{m.forScanning}</h2>
                                         </div>
                                     </div>
-                                    <div className="badge bg-info bg-opacity-10 text-info p-2" style={{ fontSize: '0.7rem', width: 'fit-content' }}>{m.pctForScanning}% Pending</div>
+                                    <div className="text-muted" style={{ fontSize: '0.75rem' }}>{m.pctForScanning}% Pending</div>
                                 </div>
                             </div>
                             <div className="col-md-4">
@@ -714,7 +820,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                                             <h2 className="fw-bold mb-0">{m.inProgress}</h2>
                                         </div>
                                     </div>
-                                    <div className="badge bg-warning bg-opacity-10 text-warning p-2" style={{ fontSize: '0.7rem', width: 'fit-content' }}>{m.pctInProgress}% Capacity</div>
+                                    <div className="text-muted" style={{ fontSize: '0.75rem' }}>{m.pctInProgress}% Capacity</div>
                                 </div>
                             </div>
                         </div>
@@ -731,7 +837,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                                             <h2 className="fw-bold mb-0">{m.completed}</h2>
                                         </div>
                                     </div>
-                                    <div className="badge bg-success bg-opacity-10 text-success p-2" style={{ fontSize: '0.7rem', width: 'fit-content' }}>{m.pctCompleted}% Rate</div>
+                                    <div className="text-muted" style={{ fontSize: '0.75rem' }}>{m.pctCompleted}% Rate</div>
                                 </div>
                             </div>
                             <div className="col-md-4">
@@ -745,7 +851,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                                             <h2 className="fw-bold mb-0">{m.noGood}</h2>
                                         </div>
                                     </div>
-                                    <div className="badge bg-danger bg-opacity-10 text-danger p-2" style={{ fontSize: '0.7rem', width: 'fit-content' }}>{m.pctNoGood}% Failure</div>
+                                    <div className="text-muted" style={{ fontSize: '0.75rem' }}>{m.pctNoGood}% Failure</div>
                                 </div>
                             </div>
                             <div className="col-md-4">
@@ -762,7 +868,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                                         </div>
                                         <button className="btn btn-primary btn-sm rounded-pill px-3 fw-bold shadow-sm" style={{ fontSize: '0.7rem' }} onClick={() => setActiveTab('approvals')}>GO <i className="bi bi-chevron-right ms-1"></i></button>
                                     </div>
-                                    <div className="badge bg-primary bg-opacity-10 text-primary p-2" style={{ fontSize: '0.7rem', width: 'fit-content' }}>{m.pctPending}% Units</div>
+                                    <div className="text-muted" style={{ fontSize: '0.75rem' }}>{m.pctPending}% Units</div>
                                 </div>
                             </div>
                         </div>
@@ -777,7 +883,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                                             <h6 className="fw-bold mb-0 uppercase text-dark" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>TOP 1 — Throughput Trend</h6>
                                             <small className="text-muted" style={{ fontSize: '0.7rem' }}>Completed units per hour (last 12 hours)</small>
                                         </div>
-                                        <span className={`badge rounded-pill px-3 py-2 ${throughputTrend.deltaPct < 0 ? 'bg-danger' : 'bg-success'}`} style={{ fontSize: '0.65rem', fontWeight: '700' }}>
+                                        <span className={`badge rounded-pill fw-normal border ${throughputTrend.deltaPct < 0 ? 'bg-danger bg-opacity-10 text-danger border-danger border-opacity-25' : 'bg-success bg-opacity-10 text-success border-success border-opacity-25'}`} style={{ fontSize: '0.65rem', padding: '6px 14px' }}>
                                             {throughputTrend.deltaPct < 0 ? 'DOWN' : 'UP'} {Math.abs(throughputTrend.deltaPct).toFixed(0)}%
                                         </span>
                                     </div>
@@ -876,7 +982,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                                             <h6 className="fw-bold mb-0 uppercase text-dark" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>TOP 3 — First Pass Yield (FPY)</h6>
                                             <small className="text-muted" style={{ fontSize: '0.7rem' }}>Completed ÷ (Completed + NG)</small>
                                         </div>
-                                        <span className="badge bg-primary rounded-pill px-3 py-2" style={{ fontSize: '0.65rem', fontWeight: '700' }}>FPY {fpy.pct.toFixed(1)}%</span>
+                                        <span className="badge rounded-pill bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 fw-normal" style={{ fontSize: '0.65rem', padding: '6px 14px' }}>FPY {fpy.pct.toFixed(1)}%</span>
                                     </div>
                                     <div className="card-body p-3 d-flex flex-wrap gap-3 align-items-center justify-content-between">
                                         <div style={{ width: 260, height: 220, position: 'relative' }}>
@@ -947,7 +1053,11 @@ export default function ITAssistantPage({ user, onLogout }) {
                                         <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded-4 mb-4 border-0 shadow-sm">
                                             <div>
                                                 <div className="text-uppercase fw-bold mb-1" style={{fontSize: '0.6rem', color: '#64748b'}}>Current Status</div>
-                                                <span className={`badge rounded-pill px-3 py-2 ${selectedUnit.status?.toLowerCase().includes('no good') ? 'bg-danger' : selectedUnit.status?.toLowerCase().includes('completed') ? 'bg-success' : 'bg-primary'}`}>
+                                                <span className={`badge rounded-pill fw-normal ${
+                                                    selectedUnit.status?.toLowerCase().includes('no good') ? 'bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25' : 
+                                                    selectedUnit.status?.toLowerCase().includes('completed') ? 'bg-success bg-opacity-10 text-success border border-success border-opacity-25' : 
+                                                    'bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25'
+                                                }`} style={{ fontSize: '0.7rem', padding: '6px 14px' }}>
                                                     {selectedUnit.status}
                                                 </span>
                                             </div>
@@ -1155,7 +1265,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                                         <h6 className="mb-0 fw-bold text-dark">Approvals Queue</h6>
                                         <small className="text-muted">Units pending quality assurance approval</small>
                                     </div>
-                                    <span className="badge bg-primary rounded-pill px-3 py-2" style={{ fontSize: '0.7rem', fontWeight: '600' }}>
+                                    <span className="badge rounded-pill bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 fw-normal" style={{ fontSize: '0.7rem', padding: '6px 14px' }}>
                                         {unitLogs.filter(u => u.status === 'Pending Approval').length} Units
                                     </span>
                                 </div>
@@ -1196,7 +1306,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                                                         </td>
                                                         <td className="px-4 py-3 text-muted">{u.device_serial_no || 'N/A'}</td>
                                                         <td className="px-4 py-3">
-                                                            <span className="badge bg-warning bg-opacity-10 text-warning border border-warning px-2 py-1" style={{ fontSize: '0.7rem' }}>
+                                                            <span className="badge rounded-pill bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 fw-normal" style={{ fontSize: '0.7rem', padding: '6px 14px' }}>
                                                                 {u.status}
                                                             </span>
                                                         </td>
@@ -1235,7 +1345,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                 const getHistoryStatus = (status) => {
                     const statusLower = (status || '').toLowerCase();
                     if (statusLower.includes('dispatched')) {
-                        return <span className="badge bg-success">Already Dispatched</span>;
+                        return <span className="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}}>Already Dispatched</span>;
                     }
                     if (statusLower.includes('completed') || 
                         statusLower.includes('no good') || 
@@ -1243,9 +1353,9 @@ export default function ITAssistantPage({ user, onLogout }) {
                         statusLower.includes('pending') ||
                         statusLower.includes('in progress') ||
                         statusLower.includes('for scanning')) {
-                        return <span className="badge bg-warning text-dark">Still on Production</span>;
+                        return <span className="badge rounded-pill bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}}>Still on Production</span>;
                     }
-                    return <span className="badge bg-secondary">Unknown</span>;
+                    return <span className="badge rounded-pill bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}}>Unknown</span>;
                 };
 
                 const formatDateTime = (dateStr) => {
@@ -1273,7 +1383,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                                     <h6 className="fw-bold mb-0 text-dark">Unit Inventory</h6>
                                     <small className="text-muted">All generated units with generation history</small>
                                 </div>
-                                <span className="badge bg-primary rounded-pill px-3 py-2" style={{ fontSize: '0.75rem', fontWeight: '600' }}>
+                                <span className="badge rounded-pill bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 fw-normal" style={{ fontSize: '0.75rem', padding: '6px 14px' }}>
                                     {filteredInventory.length} {filteredInventory.length === 1 ? 'Unit' : 'Units'}
                                 </span>
                             </div>
@@ -1461,7 +1571,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                                         </select>
                                     </div>
                                     <div className="col text-end">
-                                        <span className="badge bg-primary rounded-pill px-3 py-2" style={{fontSize: '0.75rem'}}>
+                                        <span className="badge rounded-pill bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 fw-normal" style={{fontSize: '0.75rem', padding: '6px 14px'}}>
                                             {filteredReports.length} RECORDS
                                         </span>
                                     </div>
@@ -1501,7 +1611,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                                                         </td>
                                                         <td className="px-4 py-3 text-center">
                                                             {(report.total_ng || 0) > 0 ? (
-                                                                <span className="badge bg-danger px-3 py-2">
+                                                                <span className="badge rounded-pill bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}}>
                                                                     {report.total_ng} NG
                                                                 </span>
                                                             ) : (
@@ -1620,7 +1730,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                                                         <div className="d-flex justify-content-between align-items-center mb-2">
                                                             <div>
                                                                 <span className="fw-bold text-dark me-2" style={{fontSize: '0.9rem'}}>{announcement.poster_name}</span>
-                                                                <span className="badge bg-secondary bg-opacity-10 text-secondary border px-2" style={{fontSize: '0.65rem', fontWeight: '700'}}>
+                                                                <span className="badge rounded-pill bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 fw-normal" style={{fontSize: '0.65rem', padding: '6px 14px'}}>
                                                                     {announcement.poster_role.toUpperCase()}
                                                                 </span>
                                                             </div>
@@ -1648,6 +1758,14 @@ export default function ITAssistantPage({ user, onLogout }) {
                             </div>
                         </div>
                     </div>
+                );
+            }
+            case "notifications": {
+                return (
+                    <NotificationContent
+                        notifications={notifications}
+                        onNotificationClick={handleNotificationClick}
+                    />
                 );
             }
             default: return null;
@@ -1702,18 +1820,87 @@ export default function ITAssistantPage({ user, onLogout }) {
                             border: 1px solid rgba(255, 255, 255, 0.05) !important;
                             color: white !important;
                         }
+                        .user-dropdown-toggle:hover {
+                            background: rgba(255,255,255,0.1);
+                            border-radius: 4px;
+                            transition: all 0.2s ease;
+                        }
+                        .dropdown-menu-item {
+                            transition: all 0.2s ease;
+                            border-left: 3px solid transparent;
+                        }
+                        .dropdown-menu-item:hover {
+                            background: #f8f9fa;
+                            border-left-color: #0d6efd;
+                            transform: translateX(2px);
+                        }
+                        .dropdown-menu-item i {
+                            transition: transform 0.2s ease;
+                        }
+                        .dropdown-menu-item:hover i {
+                            transform: scale(1.1);
+                        }
                     `}
                 </style>
 
                 {/* PROFILE SECTION */}
                 <div className="d-flex align-items-center mb-3 mt-1 px-1">
-                    <div className="position-relative flex-shrink-0" style={{ cursor: 'pointer' }} onClick={() => setShowProfileModal(true)}>
-                        <img src={currentAvatar ? `${AVATAR_UPLOAD_PATH}${currentAvatar}` : DEFAULT_AVATAR_PATH} alt="Profile" className="rounded-circle avatar-hover" style={{ width: '42px', height: '42px', objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
-                        <span className="position-absolute bottom-0 end-0 bg-success border border-dark rounded-circle" style={{ width: '10px', height: '10px' }}></span>
+                    <div className="position-relative flex-shrink-0" style={{ cursor: 'default' }}>
+                        <img 
+                            src={currentAvatar ? `${AVATAR_UPLOAD_PATH}${currentAvatar}` : DEFAULT_AVATAR_PATH} 
+                            alt="User" 
+                            className="rounded-circle"
+                            style={{ 
+                                width: '42px', 
+                                height: '42px', 
+                                objectFit: 'cover',
+                                border: '1px solid rgba(255,255,255,0.1)'
+                            }} 
+                            onError={(e) => { 
+                                e.target.onerror = null; 
+                                e.target.src = DEFAULT_AVATAR_PATH; 
+                            }} 
+                        />
+                        <span className="position-absolute bottom-0 end-0 bg-success border border-dark rounded-circle" style={{width: '10px', height: '10px'}}></span>
                     </div>
-                    <div className="ms-3 overflow-hidden" style={{ cursor: 'pointer' }} onClick={() => setShowProfileModal(true)}>
-                        <div className="text-white text-truncate" style={{ fontSize: '0.85rem', fontWeight: '400' }}>{currentFullName}</div>
-                        <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '1px', letterSpacing: '0.3px' }}>Authorized IT Assistant</div>
+                    <div className="ms-3 flex-grow-1 user-dropdown-container position-relative">
+                        <div className="text-white text-truncate position-relative user-dropdown-toggle px-2 py-1 rounded" style={{ fontSize: '0.85rem', fontWeight: '400', cursor: 'pointer' }} onClick={() => setShowUserDropdown(!showUserDropdown)}>
+                            {currentFullName}
+                            <i className={`bi bi-chevron-${showUserDropdown ? 'up' : 'down'} ms-1`} style={{ fontSize: '0.7rem' }}></i>
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '1px', letterSpacing: '0.3px' }}>
+                            Authorized IT Assistant
+                        </div>
+                        
+                        {/* User Dropdown Menu */}
+                        {showUserDropdown && (
+                            <div className="position-absolute top-100 start-0 mt-2 w-100 bg-white rounded shadow-lg" style={{ zIndex: 1000, minWidth: '220px', border: '1px solid #e9ecef' }}>
+                                <div className="py-1">
+                                    <button 
+                                        className="dropdown-menu-item btn btn-sm w-100 text-start d-flex align-items-center px-3 py-2 text-dark"
+                                        style={{ fontSize: '0.8rem' }}
+                                        onClick={() => {
+                                            setShowProfileModal(true);
+                                            setShowUserDropdown(false);
+                                        }}
+                                    >
+                                        <i className="bi bi-person-gear me-2 text-primary"></i>
+                                        <span>Edit Profile</span>
+                                    </button>
+                                    <button 
+                                        className="dropdown-menu-item btn btn-sm w-100 text-start d-flex align-items-center px-3 py-2 text-dark"
+                                        style={{ fontSize: '0.8rem' }}
+                                        onClick={() => {
+                                            onLogout();
+                                            setShowUserDropdown(false);
+                                        }}
+                                    >
+                                        <i className="bi bi-box-arrow-right me-2 text-danger"></i>
+                                        <span>Logout</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -1766,29 +1953,45 @@ export default function ITAssistantPage({ user, onLogout }) {
                             <i className="bi bi-megaphone"></i> 
                             <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Announcements</span>
                         </div>
-                        {unreadAnnouncementsCount > 0 && (
+                        {todayAnnouncementsCount > 0 && (
                             <span className="text-white fw-bold" style={{ fontSize: '0.8rem' }}>
-                                {unreadAnnouncementsCount}
+                                {todayAnnouncementsCount}
                             </span>
                         )}
-                    </button>
-                    
-                    <hr className="border-secondary my-2 opacity-25" />
-                    
-                    <button onClick={onLogout} className="sidebar-link" style={{ color: '#ef4444' }}>
-                        <i className="bi bi-power"></i> 
-                        <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Logout Session</span>
                     </button>
                 </div>
             </div>
 
             <div className="flex-grow-1 d-flex flex-column" style={{ marginLeft: "260px", backgroundColor: "#eeeeee", height: '100vh', overflow: 'hidden' }}>
-                <header className="bg-white d-flex justify-content-between align-items-center px-4 shadow-sm sticky-top z-2" style={{ height: '70px', borderBottom: '1px solid #e5e7eb' }}>
-                    <div>
-                        <h6 className="mb-0 fw-bold text-dark text-uppercase">{activeTab.replace('_', ' ')}</h6>
-                        <small className="text-muted d-none d-sm-block">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</small>
+                <header className="bg-white d-flex justify-content-between align-items-center px-4 shadow-sm sticky-top z-2" style={{ 
+                    height: '80px', 
+                    borderBottom: '1px solid #e5e7eb',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+                    flexShrink: 0
+                }}>
+                    <div className="d-flex align-items-center">
+                        <img 
+                            src={logo} 
+                            alt="MKFF Logo" 
+                            style={{ 
+                                height: '55px', 
+                                width: 'auto',
+                                objectFit: 'contain',
+                                marginRight: '20px'
+                            }} 
+                        />
+                        <div className="d-flex flex-column">
+                            <h4 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.4rem', letterSpacing: '-0.5px' }}>
+                                IT Assistant
+                            </h4>
+                            <span className="text-muted" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                QR Generation & Unit Management
+                            </span>
+                        </div>
                     </div>
-                    <div className="badge rounded-pill bg-light text-secondary border px-3 py-2" style={{ fontSize: '0.65rem', fontWeight: '500' }}><i className="bi bi-shield-check me-1"></i> SECURE SESSION</div>
+                    <div className="d-flex align-items-center gap-3">
+                        <NotificationBell notifications={notifications} onClick={handleBellClick} />
+                    </div>
                 </header>
 
                 <div className="p-4 flex-grow-1" style={{ overflowY: 'auto' }}>

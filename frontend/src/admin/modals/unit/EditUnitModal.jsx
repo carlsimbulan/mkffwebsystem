@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import 'bootstrap-icons/font/bootstrap-icons.css';
 
 // List of station names with their corresponding IDs for the database
 const processStations = [

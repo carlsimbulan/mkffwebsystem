@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import 'bootstrap-icons/font/bootstrap-icons.css';
 
 const processStations = [
     "PCB Pairing", "Integrated Board Test", "Main Board Conformal Coating",
@@ -33,7 +32,7 @@ const NoGoodUnits = ({ logs, handleEditClick }) => {
                     <i className="bi bi-x-circle me-2 text-danger"></i>
                     No Good (NG) Units
                 </h4>
-                <div className="badge bg-danger bg-opacity-10 text-danger px-3 py-2">
+                <div className="badge rounded-pill bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}}>
                     <i className="bi bi-hash me-1"></i>
                     {allNoGoodLogs.length} Units
                 </div>
@@ -112,7 +111,7 @@ const NoGoodUnits = ({ logs, handleEditClick }) => {
                                         </div>
                                     </td>
                                     <td className="px-3 py-3 text-center">
-                                        <span className="badge bg-danger px-3 py-2 rounded-1 fw-semibold" style={{ fontSize: '0.75rem' }}>
+                                        <span className="badge rounded-pill bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 fw-normal" style={{ fontSize: '0.75rem', padding: '6px 14px' }}>
                                             {log.status}
                                         </span>
                                     </td>

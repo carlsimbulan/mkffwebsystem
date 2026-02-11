@@ -1,5 +1,4 @@
 import React from 'react';
-import 'bootstrap-icons/font/bootstrap-icons.css';
 
 export const NotificationBell = ({ notifications = [], onClick }) => {
     const totalCount = notifications.length;

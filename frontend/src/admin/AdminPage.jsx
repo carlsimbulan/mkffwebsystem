@@ -211,7 +211,8 @@ const checkDelayedUnitsAndReports = useCallback((allUnits) => {
             const startTime = new Date(unit.updated_at || unit.created_at); 
             const elapsedMinutes = Math.floor((now.getTime() - startTime.getTime()) / (1000 * 60));
 
-            if (elapsedMinutes > thresholdMinutes) {
+            // Use >= to trigger immediately when threshold is reached
+            if (elapsedMinutes >= thresholdMinutes) {
                 currentDelayedUnitIds.add(unit.id);
                 
                 // Tukuyin kung NG ba o normal delay para sa title
@@ -349,6 +350,14 @@ const fetchData = async () => {
         };
     }, [checkDelayedUnitsAndReports]); // Added checkDelayedUnitsAndReports to dependency array to satisfy ESLint, though the polling interval keeps it running.
 
+    // --- EFFECT: RE-CHECK NOTIFICATIONS WHEN THRESHOLDS CHANGE ---
+    useEffect(() => {
+        // Re-run notification check whenever thresholds change
+        if (logs.length > 0) {
+            checkDelayedUnitsAndReports(logs);
+        }
+    }, [dynamicDelayThresholds, logs, checkDelayedUnitsAndReports]);
+
     // --- TARGET TIME MANAGEMENT HANDLERS ---
     const handleTargetTimeManagement = () => {
         setShowTargetTimeModal(true);
@@ -477,6 +486,7 @@ const handleSaveEdit = async (id, updatedData) => {
         status: updatedData.status,
         remarks: updatedData.remarks,
         station: updatedData.station,
+        admin_override: true, // Allow admin to move units between stations regardless of status
 
         // 🔑 LOGIC: Gamitin ang updatedData (bago), 
         // kung null, gamitin ang currentRecord (mula sa DB/Logs), 
@@ -1139,15 +1149,23 @@ return (
         }} 
     >
         <div className="d-flex align-items-center">
+            <img 
+                src={logo} 
+                alt="MKFF Logo" 
+                style={{ 
+                    height: '55px', 
+                    width: 'auto',
+                    objectFit: 'contain',
+                    marginRight: '20px'
+                }} 
+            />
             <div className="d-flex flex-column">
-                <span className="text-danger fw-bold mb-1" style={{ fontSize: '0.75rem', letterSpacing: '1.2px', textTransform: 'uppercase' }}>
-                    Management System
-                </span>
                 <h4 className="mb-0 fw-bold text-dark" style={{ fontSize: '1.4rem', letterSpacing: '-0.5px' }}>
-                    {activeTab === 'station_monitor' 
-                        ? `${stations.find(s => s.id === stationMonitorId)?.name || 'Monitor'} Details` 
-                        : activeTab.replace(/_/g, ' ').toUpperCase()}
+                    Management System
                 </h4>
+                <span className="text-muted" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                    Production Management Dashboard
+                </span>
             </div>
         </div>
         

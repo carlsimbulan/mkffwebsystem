@@ -683,7 +683,11 @@ if (($stat === 'No Good (NG)' || $stat === 'Pending Approval') && empty($remarks
         }
         
         // Validate station transition logic
-        if ($currentState['station'] !== $stn && $currentState['status'] === 'In Progress') {
+        // Allow admin to move units between stations regardless of status
+        // Operators must complete or mark as NG before moving
+        $isAdminOverride = isset($data['admin_override']) && $data['admin_override'] === true;
+        
+        if ($currentState['station'] !== $stn && $currentState['status'] === 'In Progress' && !$isAdminOverride) {
             // Only allow station change if unit is being completed or has NG status
             if (!in_array($stat, ['Completed', 'No Good (NG)', 'Pending Approval'])) {
                 throw new Exception("Cannot move unit from '{$currentState['station']}' to '{$stn}' while status is '{$currentState['status']}'. Unit must be completed or marked as NG first.");

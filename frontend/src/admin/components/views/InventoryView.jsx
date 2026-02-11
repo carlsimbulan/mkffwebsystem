@@ -109,15 +109,15 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
             // When "All Models" is selected, check for duplicates across ALL board types
             const duplicateInfo = hasDuplicate(log, pcbaLogs);
             if (duplicateInfo.hasDuplicate) {
-                return <span className="badge bg-danger" title={`Duplicate boards: ${duplicateInfo.duplicateBoards.join(', ')}`}>DUP</span>;
+                return <span className="badge rounded-pill bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}} title={`Duplicate boards: ${duplicateInfo.duplicateBoards.join(', ')}`}>DUP</span>;
             } else {
-                return <span className="badge bg-success">NO DUP</span>;
+                return <span className="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}}>NO DUP</span>;
             }
         } else {
             // When a specific model is selected, only check for duplicates within that board type
             const boardValue = log[selectedModelKey];
             if (!boardValue || boardValue === '000000' || boardValue === '') {
-                return <span className="badge bg-success">NO DUP</span>;
+                return <span className="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}}>NO DUP</span>;
             }
             
             // Check if this specific board value exists in any other unit
@@ -129,9 +129,9 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
             if (isDuplicate) {
                 const boardInfo = pcbaMapping.find(m => m.dbKey === selectedModelKey);
                 const boardName = boardInfo ? boardInfo.displayName : selectedModelKey;
-                return <span className="badge bg-danger" title={`Duplicate ${boardName} board`}>DUP</span>;
+                return <span className="badge rounded-pill bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}} title={`Duplicate ${boardName} board`}>DUP</span>;
             } else {
-                return <span className="badge bg-success">NO DUP</span>;
+                return <span className="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}}>NO DUP</span>;
             }
         }
     };
@@ -212,7 +212,10 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
 
     // Enhanced search for Assembly No. and Board Numbers
     const filteredLogs = useMemo(() => {
-        let logs = pcbaLogs;
+        let logs = [...pcbaLogs]; // Create a copy to avoid mutating original
+        
+        // Sort by ID to maintain stable order
+        logs.sort((a, b) => b.id - a.id); // Newest first (descending ID)
         
         // Filter by search term
         if (searchTerm) {
@@ -848,7 +851,7 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                                                         <code className="text-dark fw-bold">{formatAssemblyNumber(request.assembly_no)}</code>
                                                     </td>
                                                     <td>
-                                                        <span className="badge bg-info">{request.board_type}</span>
+                                                        <span className="badge rounded-pill bg-info bg-opacity-10 text-info border border-info border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}}>{request.board_type}</span>
                                                     </td>
                                                     <td>
                                                         <code className="text-muted">

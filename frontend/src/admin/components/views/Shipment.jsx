@@ -60,7 +60,7 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                     <button className="btn btn-outline-primary rounded p-2 shadow-sm transition-all" onClick={() => setShowHistoryModal(true)} title="History">
                         <i className="bi bi-clock-history"></i>
                     </button>
-                    <div className="badge bg-primary bg-opacity-10 text-primary px-3 py-2">
+                    <div className="badge rounded-pill bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}}>
                         <i className="bi bi-box-seam me-1"></i>
                         {readyUnits.length} Pending
                     </div>
@@ -110,7 +110,7 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                                         </td>
                                         <td className="px-3 py-3">
                                             <div className="fw-semibold text-dark">{formatDateTime(unit.updated_at)}</div>
-                                            <span className="badge bg-success px-2 py-1 rounded-1 fw-semibold mt-1" style={{ fontSize: '0.7rem' }}>
+                                            <span className="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25 fw-normal mt-1" style={{ fontSize: '0.7rem', padding: '6px 14px' }}>
                                                 VERIFIED
                                             </span>
                                         </td>
@@ -195,7 +195,7 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
-                                                    <span className="badge bg-success px-3 py-2 rounded-1 fw-semibold" style={{ fontSize: '0.75rem' }}>
+                                                    <span className="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25 fw-normal" style={{ fontSize: '0.75rem', padding: '6px 14px' }}>
                                                         RELEASED
                                                     </span>
                                                 </td>

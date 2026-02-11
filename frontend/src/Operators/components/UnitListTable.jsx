@@ -516,7 +516,7 @@ export const UnitListTable = ({ units, listStatus, loading, error, onEdit, dynam
                         <i className="bi bi-list-columns-reverse me-2 text-primary"></i>
                         {displayTitle} Units
                     </h4>
-                    <div className="badge bg-primary bg-opacity-10 text-primary px-3 py-2">
+                    <div className="badge rounded-pill bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}}>
                         <i className="bi bi-hash me-1"></i>
                         {units.length} Units
                     </div>
@@ -589,11 +589,11 @@ export const UnitListTable = ({ units, listStatus, loading, error, onEdit, dynam
                                                 <span className="text-muted small">{unit.accessoryKittingNo || '---'}</span>
                                             </td>
                                             <td className="px-3 py-3 text-center">
-                                                <span className={`badge px-3 py-2 rounded-1 fw-semibold ${
-                                                    unit.status.includes('Progress') ? 'bg-warning text-dark' : 
-                                                    unit.status.includes('Completed') ? 'bg-success' : 
-                                                    'bg-danger'
-                                                }`} style={{ fontSize: '0.75rem' }}>
+                                                <span className={`badge rounded-pill fw-normal ${
+                                                    unit.status.includes('Progress') ? 'bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25' : 
+                                                    unit.status.includes('Completed') ? 'bg-success bg-opacity-10 text-success border border-success border-opacity-25' : 
+                                                    'bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25'
+                                                }`} style={{ fontSize: '0.7rem', padding: '6px 14px' }}>
                                                     {unit.status}
                                                 </span>
                                             </td>
@@ -770,7 +770,7 @@ export const UnitListTable = ({ units, listStatus, loading, error, onEdit, dynam
                                                             return (
                                                                 <tr key={request.id}>
                                                                     <td>
-                                                                        <span className="badge bg-info">{request.board_type}</span>
+                                                                        <span className="badge rounded-pill bg-info bg-opacity-10 text-info border border-info border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}}>{request.board_type}</span>
                                                                     </td>
                                                                     <td>
                                                                         <code className="text-muted">
@@ -792,7 +792,7 @@ export const UnitListTable = ({ units, listStatus, loading, error, onEdit, dynam
                                                                         </small>
                                                                     </td>
                                                                     <td>
-                                                                        <span className="badge bg-warning text-dark">
+                                                                        <span className="badge rounded-pill bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}}>
                                                                             <i className="bi bi-hourglass-split me-1"></i>
                                                                             Pending Approval
                                                                         </span>
@@ -829,7 +829,7 @@ export const UnitListTable = ({ units, listStatus, loading, error, onEdit, dynam
                                                             }))}
                                                         >
                                                             <h6 className="mb-0 fw-bold">
-                                                                <span className="badge bg-primary me-2">{stationNumber}</span>
+                                                                <span className="badge rounded-pill bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 fw-normal me-2" style={{fontSize: '0.7rem', padding: '6px 14px'}}>{stationNumber}</span>
                                                                 {stationName}
                                                             </h6>
                                                             <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'}`}></i>

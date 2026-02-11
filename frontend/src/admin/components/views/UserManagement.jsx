@@ -106,7 +106,7 @@ export function UserManagement({
             <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
                 <div className="table-responsive">
                     <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem' }}>
-                        <thead className="bg-primary text-white">
+                        <thead className="bg-dark text-white">
                             <tr>
                                 <th className="border-0 px-4 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>USER PROFILE</th>
                                 <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>ACCESS LEVEL</th>
@@ -135,7 +135,7 @@ export function UserManagement({
                                 }
 
                                 return (
-                                    <tr key={u.id} className="border-bottom hover-bg-primary hover-bg-opacity-5 transition-all">
+                                    <tr key={u.id} className="border-bottom hover-bg-light transition-all">
                                         <td className="ps-4 py-3">
                                             <div className="d-flex align-items-center">
                                                 <img
@@ -154,24 +154,22 @@ export function UserManagement({
                                             </div>
                                         </td>
                                         <td className="px-3 py-3">
-                                            <span className={`badge px-3 py-2 rounded-1 fw-semibold ${
-                                                u.role === 'Administrator' ? 'bg-danger text-white' :
-                                                u.role === 'IT Assistant' ? 'bg-info text-white' :
-                                                'bg-secondary text-white'
-                                            }`} style={{ fontSize: '0.75rem' }}>
-                                                {badgeIcon}
+                                            <span className={`badge rounded-pill fw-normal ${
+                                                u.role === 'Administrator' ? 'bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25' :
+                                                u.role === 'IT Assistant' ? 'bg-info bg-opacity-10 text-info border border-info border-opacity-25' :
+                                                'bg-success bg-opacity-10 text-success border border-success border-opacity-25'
+                                            }`} style={{ fontSize: '0.7rem', padding: '6px 14px' }}>
                                                 {u.role}
                                             </span>
                                         </td>
                                         <td className="px-3 py-3">
                                             {!isAssigned ? (
-                                                <span className="badge bg-warning text-dark px-2 py-1 rounded-1 fw-semibold" style={{ fontSize: '0.7rem' }}>
-                                                    <i className="bi bi-clock me-1"></i>
+                                                <span className="badge rounded-pill bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 fw-normal" style={{ fontSize: '0.7rem', padding: '6px 14px' }}>
                                                     Not Assigned
                                                 </span>
                                             ) : (
-                                                <div className="fw-bold text-dark" style={{ fontSize: '0.8rem' }}>
-                                                    <i className="bi bi-geo-alt-fill text-primary me-2"></i>
+                                                <div className="text-dark" style={{ fontSize: '0.8rem' }}>
+                                                    <i className="bi bi-geo-alt text-muted me-1" style={{ fontSize: '0.75rem' }}></i>
                                                     {u.station}
                                                 </div>
                                             )}
@@ -229,8 +227,8 @@ export function UserManagement({
 // Add custom styles
 const customStyles = `
 <style>
-.hover-bg-primary:hover {
-    background-color: rgba(13, 110, 253, 0.03) !important;
+.hover-bg-light:hover {
+    background-color: rgba(248, 250, 252, 0.8) !important;
 }
 
 .transition-all {
@@ -278,9 +276,9 @@ const customStyles = `
 
 .search-input:focus {
     outline: none;
-    border-color: #3b82f6;
+    border-color: #64748b;
     background: white;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.1);
 }
 
 .search-icon {

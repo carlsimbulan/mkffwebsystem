@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import 'bootstrap-icons/font/bootstrap-icons.css';
 import ReactDOM from 'react-dom';
 
 const processStations = [
@@ -24,11 +23,11 @@ const formatTimestamp = (isoString) => {
 
 const getStatusBadgeClass = (status) => {
     const statusText = status?.toLowerCase() || '';
-    if (statusText.includes('completed') || statusText.includes('ok')) return 'bg-success text-white';
-    if (statusText.includes('no good') || statusText.includes('ng')) return 'bg-danger text-white';
-    if (statusText.includes('in progress')) return 'bg-warning text-dark';
-    if (statusText.includes('pending approval')) return 'bg-primary text-white'; 
-    if (statusText.includes('scanning')) return 'bg-info text-white';
+    if (statusText.includes('completed') || statusText.includes('ok')) return 'bg-success bg-opacity-10 text-success border border-success border-opacity-25';
+    if (statusText.includes('no good') || statusText.includes('ng')) return 'bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25';
+    if (statusText.includes('in progress')) return 'bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25';
+    if (statusText.includes('pending approval')) return 'bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25'; 
+    if (statusText.includes('scanning')) return 'bg-info bg-opacity-10 text-info border border-info border-opacity-25';
     return 'bg-light text-secondary border';
 };
 
@@ -36,8 +35,9 @@ const checkUnitDelay = (stationId, updatedAt, thresholds = {}) => {
     const threshold = thresholds[stationId] || 10;
     const lastUpdate = new Date(updatedAt).getTime();
     const minutesInStation = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
-    if (minutesInStation > threshold * 3) return { isDelayed: true, level: 'CRITICAL', minutes: minutesInStation };
-    if (minutesInStation > threshold) return { isDelayed: true, level: 'MODERATE', minutes: minutesInStation };
+    // Use >= to trigger immediately when threshold is reached
+    if (minutesInStation >= threshold * 3) return { isDelayed: true, level: 'CRITICAL', minutes: minutesInStation };
+    if (minutesInStation >= threshold) return { isDelayed: true, level: 'MODERATE', minutes: minutesInStation };
     return { isDelayed: false, level: 'NORMAL', minutes: minutesInStation };
 };
 
@@ -396,7 +396,10 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
     const [stationDropdowns, setStationDropdowns] = useState({});
     const [progressDropdowns, setProgressDropdowns] = useState({});
 
-    // Enhanced AI output formatting for new 3-section format
+    // Get monitor metrics for this station
+    const monitorMetrics = calculateMetrics(stationMonitorId);
+
+    // Enhanced AI output formatting for ultra-concise production-ready display
     const formatStationOutput = (text) => {
         if (!text) return '';
         
@@ -429,44 +432,173 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 }
             }
         }
-        
+
+        // Extract bullet points and make them concise
+        const extractBullets = (text) => {
+            if (!text) return [];
+            return text.split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0)
+                .map(line => line.replace(/^[-•*]\s*/, '').trim())
+                .filter(line => line.length > 0);
+        };
+
+        const diagnosisBullets = extractBullets(diagnosis);
+        const forecastBullets = extractBullets(forecast);
+        const prescriptionBullets = extractBullets(prescription);
+
         return `
-            <div class="intelligent-analysis-container">
-                ${diagnosis ? `
-                    <div class="diagnosis-card">
-                        <div class="analysis-header">
-                            <span class="analysis-title">DIAGNOSIS</span>
+            <style>
+                .ai-analysis-grid {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 1rem;
+                    margin-top: 1rem;
+                }
+                @media (max-width: 992px) {
+                    .ai-analysis-grid {
+                        grid-template-columns: 1fr;
+                    }
+                }
+                .analysis-card {
+                    background: white;
+                    border-radius: 8px;
+                    padding: 1rem;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    border-left: 4px solid;
+                }
+                .analysis-card.diagnosis {
+                    border-left-color: #dc3545;
+                }
+                .analysis-card.forecast {
+                    border-left-color: #ffc107;
+                }
+                .analysis-card.prescription {
+                    border-left-color: #28a745;
+                }
+                .analysis-card-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    margin-bottom: 0.75rem;
+                    font-weight: 700;
+                    font-size: 0.85rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                .analysis-card-header .icon {
+                    font-size: 1.2rem;
+                }
+                .analysis-card.diagnosis .analysis-card-header {
+                    color: #dc3545;
+                }
+                .analysis-card.forecast .analysis-card-header {
+                    color: #f59e0b;
+                }
+                .analysis-card.prescription .analysis-card-header {
+                    color: #28a745;
+                }
+                .checklist-item {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 0.5rem;
+                    padding: 0.5rem 0;
+                    border-bottom: 1px solid #f0f0f0;
+                    font-size: 0.85rem;
+                    line-height: 1.4;
+                }
+                .checklist-item:last-child {
+                    border-bottom: none;
+                }
+                .checklist-icon {
+                    flex-shrink: 0;
+                    width: 18px;
+                    height: 18px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 0.7rem;
+                    margin-top: 2px;
+                }
+                .diagnosis .checklist-icon {
+                    background: #fee;
+                    color: #dc3545;
+                }
+                .forecast .checklist-icon {
+                    background: #fff8e1;
+                    color: #f59e0b;
+                }
+                .prescription .checklist-icon {
+                    background: #e8f5e9;
+                    color: #28a745;
+                }
+                .checklist-text {
+                    flex: 1;
+                    color: #333;
+                }
+                .empty-state {
+                    text-align: center;
+                    padding: 2rem;
+                    color: #999;
+                    font-style: italic;
+                }
+            </style>
+            <div class="ai-analysis-grid">
+                ${diagnosisBullets.length > 0 ? `
+                    <div class="analysis-card diagnosis">
+                        <div class="analysis-card-header">
+                            <span class="icon">⚠️</span>
+                            <span>Root Cause</span>
                         </div>
-                        <div class="analysis-content">${diagnosis.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
+                        ${diagnosisBullets.map(item => `
+                            <div class="checklist-item">
+                                <div class="checklist-icon">✗</div>
+                                <div class="checklist-text">${item}</div>
+                            </div>
+                        `).join('')}
                     </div>
                 ` : ''}
-                ${forecast ? `
-                    <div class="forecast-card">
-                        <div class="analysis-header">
-                            <span class="analysis-title">FORECAST</span>
+                
+                ${forecastBullets.length > 0 ? `
+                    <div class="analysis-card forecast">
+                        <div class="analysis-card-header">
+                            <span class="icon">📊</span>
+                            <span>Impact Forecast</span>
                         </div>
-                        <div class="analysis-content">${forecast.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
+                        ${forecastBullets.map(item => `
+                            <div class="checklist-item">
+                                <div class="checklist-icon">⚡</div>
+                                <div class="checklist-text">${item}</div>
+                            </div>
+                        `).join('')}
                     </div>
                 ` : ''}
-                ${prescription ? `
-                    <div class="prescription-card">
-                        <div class="analysis-header">
-                            <span class="analysis-title">PRESCRIPTION</span>
+                
+                ${prescriptionBullets.length > 0 ? `
+                    <div class="analysis-card prescription">
+                        <div class="analysis-card-header">
+                            <span class="icon">✅</span>
+                            <span>Action Items</span>
                         </div>
-                        <div class="analysis-content">${prescription.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
+                        ${prescriptionBullets.map(item => `
+                            <div class="checklist-item">
+                                <div class="checklist-icon">→</div>
+                                <div class="checklist-text">${item}</div>
+                            </div>
+                        `).join('')}
                     </div>
                 ` : ''}
-                ${!diagnosis && !forecast && !prescription ? `
-                    <div class="fallback-analysis">
-                        <div class="analysis-content">${cleanedAnalysis.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
+                
+                ${diagnosisBullets.length === 0 && forecastBullets.length === 0 && prescriptionBullets.length === 0 ? `
+                    <div class="empty-state">
+                        <p>No analysis data available</p>
                     </div>
                 ` : ''}
             </div>
         `;
     };
-
-    const monitorMetrics = calculateMetrics(stationMonitorId);
-
+    
     const filteredLogs = useMemo(() => {
         return (monitorMetrics.stationLogs || [])
             .filter(log => log.assembly_no?.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -605,48 +737,11 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 throw new Error('No model returned from backend');
             }
 
-            const prompt = `You are an AI Industrial Engineer specializing in real-time production optimization at MKFF Laserteknique International inc.
-
-STATION ANALYSIS: ${processName} (${stationMonitorId})
-Current Status: ${hasDelayedUnits ? 'DELAYED UNITS DETECTED' : 'NORMAL OPERATION'}
-Takt Time Status: ${taktTimeStatus}
-
-DELAYED UNITS CHECKLIST DATA:
-${JSON.stringify(delayedContext, null, 2)}
-
-ANALYSIS INSTRUCTIONS:
-1. Look for Voltage Tolerance breaches (outside 113.85V-116.15V) in the checklist data
-2. Identify if delays are Quality-Driven (due to 'NO GO', 'FAIL', 'NOT DETECTED' values) or Process-Driven (all items are 'GO' but time spent is still high)
-3. Focus on specific errors found in the actual checklist values
-4. When you see 'Empty' values in the checklist, diagnose this as Documentation Breakdown - this indicates failure in documentation protocol
-
-REQUIRED OUTPUT FORMAT (STRICT):
-[DIAGNOSIS]: Current root cause using manufacturing terminology, referencing specific checklist failures
-- Maximum 2 bullet points
-- Each bullet must be exactly one sentence
-- Example: • Voltage breach detected at Station 2.
-
-[FORECAST]: Predict station status for next 2-4 hours based on current conditions and error patterns
-- Maximum 1 bullet point
-- Each bullet must be exactly one sentence
-- Example: • Risk of 30% slowdown in 2 hours.
-
-[PRESCRIPTION]: Provide exactly 2 actionable steps for production supervisor based on specific checklist errors found
-- Maximum 2 bullet points
-- Each bullet must be exactly one sentence
-- Example: • Recalibrate Station 2 test rig.
-- For voltage issues: suggest electrical equipment calibration
-- For quality failures: suggest specific process adjustments
-- For process-driven delays: suggest workflow optimization
-
-EXECUTIVE SUMMARY: Strictly maximum of 10 words only.
-
-CRITICAL: Use only one-sentence bullet points. No paragraphs. No long explanations.`;
-
             const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    action: 'generateContent',
                     modelName: modelData.modelName,
                     prompt: prompt
                 })
@@ -774,11 +869,45 @@ CRITICAL: Use only one-sentence bullet points. No paragraphs. No long explanatio
                 }
                 
                 .analysis-content { 
-                    padding: 16px; 
-                    font-size: 0.8rem; 
-                    line-height: 1.4; 
-                    font-weight: 500;
-                    color: #374151;
+                    padding: 20px; 
+                    font-size: 0.9rem; 
+                    line-height: 1.6; 
+                    font-weight: 600;
+                    color: #1f2937;
+                }
+                
+                .analysis-content ul {
+                    list-style: none;
+                    padding: 0;
+                    margin: 0;
+                }
+                
+                .analysis-content li {
+                    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+                    border-left: 4px solid #3b82f6;
+                    margin-bottom: 12px;
+                    padding: 16px 20px;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
+                    transition: all 0.3s ease;
+                    position: relative;
+                    font-weight: 700;
+                }
+                
+                .analysis-content li:hover {
+                    transform: translateX(8px);
+                    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+                    border-left-color: #2563eb;
+                }
+                
+                .analysis-content li::before {
+                    content: "▶";
+                    position: absolute;
+                    left: -2px;
+                    top: 18px;
+                    color: #3b82f6;
+                    font-size: 0.8rem;
+                    font-weight: bold;
                 }
 
                 /* Takt Time Badge Styling */
@@ -810,33 +939,6 @@ CRITICAL: Use only one-sentence bullet points. No paragraphs. No long explanatio
                     <button className="btn btn-light border btn-sm px-3 shadow-sm fw-bold" onClick={() => setActiveTab('stations')}>BACK</button>
                 </div>
             </div>
-
-            {hasDelayedUnits && (
-                <div className="diagnostic-card-minimal p-3 mb-4 shadow-sm">
-                    <div className="d-flex justify-content-between align-items-center mb-2">
-                        <div>
-                            <div className="fw-bold text-dark small uppercase tracking-wider">AI INDUSTRIAL ENGINEER ANALYSIS</div>
-                            <div className="small text-muted">Predictive manufacturing intelligence with forecasting and actionable prescriptions.</div>
-                        </div>
-                        <button
-                            className="btn btn-outline-dark btn-sm fw-bold shadow-sm px-4 rounded-pill"
-                            onClick={fetchStationDiagnosis}
-                            disabled={isStationAiLoading}
-                        >
-                            {isStationAiLoading ? 'ANALYZING...' : 'ANALYZE STATION'}
-                        </button>
-                    </div>
-
-                    {stationAiAnalysis ? (
-                        <div 
-                            className="text-dark" 
-                            dangerouslySetInnerHTML={{ __html: formatStationOutput(stationAiAnalysis) }}
-                        />
-                    ) : (
-                        <div className="text-muted p-3">No analysis available.</div>
-                    )}
-                </div>
-            )}
 
             <div className="row g-4 mb-4">
                 <div className="col-md-6 col-xl-3">
@@ -1017,20 +1119,20 @@ CRITICAL: Use only one-sentence bullet points. No paragraphs. No long explanatio
                                             <span className="text-muted small">{log.accessory_kitting_no || '---'}</span>
                                         </td>
                                         <td className="px-3 py-3 text-center">
-                                            <span className={`badge px-3 py-2 rounded-1 fw-semibold ${
-                                                log.status.includes('Progress') ? 'bg-warning text-dark' : 
-                                                log.status.includes('Completed') ? 'bg-success' : 
-                                                'bg-danger'
-                                            }`} style={{ fontSize: '0.75rem' }}>
+                                            <span className={`badge rounded-pill fw-normal ${
+                                                log.status.includes('Progress') ? 'bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25' : 
+                                                log.status.includes('Completed') ? 'bg-success bg-opacity-10 text-success border border-success border-opacity-25' : 
+                                                'bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25'
+                                            }`} style={{ fontSize: '0.7rem', padding: '6px 14px' }}>
                                                 {log.status}
                                             </span>
                                         </td>
                                         <td className="px-3 py-3 text-center">
                                             {isInProgressOrNG && delay.isDelayed ? (
                                                 <div className="d-flex flex-column align-items-center">
-                                                    <span className={`badge rounded-pill px-2 py-1 fw-bold ${
-                                                        delay.level === 'CRITICAL' ? 'bg-danger' : 'bg-warning text-dark'
-                                                    }`} style={{ fontSize: '0.7rem' }}>
+                                                    <span className={`badge rounded-pill fw-normal ${
+                                                        delay.level === 'CRITICAL' ? 'bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25' : 'bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25'
+                                                    }`} style={{ fontSize: '0.7rem', padding: '6px 14px' }}>
                                                         +{Math.round(delayMinutes)}m
                                                     </span>
                                                     <small className="text-muted mt-1" style={{ fontSize: '0.6rem' }}>
@@ -1222,7 +1324,6 @@ CRITICAL: Use only one-sentence bullet points. No paragraphs. No long explanatio
     );
 };
 
-/* ... */
 export function StationsOverview({
     activeTab, stations, calculateMetrics, stationMonitorId, highlightedUnitId, setActiveTab, handleMonitorStation, handleViewHistory, handleEditClick, fetchData, allLogs, liveUnitLogs, dynamicDelayThresholds, onTargetTimeManagement
 }) {
@@ -1289,7 +1390,9 @@ export function StationsOverview({
     const formatHotspotOutput = (text) => {
         if (!text) return '';
         
-        const cleanedAnalysis = text.replace(/\*\*/g, '').replace(/\*/g, '');
+        // Remove EXECUTIVE SUMMARY section if it exists
+        let cleanedAnalysis = text.replace(/\*\*/g, '').replace(/\*/g, '');
+        cleanedAnalysis = cleanedAnalysis.replace(/EXECUTIVE SUMMARY[:\s]*[^\n]*\n?/gi, '');
         
         let diagnosis = '';
         let forecast = '';
@@ -1318,36 +1421,168 @@ export function StationsOverview({
                 }
             }
         }
-        
+
+        // Extract bullet points and make them concise, filter out EXECUTIVE SUMMARY
+        const extractBullets = (text) => {
+            if (!text) return [];
+            return text.split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0)
+                .filter(line => !line.toLowerCase().includes('executive summary'))
+                .map(line => line.replace(/^[-•*]\s*/, '').trim())
+                .filter(line => line.length > 0);
+        };
+
+        const diagnosisBullets = extractBullets(diagnosis);
+        const forecastBullets = extractBullets(forecast);
+        const prescriptionBullets = extractBullets(prescription);
+
         return `
-            <div class="intelligence-hub-container">
-                ${diagnosis ? `
-                    <div class="diagnosis-hub-card">
-                        <div class="hub-header">
-                            <span class="hub-title">DIAGNOSIS</span>
+            <style>
+                .ai-analysis-grid {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 1rem;
+                    margin-top: 1rem;
+                }
+                @media (max-width: 992px) {
+                    .ai-analysis-grid {
+                        grid-template-columns: 1fr;
+                    }
+                }
+                .analysis-card {
+                    background: white;
+                    border-radius: 8px;
+                    padding: 1rem;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    border-left: 4px solid;
+                }
+                .analysis-card.diagnosis {
+                    border-left-color: #dc3545;
+                }
+                .analysis-card.forecast {
+                    border-left-color: #ffc107;
+                }
+                .analysis-card.prescription {
+                    border-left-color: #28a745;
+                }
+                .analysis-card-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    margin-bottom: 0.75rem;
+                    font-weight: 700;
+                    font-size: 0.85rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                .analysis-card-header .icon {
+                    font-size: 1.2rem;
+                }
+                .analysis-card.diagnosis .analysis-card-header {
+                    color: #dc3545;
+                }
+                .analysis-card.forecast .analysis-card-header {
+                    color: #f59e0b;
+                }
+                .analysis-card.prescription .analysis-card-header {
+                    color: #28a745;
+                }
+                .checklist-item {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 0.5rem;
+                    padding: 0.5rem 0;
+                    border-bottom: 1px solid #f0f0f0;
+                    font-size: 0.85rem;
+                    line-height: 1.4;
+                }
+                .checklist-item:last-child {
+                    border-bottom: none;
+                }
+                .checklist-icon {
+                    flex-shrink: 0;
+                    width: 18px;
+                    height: 18px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 0.7rem;
+                    margin-top: 2px;
+                }
+                .diagnosis .checklist-icon {
+                    background: #fee;
+                    color: #dc3545;
+                }
+                .forecast .checklist-icon {
+                    background: #fff8e1;
+                    color: #f59e0b;
+                }
+                .prescription .checklist-icon {
+                    background: #e8f5e9;
+                    color: #28a745;
+                }
+                .checklist-text {
+                    flex: 1;
+                    color: #333;
+                }
+                .empty-state {
+                    text-align: center;
+                    padding: 2rem;
+                    color: #999;
+                    font-style: italic;
+                }
+            </style>
+            <div class="ai-analysis-grid">
+                ${diagnosisBullets.length > 0 ? `
+                    <div class="analysis-card diagnosis">
+                        <div class="analysis-card-header">
+                            <span class="icon">⚠️</span>
+                            <span>Root Cause</span>
                         </div>
-                        <div class="hub-content">${diagnosis.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
+                        ${diagnosisBullets.map(item => `
+                            <div class="checklist-item">
+                                <div class="checklist-icon">✗</div>
+                                <div class="checklist-text">${item}</div>
+                            </div>
+                        `).join('')}
                     </div>
                 ` : ''}
-                ${forecast ? `
-                    <div class="forecast-hub-card">
-                        <div class="hub-header">
-                            <span class="hub-title">FORECAST</span>
+                
+                ${forecastBullets.length > 0 ? `
+                    <div class="analysis-card forecast">
+                        <div class="analysis-card-header">
+                            <span class="icon">📊</span>
+                            <span>Impact Forecast</span>
                         </div>
-                        <div class="hub-content">${forecast.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
+                        ${forecastBullets.map(item => `
+                            <div class="checklist-item">
+                                <div class="checklist-icon">⚡</div>
+                                <div class="checklist-text">${item}</div>
+                            </div>
+                        `).join('')}
                     </div>
                 ` : ''}
-                ${prescription ? `
-                    <div class="prescription-hub-card">
-                        <div class="hub-header">
-                            <span class="hub-title">PRESCRIPTION</span>
+                
+                ${prescriptionBullets.length > 0 ? `
+                    <div class="analysis-card prescription">
+                        <div class="analysis-card-header">
+                            <span class="icon">✅</span>
+                            <span>Action Items</span>
                         </div>
-                        <div class="hub-content">${prescription.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
+                        ${prescriptionBullets.map(item => `
+                            <div class="checklist-item">
+                                <div class="checklist-icon">→</div>
+                                <div class="checklist-text">${item}</div>
+                            </div>
+                        `).join('')}
                     </div>
                 ` : ''}
-                ${!diagnosis && !forecast && !prescription ? `
-                    <div class="fallback-hub-analysis">
-                        <div class="hub-content">${cleanedAnalysis.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
+                
+                ${diagnosisBullets.length === 0 && forecastBullets.length === 0 && prescriptionBullets.length === 0 ? `
+                    <div class="empty-state">
+                        <p>No analysis data available</p>
                     </div>
                 ` : ''}
             </div>
@@ -1610,7 +1845,8 @@ export function StationsOverview({
                     const lastUpdate = new Date(log.updated_at || log.created_at).getTime();
                     const minutesInStation = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
                     const threshold = dynamicDelayThresholds[stationId] || 10;
-                    return minutesInStation > threshold;
+                    // Use >= to trigger immediately when threshold is reached
+                    return minutesInStation >= threshold;
                 }).length;
 
                 const avgDelayTime = operatorLogs.reduce((sum, log) => {
@@ -1969,7 +2205,17 @@ export function StationsOverview({
     body: JSON.stringify({ action: 'list_models' })
 });
 
+if (!modelRes.ok) {
+    throw new Error(`Failed to fetch models: ${modelRes.status} ${modelRes.statusText}`);
+}
+
 const modelData = await modelRes.json();
+console.log('Model Data:', modelData);
+
+if (modelData.error) {
+    throw new Error(`Model fetch error: ${modelData.error}`);
+}
+
 if (!modelData.modelName) {
     throw new Error('No model returned from backend');
 }
@@ -2047,27 +2293,26 @@ REQUIRED OUTPUT FORMAT (STRICT):
 [DIAGNOSIS]: Identify immediate root causes with personal accountability using operator_full_name AND MANDATORY 3-year deep dive context
 - Maximum 2 bullet points
 - Each bullet must be exactly one sentence
-- MANDATORY DEEP DIVE FORMAT: Must use "Based on a 3-year deep dive into the performance of [Full Name], a chronic pattern of [specific issue] has been identified ([XX]% historical [metric] rate over 3 years)"
-- REQUIRED: Include historical performance metrics when available (NG rate, voltage error rate, consistency score) with specific percentages and "3-year deep dive" timeframe
-- If operator shows poor historical pattern (>15% NG rate or <80% consistency), you MUST mention the specific percentage and "3-year deep dive" analysis
+- MANDATORY DEEP DIVE FORMAT: Must use "Based on a 3-month deep dive into the performance of [Full Name], a chronic pattern of [specific issue] has been identified ([XX]% historical [metric] rate over 3 months)"
+- REQUIRED: Include historical performance metrics when available (NG rate, voltage error rate, consistency score) with specific percentages and "3-month deep dive" timeframe
+- If operator shows poor historical pattern (>10% NG rate or <80% consistency), you MUST mention the specific percentage and "3-month deep dive" analysis
 
 [FORECAST]: Predict production line status for the next 3 hours ONLY with probability metrics based on current conditions AND historical operator patterns
 - Maximum 1 bullet point
 - Each bullet must be exactly one sentence
 - Must include probability percentage and specific 3-hour timeframe (e.g., '85% chance of clearing backlog by 3PM today based on Lebron James historical 12% NG rate' or '95% risk of line stoppage within 3 hours due to Shane Villars chronic voltage issues')
 
-[PRESCRIPTION]: Provide surgical interventions for specific operators using their exact full names from users database, MANDATORY enhanced with 3-year deep dive analysis
+[PRESCRIPTION]: Provide surgical interventions for specific operators using their exact full names from users database, MANDATORY enhanced with 3-month deep dive analysis
 - Maximum 2 bullet points
 - Each bullet must be exactly one sentence
-- MANDATORY DEEP DIVE FORMAT: Must use "Based on a 3-year deep dive into the performance of [Full Name], mandatory [specific intervention] is required due to chronic [specific issue] pattern ([XX]% historical [metric] rate over 3 years)"
+- MANDATORY DEEP DIVE FORMAT: Must use "Based on a 3-month deep dive into the performance of [Full Name], mandatory [specific intervention] is required due to chronic [specific issue] pattern ([XX]% historical [metric] rate over 3 months)"
 - For "Unassigned" stations, recommend specific operator assignment avoiding those with poor historical performance
 - Focus on operators with repeated 'NO GO' or '0V' readings AND poor historical metrics
-- MANDATORY: If historical performance shows chronic issues (>20% NG rate, >15% voltage errors, <70% consistency), recommend mandatory retraining or performance improvement plans with specific percentages and "3-year deep dive" timeframe
+- MANDATORY: If historical performance shows chronic issues (>10% NG rate, >5% voltage errors, <80% consistency), recommend mandatory retraining or performance improvement plans with specific percentages and "3-month deep dive" timeframe
 - CRITICAL: Use FULL NAMES ONLY (e.g., "Shane Villars", "Lebron James") - NEVER use email addresses or usernames
-- REQUIRED EXAMPLE FORMAT: "Based on a 3-year deep dive into the performance of [Full Name], mandatory retraining is required due to chronic [specific issue] pattern ([XX]% historical [metric] rate over 3 years)"
+- REQUIRED EXAMPLE FORMAT: "Based on a 3-month deep dive into the performance of [Full Name], mandatory retraining is required due to chronic [specific issue] pattern ([XX]% historical [metric] rate over 3 months)"
+- MUST REFERENCE: Look for these patterns in the comprehensive_historical_performance object which contains complete 3-month analysis including dispatched units
 - MUST REFERENCE: Look for these patterns in the comprehensive_historical_performance object which contains complete 3-year analysis including dispatched units
-
-EXECUTIVE SUMMARY: Strictly maximum of 10 words only.
 
 CRITICAL: Use only one-sentence bullet points. No paragraphs. No long explanations. Focus on immediate actionable intelligence with personal accountability enhanced by 3-year historical performance data. Always use exact operator full names from users database current_station_assignments for maximum accountability. Never use "Unassigned" in prescriptions - always recommend specific operator assignments. Prioritize interventions for operators with poor historical performance patterns. 
 
@@ -2085,7 +2330,12 @@ const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.ph
 });
 
 const genData = await genRes.json();
-if (genData.text) {
+console.log('Gemini API Response:', genData);
+
+if (genData.error) {
+    console.error('Gemini API Error:', genData.error);
+    setDelayHotspotsAi({ __error: `AI Service Error: ${genData.error}` });
+} else if (genData.text) {
     setDelayHotspotsAi({ __complete_analysis: genData.text });
 } else {
     setDelayHotspotsAi({ __error: 'No analysis returned from AI service' });
@@ -2157,7 +2407,7 @@ if (activeTab === "overall_history") {
                                     <td className="small text-muted fw-bold">{log.action_type || 'UPDATE'}</td>
                                     <td className="fw-semibold">{log.station_name || log.station}</td>
                                     <td className="text-center">
-                                        <span className={`badge rounded-1 px-3 ${getStatusBadgeClass(log.status_after || log.status)}`}>
+                                        <span className={`badge rounded-pill fw-normal ${getStatusBadgeClass(log.status_after || log.status)}`} style={{fontSize: '0.7rem', padding: '6px 14px'}}>
                                             {log.status_after || log.status}
                                         </span>
                                     </td>
@@ -2400,6 +2650,14 @@ return (
                 ) : delayHotspotsAi && delayHotspotsAi.__error ? (
                     <div className="alert alert-danger">
                         <strong>Analysis Error:</strong> {delayHotspotsAi.__error}
+                    </div>
+                ) : isDelayHotspotsAiLoading ? (
+                    <div className="text-center py-5">
+                        <div className="spinner-border text-primary mb-3" role="status" style={{ width: '3rem', height: '3rem' }}>
+                            <span className="visually-hidden">Loading...</span>
+                        </div>
+                        <div className="fw-bold text-primary mb-2">Analyzing Production Data...</div>
+                        <div className="text-muted small">Please wait while AI processes station metrics and operator performance</div>
                     </div>
                 ) : (
                     <div className="text-muted text-center py-4">

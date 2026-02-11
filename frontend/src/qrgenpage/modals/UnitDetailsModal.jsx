@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import 'bootstrap-icons/font/bootstrap-icons.css';
 
 const PROCESS_STATIONS = [
     "PCB Pairing", "Integrated Board Test", "Main Board Conformal Coating",

@@ -1,5 +1,4 @@
 import React from 'react';
-import 'bootstrap-icons/font/bootstrap-icons.css';
 
 export function ApproveUnitModal({ selectedLogToApprove, onClose, onApprove }) {
     if (!selectedLogToApprove) return null;

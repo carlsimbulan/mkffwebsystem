@@ -37,7 +37,7 @@ export function ApprovalQueue({
                     <i className="bi bi-clipboard-check me-2 text-primary"></i>
                     Approval Queue
                 </h4>
-                <div className="badge bg-primary bg-opacity-10 text-primary px-3 py-2">
+                <div className="badge rounded-pill bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}}>
                     <i className="bi bi-hash me-1"></i>
                     {approvalQueueLogs.length} Units
                 </div>
@@ -83,7 +83,7 @@ export function ApprovalQueue({
                                                     {log.assembly_no}
                                                 </code>
                                                 {isOverdue && (
-                                                    <span className="ms-2 badge bg-danger text-white rounded-pill px-2 py-1" style={{ fontSize: '0.7rem' }}>
+                                                    <span className="ms-2 badge rounded-pill bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 fw-normal" style={{ fontSize: '0.7rem', padding: '6px 14px' }}>
                                                         <i className="bi bi-clock-fill me-1"></i>
                                                         Overdue
                                                     </span>

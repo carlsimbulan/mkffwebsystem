@@ -1,9 +1,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import 'bootstrap-icons/font/bootstrap-icons.css';
 
 export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, announcementCount, logs, calculateMetrics, dynamicTargetTimes = {} }) {
     
-    // 🔑 Track loading state for target times
+    // Track loading state for target times
     const [isTargetTimeLoading, setIsTargetTimeLoading] = useState(false);
     
     // 🔑 Delay calculation function (updated to use dynamic target times)
@@ -11,8 +10,9 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
         const threshold = dynamicTargetTimes[stationId] || 10;
         const lastUpdate = new Date(updatedAt).getTime();
         const minutesInStation = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
-        if (minutesInStation > threshold * 3) return { isDelayed: true, level: 'CRITICAL', minutes: minutesInStation };
-        if (minutesInStation > threshold) return { isDelayed: true, level: 'MODERATE', minutes: minutesInStation };
+        // Use >= to trigger immediately when threshold is reached
+        if (minutesInStation >= threshold * 3) return { isDelayed: true, level: 'CRITICAL', minutes: minutesInStation };
+        if (minutesInStation >= threshold) return { isDelayed: true, level: 'MODERATE', minutes: minutesInStation };
         return { isDelayed: false, level: 'NORMAL', minutes: minutesInStation };
     };
 
@@ -91,7 +91,7 @@ export function StationHomeDashboard({ currentStation, homeStats, setActiveTab, 
 
     const SimpleStatCard = ({ title, value, percentage, label, borderColor, badgeClass, icon }) => (
         <div className="col-md-3">
-            <div className={`card border-0 shadow-sm h-100 border-top border-4 ${borderColor}`} style={{ borderRadius: '12px' }}>
+            <div className="card border-0 shadow-sm h-100" style={{ borderRadius: '12px' }}>
                 <div className="card-body p-4">
                     <div className="d-flex justify-content-between align-items-center mb-3">
                         <div className="bg-light rounded-circle p-2 d-flex align-items-center justify-content-center" style={{ width: '40px', height: '40px' }}>

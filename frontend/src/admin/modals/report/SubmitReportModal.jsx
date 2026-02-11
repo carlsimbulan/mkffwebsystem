@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import 'bootstrap-icons/font/bootstrap-icons.css';
 
 const getTodayDate = () => {
     const d = new Date();

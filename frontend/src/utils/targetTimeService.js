@@ -27,7 +27,7 @@ const DEFAULT_THRESHOLDS = {
 // Global cache for target times
 let cachedThresholds = null;
 let lastFetchTime = 0;
-const CACHE_DURATION = 5000; // 5 seconds cache (much shorter for real-time feel)
+const CACHE_DURATION = 2000; // 2 seconds cache for faster updates
 let pollingInterval = null;
 
 // Event listeners for real-time updates
@@ -37,6 +37,8 @@ const listeners = new Set();
 const startPolling = () => {
     if (pollingInterval) return; // Already polling
     
+    console.log('🔄 [POLLING] Starting target time polling (every 1 second)');
+    
     pollingInterval = setInterval(async () => {
         try {
             const response = await axios.get(TARGET_TIMES_ENDPOINT);
@@ -44,6 +46,10 @@ const startPolling = () => {
             
             // Check if thresholds actually changed
             if (JSON.stringify(newThresholds) !== JSON.stringify(cachedThresholds)) {
+                console.log('🔄 [POLLING] Thresholds changed detected!');
+                console.log('🔄 [POLLING] Old:', cachedThresholds);
+                console.log('🔄 [POLLING] New:', newThresholds);
+                
                 cachedThresholds = newThresholds;
                 lastFetchTime = Date.now();
                 
@@ -53,6 +59,8 @@ const startPolling = () => {
                     timestamp: Date.now()
                 }));
                 
+                console.log('📢 [POLLING] Broadcasting change to all tabs');
+                
                 // Notify all listeners of the change
                 listeners.forEach(callback => {
                     try {
@@ -61,21 +69,28 @@ const startPolling = () => {
                         console.error('Error in target time listener:', error);
                     }
                 });
+                
+                console.log('✅ [POLLING] All listeners notified');
             }
         } catch (error) {
             console.warn('Failed to poll target times:', error);
         }
-    }, 3000); // Poll every 3 seconds for real-time updates
+    }, 1000); // Poll every 1 second for real-time updates
 };
 
 // Listen for localStorage changes (cross-tab updates)
 window.addEventListener('storage', (e) => {
     if (e.key === 'targetTimesUpdate' && e.newValue) {
         try {
+            console.log('📢 [STORAGE EVENT] Received cross-tab threshold update');
             const { thresholds, timestamp } = JSON.parse(e.newValue);
+            
+            console.log('📢 [STORAGE EVENT] New thresholds:', thresholds);
+            console.log('📢 [STORAGE EVENT] Timestamp:', timestamp, 'Last fetch:', lastFetchTime);
             
             // Only update if this is a newer change
             if (timestamp > lastFetchTime) {
+                console.log('✅ [STORAGE EVENT] Applying new thresholds (newer than cache)');
                 cachedThresholds = thresholds;
                 lastFetchTime = timestamp;
                 
@@ -87,6 +102,10 @@ window.addEventListener('storage', (e) => {
                         console.error('Error in target time listener:', error);
                     }
                 });
+                
+                console.log('✅ [STORAGE EVENT] All listeners notified');
+            } else {
+                console.log('⏭️ [STORAGE EVENT] Ignoring update (older than cache)');
             }
         } catch (error) {
             console.error('Error parsing localStorage target time update:', error);
@@ -139,6 +158,8 @@ export const targetTimeService = {
     // Update target times and immediately notify all components
     async updateTargetTimes(newThresholds) {
         try {
+            console.log('🎯 [TARGET TIME UPDATE] Saving new thresholds:', newThresholds);
+            
             await axios.post(TARGET_TIMES_ENDPOINT, newThresholds, {
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -147,24 +168,31 @@ export const targetTimeService = {
             cachedThresholds = newThresholds;
             lastFetchTime = Date.now();
             
+            console.log('✅ [TARGET TIME UPDATE] Thresholds saved to backend');
+            
             // Broadcast to all tabs/windows immediately
             localStorage.setItem('targetTimesUpdate', JSON.stringify({
                 thresholds: newThresholds,
                 timestamp: lastFetchTime
             }));
             
+            console.log('📢 [TARGET TIME UPDATE] Broadcasting to all tabs via localStorage');
+            
             // Immediately notify all listeners for instant updates
             listeners.forEach(callback => {
                 try {
+                    console.log('🔔 [TARGET TIME UPDATE] Notifying listener');
                     callback(newThresholds);
                 } catch (error) {
                     console.error('Error in target time listener:', error);
                 }
             });
             
+            console.log('✅ [TARGET TIME UPDATE] All listeners notified');
+            
             return { success: true };
         } catch (error) {
-            console.error('Failed to update target times:', error);
+            console.error('❌ [TARGET TIME UPDATE] Failed to update target times:', error);
             throw error;
         }
     },
@@ -178,19 +206,23 @@ export const targetTimeService = {
 
     // Subscribe to target time changes
     subscribe(callback) {
+        console.log('🔔 [SUBSCRIBE] New listener registered. Total listeners:', listeners.size + 1);
         listeners.add(callback);
         
         // Start polling when first listener is added
         if (listeners.size === 1) {
+            console.log('🔄 [SUBSCRIBE] First listener added, starting polling');
             startPolling();
         }
         
         // Return unsubscribe function
         return () => {
+            console.log('🔕 [UNSUBSCRIBE] Listener removed. Remaining listeners:', listeners.size - 1);
             listeners.delete(callback);
             
             // Stop polling when no more listeners
             if (listeners.size === 0) {
+                console.log('🛑 [UNSUBSCRIBE] No more listeners, stopping polling');
                 stopPolling();
             }
         };
@@ -234,22 +266,30 @@ export const useTargetTimes = () => {
     const [loading, setLoading] = React.useState(true);
 
     React.useEffect(() => {
+        console.log('🎯 [useTargetTimes] Hook initialized');
+        
         // Initial load
         targetTimeService.getTargetTimes().then(data => {
+            console.log('🎯 [useTargetTimes] Initial thresholds loaded:', data);
             setThresholds(data);
             setLoading(false);
         }).catch(() => {
+            console.warn('⚠️ [useTargetTimes] Failed to load initial thresholds, using defaults');
             setThresholds(DEFAULT_THRESHOLDS);
             setLoading(false);
         });
 
         // Subscribe to real-time changes
         const unsubscribe = targetTimeService.subscribe((newThresholds) => {
+            console.log('🔔 [useTargetTimes] Received threshold update:', newThresholds);
             setThresholds(newThresholds);
             setLoading(false);
         });
 
-        return unsubscribe;
+        return () => {
+            console.log('🎯 [useTargetTimes] Hook unmounting, unsubscribing');
+            unsubscribe();
+        };
     }, []);
 
     return { thresholds, loading, refresh: targetTimeService.refreshCache };

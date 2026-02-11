@@ -7,6 +7,7 @@ import reportWebVitals from './reportWebVitals';
 // Base sa iyong screenshots, ito ang tamang path:
 import './bootstrap/css/bootstrap.min.css';
 import './bootstrap/js/bootstrap.bundle.min.js';
+import 'bootstrap-icons/font/bootstrap-icons.css';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

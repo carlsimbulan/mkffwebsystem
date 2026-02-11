@@ -2,7 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 
 // Fallback utility function for operator name lookup
-const getOperatorDisplayName = (actionBy) => {
+const getOperatorDisplayName = (actionBy, userFullName) => {
+    // Prioritize the user_full_name from the JOIN query
+    if (userFullName && userFullName.trim() !== '') {
+        return userFullName;
+    }
+    
     if (!actionBy) return 'SYSTEM';
     if (actionBy.toLowerCase() === 'system') return 'SYSTEM';
     
@@ -151,7 +156,7 @@ export const StationHistoryModal = ({ stationId, onClose, HISTORY_ENDPOINT, high
                                                     </span>
                                                 </td>
                                                 <td className="small fw-bold">
-                                                    {getOperatorDisplayName(log.action_by)}
+                                                    {getOperatorDisplayName(log.action_by, log.user_full_name)}
                                                 </td>
                                                 <td className="small">
                                                     {new Date(log.timestamp || log.created_at).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}

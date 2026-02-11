@@ -1,5 +1,4 @@
 import React from 'react';
-import 'bootstrap-icons/font/bootstrap-icons.css';
 
 const API_BASE_URL_PLACEHOLDER = "http://localhost/mkffwebsystem/backend/api"; 
 

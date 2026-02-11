@@ -58,8 +58,9 @@ const checkUnitDelay = (stationId, updatedAt, thresholds) => {
     const threshold = thresholds[stationId] || 10;
     const lastUpdate = new Date(updatedAt).getTime();
     const minutesInStation = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
-    if (minutesInStation > threshold * 3) return { isDelayed: true, level: 'CRITICAL', minutes: minutesInStation };
-    if (minutesInStation > threshold) return { isDelayed: true, level: 'MODERATE', minutes: minutesInStation };
+    // Use >= to trigger immediately when threshold is reached
+    if (minutesInStation >= threshold * 3) return { isDelayed: true, level: 'CRITICAL', minutes: minutesInStation };
+    if (minutesInStation >= threshold) return { isDelayed: true, level: 'MODERATE', minutes: minutesInStation };
     return { isDelayed: false, level: 'NORMAL', minutes: minutesInStation };
 };
 
@@ -317,7 +318,9 @@ export function Dashboard({
     const formatCriticalStationOutput = (text) => {
         if (!text) return '';
         
-        const cleanedAnalysis = text.replace(/\*\*/g, '').replace(/\*/g, '');
+        // Remove EXECUTIVE SUMMARY section if it exists
+        let cleanedAnalysis = text.replace(/\*\*/g, '').replace(/\*/g, '');
+        cleanedAnalysis = cleanedAnalysis.replace(/EXECUTIVE SUMMARY[:\s]*[^\n]*\n?/gi, '');
         
         let diagnosis = '';
         let forecast = '';
@@ -346,36 +349,168 @@ export function Dashboard({
                 }
             }
         }
-        
+
+        // Extract bullet points and make them concise, filter out EXECUTIVE SUMMARY
+        const extractBullets = (text) => {
+            if (!text) return [];
+            return text.split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0)
+                .filter(line => !line.toLowerCase().includes('executive summary'))
+                .map(line => line.replace(/^[-•*]\s*/, '').trim())
+                .filter(line => line.length > 0);
+        };
+
+        const diagnosisBullets = extractBullets(diagnosis);
+        const forecastBullets = extractBullets(forecast);
+        const prescriptionBullets = extractBullets(prescription);
+
         return `
-            <div class="intelligence-hub-container">
-                ${diagnosis ? `
-                    <div class="diagnosis-hub-card">
-                        <div class="hub-header">
-                            <span class="hub-title">DIAGNOSIS</span>
+            <style>
+                .ai-analysis-grid {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 1rem;
+                    margin-top: 1rem;
+                }
+                @media (max-width: 992px) {
+                    .ai-analysis-grid {
+                        grid-template-columns: 1fr;
+                    }
+                }
+                .analysis-card {
+                    background: white;
+                    border-radius: 8px;
+                    padding: 1rem;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    border-left: 4px solid;
+                }
+                .analysis-card.diagnosis {
+                    border-left-color: #dc3545;
+                }
+                .analysis-card.forecast {
+                    border-left-color: #ffc107;
+                }
+                .analysis-card.prescription {
+                    border-left-color: #28a745;
+                }
+                .analysis-card-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    margin-bottom: 0.75rem;
+                    font-weight: 700;
+                    font-size: 0.85rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                .analysis-card-header .icon {
+                    font-size: 1.2rem;
+                }
+                .analysis-card.diagnosis .analysis-card-header {
+                    color: #dc3545;
+                }
+                .analysis-card.forecast .analysis-card-header {
+                    color: #f59e0b;
+                }
+                .analysis-card.prescription .analysis-card-header {
+                    color: #28a745;
+                }
+                .checklist-item {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 0.5rem;
+                    padding: 0.5rem 0;
+                    border-bottom: 1px solid #f0f0f0;
+                    font-size: 0.85rem;
+                    line-height: 1.4;
+                }
+                .checklist-item:last-child {
+                    border-bottom: none;
+                }
+                .checklist-icon {
+                    flex-shrink: 0;
+                    width: 18px;
+                    height: 18px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 0.7rem;
+                    margin-top: 2px;
+                }
+                .diagnosis .checklist-icon {
+                    background: #fee;
+                    color: #dc3545;
+                }
+                .forecast .checklist-icon {
+                    background: #fff8e1;
+                    color: #f59e0b;
+                }
+                .prescription .checklist-icon {
+                    background: #e8f5e9;
+                    color: #28a745;
+                }
+                .checklist-text {
+                    flex: 1;
+                    color: #333;
+                }
+                .empty-state {
+                    text-align: center;
+                    padding: 2rem;
+                    color: #999;
+                    font-style: italic;
+                }
+            </style>
+            <div class="ai-analysis-grid">
+                ${diagnosisBullets.length > 0 ? `
+                    <div class="analysis-card diagnosis">
+                        <div class="analysis-card-header">
+                            <span class="icon">⚠️</span>
+                            <span>Root Cause</span>
                         </div>
-                        <div class="hub-content">${diagnosis.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
+                        ${diagnosisBullets.map(item => `
+                            <div class="checklist-item">
+                                <div class="checklist-icon">✗</div>
+                                <div class="checklist-text">${item}</div>
+                            </div>
+                        `).join('')}
                     </div>
                 ` : ''}
-                ${forecast ? `
-                    <div class="forecast-hub-card">
-                        <div class="hub-header">
-                            <span class="hub-title">FORECAST</span>
+                
+                ${forecastBullets.length > 0 ? `
+                    <div class="analysis-card forecast">
+                        <div class="analysis-card-header">
+                            <span class="icon">📊</span>
+                            <span>Impact Forecast</span>
                         </div>
-                        <div class="hub-content">${forecast.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
+                        ${forecastBullets.map(item => `
+                            <div class="checklist-item">
+                                <div class="checklist-icon">⚡</div>
+                                <div class="checklist-text">${item}</div>
+                            </div>
+                        `).join('')}
                     </div>
                 ` : ''}
-                ${prescription ? `
-                    <div class="prescription-hub-card">
-                        <div class="hub-header">
-                            <span class="hub-title">PRESCRIPTION</span>
+                
+                ${prescriptionBullets.length > 0 ? `
+                    <div class="analysis-card prescription">
+                        <div class="analysis-card-header">
+                            <span class="icon">✅</span>
+                            <span>Action Items</span>
                         </div>
-                        <div class="hub-content">${prescription.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
+                        ${prescriptionBullets.map(item => `
+                            <div class="checklist-item">
+                                <div class="checklist-icon">→</div>
+                                <div class="checklist-text">${item}</div>
+                            </div>
+                        `).join('')}
                     </div>
                 ` : ''}
-                ${!diagnosis && !forecast && !prescription ? `
-                    <div class="fallback-hub-analysis">
-                        <div class="hub-content">${cleanedAnalysis.split('\n').filter(line => line.trim()).map(line => line.replace(/^[-•*]\s*/, '• ').trim()).join('<br>')}</div>
+                
+                ${diagnosisBullets.length === 0 && forecastBullets.length === 0 && prescriptionBullets.length === 0 ? `
+                    <div class="empty-state">
+                        <p>No analysis data available</p>
                     </div>
                 ` : ''}
             </div>
@@ -471,7 +606,60 @@ export function Dashboard({
         setCriticalStationAnalysis('');
         
         try {
-            // Step 1: Get available model from backend
+            // Step 1: Get operator assignments and user data
+            const usersRes = await fetch(`http://localhost/mkffwebsystem/backend/api/user_management.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'get_all_users' })
+            });
+            
+            let assignedOperator = 'Unassigned';
+            let operatorMap = {};
+            
+            if (usersRes.ok) {
+                const usersData = await usersRes.json();
+                const users = usersData.users || [];
+                
+                // Create operator map (username/email -> full_name)
+                users.forEach(user => {
+                    if (user.username && user.full_name) {
+                        operatorMap[user.username] = user.full_name;
+                    }
+                    if (user.email && user.full_name) {
+                        operatorMap[user.email] = user.full_name;
+                    }
+                    if (user.id && user.full_name) {
+                        operatorMap[user.id.toString()] = user.full_name;
+                    }
+                });
+                
+                // Find operator assigned to this station
+                const stationOperator = users.find(user => 
+                    user.station === worstStation.id && 
+                    user.role === 'Operator' && 
+                    user.full_name
+                );
+                
+                if (stationOperator) {
+                    assignedOperator = stationOperator.full_name;
+                } else {
+                    // Fallback: check recent activity logs
+                    const recentLog = worstStation.stationLogs
+                        .filter(log => log.action_by)
+                        .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))[0];
+                    
+                    if (recentLog && recentLog.action_by) {
+                        const operatorUser = users.find(user => 
+                            user.username === recentLog.action_by || 
+                            user.id === recentLog.action_by ||
+                            user.email === recentLog.action_by
+                        );
+                        assignedOperator = operatorUser ? operatorUser.full_name : recentLog.action_by;
+                    }
+                }
+            }
+            
+            // Step 2: Get available model from backend
             const modelRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -479,8 +667,7 @@ export function Dashboard({
             });
             
             if (!modelRes.ok) {
-                const body = await modelRes.text().catch(() => "");
-                throw new Error(`Model listing failed (${modelRes.status}): ${body || modelRes.statusText}`);
+                throw new Error(`Failed to fetch models: ${modelRes.status}`);
             }
             
             const modelData = await modelRes.json();
@@ -490,142 +677,135 @@ export function Dashboard({
             
             const modelName = modelData.modelName;
 
-            // Step 2: Fetch trend data - Get last 5 completed units for the worst station
-            const historyRes = await fetch(`http://localhost/mkffwebsystem/backend/api/unit_history.php?station=${encodeURIComponent(worstStation.id)}`);
-            let trendData = [];
-            let velocity = 'STABLE';
-            
-            if (historyRes.ok) {
-                const historyLogs = await historyRes.json();
-                
-                // Filter for completed units at this station (last 5)
-                const completedUnits = historyLogs
-                    .filter(log => 
-                        log.station_name === worstStation.id && 
-                        (log.status_after?.toLowerCase().includes('completed') || 
-                         log.action_type === 'STATION_UPDATE' && 
-                         log.status_after?.toLowerCase() === 'in progress')
-                    )
-                    .slice(0, 5)
-                    .reverse(); // Oldest to newest for trend calculation
-
-                if (completedUnits.length >= 2) {
-                    // Calculate processing speeds (time between consecutive completions)
-                    const processingTimes = [];
-                    for (let i = 1; i < completedUnits.length; i++) {
-                        const prevTime = new Date(completedUnits[i-1].timestamp).getTime();
-                        const currTime = new Date(completedUnits[i].timestamp).getTime();
-                        const timeDiff = (currTime - prevTime) / (1000 * 60); // minutes
-                        processingTimes.push(timeDiff);
-                    }
-                    
-                    // Calculate velocity trend (comparing first half vs second half of processing times)
-                    if (processingTimes.length >= 2) {
-                        const firstHalf = processingTimes.slice(0, Math.ceil(processingTimes.length / 2));
-                        const secondHalf = processingTimes.slice(Math.floor(processingTimes.length / 2));
-                        
-                        const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
-                        const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
-                        
-                        const velocityChange = ((secondAvg - firstAvg) / firstAvg) * 100;
-                        
-                        if (velocityChange > 15) velocity = 'SLOWING_DOWN';
-                        else if (velocityChange < -15) velocity = 'SPEEDING_UP';
-                        else velocity = 'STABLE';
-                    }
-                    
-                    trendData = completedUnits.map((log, idx) => ({
-                        assembly_no: log.assembly_no,
-                        timestamp: log.timestamp,
-                        processing_time_minutes: idx > 0 ? processingTimes[idx-1] : null,
-                        action_type: log.action_type,
-                        status: log.status_after
-                    }));
-                }
-            }
-
             // Step 3: Prepare comprehensive station data for AI analysis
             const delayedUnits = worstStation.delayedUnits || [];
             const thresholdMinutes = dynamicDelayThresholds[worstStation.id] || 10;
             
-            // Enhanced context with checklist error scanning AND trend data
+            // Enhanced context with checklist error scanning AND operator info
             const delayedContext = delayedUnits.map(log => {
                 const lastUpdate = new Date(log.updated_at || log.created_at).getTime();
                 const timeSpentMinutes = Math.max(0, (new Date().getTime() - lastUpdate) / (1000 * 60));
                 
-                // Checklist error scanning (similar to StationsOverview)
+                // Get operator full name for this unit
+                const unitOperator = operatorMap[log.action_by] || log.action_by || 'Unknown';
+                
+                // Checklist error scanning
                 const checklist_errors = [];
                 const checklist_values = {};
                 const voltage_tolerance = { min: 113.85, max: 116.15 };
                 
                 // Station-specific checks based on station ID
-                if (worstStation.id.includes('Station1') || worstStation.id.includes('Station 1')) {
-                    checklist_values.s1_header_seated_90_deg = log.s1_header_seated_90_deg;
-                    checklist_values.s1_leads_properly_soldered = log.s1_leads_properly_soldered;
-                    if (log.s1_header_seated_90_deg === 'NO GO' || log.s1_header_seated_90_deg === 'FAIL') checklist_errors.push('S1: Header seating failure');
-                    if (log.s1_leads_properly_soldered === 'NO GO' || log.s1_leads_properly_soldered === 'FAIL') checklist_errors.push('S1: Soldering defects');
-                    // Check for Empty/null values
-                    if (!log.s1_header_seated_90_deg || log.s1_header_seated_90_deg === '' || log.s1_header_seated_90_deg === null) checklist_errors.push('S1: Documentation Gap - Header seating');
-                    if (!log.s1_leads_properly_soldered || log.s1_leads_properly_soldered === '' || log.s1_leads_properly_soldered === null) checklist_errors.push('S1: Documentation Gap - Soldering');
-                }
+                const stationNum = worstStation.id.replace(/\D/g, '');
                 
-                if (worstStation.id.includes('Station2') || worstStation.id.includes('Station 2')) {
-                    checklist_values.s2_voltage = log.s2_voltage;
-                    checklist_values.s2_go_no_go = log.s2_go_no_go;
-                    if (log.s2_voltage && (log.s2_voltage < voltage_tolerance.min || log.s2_voltage > voltage_tolerance.max)) checklist_errors.push('S2: Voltage out of tolerance');
-                    if (log.s2_go_no_go === 'NO GO' || log.s2_go_no_go === 'FAIL') checklist_errors.push('S2: Final test failure');
-                    // Check for Empty/null values
-                    if (!log.s2_voltage || log.s2_voltage === '' || log.s2_voltage === null) checklist_errors.push('S2: Documentation Gap - Voltage');
-                    if (!log.s2_go_no_go || log.s2_go_no_go === '' || log.s2_go_no_go === null) checklist_errors.push('S2: Documentation Gap - Test result');
+                // Check all station-specific fields
+                for (let i = 1; i <= 15; i++) {
+                    if (parseInt(stationNum) === i) {
+                        // Station 1
+                        if (i === 1) {
+                            checklist_values.s1_header_seated_90_deg = log.s1_header_seated_90_deg;
+                            checklist_values.s1_leads_properly_soldered = log.s1_leads_properly_soldered;
+                            if (log.s1_header_seated_90_deg === 'NO GO' || log.s1_header_seated_90_deg === 'FAIL') checklist_errors.push('Header seating failure');
+                            if (log.s1_leads_properly_soldered === 'NO GO' || log.s1_leads_properly_soldered === 'FAIL') checklist_errors.push('Soldering defects');
+                            if (!log.s1_header_seated_90_deg) checklist_errors.push('Missing: Header seating check');
+                            if (!log.s1_leads_properly_soldered) checklist_errors.push('Missing: Soldering check');
+                        }
+                        // Station 2 & 6
+                        if (i === 2 || i === 6) {
+                            const prefix = `s${i}`;
+                            checklist_values[`${prefix}_voltage`] = log[`${prefix}_voltage`];
+                            checklist_values[`${prefix}_line1`] = log[`${prefix}_line1`];
+                            checklist_values[`${prefix}_line2`] = log[`${prefix}_line2`];
+                            checklist_values[`${prefix}_line3`] = log[`${prefix}_line3`];
+                            checklist_values[`${prefix}_go_no_go`] = log[`${prefix}_go_no_go`];
+                            
+                            if (log[`${prefix}_voltage`] && (log[`${prefix}_voltage`] < voltage_tolerance.min || log[`${prefix}_voltage`] > voltage_tolerance.max)) {
+                                checklist_errors.push(`Voltage out of tolerance: ${log[`${prefix}_voltage`]}V`);
+                            }
+                            if (log[`${prefix}_go_no_go`] === 'NO GO' || log[`${prefix}_go_no_go`] === 'FAIL') checklist_errors.push('Final test failure');
+                            if (!log[`${prefix}_voltage`]) checklist_errors.push('Missing: Voltage reading');
+                            if (!log[`${prefix}_go_no_go`]) checklist_errors.push('Missing: Test result');
+                        }
+                        // Station 8
+                        if (i === 8) {
+                            checklist_values.s8_power_unit_disable_lora = log.s8_power_unit_disable_lora;
+                            checklist_values.s8_rsso_testing = log.s8_rsso_testing;
+                            if (log.s8_rsso_testing === 'NO GO' || log.s8_rsso_testing === 'FAIL') checklist_errors.push('RSSO test failure');
+                            if (!log.s8_rsso_testing) checklist_errors.push('Missing: RSSO test');
+                        }
+                        // Station 11
+                        if (i === 11) {
+                            checklist_values.s11_led_status = log.s11_led_status;
+                            if (log.s11_led_status !== 'SOLID GREEN' && log.s11_led_status !== 'GO') checklist_errors.push('LED status error');
+                            if (!log.s11_led_status) checklist_errors.push('Missing: LED status');
+                        }
+                        // Station 12
+                        if (i === 12) {
+                            checklist_values.s12_stickers_attached = log.s12_stickers_attached;
+                            checklist_values.s12_stickers_readable = log.s12_stickers_readable;
+                            if (log.s12_stickers_attached === 'NO GO') checklist_errors.push('Stickers not attached');
+                            if (log.s12_stickers_readable === 'NO GO') checklist_errors.push('Stickers not readable');
+                            if (!log.s12_stickers_attached) checklist_errors.push('Missing: Sticker attachment check');
+                        }
+                        // Generic stations (3,4,5,7,9,10,13,14)
+                        if ([3,4,5,7,9,10,13,14].includes(i)) {
+                            checklist_values[`s${i}_requirements`] = log[`s${i}_requirements`];
+                            checklist_values[`s${i}_remarks`] = log[`s${i}_remarks`];
+                            if (log[`s${i}_requirements`] === 'NO GO' || log[`s${i}_requirements`] === 'FAIL') checklist_errors.push('Requirements not met');
+                            if (!log[`s${i}_requirements`]) checklist_errors.push('Missing: Requirements check');
+                            if (!log[`s${i}_remarks`]) checklist_errors.push('Missing: Remarks');
+                        }
+                    }
                 }
-                
-                // Generic checks for other stations
-                if (log.remarks && log.remarks.toLowerCase().includes('error')) checklist_errors.push('Remarks indicate error condition');
-                if (!log.remarks || log.remarks === '' || log.remarks === null) checklist_errors.push('Documentation Gap - Remarks');
                 
                 return {
                     assembly_no: log.assembly_no,
                     time_spent_minutes: Math.round(timeSpentMinutes * 10) / 10,
                     status: log.status,
+                    operator_full_name: unitOperator,
                     remarks: log.remarks || '',
                     checklist_errors: checklist_errors,
-                    checklist_values: checklist_values,
-                    trend_velocity: velocity // Add velocity to each delayed unit context
+                    checklist_values: checklist_values
                 };
             });
 
             const prompt = `You are an AI Industrial Engineer specializing in real-time production optimization at MKFF Laserteknique International inc.
 
-CRITICAL BOTTLENECK ANALYSIS: Focus on the primary reason for the bottleneck.
+CRITICAL BOTTLENECK ANALYSIS:
 
-STATION PERFORMANCE:
-Station: ${worstStation.name} (${worstStation.id}) | Threshold: ${thresholdMinutes}min
-WIP: ${worstStation.totalWIP} units | Bottleneck Units: ${worstStation.stuckUnits} units | Avg Delay: ${worstStation.avgDelay.toFixed(1)}min
+STATION INFORMATION:
+Station: ${worstStation.name} (${worstStation.id})
+Assigned Operator: ${assignedOperator}
+Threshold: ${thresholdMinutes} minutes
+Current WIP: ${worstStation.totalWIP} units
+Bottleneck Units: ${worstStation.stuckUnits} units
+Average Delay: ${worstStation.avgDelay.toFixed(1)} minutes
 
-BOTTLENECK UNIT DATA:
+BOTTLENECK UNIT DATA WITH OPERATOR INFO:
 ${JSON.stringify(delayedContext, null, 2)}
 
 CRITICAL INSTRUCTIONS:
-- Scan for 'Empty' or 'null' values in bottleneck units
-- If found, diagnose as 'Documentation Gap'
-- Focus ONLY on the primary bottleneck cause
-- Provide ONLY bullet points (Max 2 per section)
+- Identify the PRIMARY root cause of the bottleneck
+- Reference the assigned operator by FULL NAME: ${assignedOperator}
+- Scan for missing checklist data (null/empty values)
+- Focus on voltage errors, test failures, and documentation gaps
+- Provide direct, actionable recommendations
+- Keep responses concise and to the point
 
 REQUIRED OUTPUT FORMAT (STRICT):
-[DIAGNOSIS]: Primary bottleneck reason (Max 2 bullets)
-Example: • High NG count due to Voltage breaches
+[DIAGNOSIS]: Primary bottleneck reason (Max 2 bullets, one sentence each)
+- Must mention operator name if relevant
+- Example: • ${assignedOperator} has ${worstStation.stuckUnits} units with voltage calibration errors
 
-[FORECAST]: Production line status prediction (Max 1 bullet)
-Example: • Risk of 30% slowdown in 2 hours
+[FORECAST]: Production impact prediction (Max 1 bullet, one sentence)
+- Example: • 30% throughput reduction risk within 2 hours if not addressed
 
-[PRESCRIPTION]: Actionable steps (Max 2 bullets)
-Example: • Recalibrate Station 2 test rig
+[PRESCRIPTION]: Actionable steps (Max 2 bullets, one sentence each)
+- Must be specific and actionable
+- Example: • Recalibrate ${worstStation.name} test equipment and retrain ${assignedOperator}
 
-EXECUTIVE SUMMARY: Exactly one sentence (Max 10 words)
+CRITICAL: Use only bullet points. No paragraphs. No long explanations. Always use operator full name: ${assignedOperator}`;
 
-CRITICAL: Use only bullet points. No paragraphs. No long explanations.`;
-
-            // Step 3: Generate AI analysis
+            // Step 4: Generate AI analysis
             const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -636,15 +816,22 @@ CRITICAL: Use only bullet points. No paragraphs. No long explanations.`;
             });
 
             if (!genRes.ok) {
-                const body = await genRes.text().catch(() => "");
-                throw new Error(`generateContent failed (${genRes.status}): ${body || genRes.statusText}`);
+                throw new Error(`AI generation failed: ${genRes.status}`);
             }
 
             const genData = await genRes.json();
+            
+            if (genData.error) {
+                throw new Error(genData.error);
+            }
+            
             const text = genData.text || '';
             
             if (!text) throw new Error("Empty AI response.");
-            setCriticalStationAnalysis(text);
+            
+            // Remove EXECUTIVE SUMMARY if present
+            const cleanedText = text.replace(/EXECUTIVE SUMMARY[:\s]*[^\n]*\n?/gi, '');
+            setCriticalStationAnalysis(cleanedText);
 
         } catch (err) {
             console.error("Critical Station AI Error:", err);
@@ -658,7 +845,7 @@ CRITICAL: Use only bullet points. No paragraphs. No long explanations.`;
         <div className="container-fluid px-0 py-2">
             <style>{`
                 /* Stat Cards shrunk from 24px to 18px padding and font size reduced */
-                .stat-card-pro { background: #ffffff; border: 1px solid #edf2f7; border-radius: 16px; padding: 18px; height: 100%; position: relative; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
+                .stat-card-pro { background: #ffffff; border: 1px solid #edf2f7; border-radius: 16px; padding: 18px; height: 100%; position: relative; box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); }
                 .icon-bg-box { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; font-size: 1.1rem; }
                 .label-caps { font-size: 0.65rem; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; display: block; }
                 .value-bold { font-size: 1.8rem; font-weight: 900; color: #0f172a; margin: 0; line-height: 1; letter-spacing: -1px; }
@@ -693,7 +880,7 @@ CRITICAL: Use only bullet points. No paragraphs. No long explanations.`;
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
 
-                .analytics-card { background: #ffffff; border: 0.5px solid #e0e0e0ff; border-radius: 18px; box-shadow: 0 6px 18px rgba(0,0,0,0.08); overflow: hidden; }
+                .analytics-card { background: #ffffff; border: 0.5px solid #e0e0e0ff; border-radius: 18px; box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); overflow: hidden; }
                 .analytics-card-header { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; background: #f8fafc; }
                 .analytics-card-body { padding: 14px 16px; }
                 .kpi-pill { font-size: 0.65rem; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; padding: 6px 10px; border-radius: 999px; border: 1px solid #f3f3f3ff; background: #fff; }
@@ -1086,9 +1273,9 @@ CRITICAL: Use only bullet points. No paragraphs. No long explanations.`;
                                         <div className="col-3">
                                             <div className="fw-bold" style={{fontSize: '0.7rem'}}>
                                                 {worstStation.avgDelay > (dynamicDelayThresholds[worstStation.id] || 10) * 2 ? (
-                                                    <span className="badge bg-danger text-white px-2 py-1">📈 CRITICAL</span>
+                                                    <span className="badge rounded-pill bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}}>📈 CRITICAL</span>
                                                 ) : (
-                                                    <span className="badge bg-secondary text-white px-2 py-1">⏳ STABLE</span>
+                                                    <span className="badge rounded-pill bg-success bg-opacity-10 text-success border border-success border-opacity-25 fw-normal" style={{fontSize: '0.7rem', padding: '6px 14px'}}>⏳ STABLE</span>
                                                 )}
                                             </div>
                                             <div className="small text-muted" style={{fontSize: '0.65rem'}}>4H Forecast</div>
