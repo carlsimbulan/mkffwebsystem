@@ -16,6 +16,8 @@ import { UnitListTable } from './components/UnitListTable';
 import { EditUnitModal } from './modals/EditUnitModal';
 import { AnnouncementView } from './components/AnnouncementView';
 import { UserProfileModal } from './modals/UserProfileModal'; // <--- DAGDAG
+import { NotificationBell } from './components/notifications/NotificationBell';
+import { NotificationContent } from './components/notifications/NotificationContent';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 
 
@@ -140,6 +142,9 @@ const setActiveTab = (tab) => {
     const [listError, setListError] = useState(null);
     const [unitToEdit, setUnitToEdit] = useState(null); 
     const [scannedUnitId, setScannedUnitId] = useState(null); 
+    const [highlightedUnitId, setHighlightedUnitId] = useState(null);
+    const [notifications, setNotifications] = useState([]);
+    const [showUserDropdown, setShowUserDropdown] = useState(false);
 
     // 🔑 REF for Previous Unit List (used for status change detection)
     const prevUnitListRef = useRef([]);
@@ -418,7 +423,76 @@ useEffect(() => {
         }
     };
 
-    // --- 🔑 POLLING EFFECT FOR ANNOUNCEMENTS (1 second) ---
+    // --- NOTIFICATION HANDLERS ---
+    const handleBellClick = () => { setActiveTab('notifications'); };
+    const handleNotificationClick = (notification) => {
+        if (notification.type === 'DelayedUnit') {
+            // Highlight unit in current view
+            setHighlightedUnitId(notification.unitId);
+            // Navigate to appropriate tab based on unit status
+            setActiveTab('in_progress');
+            // Don't remove notification - let it stay until unit is no longer delayed
+        }
+    };
+
+    // --- CHECK DELAYED UNITS FOR NOTIFICATIONS ---
+    const checkDelayedUnitsForNotifications = useCallback((allUnits) => {
+        const now = new Date();
+        const newDelayedNotifications = [];
+
+        // Check for delayed units and NG units at current station ONLY
+        const validDelayedUnits = allUnits.filter(unit => {
+            const status = (unit.status || '').trim();
+            // Only check units at current station that are In Progress or No Good
+            return unit.station === currentStation && (
+                status === 'In Progress' || 
+                status.toLowerCase().includes('no good') || 
+                status.toLowerCase() === 'ng'
+            );
+        });
+
+        console.log('🔍 Checking notifications for', currentStation, 'Valid units:', validDelayedUnits.length);
+
+        validDelayedUnits.forEach(unit => {
+            // Use dynamic thresholds for delay calculation
+            const thresholdMinutes = dynamicTargetTimes[currentStation] || 10;
+            
+            // Only check if threshold is greater than 0
+            if (thresholdMinutes > 0) {
+                const startTime = new Date(unit.updated_at || unit.created_at);
+                const elapsedMinutes = Math.floor((now.getTime() - startTime.getTime()) / (1000 * 60));
+
+                console.log(`📊 Unit ${unit.assembly_no}: ${elapsedMinutes} mins (threshold: ${thresholdMinutes})`);
+
+                // Only create notification if actually delayed
+                if (elapsedMinutes > thresholdMinutes) {
+                    // Determine if NG or normal delay for title
+                    const isNG = unit.status.toLowerCase().includes('ng') || unit.status.toLowerCase().includes('no good');
+                    const alertTitle = isNG ? `🚨 Quality Alert (NG)` : `⚠️ Unit Delay Alert`;
+
+                    newDelayedNotifications.push({
+                        id: `delayed-${unit.id}`,
+                        type: 'DelayedUnit',
+                        unitId: unit.id,
+                        title: alertTitle,
+                        message: `Unit ${unit.assembly_no || unit.device_serial_no} (${unit.status}) - ${elapsedMinutes} mins (Limit: ${thresholdMinutes} mins).`,
+                        timestamp: now.toISOString(),
+                        stationId: currentStation,
+                        assemblyNo: unit.assembly_no,
+                        deviceSerialNo: unit.device_serial_no,
+                        status: unit.status,
+                        elapsedMinutes,
+                        thresholdMinutes
+                    });
+                }
+            }
+        });
+
+        console.log('🔔 New notifications:', newDelayedNotifications.length);
+        setNotifications(newDelayedNotifications);
+    }, [currentStation, dynamicTargetTimes]);
+
+    // --- POLLING EFFECT FOR ANNOUNCEMENTS (1 second) ---
     useEffect(() => {
         fetchAnnouncements(); 
         const intervalId = setInterval(fetchAnnouncements, 1000); 
@@ -441,6 +515,14 @@ useEffect(() => {
             if (intervalId) clearInterval(intervalId);
         };
     }, [fetchGlobalUnits]); // Only depends on fetchGlobalUnits
+
+    // --- NOTIFICATION CHECK EFFECT ---
+    useEffect(() => {
+        // Check for delayed units whenever global unit list is updated
+        if (globalUnitList.length > 0) {
+            checkDelayedUnitsForNotifications(globalUnitList);
+        }
+    }, [globalUnitList, checkDelayedUnitsForNotifications]);
 
     // --- EFFECT: FETCH ALL UNITS FOR PCBA AUTO-POPULATION ---
     useEffect(() => {
@@ -834,6 +916,18 @@ const handleSubmit = async (e, checklist_data = null) => {
         // 🔑 REMOVED: setUnitList([]) to prevent sidebar flickering
     }, [activeTab, fetchUnits, fetchHistory, fetchAnnouncements, announcements.length, handleMarkAsRead]);
 
+    // --- USEEFFECT FOR DROPDOWN CLICK OUTSIDE ---
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showUserDropdown && !event.target.closest('.user-dropdown-container')) {
+                setShowUserDropdown(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showUserDropdown]);
+
     // --- USEEFFECT FOR SCANNER FOCUS (Unchanged) ---
     useEffect(() => { 
         if (activeTab === "input_unit" && scannerInputRef.current && processStatus === 'idle') scannerInputRef.current.focus();
@@ -950,7 +1044,14 @@ const todayAnnouncementsCount = announcements.filter(a => {
                         error={announcementError}
                         AVATAR_UPLOAD_PATH={AVATAR_UPLOAD_PATH}
                         DEFAULT_AVATAR_PATH={DEFAULT_AVATAR_PATH}
-                        onMarkAsRead={handleMarkAsRead} // 🔑 Pass the mark as read handler
+                        onMarkAsRead={handleMarkAsRead} // 🔑 Pass mark as read handler
+                    />
+                );
+            case "notifications":
+                return (
+                    <NotificationContent
+                        notifications={notifications}
+                        onNotificationClick={handleNotificationClick}
                     />
                 );
 
@@ -1063,13 +1164,42 @@ const todayAnnouncementsCount = announcements.filter(a => {
             />
             <span className="position-absolute bottom-0 end-0 bg-success border border-dark rounded-circle" style={{width: '10px', height: '10px'}}></span>
         </div>
-        <div className="ms-3 overflow-hidden">
-            <div className="text-white text-truncate" style={{ fontSize: '0.85rem', fontWeight: '400' }}>
+        <div className="ms-3 flex-grow-1 user-dropdown-container position-relative">
+            <div className="text-white text-truncate position-relative" style={{ fontSize: '0.85rem', fontWeight: '400', cursor: 'pointer' }} onClick={() => setShowUserDropdown(!showUserDropdown)}>
                 {currentFullName}
+                <i className={`bi bi-chevron-${showUserDropdown ? 'up' : 'down'} ms-1`} style={{ fontSize: '0.7rem' }}></i>
             </div>
             <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '1px', letterSpacing: '0.3px' }}>
                 Authorized Operator
             </div>
+            
+            {/* User Dropdown Menu */}
+            {showUserDropdown && (
+                <div className="position-absolute top-100 start-0 mt-2 w-100 bg-white rounded shadow-lg" style={{ zIndex: 1000, minWidth: '200px' }}>
+                    <button 
+                        className="btn btn-sm w-100 text-start d-flex align-items-center px-3 py-2 text-dark hover:bg-light border-bottom"
+                        style={{ fontSize: '0.8rem' }}
+                        onClick={() => {
+                            setShowProfileModal(true);
+                            setShowUserDropdown(false);
+                        }}
+                    >
+                        <i className="bi bi-person-gear me-2 text-primary"></i>
+                        <span>Edit User Details</span>
+                    </button>
+                    <button 
+                        className="btn btn-sm w-100 text-start d-flex align-items-center px-3 py-2 text-dark hover:bg-light"
+                        style={{ fontSize: '0.8rem' }}
+                        onClick={() => {
+                            onLogout();
+                            setShowUserDropdown(false);
+                        }}
+                    >
+                        <i className="bi bi-box-arrow-right me-2 text-danger"></i>
+                        <span>Logout</span>
+                    </button>
+                </div>
+            )}
         </div>
     </div>
 
@@ -1161,7 +1291,7 @@ const todayAnnouncementsCount = announcements.filter(a => {
     {/* Sidebar Footer */}
     <div className="mt-auto pt-3 border-top border-secondary text-center text-white-50 opacity-25" style={{ fontSize: '0.65rem' }}>
         
-        <span>©2025 MKFF Laser Technique</span>
+        <span>2025 MKFF Laser Technique</span>
     </div>
 </div>
 
@@ -1183,13 +1313,7 @@ const todayAnnouncementsCount = announcements.filter(a => {
         </div>
 
         <div className="d-flex align-items-center">
-            <button 
-                className="btn btn-sm d-flex align-items-center px-3 rounded-pill" 
-                style={{ border: '1px solid #fecaca', color: '#ef4444', fontSize: '0.8rem', fontWeight: '500' }}
-                onClick={onLogout}
-            >
-                <i className="bi bi-box-arrow-right me-2"></i> Logout
-            </button>
+            <NotificationBell notifications={notifications} onClick={handleBellClick} />
         </div>
     </header>
 
