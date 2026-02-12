@@ -3,23 +3,13 @@ import React, { useState } from 'react';
 const TARGET_STATION = 'Station15';
 
 export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
-    const [confirmModal, setConfirmModal] = useState({ show: false, unitId: null, assemblyNo: '' });
+    const [confirmModal, setConfirmModal] = useState({ show: false, unitId: null, assemblyNo: '', isBulk: false, selectedUnits: [] });
     const [showHistoryModal, setShowHistoryModal] = useState(false);
-    const [showChangePinModal, setShowChangePinModal] = useState(false);
     const [authPin, setAuthPin] = useState('');
     const [authError, setAuthError] = useState('');
     const [isVerifying, setIsVerifying] = useState(false);
     const [showAuthPin, setShowAuthPin] = useState(false);
-    
-    // Change PIN states
-    const [currentPin, setCurrentPin] = useState('');
-    const [newPin, setNewPin] = useState('');
-    const [confirmNewPin, setConfirmNewPin] = useState('');
-    const [pinError, setPinError] = useState('');
-    const [isUpdatingPin, setIsUpdatingPin] = useState(false);
-    const [showCurrentPin, setShowCurrentPin] = useState(false);
-    const [showNewPin, setShowNewPin] = useState(false);
-    const [showConfirmNewPin, setShowConfirmNewPin] = useState(false);
+    const [selectedUnitIds, setSelectedUnitIds] = useState([]);
     
     const [currentPage, setCurrentPage] = useState(1);
     const recordsPerPage = 5;
@@ -49,8 +39,39 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
     const currentDispatched = dispatchedUnits.slice(indexOfFirstRecord, indexOfLastRecord);
     const totalPages = Math.ceil(dispatchedUnits.length / recordsPerPage);
 
+    const handleToggleSelect = (unitId) => {
+        setSelectedUnitIds(prev => {
+            if (prev.includes(unitId)) {
+                return prev.filter(id => id !== unitId);
+            } else {
+                return [...prev, unitId];
+            }
+        });
+    };
+
+    const handleSelectAll = () => {
+        if (selectedUnitIds.length === readyUnits.length) {
+            setSelectedUnitIds([]);
+        } else {
+            setSelectedUnitIds(readyUnits.map(u => u.id));
+        }
+    };
+
     const handleOpenConfirm = (unit) => {
-        setConfirmModal({ show: true, unitId: unit.id, assemblyNo: unit.assembly_no });
+        setConfirmModal({ show: true, unitId: unit.id, assemblyNo: unit.assembly_no, isBulk: false, selectedUnits: [] });
+        setAuthPin('');
+        setAuthError('');
+    };
+
+    const handleOpenBulkConfirm = () => {
+        const selectedUnits = readyUnits.filter(u => selectedUnitIds.includes(u.id));
+        setConfirmModal({ 
+            show: true, 
+            unitId: null, 
+            assemblyNo: '', 
+            isBulk: true, 
+            selectedUnits: selectedUnits 
+        });
         setAuthPin('');
         setAuthError('');
     };
@@ -78,10 +99,21 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
             
             if (result.status === 'success' && result.verified === true) {
                 // PIN is correct, proceed with release
-                if (typeof onMarkAsShipped === 'function') {
-                    onMarkAsShipped(confirmModal.unitId);
+                if (confirmModal.isBulk) {
+                    // Bulk release
+                    for (const unit of confirmModal.selectedUnits) {
+                        if (typeof onMarkAsShipped === 'function') {
+                            await onMarkAsShipped(unit.id);
+                        }
+                    }
+                    setSelectedUnitIds([]);
+                } else {
+                    // Single release
+                    if (typeof onMarkAsShipped === 'function') {
+                        onMarkAsShipped(confirmModal.unitId);
+                    }
                 }
-                setConfirmModal({ show: false, unitId: null, assemblyNo: '' });
+                setConfirmModal({ show: false, unitId: null, assemblyNo: '', isBulk: false, selectedUnits: [] });
                 setAuthPin('');
                 setAuthError('');
             } else {
@@ -92,57 +124,6 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
             setAuthError('Connection error. Please try again.');
         } finally {
             setIsVerifying(false);
-        }
-    };
-
-    const handleChangePin = async () => {
-        // Validation
-        if (!currentPin || !newPin || !confirmNewPin) {
-            setPinError('All fields are required');
-            return;
-        }
-        
-        if (newPin !== confirmNewPin) {
-            setPinError('New PIN and confirmation do not match');
-            return;
-        }
-        
-        if (newPin.length < 4) {
-            setPinError('PIN must be at least 4 digits');
-            return;
-        }
-        
-        setIsUpdatingPin(true);
-        setPinError('');
-        
-        try {
-            const response = await fetch('http://localhost/mkffwebsystem/backend/api/units.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'update_release_pin',
-                    current_pin: currentPin,
-                    new_pin: newPin
-                })
-            });
-            
-            const result = await response.json();
-            
-            if (result.status === 'success') {
-                alert('✅ PIN updated successfully!');
-                setShowChangePinModal(false);
-                setCurrentPin('');
-                setNewPin('');
-                setConfirmNewPin('');
-                setPinError('');
-            } else {
-                setPinError(result.message || 'Failed to update PIN');
-            }
-        } catch (error) {
-            console.error('Error updating PIN:', error);
-            setPinError('Connection error. Please try again.');
-        } finally {
-            setIsUpdatingPin(false);
         }
     };
 
@@ -158,14 +139,16 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                     <p className="text-muted small mb-0 mt-1">Verified units awaiting outbound release.</p>
                 </div>
                 <div className="d-flex align-items-center gap-3">
-                    <button 
-                        className="btn btn-outline-secondary rounded p-2 px-3 shadow-sm transition-all" 
-                        onClick={() => setShowChangePinModal(true)} 
-                        title="Change Release PIN"
-                    >
-                        <i className="bi bi-key me-1"></i>
-                        Change PIN
-                    </button>
+                    {selectedUnitIds.length > 0 && (
+                        <button 
+                            className="btn btn-success rounded p-2 px-3 shadow-sm transition-all fw-bold" 
+                            onClick={handleOpenBulkConfirm}
+                            title="Release Selected Units"
+                        >
+                            <i className="bi bi-box-arrow-right me-2"></i>
+                            Release All ({selectedUnitIds.length})
+                        </button>
+                    )}
                     <button 
                         className="btn btn-outline-primary rounded p-2 shadow-sm transition-all" 
                         onClick={() => setShowHistoryModal(true)} 
@@ -186,6 +169,15 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                     <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem' }}>
                         <thead className="bg-primary text-white">
                             <tr>
+                                <th className="border-0 px-3 py-3 text-center fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', width: '50px' }}>
+                                    <input 
+                                        type="checkbox" 
+                                        className="form-check-input" 
+                                        checked={readyUnits.length > 0 && selectedUnitIds.length === readyUnits.length}
+                                        onChange={handleSelectAll}
+                                        style={{ cursor: 'pointer' }}
+                                    />
+                                </th>
                                 <th className="border-0 px-4 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>ASSEMBLY</th>
                                 <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>MODEL</th>
                                 <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>REVISION</th>
@@ -196,7 +188,7 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                         <tbody>
                             {readyUnits.length === 0 ? (
                                 <tr>
-                                    <td colSpan="5" className="text-center py-5">
+                                    <td colSpan="6" className="text-center py-5">
                                         <i className="bi bi-check2-all text-success fs-1 mb-3 d-block"></i>
                                         <h6 className="fw-bold text-dark">Logistics Queue Empty</h6>
                                         <p className="text-muted small mb-0">All verified units have been successfully dispatched from Station 15.</p>
@@ -204,7 +196,16 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                                 </tr>
                             ) : (
                                 readyUnits.map(unit => (
-                                    <tr key={unit.id} className="border-bottom hover-bg-primary hover-bg-opacity-5 transition-all">
+                                    <tr key={unit.id} className={`border-bottom hover-bg-primary hover-bg-opacity-5 transition-all ${selectedUnitIds.includes(unit.id) ? 'table-active' : ''}`}>
+                                        <td className="px-3 py-3 text-center">
+                                            <input 
+                                                type="checkbox" 
+                                                className="form-check-input" 
+                                                checked={selectedUnitIds.includes(unit.id)}
+                                                onChange={() => handleToggleSelect(unit.id)}
+                                                style={{ cursor: 'pointer' }}
+                                            />
+                                        </td>
                                         <td className="ps-4 py-3">
                                             <div className="d-flex align-items-center">
                                                 <code className="text-primary fw-bold bg-light px-2 py-1 rounded" style={{ fontSize: '0.8rem' }}>
@@ -256,7 +257,7 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                             <button 
                                 className="btn-close btn-close-white shadow-none" 
                                 onClick={() => {
-                                    setConfirmModal({ show: false, unitId: null, assemblyNo: '' });
+                                    setConfirmModal({ show: false, unitId: null, assemblyNo: '', isBulk: false, selectedUnits: [] });
                                     setAuthPin('');
                                     setAuthError('');
                                 }}
@@ -266,8 +267,23 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                             <div className="bg-primary bg-opacity-10 text-primary rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style={{ width: '60px', height: '60px' }}>
                                 <i className="bi bi-shield-check fs-2"></i>
                             </div>
-                            <h6 className="fw-bold text-dark mb-2">Confirm Release</h6>
-                            <p className="text-muted small mb-3">Unit: <strong className="text-primary">{confirmModal.assemblyNo}</strong></p>
+                            <h6 className="fw-bold text-dark mb-2">
+                                {confirmModal.isBulk ? 'Confirm Bulk Release' : 'Confirm Release'}
+                            </h6>
+                            {confirmModal.isBulk ? (
+                                <div className="text-muted small mb-3">
+                                    <p className="mb-2">You are about to release <strong className="text-primary">{confirmModal.selectedUnits.length}</strong> units:</p>
+                                    <div className="text-start" style={{ maxHeight: '150px', overflowY: 'auto' }}>
+                                        {confirmModal.selectedUnits.map((unit, idx) => (
+                                            <div key={unit.id} className="badge bg-light text-dark me-1 mb-1">
+                                                {unit.assembly_no}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-muted small mb-3">Unit: <strong className="text-primary">{confirmModal.assemblyNo}</strong></p>
+                            )}
                             
                             {/* PIN Input */}
                             <div className="mb-4">
@@ -314,7 +330,7 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                                 <button 
                                     className="btn btn-light px-4 fw-bold text-muted" 
                                     onClick={() => {
-                                        setConfirmModal({ show: false, unitId: null, assemblyNo: '' });
+                                        setConfirmModal({ show: false, unitId: null, assemblyNo: '', isBulk: false, selectedUnits: [] });
                                         setAuthPin('');
                                         setAuthError('');
                                     }}
@@ -335,159 +351,6 @@ export const Shipment = ({ liveUnitLogs = [], onMarkAsShipped }) => {
                                         <>
                                             <i className="bi bi-unlock me-1"></i>
                                             Release
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* --- CHANGE PIN MODAL --- */}
-            {showChangePinModal && (
-                <div className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style={{ background: 'rgba(0, 0, 0, 0.4)', zIndex: 1050 }}>
-                    <div className="bg-white rounded-3 shadow-lg p-0 overflow-hidden border-0" style={{ width: '90%', maxWidth: '450px' }}>
-                        <div className="modal-header bg-primary text-white flex-shrink-0 d-flex justify-content-between align-items-center p-3">
-                            <div>
-                                <h5 className="mb-0 fw-bold">Change Release PIN</h5>
-                                <small className="opacity-75">Update authorization PIN</small>
-                            </div>
-                            <button 
-                                className="btn-close btn-close-white shadow-none" 
-                                onClick={() => {
-                                    setShowChangePinModal(false);
-                                    setCurrentPin('');
-                                    setNewPin('');
-                                    setConfirmNewPin('');
-                                    setPinError('');
-                                }}
-                            ></button>
-                        </div>
-                        <div className="modal-body p-4">
-                            <div className="mb-3">
-                                <label className="form-label fw-bold text-muted small">
-                                    <i className="bi bi-key me-1"></i>
-                                    Current PIN
-                                </label>
-                                <div className="position-relative">
-                                    <input 
-                                        type={showCurrentPin ? "text" : "password"}
-                                        className="form-control"
-                                        placeholder="Enter current PIN"
-                                        value={currentPin}
-                                        maxLength="10"
-                                        onChange={(e) => {
-                                            setCurrentPin(e.target.value);
-                                            setPinError('');
-                                        }}
-                                    />
-                                    <button
-                                        type="button"
-                                        className="btn btn-sm position-absolute top-50 end-0 translate-middle-y me-2"
-                                        onClick={() => setShowCurrentPin(!showCurrentPin)}
-                                        style={{ background: 'none', border: 'none', padding: '0.25rem 0.5rem' }}
-                                    >
-                                        <i className={`bi ${showCurrentPin ? 'bi-eye-slash' : 'bi-eye'} text-muted`}></i>
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <div className="mb-3">
-                                <label className="form-label fw-bold text-muted small">
-                                    <i className="bi bi-key-fill me-1"></i>
-                                    New PIN
-                                </label>
-                                <div className="position-relative">
-                                    <input 
-                                        type={showNewPin ? "text" : "password"}
-                                        className="form-control"
-                                        placeholder="Enter new PIN (min 4 digits)"
-                                        value={newPin}
-                                        maxLength="10"
-                                        onChange={(e) => {
-                                            setNewPin(e.target.value);
-                                            setPinError('');
-                                        }}
-                                    />
-                                    <button
-                                        type="button"
-                                        className="btn btn-sm position-absolute top-50 end-0 translate-middle-y me-2"
-                                        onClick={() => setShowNewPin(!showNewPin)}
-                                        style={{ background: 'none', border: 'none', padding: '0.25rem 0.5rem' }}
-                                    >
-                                        <i className={`bi ${showNewPin ? 'bi-eye-slash' : 'bi-eye'} text-muted`}></i>
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <div className="mb-3">
-                                <label className="form-label fw-bold text-muted small">
-                                    <i className="bi bi-check-circle me-1"></i>
-                                    Confirm New PIN
-                                </label>
-                                <div className="position-relative">
-                                    <input 
-                                        type={showConfirmNewPin ? "text" : "password"}
-                                        className="form-control"
-                                        placeholder="Re-enter new PIN"
-                                        value={confirmNewPin}
-                                        maxLength="10"
-                                        onChange={(e) => {
-                                            setConfirmNewPin(e.target.value);
-                                            setPinError('');
-                                        }}
-                                        onKeyPress={(e) => {
-                                            if (e.key === 'Enter' && currentPin && newPin && confirmNewPin) {
-                                                handleChangePin();
-                                            }
-                                        }}
-                                    />
-                                    <button
-                                        type="button"
-                                        className="btn btn-sm position-absolute top-50 end-0 translate-middle-y me-2"
-                                        onClick={() => setShowConfirmNewPin(!showConfirmNewPin)}
-                                        style={{ background: 'none', border: 'none', padding: '0.25rem 0.5rem' }}
-                                    >
-                                        <i className={`bi ${showConfirmNewPin ? 'bi-eye-slash' : 'bi-eye'} text-muted`}></i>
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            {pinError && (
-                                <div className="alert alert-danger py-2 px-3 small">
-                                    <i className="bi bi-exclamation-circle me-1"></i>
-                                    {pinError}
-                                </div>
-                            )}
-                            
-                            <div className="d-flex gap-2 justify-content-end mt-4">
-                                <button 
-                                    className="btn btn-light px-4 fw-bold" 
-                                    onClick={() => {
-                                        setShowChangePinModal(false);
-                                        setCurrentPin('');
-                                        setNewPin('');
-                                        setConfirmNewPin('');
-                                        setPinError('');
-                                    }}
-                                >
-                                    Cancel
-                                </button>
-                                <button 
-                                    className="btn btn-primary px-4 fw-bold shadow-sm" 
-                                    onClick={handleChangePin}
-                                    disabled={!currentPin || !newPin || !confirmNewPin || isUpdatingPin}
-                                >
-                                    {isUpdatingPin ? (
-                                        <>
-                                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                            Updating...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <i className="bi bi-check-lg me-1"></i>
-                                            Update PIN
                                         </>
                                     )}
                                 </button>

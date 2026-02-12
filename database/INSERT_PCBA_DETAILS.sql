@@ -1,0 +1,71 @@
+-- ============================================================================
+-- PCBA DETAILS TEST DATA
+-- Run this FIRST before INSERT_ALL_TEST_DATA.sql
+-- ============================================================================
+
+-- Insert PCBA details for all test units
+INSERT INTO unit_pcba_details (unit_id, assembly_no, mnbd_board_no, cmbd_board_no, lrbd_board_no, pqbd_board_no, bkbd_board_no) VALUES
+-- Station 2 units (4 units)
+(NULL, 'TEST-S2-001', 'MNBD-2024-001', 'CMBD-2024-001', 'LRBD-2024-001', 'PQBD-2024-001', 'BKBD-2024-001'),
+(NULL, 'TEST-S2-002', 'MNBD-2024-002', 'CMBD-2024-002', 'LRBD-2024-002', 'PQBD-2024-002', 'BKBD-2024-002'),
+(NULL, 'TEST-S2-003', 'MNBD-2024-003', 'CMBD-2024-003', 'LRBD-2024-003', 'PQBD-2024-003', 'BKBD-2024-003'),
+(NULL, 'TEST-S2-004', 'MNBD-2024-004', 'CMBD-2024-004', 'LRBD-2024-004', 'PQBD-2024-004', 'BKBD-2024-004'),
+
+-- Station 6 units (3 units)
+(NULL, 'TEST-S6-001', 'MNBD-2024-005', 'CMBD-2024-005', 'LRBD-2024-005', 'PQBD-2024-005', 'BKBD-2024-005'),
+(NULL, 'TEST-S6-002', 'MNBD-2024-006', 'CMBD-2024-006', 'LRBD-2024-006', 'PQBD-2024-006', 'BKBD-2024-006'),
+(NULL, 'TEST-S6-003', 'MNBD-2024-007', 'CMBD-2024-007', 'LRBD-2024-007', 'PQBD-2024-007', 'BKBD-2024-007'),
+
+-- Station 8 units (3 units)
+(NULL, 'TEST-S8-001', 'MNBD-2024-008', 'CMBD-2024-008', 'LRBD-2024-008', 'PQBD-2024-008', 'BKBD-2024-008'),
+(NULL, 'TEST-S8-002', 'MNBD-2024-009', 'CMBD-2024-009', 'LRBD-2024-009', 'PQBD-2024-009', 'BKBD-2024-009'),
+(NULL, 'TEST-S8-003', 'MNBD-2024-010', 'CMBD-2024-010', 'LRBD-2024-010', 'PQBD-2024-010', 'BKBD-2024-010'),
+
+-- Station 11 units (3 units)
+(NULL, 'TEST-S11-001', 'MNBD-2024-011', 'CMBD-2024-011', 'LRBD-2024-011', 'PQBD-2024-011', 'BKBD-2024-011'),
+(NULL, 'TEST-S11-002', 'MNBD-2024-012', 'CMBD-2024-012', 'LRBD-2024-012', 'PQBD-2024-012', 'BKBD-2024-012'),
+(NULL, 'TEST-S11-003', 'MNBD-2024-013', 'CMBD-2024-013', 'LRBD-2024-013', 'PQBD-2024-013', 'BKBD-2024-013'),
+
+-- Station 1 units (3 units)
+(NULL, 'TEST-S1-001', 'MNBD-2024-014', 'CMBD-2024-014', 'LRBD-2024-014', 'PQBD-2024-014', 'BKBD-2024-014'),
+(NULL, 'TEST-S1-002', 'MNBD-2024-015', 'CMBD-2024-015', 'LRBD-2024-015', 'PQBD-2024-015', 'BKBD-2024-015'),
+(NULL, 'TEST-S1-003', 'MNBD-2024-016', 'CMBD-2024-016', 'LRBD-2024-016', 'PQBD-2024-016', 'BKBD-2024-016'),
+
+-- Station 12 units (3 units)
+(NULL, 'TEST-S12-001', 'MNBD-2024-017', 'CMBD-2024-017', 'LRBD-2024-017', 'PQBD-2024-017', 'BKBD-2024-017'),
+(NULL, 'TEST-S12-002', 'MNBD-2024-018', 'CMBD-2024-018', 'LRBD-2024-018', 'PQBD-2024-018', 'BKBD-2024-018'),
+(NULL, 'TEST-S12-003', 'MNBD-2024-019', 'CMBD-2024-019', 'LRBD-2024-019', 'PQBD-2024-019', 'BKBD-2024-019'),
+
+-- Station 3 units (2 units)
+(NULL, 'TEST-S3-001', 'MNBD-2024-020', 'CMBD-2024-020', 'LRBD-2024-020', 'PQBD-2024-020', 'BKBD-2024-020'),
+(NULL, 'TEST-S3-002', 'MNBD-2024-021', 'CMBD-2024-021', 'LRBD-2024-021', 'PQBD-2024-021', 'BKBD-2024-021'),
+
+-- Station 5 units (2 units)
+(NULL, 'TEST-S5-001', 'MNBD-2024-022', 'CMBD-2024-022', 'LRBD-2024-022', 'PQBD-2024-022', 'BKBD-2024-022'),
+(NULL, 'TEST-S5-002', 'MNBD-2024-023', 'CMBD-2024-023', 'LRBD-2024-023', 'PQBD-2024-023', 'BKBD-2024-023'),
+
+-- Station 10 units (2 units)
+(NULL, 'TEST-S10-001', 'MNBD-2024-024', 'CMBD-2024-024', 'LRBD-2024-024', 'PQBD-2024-024', 'BKBD-2024-024'),
+(NULL, 'TEST-S10-002', 'MNBD-2024-025', 'CMBD-2024-025', 'LRBD-2024-025', 'PQBD-2024-025', 'BKBD-2024-025'),
+
+-- Station 4 units (2 units)
+(NULL, 'TEST-S4-001', 'MNBD-2024-026', 'CMBD-2024-026', 'LRBD-2024-026', 'PQBD-2024-026', 'BKBD-2024-026'),
+(NULL, 'TEST-S4-002', 'MNBD-2024-027', 'CMBD-2024-027', 'LRBD-2024-027', 'PQBD-2024-027', 'BKBD-2024-027'),
+
+-- Station 7 units (2 units)
+(NULL, 'TEST-S7-001', 'MNBD-2024-028', 'CMBD-2024-028', 'LRBD-2024-028', 'PQBD-2024-028', 'BKBD-2024-028'),
+(NULL, 'TEST-S7-002', 'MNBD-2024-029', 'CMBD-2024-029', 'LRBD-2024-029', 'PQBD-2024-029', 'BKBD-2024-029'),
+
+-- NG units (3 units)
+(NULL, 'TEST-NG-001', 'MNBD-2024-030', 'CMBD-2024-030', 'LRBD-2024-030', 'PQBD-2024-030', 'BKBD-2024-030'),
+(NULL, 'TEST-NG-002', 'MNBD-2024-031', 'CMBD-2024-031', 'LRBD-2024-031', 'PQBD-2024-031', 'BKBD-2024-031'),
+(NULL, 'TEST-NG-003', 'MNBD-2024-032', 'CMBD-2024-032', 'LRBD-2024-032', 'PQBD-2024-032', 'BKBD-2024-032');
+-- ============================================================================
+-- DONE! 32 PCBA details created
+-- ============================================================================
+
+-- Verify the data
+SELECT COUNT(*) as total_pcba_records FROM unit_pcba_details WHERE assembly_no LIKE 'TEST-%';
+
+-- To delete test PCBA data after demo:
+-- DELETE FROM unit_pcba_details WHERE assembly_no LIKE 'TEST-%';

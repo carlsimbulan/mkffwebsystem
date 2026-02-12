@@ -12,7 +12,8 @@ export function ApprovalQueue({
     setShowApproveModal,
     showApproveModal,
     selectedLogToApprove,
-    executeApproval
+    executeApproval,
+    handleEditClick
 }) {
     // 1. Filter logs to show only those pending approval
     // Ginagamit ang useMemo para hindi mag-recompute kung walang nagbago sa logs
@@ -134,19 +135,27 @@ export function ApprovalQueue({
 
                                         {/* Action */}
                                         <td className="px-4 py-3 text-center">
-                                            <button
-                                                className={`btn btn-sm rounded p-2 transition-all fw-bold px-3 ${
-                                                    isOverdue ? 'btn-danger' : 'btn-primary'
-                                                }`}
-                                                onClick={() => {
-                                                    setSelectedLogToApprove(log);
-                                                    setShowApproveModal(true);
-                                                }}
-                                                title={isOverdue ? 'Review Overdue Unit' : 'Approve Unit'}
-                                            >
-                                                <i className={`bi ${isOverdue ? 'bi-exclamation-triangle' : 'bi-check-circle'} me-1`}></i>
-                                                {isOverdue ? 'REVIEW' : 'APPROVE'}
-                                            </button>
+                                            <div className="d-flex gap-2 justify-content-center">
+                                                <button
+                                                    className="btn btn-sm btn-outline-primary rounded p-2 px-3 transition-all"
+                                                    onClick={() => handleEditClick(log)}
+                                                    title="Edit Unit Details"
+                                                >
+                                                    <i className="bi bi-pencil"></i>
+                                                </button>
+                                                <button
+                                                    className={`btn btn-sm rounded p-2 transition-all fw-bold px-3 ${
+                                                        isOverdue ? 'btn-danger' : 'btn-success'
+                                                    }`}
+                                                    onClick={() => {
+                                                        setSelectedLogToApprove(log);
+                                                        setShowApproveModal(true);
+                                                    }}
+                                                    title={isOverdue ? 'Review Overdue Unit' : 'Approve Unit'}
+                                                >
+                                                    <i className={`bi ${isOverdue ? 'bi-exclamation-triangle' : 'bi-check-circle'}`}></i>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 );

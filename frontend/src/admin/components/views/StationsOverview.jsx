@@ -2614,14 +2614,6 @@ return (
                 <p className="text-muted small mb-0"></p>
             </div>
             <div className="d-flex gap-2">
-                <button 
-                    className="btn btn-outline-primary btn-sm px-3 py-2 shadow-sm fw-bold" 
-                    onClick={onTargetTimeManagement}
-                    title="Configure target processing times for each station"
-                >
-                    <i className="bi bi-clock-history me-2"></i>
-                    Set Thresholds
-                </button>
                 <button className="btn btn-dark btn-sm px-4 py-2 shadow-sm fw-bold" onClick={() => setActiveTab('overall_history')}>OVERALL HISTORY</button>
             </div>
         </div>

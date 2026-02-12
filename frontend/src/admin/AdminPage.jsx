@@ -32,6 +32,7 @@ import {
     InventoryView,
     Shipment,
     NoGoodUnits,
+    SettingsView,
     StationBarChart,
     UnitPieChart,
     NotificationBell,
@@ -830,6 +831,7 @@ case "announcements":
                         showApproveModal={showApproveModal}
                         selectedLogToApprove={selectedLogToApprove}
                         executeApproval={executeApproval}
+                        handleEditClick={handleEditClick}
                     />
                 );
 
@@ -847,6 +849,14 @@ case "announcements":
                         viewUser={viewUser}
                         setShowViewModal={setShowViewModal}
                         handleEditUser={handleEditUser}
+                    />
+                );
+
+            case "settings":
+                return (
+                    <SettingsView
+                        user={user}
+                        onTargetTimeManagement={handleTargetTimeManagement}
                     />
                 );
 
@@ -1067,6 +1077,16 @@ return (
             >
                 <i className="bi bi-person-gear"></i>
                 <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Manage Account</span>
+            </button>
+        </li>
+
+        <li className="nav-item">
+            <button
+                className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${activeTab === "settings" ? "active-glass" : ""}`}
+                onClick={() => handleTabChange("settings")}
+            >
+                <i className="bi bi-gear-fill"></i>
+                <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Settings</span>
             </button>
         </li>
     </ul>

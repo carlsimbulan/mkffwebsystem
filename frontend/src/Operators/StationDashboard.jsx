@@ -1374,7 +1374,7 @@ const todayAnnouncementsCount = announcements.filter(a => {
     {/* Sidebar Footer */}
     <div className="mt-auto pt-3 border-top border-secondary text-center text-white-50 opacity-25" style={{ fontSize: '0.65rem' }}>
         
-        <span>2025 MKFF Laser Technique</span>
+        <span>@2025 MKFF Laser Technique</span>
     </div>
 </div>
 

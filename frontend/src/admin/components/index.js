@@ -16,3 +16,4 @@ export { UserManagement } from './views/UserManagement';
 export { InventoryView } from './views/InventoryView';
 export { Shipment } from './views/Shipment';
 export { NoGoodUnits } from './views/NoGoodUnits';
+export { SettingsView } from './views/SettingsView';

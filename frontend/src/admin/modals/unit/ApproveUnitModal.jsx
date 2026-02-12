@@ -19,7 +19,7 @@ export function ApproveUnitModal({ selectedLogToApprove, onClose, onApprove }) {
                     <div className="modal-body p-4 bg-white text-start">
                         {/* Header: Simple text lang */}
                         <div className="mb-3">
-                            <h5 className="fw-bold text-dark mb-1">Approval Confirmation</h5>
+                            <h5 className="fw-bold text-dark mb-1">Override Unit Details</h5>
                             <div className="text-muted small">Production Workflow Release</div>
                         </div>
                         
