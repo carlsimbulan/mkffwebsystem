@@ -40,37 +40,37 @@ const NoGoodUnits = ({ logs, handleEditClick }) => {
 
             <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
                 <div className="table-responsive">
-                    <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem' }}>
-                        <thead className="bg-primary text-white">
+                    <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem', borderCollapse: 'separate', borderSpacing: 0 }}>
+                        <thead>
                             <tr>
-                                <th className="border-0 px-4 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                <th className="px-4 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>
                                     MODEL
                                 </th>
-                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>
                                     REVISION
                                 </th>
-                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>
                                     BASE UNIT
                                 </th>
-                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>
                                     ASSEMBLY
                                 </th>
-                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>
                                     DEVICE SERIAL
                                 </th>
-                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>
                                     ACCESSORY
                                 </th>
-                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>
                                     ERROR STATION
                                 </th>
-                                <th className="border-0 px-3 py-3 text-center fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                <th className="px-3 py-3 text-center fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>
                                     STATUS
                                 </th>
-                                <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>
                                     LAST MOVEMENT
                                 </th>
-                                <th className="border-0 px-4 py-3 text-center fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>
+                                <th className="px-4 py-3 text-center fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderTop: 'none', borderBottom: 'none', borderLeft: 'none', borderRight: 'none' }}>
                                     ACTIONS
                                 </th>
                             </tr>

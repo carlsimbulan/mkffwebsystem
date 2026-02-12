@@ -524,20 +524,20 @@ export const UnitListTable = ({ units, listStatus, loading, error, onEdit, dynam
                 
                 <div className="card border-0 shadow-sm rounded-3 overflow-hidden">
                     <div className="table-responsive">
-                        <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem' }}>
-                            <thead className="bg-primary text-white">
+                        <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.85rem', borderCollapse: 'separate', borderSpacing: 0 }}>
+                            <thead>
                                 <tr>
-                                    <th className="border-0 px-4 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>MODEL</th>
-                                    <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>REVISION</th>
-                                    <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>BASE UNIT</th>
-                                    <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>ASSEMBLY</th>
-                                    <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>DEVICE SERIAL</th>
-                                    <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>ACCESSORY</th>
-                                    <th className="border-0 px-3 py-3 text-center fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>STATUS</th>
-                                    <th className="border-0 px-3 py-3 text-center fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>DELAY</th>
-                                    <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>REMARKS</th>
-                                    <th className="border-0 px-3 py-3 fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>LAST UPDATE</th>
-                                    <th className="border-0 px-4 py-3 text-center fw-semibold" style={{ fontSize: '0.75rem', letterSpacing: '0.5px' }}>ACTIONS</th>
+                                    <th className="px-4 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>MODEL</th>
+                                    <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>REVISION</th>
+                                    <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>BASE UNIT</th>
+                                    <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>ASSEMBLY</th>
+                                    <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>DEVICE SERIAL</th>
+                                    <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>ACCESSORY</th>
+                                    <th className="px-3 py-3 text-center fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>STATUS</th>
+                                    <th className="px-3 py-3 text-center fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>DELAY</th>
+                                    <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>REMARKS</th>
+                                    <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>LAST UPDATE</th>
+                                    <th className="px-4 py-3 text-center fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderTop: 'none', borderBottom: 'none', borderLeft: 'none', borderRight: 'none' }}>ACTIONS</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -750,16 +750,16 @@ export const UnitListTable = ({ units, listStatus, loading, error, onEdit, dynam
                                         </div>
                                         <div className="card-body p-0">
                                             <div className="table-responsive">
-                                                <table className="table table-hover mb-0">
-                                                    <thead className="table-light">
+                                                <table className="table table-hover mb-0" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+                                                    <thead>
                                                         <tr>
-                                                            <th>Board Type</th>
-                                                            <th>Old Value</th>
-                                                            <th>New Value</th>
-                                                            <th>Requested By</th>
-                                                            <th>Remarks</th>
-                                                            <th>Requested At</th>
-                                                            <th>Status</th>
+                                                            <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>Board Type</th>
+                                                            <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>Old Value</th>
+                                                            <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>New Value</th>
+                                                            <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>Requested By</th>
+                                                            <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>Remarks</th>
+                                                            <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>Requested At</th>
+                                                            <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderTop: 'none', borderBottom: 'none', borderLeft: 'none', borderRight: 'none' }}>Status</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>

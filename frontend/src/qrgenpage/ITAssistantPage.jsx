@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import axios from 'axios';
-import logo from '../logo.png';
+import logo from '../icon.ico';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import {
     Chart as ChartJS,
@@ -449,15 +449,48 @@ export default function ITAssistantPage({ user, onLogout }) {
         return { completed, ng, processed, pct };
     }, [unitLogs]);
 
-    // Inventory filtered by search
-    const filteredInventory = useMemo(() => {
-        if (!inventorySearch.trim()) return unitLogs;
-        const searchLower = inventorySearch.toLowerCase().trim();
-        return unitLogs.filter(u => 
-            u.assembly_no?.toLowerCase().includes(searchLower) ||
-            u.model?.toLowerCase().includes(searchLower)
-        );
+    // Group units by batch (based on created_at timestamp)
+    const batchedInventory = useMemo(() => {
+        // First, filter by search
+        let unitsToGroup = unitLogs;
+        if (inventorySearch.trim()) {
+            const searchLower = inventorySearch.toLowerCase().trim();
+            unitsToGroup = unitLogs.filter(u => 
+                u.assembly_no?.toLowerCase().includes(searchLower) ||
+                u.model?.toLowerCase().includes(searchLower)
+            );
+        }
+
+        // Group by created_at timestamp
+        const batchMap = {};
+        unitsToGroup.forEach(unit => {
+            const timestamp = unit.created_at || 'Unknown';
+            if (!batchMap[timestamp]) {
+                batchMap[timestamp] = [];
+            }
+            batchMap[timestamp].push(unit);
+        });
+
+        // Convert to array and sort by timestamp (earliest first)
+        const batches = Object.entries(batchMap)
+            .map(([timestamp, units]) => ({ timestamp, units }))
+            .sort((a, b) => {
+                if (a.timestamp === 'Unknown') return 1;
+                if (b.timestamp === 'Unknown') return -1;
+                return new Date(a.timestamp) - new Date(b.timestamp);
+            });
+
+        // Assign batch numbers
+        return batches.map((batch, index) => ({
+            ...batch,
+            batchNumber: index + 1
+        }));
     }, [unitLogs, inventorySearch]);
+
+    // Flatten batches for counting total units
+    const filteredInventory = useMemo(() => {
+        return batchedInventory.flatMap(batch => batch.units);
+    }, [batchedInventory]);
 
     // Paginated inventory (10 items per page)
     const ITEMS_PER_PAGE = 10;
@@ -1272,18 +1305,18 @@ export default function ITAssistantPage({ user, onLogout }) {
                             </div>
                             <div className="card-body p-0">
                                 <div className="table-responsive">
-                                    <table className="table table-hover mb-0 align-middle" style={{ fontSize: '0.85rem' }}>
-                                        <thead className="table-light">
+                                    <table className="table table-hover mb-0 align-middle" style={{ fontSize: '0.85rem', borderCollapse: 'separate', borderSpacing: 0 }}>
+                                        <thead>
                                             <tr>
-                                                <th className="py-3 px-4 fw-bold text-muted">MODEL</th>
-                                                <th className="py-3 px-4 fw-bold text-muted">REVISION</th>
-                                                <th className="py-3 px-4 fw-bold text-muted">BASE UNIT</th>
-                                                <th className="py-3 px-4 fw-bold text-muted">ASSEMBLY</th>
-                                                <th className="py-3 px-4 fw-bold text-muted">DEVICE SERIAL</th>
-                                                <th className="py-3 px-4 fw-bold text-muted">STATUS</th>
-                                                <th className="py-3 px-4 fw-bold text-muted">REMARKS</th>
-                                                <th className="py-3 px-4 fw-bold text-muted">TIMESTAMP</th>
-                                                <th className="py-3 px-4 fw-bold text-muted text-center">ACTIONS</th>
+                                                <th className="py-3 px-4 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>MODEL</th>
+                                                <th className="py-3 px-4 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>REVISION</th>
+                                                <th className="py-3 px-4 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>BASE UNIT</th>
+                                                <th className="py-3 px-4 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>ASSEMBLY</th>
+                                                <th className="py-3 px-4 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>DEVICE SERIAL</th>
+                                                <th className="py-3 px-4 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>STATUS</th>
+                                                <th className="py-3 px-4 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>REMARKS</th>
+                                                <th className="py-3 px-4 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>TIMESTAMP</th>
+                                                <th className="py-3 px-4 fw-semibold text-white text-center" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderTop: 'none', borderBottom: 'none', borderLeft: 'none', borderRight: 'none' }}>ACTIONS</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1419,16 +1452,16 @@ export default function ITAssistantPage({ user, onLogout }) {
                         <div className="card border-0 shadow-sm">
                             <div className="card-body p-0">
                                 <div className="table-responsive">
-                                    <table className="table table-hover mb-0 align-middle" style={{ fontSize: '0.85rem' }}>
-                                        <thead className="table-light">
+                                    <table className="table table-hover mb-0 align-middle" style={{ fontSize: '0.85rem', borderCollapse: 'separate', borderSpacing: 0 }}>
+                                        <thead>
                                             <tr>
-                                                <th className="py-3 px-4 fw-bold text-muted">MODEL</th>
-                                                <th className="py-3 px-4 fw-bold text-muted">ASSEMBLY NO</th>
-                                                <th className="py-3 px-4 fw-bold text-muted">REVISION</th>
-                                                <th className="py-3 px-4 fw-bold text-muted">BASE UNIT KIT</th>
-                                                <th className="py-3 px-4 fw-bold text-muted">ACCESSORY KIT</th>
-                                                <th className="py-3 px-4 fw-bold text-muted">GENERATION DATE & TIME</th>
-                                                <th className="py-3 px-4 fw-bold text-muted">STATUS</th>
+                                                <th className="py-3 px-4 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>BATCH</th>
+                                                <th className="py-3 px-4 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>MODEL</th>
+                                                <th className="py-3 px-4 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>ASSEMBLY NO</th>
+                                                <th className="py-3 px-4 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>REVISION</th>
+                                                <th className="py-3 px-4 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>BASE UNIT KIT</th>
+                                                <th className="py-3 px-4 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>GENERATION DATE & TIME</th>
+                                                <th className="py-3 px-4 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderTop: 'none', borderBottom: 'none', borderLeft: 'none', borderRight: 'none' }}>STATUS</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1582,15 +1615,15 @@ export default function ITAssistantPage({ user, onLogout }) {
                         <div className="card border-0 shadow-sm">
                             <div className="card-body p-0">
                                 <div className="table-responsive">
-                                    <table className="table table-hover mb-0 align-middle" style={{ fontSize: '0.85rem' }}>
-                                        <thead className="table-light">
+                                    <table className="table table-hover mb-0 align-middle" style={{ fontSize: '0.85rem', borderCollapse: 'separate', borderSpacing: 0 }}>
+                                        <thead>
                                             <tr>
-                                                <th className="py-3 px-4 fw-bold text-muted">SOURCE STATION</th>
-                                                <th className="py-3 px-4 fw-bold text-muted text-center">UNITS PROCESSED</th>
-                                                <th className="py-3 px-4 fw-bold text-muted text-center">TOTAL NG</th>
-                                                <th className="py-3 px-4 fw-bold text-muted text-center">YIELD RATE</th>
-                                                <th className="py-3 px-4 fw-bold text-muted">DATE & TIME</th>
-                                                <th className="py-3 px-4 fw-bold text-muted text-center">ACTIONS</th>
+                                                <th className="py-3 px-4 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>SOURCE STATION</th>
+                                                <th className="py-3 px-4 fw-semibold text-white text-center" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>UNITS PROCESSED</th>
+                                                <th className="py-3 px-4 fw-semibold text-white text-center" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>TOTAL NG</th>
+                                                <th className="py-3 px-4 fw-semibold text-white text-center" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>YIELD RATE</th>
+                                                <th className="py-3 px-4 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>DATE & TIME</th>
+                                                <th className="py-3 px-4 fw-semibold text-white text-center" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderTop: 'none', borderBottom: 'none', borderLeft: 'none', borderRight: 'none' }}>ACTIONS</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1974,7 +2007,7 @@ export default function ITAssistantPage({ user, onLogout }) {
                             src={logo} 
                             alt="MKFF Logo" 
                             style={{ 
-                                height: '55px', 
+                                height: '42px', 
                                 width: 'auto',
                                 objectFit: 'contain',
                                 marginRight: '20px'

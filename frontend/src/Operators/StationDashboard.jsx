@@ -5,7 +5,7 @@ import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, BarElement, T
 import { useTargetTimes } from '../utils/targetTimeService';
 
 // Import local assets
-import logo from '../logo.png'; 
+import logo from '../icon.ico'; 
 
 // --- IMPORT SEPARATED VIEW/MODAL COMPONENTS ---
 import { StationHomeDashboard } from './components/StationHomeDashboard';
@@ -1395,7 +1395,7 @@ const todayAnnouncementsCount = announcements.filter(a => {
                 src={logo} 
                 alt="MKFF Logo" 
                 style={{ 
-                    height: '55px', 
+                    height: '42px', 
                     width: 'auto',
                     objectFit: 'contain',
                     marginRight: '20px'

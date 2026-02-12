@@ -151,7 +151,15 @@ export const StationHistoryModal = ({ stationId, onClose, HISTORY_ENDPOINT, high
                                                 <td className="small">{log.action_type || 'UPDATE'}</td>
                                                 <td>{log.station_name || log.station}</td>
                                                 <td>
-                                                    <span className={`badge rounded-pill ${log.status_after?.includes('Completed') || log.status?.includes('Completed') ? 'bg-success' : log.status_after?.includes('NG') || log.status?.includes('NG') ? 'bg-danger' : 'bg-warning text-dark'}`}>
+                                                    <span className={`badge rounded-pill fw-normal ${
+                                                        log.status_after?.includes('Completed') || log.status?.includes('Completed') 
+                                                            ? 'bg-success bg-opacity-10 text-success border border-success border-opacity-25' 
+                                                            : log.status_after?.includes('NG') || log.status?.includes('NG') 
+                                                            ? 'bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25' 
+                                                            : log.status_after?.includes('In Progress') || log.status?.includes('In Progress')
+                                                            ? 'bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25'
+                                                            : 'bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25'
+                                                    }`} style={{ fontSize: '0.7rem', padding: '6px 14px' }}>
                                                         {log.status_after || log.status}
                                                     </span>
                                                 </td>

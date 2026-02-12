@@ -4,7 +4,7 @@ import { useTargetTimes, targetTimeService } from '../utils/targetTimeService';
 
 // 1. CHART IMPORTS & REGISTRATION (Keep for global chart setup)
 import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
-import logo from '../logo.png';
+import logo from '../icon.ico';
 
 // 2. IMPORT SEPARATED COMPONENTS (Updated List)
 // Import all components from organized index files
@@ -1157,15 +1157,12 @@ return (
     {/* --- HEADER --- */}
 {/* --- PINATABA NA HEADER (80px height) --- */}
     <header 
-        className="bg-white d-flex justify-content-between align-items-center px-5"
+        className="bg-white d-flex justify-content-between align-items-center px-4 shadow-sm sticky-top z-2"
         style={{ 
-            flexShrink: 0, 
-            position: 'sticky', 
-            top: 0, 
-            zIndex: 10,
-            height: '80px', // Pinataba mula 60px
-            boxShadow: '0 2px 10px rgba(0,0,0,0.05)', // Mas ramdam na shadow
-            borderBottom: '1px solid #e5e7eb'
+            height: '80px', 
+            borderBottom: '1px solid #e5e7eb',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+            flexShrink: 0
         }} 
     >
         <div className="d-flex align-items-center">
@@ -1173,7 +1170,7 @@ return (
                 src={logo} 
                 alt="MKFF Logo" 
                 style={{ 
-                    height: '55px', 
+                    height: '42px', 
                     width: 'auto',
                     objectFit: 'contain',
                     marginRight: '20px'

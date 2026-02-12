@@ -827,17 +827,17 @@ export const InventoryView = ({ pcbaLogs, onUpdateSerial, setSelectedUnit }) => 
                         </div>
                         <div className="card-body p-0">
                             <div className="table-responsive">
-                                <table className="table table-hover mb-0">
-                                    <thead className="table-light">
+                                <table className="table table-hover mb-0" style={{ borderCollapse: 'separate', borderSpacing: 0 }}>
+                                    <thead>
                                         <tr>
-                                            <th>Assembly No.</th>
-                                            <th>Board Type</th>
-                                            <th>Old Value</th>
-                                            <th>New Value</th>
-                                            <th>Requested By</th>
-                                            <th>Remarks</th>
-                                            <th>Requested At</th>
-                                            <th>Actions</th>
+                                            <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>Assembly No.</th>
+                                            <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>Board Type</th>
+                                            <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>Old Value</th>
+                                            <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>New Value</th>
+                                            <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>Requested By</th>
+                                            <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>Remarks</th>
+                                            <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderRight: '1px solid #6c757d', borderTop: 'none', borderBottom: 'none', borderLeft: 'none' }}>Requested At</th>
+                                            <th className="px-3 py-3 fw-semibold text-white" style={{ fontSize: '0.75rem', letterSpacing: '0.5px', backgroundColor: '#495057', borderTop: 'none', borderBottom: 'none', borderLeft: 'none', borderRight: 'none' }}>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
