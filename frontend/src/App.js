@@ -13,7 +13,7 @@ const getHomePathByRole = (role) => {
         case 'IT Assistant':
             return '/itassistant/overview';
         case 'Operator':
-            return '/operator/dashboard'; // <--- BINAGO: Default sa dashboard sub-route
+            return '/operator/home'; // <--- BINAGO: Default sa dashboard sub-route
         default:
             return '/login';
     }
@@ -46,6 +46,7 @@ function App() {
         }
     });
 
+    // Sync user state with localStorage
     useEffect(() => {
         if (user) {
             localStorage.setItem('mkff_user', JSON.stringify(user));
@@ -53,6 +54,34 @@ function App() {
             localStorage.removeItem('mkff_user');
         }
     }, [user]);
+
+    // Cross-tab session synchronization
+    useEffect(() => {
+        const handleStorageChange = (e) => {
+            // Only respond to changes in mkff_user key
+            if (e.key === 'mkff_user') {
+                if (e.newValue === null) {
+                    // User logged out in another tab
+                    setUser(null);
+                } else if (e.newValue !== e.oldValue) {
+                    // User logged in or changed in another tab
+                    try {
+                        const newUser = JSON.parse(e.newValue);
+                        setUser(newUser);
+                    } catch (error) {
+                        console.error("Error parsing user data from storage event:", error);
+                    }
+                }
+            }
+        };
+
+        // Listen for storage events from other tabs
+        window.addEventListener('storage', handleStorageChange);
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+        };
+    }, []);
 
     const handleLogin = (loggedInUser) => {
         setUser(loggedInUser);
