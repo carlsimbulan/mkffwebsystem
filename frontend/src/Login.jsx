@@ -57,6 +57,11 @@ export default function Login({ onLogin }) {
     const hiddenTextRef = useRef(null);
     const navigate = useNavigate();
 
+    // Set page title for login page
+    useEffect(() => {
+        document.title = 'MKFF - Login';
+    }, []);
+
     // Sinusukat ang lapad ng text para laging nakadikit ang suffix
     useEffect(() => {
         if (hiddenTextRef.current) {

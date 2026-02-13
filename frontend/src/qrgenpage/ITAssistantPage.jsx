@@ -83,6 +83,23 @@ export default function ITAssistantPage({ user, onLogout }) {
         navigate(`/itassistant/${tab}`);
     };
 
+    // Update page title based on active tab
+    useEffect(() => {
+        const tabTitles = {
+            'overview': 'Overview',
+            'qr_generator': 'QR Generator',
+            'station_monitor': 'Station Monitor',
+            'station_details': 'Station Details',
+            'approvals': 'Approvals',
+            'inventory': 'Inventory',
+            'reports': 'Reports',
+            'announcements': 'Announcements',
+            'notifications': 'Notifications'
+        };
+        const tabTitle = tabTitles[activeTab] || 'Dashboard';
+        document.title = `MKFF - IT Assistant - ${tabTitle}`;
+    }, [activeTab]);
+
     const [currentAvatar, setCurrentAvatar] = useState(user?.avatar_url || null);
     const [currentFullName, setCurrentFullName] = useState(user?.full_name || user?.username);
 

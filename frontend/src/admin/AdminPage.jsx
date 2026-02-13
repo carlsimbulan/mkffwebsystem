@@ -104,8 +104,11 @@ const activeTab = location.pathname.split('/').pop() || "dashboard";
 const handleTabChange = (tabName) => {
     navigate(`/admin/${tabName}`);
 };
+
+    // --- STATE DECLARATIONS ---
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [showQualityDropdown, setShowQualityDropdown] = useState(false);
+    const [showUserDropdown, setShowUserDropdown] = useState(false);
     const [filterStartDate, setFilterStartDate] = useState('');
     const [filterEndDate, setFilterEndDate] = useState(getTodayDate());
     const [logs, setLogs] = useState([]); // Unit logs (Current State)
@@ -146,7 +149,39 @@ const handleTabChange = (tabName) => {
     const [newReportsToday, setNewReportsToday] = useState(0); 
 
     const [announcements, setAnnouncements] = useState([]); 
-    const [showPostModal, setShowPostModal] = useState(false); 
+    const [showPostModal, setShowPostModal] = useState(false);
+
+// Update page title based on active tab
+useEffect(() => {
+    const tabTitles = {
+        'dashboard': 'Dashboard',
+        'stations': 'Stations Overview',
+        'station_monitor': 'Station Monitor',
+        'overall_history': 'Overall History',
+        'reports': 'Reports',
+        'announcements': 'Announcements',
+        'approval': 'Approval Queue',
+        'manage_account': 'User Management',
+        'inventory': 'Inventory',
+        'shipment': 'Shipment',
+        'no_good_list': 'No Good Units',
+        'settings': 'Settings',
+        'notifications': 'Notifications'
+    };
+    const tabTitle = tabTitles[activeTab] || 'Admin';
+    document.title = `MKFF - Admin - ${tabTitle}`;
+}, [activeTab]);
+
+// Close dropdown when clicking outside
+useEffect(() => {
+    const handleClickOutside = (event) => {
+        if (showUserDropdown && !event.target.closest('.user-dropdown-container')) {
+            setShowUserDropdown(false);
+        }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+}, [showUserDropdown]); 
 
     // Calculate today's announcement count
     const todayStr = new Date().toISOString().split('T')[0];
@@ -920,7 +955,7 @@ return (
 >
     {/* COMPACT PROFILE SECTION */}
     <div className="d-flex align-items-center mb-3 mt-1 px-1">
-        <div className="position-relative flex-shrink-0">
+        <div className="position-relative flex-shrink-0" style={{ cursor: 'default' }}>
             <img
                 src={headerAvatarSrc}
                 alt="User Avatar"
@@ -933,13 +968,16 @@ return (
                 }}
                 onError={(e) => { e.target.onerror = null; e.target.src = DEFAULT_AVATAR_PATH; }}
             />
+            <span className="position-absolute bottom-0 end-0 bg-success border border-dark rounded-circle" style={{width: '10px', height: '10px'}}></span>
         </div>
-        <div className="ms-3 overflow-hidden">
+        <div className="ms-3 flex-grow-1 user-dropdown-container position-relative">
             <div 
-                className="text-white text-truncate" 
-                style={{ fontSize: '0.85rem', fontWeight: '400' }}
+                className="text-white text-truncate position-relative user-dropdown-toggle px-2 py-1 rounded" 
+                style={{ fontSize: '0.85rem', fontWeight: '400', cursor: 'pointer' }}
+                onClick={() => setShowUserDropdown(!showUserDropdown)}
             >
                 {headerFullName}
+                <i className={`bi bi-chevron-${showUserDropdown ? 'up' : 'down'} ms-1`} style={{ fontSize: '0.7rem' }}></i>
             </div>
             <div 
                 style={{ 
@@ -950,7 +988,37 @@ return (
                 }}
             >
                 Administrator
-            </div> 
+            </div>
+            
+            {/* User Dropdown Menu */}
+            {showUserDropdown && (
+                <div className="position-absolute top-100 start-0 mt-2 w-100 bg-white rounded shadow-lg" style={{ zIndex: 1000, minWidth: '220px', border: '1px solid #e9ecef' }}>
+                    <div className="py-1">
+                        <button 
+                            className="dropdown-menu-item btn btn-sm w-100 text-start d-flex align-items-center px-3 py-2 text-dark"
+                            style={{ fontSize: '0.8rem' }}
+                            onClick={() => {
+                                handleTabChange('settings');
+                                setShowUserDropdown(false);
+                            }}
+                        >
+                            <i className="bi bi-gear-fill me-2 text-secondary"></i>
+                            <span>Settings</span>
+                        </button>
+                        <button 
+                            className="dropdown-menu-item btn btn-sm w-100 text-start d-flex align-items-center px-3 py-2 text-dark"
+                            style={{ fontSize: '0.8rem' }}
+                            onClick={() => {
+                                onLogout();
+                                setShowUserDropdown(false);
+                            }}
+                        >
+                            <i className="bi bi-box-arrow-right me-2 text-danger"></i>
+                            <span>Logout</span>
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     </div>
 
@@ -1079,28 +1147,10 @@ return (
                 <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Manage Account</span>
             </button>
         </li>
-
-        <li className="nav-item">
-            <button
-                className={`nav-link text-white w-100 d-flex align-items-center gap-3 py-2 px-3 sidebar-btn ${activeTab === "settings" ? "active-glass" : ""}`}
-                onClick={() => handleTabChange("settings")}
-            >
-                <i className="bi bi-gear-fill"></i>
-                <span style={{ fontSize: '0.85rem', fontWeight: '400' }}>Settings</span>
-            </button>
-        </li>
     </ul>
 
     {/* BOTTOM SECTION */}
     <div className="mt-auto">
-        <button 
-            className="btn text-white-50 btn-sm w-100 logout-btn d-flex align-items-center justify-content-center gap-2 py-2" 
-            onClick={onLogout}
-            style={{ fontSize: '0.8rem', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px' }}
-        >
-            <i className="bi bi-box-arrow-left"></i>
-            Logout
-        </button>
         <div className="text-center text-white-50 small pt-3 mt-2 border-top border-secondary opacity-25" style={{ fontSize: '0.65rem' }}>
             <span>©2025 MKFF Laser Technique</span>
         </div>
@@ -1132,10 +1182,18 @@ return (
             color: white !important;
         }
 
-        .logout-btn:hover {
-            background-color: rgba(239, 68, 68, 0.1) !important;
-            color: #ef4444 !important;
-            border-color: rgba(239, 68, 68, 0.2) !important;
+        .user-dropdown-toggle:hover {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+        }
+
+        .dropdown-menu-item {
+            border: none;
+            background: transparent;
+            transition: all 0.2s ease;
+        }
+
+        .dropdown-menu-item:hover {
+            background-color: #f8f9fa !important;
         }
     `}</style>
 </div>

@@ -125,7 +125,26 @@ const activeTab = location.pathname.split('/').pop() || "dashboard";
 // Helper function to change tabs
 const setActiveTab = (tab) => {
     navigate(`/operator/${tab}`);
-}; 
+};
+
+// Update page title based on active tab
+useEffect(() => {
+    const tabTitles = {
+        'home': 'Home',
+        'input_unit': 'Unit Entry',
+        'in_progress': 'In Progress',
+        'completed': 'Completed',
+        'no_good': 'No Good',
+        'pending': 'Pending',
+        'daily_reports': 'Daily Report',
+        'account_history': 'Unit History',
+        'announcements': 'Announcements',
+        'notifications': 'Notifications'
+    };
+    const tabTitle = tabTitles[activeTab] || 'Dashboard';
+    const stationName = user?.station_assigned ? ` - ${user.station_assigned}` : '';
+    document.title = `MKFF - Operator${stationName} - ${tabTitle}`;
+}, [activeTab, user?.station_assigned]); 
     const [announcements, setAnnouncements] = useState([]); 
     const [announcementLoading, setAnnouncementLoading] = useState(false);
     const [announcementError, setAnnouncementError] = useState(null);
