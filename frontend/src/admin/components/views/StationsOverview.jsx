@@ -1791,15 +1791,15 @@ export function StationsOverview({
 
             const operatorMap = createOperatorMap();
 
-            // 3-Year Historical Operator Performance Analysis - DEEP DIVE
+            // 3-Month Historical Operator Performance Analysis - DEEP DIVE
             const calculateHistoricalPerformance = (operatorId, stationId) => {
                 // Get the full name for this operator using the operator map
                 const operatorFullName = operatorMap[operatorId] || operatorId;
                 
-                // DEEP DIVE: Filter allLogs for this operator and station over 3 years
+                // DEEP DIVE: Filter allLogs for this operator and station over 3 months
                 // INCLUDE DISPATCHED UNITS: Scan ALL records regardless of current unit status
-                const threeYearsAgo = new Date();
-                threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
+                const threeMonthsAgo = new Date();
+                threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
                 // SCAN BY STATION NAME: Use station_name field within history entry instead of current station field
                 const stationNameVariants = [
@@ -1829,7 +1829,7 @@ export function StationsOverview({
                     return (
                         isOperatorMatch &&
                         isStationMatch &&
-                        logDate >= threeYearsAgo
+                        logDate >= threeMonthsAgo
                     );
                 });
 
@@ -1859,7 +1859,7 @@ export function StationsOverview({
                 const consistencyScore = totalUnitsProcessed > 0 ? 
                     Math.round(((totalUnitsProcessed - delayedUnits) / totalUnitsProcessed) * 100) : 100;
 
-                // Calculate NG rate from 3-year deep dive
+                // Calculate NG rate from 3-month deep dive
                 const ngRate = totalUnitsProcessed > 0 ? 
                     Math.round((ngCount / totalUnitsProcessed) * 100) : 0;
 
@@ -1928,9 +1928,9 @@ export function StationsOverview({
                 // Get all unique operators who have worked at this station from BOTH current logs AND historical logs
                 const currentOperators = [...new Set(stationLogs.map(log => log.action_by).filter(Boolean))];
                 
-                // DEEP DIVE: Get operators from 3-year historical data using station_name field
-                const threeYearsAgo = new Date();
-                threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
+                // DEEP DIVE: Get operators from 3-month historical data using station_name field
+                const threeMonthsAgo = new Date();
+                threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
                 
                 const stationNameVariants = [
                     station.id,
@@ -1946,7 +1946,7 @@ export function StationsOverview({
                             (log.station_name && log.station_name === variant) ||
                             (log.station && log.station === variant)
                         );
-                        return isStationMatch && logDate >= threeYearsAgo;
+                        return isStationMatch && logDate >= threeMonthsAgo;
                     })
                     .map(log => log.action_by)
                     .filter(Boolean)
@@ -2007,7 +2007,7 @@ export function StationsOverview({
                     operatorNameMap[op.operator_id] = op.operator_full_name;
                 });
                 
-                // Enhanced 3-year historical performance with local calculation fallback
+                // Enhanced 3-month historical performance with local calculation fallback
                 const enhancedHistoricalPerformance = await Promise.all(activeOperators.map(async (operatorId) => {
                     try {
                         // Get full name from operator map
@@ -2153,7 +2153,7 @@ export function StationsOverview({
                 current_station_assignments: currentAssignments,
                 delay_hotspots: hotspotDetailedPayload,
                 comprehensive_historical_performance: historicalPerformanceDatabase,
-                // Add explicit mapping of current assignments to their 3-year historical performance
+                // Add explicit mapping of current assignments to their 3-month historical performance
                 current_operators_historical_summary: Object.entries(currentAssignments).reduce((summary, [stationId, operatorName]) => {
                     if (operatorName !== 'Unassigned' && operatorName !== 'Unknown Assignment') {
                         // Look up historical data using full name as primary key
@@ -2222,13 +2222,13 @@ if (!modelData.modelName) {
 
 const prompt = `You are a Senior Industrial AI Systems Engineer specializing in real-time manufacturing intelligence at MKFF Laserteknique International inc.
 
-REAL-TIME OPERATIONAL INTELLIGENCE WITH 3-YEAR PERFORMANCE DEEP DIVE:
+REAL-TIME OPERATIONAL INTELLIGENCE WITH 3-MONTH PERFORMANCE DEEP DIVE:
 ${JSON.stringify(payloadWithAssignments, null, 2)}
 
 CURRENT STATION ASSIGNMENTS FROM USERS DATABASE (Use these exact full names for accountability):
 ${Object.entries(currentAssignments).map(([station, operator]) => `${station}: ${operator}`).join('\n')}
 
-CURRENT OPERATORS 3-YEAR HISTORICAL PERFORMANCE SUMMARY (MANDATORY TO REFERENCE):
+CURRENT OPERATORS 3-MONTH HISTORICAL PERFORMANCE SUMMARY (MANDATORY TO REFERENCE):
 ${Object.entries(currentAssignments).map(([stationId, operatorName]) => {
     if (operatorName !== 'Unassigned' && operatorName !== 'Unknown Assignment') {
         const stationHistorical = historicalPerformanceDatabase[stationId] || {};
@@ -2243,36 +2243,36 @@ ${Object.entries(currentAssignments).map(([stationId, operatorName]) => {
     return `${stationId} - ${operatorName}: Station unassigned`;
 }).join('\n')}
 
-MANDATORY 3-YEAR PERFORMANCE DEEP DIVE ANALYSIS:
-You are performing a comprehensive 3-year performance deep dive that includes ALL historical records from 2023-2025, including dispatched units and completed production runs. This analysis provides the complete digital footprint of each operator's performance patterns.
+MANDATORY 3-MONTH PERFORMANCE DEEP DIVE ANALYSIS:
+You are performing a comprehensive 3-month performance deep dive that includes ALL historical records from the past 3 months, including dispatched units and completed production runs. This analysis provides the complete digital footprint of each operator's performance patterns.
 
 CRITICAL DATA STRUCTURE RULES:
 1. ALL OPERATOR IDENTIFIERS ARE FULL NAMES: The system has already converted all email addresses (e.g., 'james@mkff.com') and usernames to full names (e.g., 'Lebron James')
 2. NEVER USE EMAIL ADDRESSES OR USERNAMES: You will only see and must only use full names like "Lebron James", "Shane Villars", "Carl Ivan Simbulan"
-3. HISTORICAL DATA LOOKUP: comprehensive_historical_performance[station_id][operator_full_name] contains the 3-year metrics
+3. HISTORICAL DATA LOOKUP: comprehensive_historical_performance[station_id][operator_full_name] contains the 3-month metrics
 4. CURRENT ASSIGNMENTS: current_station_assignments maps each station to an operator's full name
 5. DELAYED UNITS: delayed_units_with_checklist uses operator_full_name field (NOT action_by)
 
 CRITICAL HISTORICAL DATA EXTRACTION RULES:
 1. MANDATORY CROSS-REFERENCE: For each delayed station, find the current_assigned_operator (which is a full name) and look up their historical_metrics in comprehensive_historical_performance[station_id][operator_full_name]
-2. REQUIRED METRICS TO CITE: ng_rate_percentage, voltage_error_rate_percentage, consistency_score_percentage from the 3-year analysis
-3. PATTERN RECOGNITION: Cross-reference current delays with 3-year historical data to identify recurring operator performance issues
+2. REQUIRED METRICS TO CITE: ng_rate_percentage, voltage_error_rate_percentage, consistency_score_percentage from the 3-month analysis
+3. PATTERN RECOGNITION: Cross-reference current delays with 3-month historical data to identify recurring operator performance issues
 4. SURGICAL ACCOUNTABILITY: If an operator shows consistent patterns (high NG rate >15%, voltage errors >10%, consistency score <80%), flag for mandatory retraining
 5. PREDICTIVE INTERVENTION: Use historical trends to predict which operators will cause future bottlenecks
 
 MANDATORY HISTORICAL CITATION RULES FOR DEEP DIVE:
 - CRITICAL: You MUST examine the comprehensive_historical_performance object for EVERY operator mentioned in your analysis
-- MANDATORY DEEP DIVE FORMAT: "Based on a 3-year deep dive into the performance of [Full Name], a chronic pattern of [NG/Delay/Voltage Issues] has been identified ([XX]% historical [metric] rate over 3 years)"
-- If operator has >20% NG rate over 3 years: "Based on a 3-year deep dive into the performance of [Full Name], a chronic pattern of quality failures has been identified ([XX]% historical NG rate over 3 years)"
-- If operator has >15% voltage error rate over 3 years: "Based on a 3-year deep dive into the performance of [Full Name], a chronic pattern of voltage calibration issues has been identified ([XX]% historical voltage error rate over 3 years)"
-- If operator has <70% consistency score over 3 years: "Based on a 3-year deep dive into the performance of [Full Name], a chronic pattern of processing delays has been identified ([XX]% historical consistency score over 3 years)"
-- MANDATORY: ALWAYS include the specific percentage and "3-year deep dive" in your citations
-- SCAN ALL RECORDS: The comprehensive_historical_performance includes data from dispatched units and all historical records over 3 years using station_name field analysis
+- MANDATORY DEEP DIVE FORMAT: "Based on a 3-month deep dive into the performance of [Full Name], a chronic pattern of [NG/Delay/Voltage Issues] has been identified ([XX]% historical [metric] rate over 3 months)"
+- If operator has >20% NG rate over 3 months: "Based on a 3-month deep dive into the performance of [Full Name], a chronic pattern of quality failures has been identified ([XX]% historical NG rate over 3 months)"
+- If operator has >15% voltage error rate over 3 months: "Based on a 3-month deep dive into the performance of [Full Name], a chronic pattern of voltage calibration issues has been identified ([XX]% historical voltage error rate over 3 months)"
+- If operator has <70% consistency score over 3 months: "Based on a 3-month deep dive into the performance of [Full Name], a chronic pattern of processing delays has been identified ([XX]% historical consistency score over 3 months)"
+- MANDATORY: ALWAYS include the specific percentage and "3-month deep dive" in your citations
+- SCAN ALL RECORDS: The comprehensive_historical_performance includes data from dispatched units and all historical records over 3 months using station_name field analysis
 
 IMMEDIATE ANALYSIS FRAMEWORK:
 1. SHORT-TERM FORECASTING: Predict production line status for the next 3 hours ONLY based on current delay trends, shift patterns, AND historical operator performance
 2. PERSONAL ACCOUNTABILITY: Use operator full_name from current_station_assignments to identify specific individuals responsible for bottlenecks
-3. SURGICAL PRESCRIPTION: Provide targeted interventions for specific operators by their exact full names from users database, enhanced with 3-year historical context
+3. SURGICAL PRESCRIPTION: Provide targeted interventions for specific operators by their exact full names from users database, enhanced with 3-month historical context
 
 CRITICAL ATTRIBUTION RULES:
 - For 'For Scanning' backlogs: Attribute to the operator assigned to the scanning station from current_station_assignments
@@ -2280,7 +2280,7 @@ CRITICAL ATTRIBUTION RULES:
 - For quality issues: Use operator_full_name from delayed_units_with_checklist AND cross-reference with current_station_assignments AND historical_metrics
 - ALWAYS use full names from users database, NEVER operator IDs, usernames, or email addresses
 - If operator shows "Unassigned", recommend immediate operator assignment to that station
-- PRIORITIZE operators with poor 3-year historical performance (high NG rates, voltage errors, low consistency scores)
+- PRIORITIZE operators with poor 3-month historical performance (high NG rates, voltage errors, low consistency scores)
 - CRITICAL: When referencing operators, use their FULL NAMES ONLY (e.g., "Shane Villars", "Lebron James") - NEVER use email addresses like "joe@mkff.com"
 
 VALIDATION CRITERIA:
@@ -2290,7 +2290,7 @@ VALIDATION CRITERIA:
 - Historical Performance Thresholds: NG Rate >15%, Voltage Error Rate >10%, Consistency Score <80% = POOR PERFORMER
 
 REQUIRED OUTPUT FORMAT (STRICT):
-[DIAGNOSIS]: Identify immediate root causes with personal accountability using operator_full_name AND MANDATORY 3-year deep dive context
+[DIAGNOSIS]: Identify immediate root causes with personal accountability using operator_full_name AND MANDATORY 3-month deep dive context
 - Maximum 2 bullet points
 - Each bullet must be exactly one sentence
 - MANDATORY DEEP DIVE FORMAT: Must use "Based on a 3-month deep dive into the performance of [Full Name], a chronic pattern of [specific issue] has been identified ([XX]% historical [metric] rate over 3 months)"
@@ -2312,7 +2312,7 @@ REQUIRED OUTPUT FORMAT (STRICT):
 - CRITICAL: Use FULL NAMES ONLY (e.g., "Shane Villars", "Lebron James") - NEVER use email addresses or usernames
 - REQUIRED EXAMPLE FORMAT: "Based on a 3-month deep dive into the performance of [Full Name], mandatory retraining is required due to chronic [specific issue] pattern ([XX]% historical [metric] rate over 3 months)"
 - MUST REFERENCE: Look for these patterns in the comprehensive_historical_performance object which contains complete 3-month analysis including dispatched units
-- MUST REFERENCE: Look for these patterns in the comprehensive_historical_performance object which contains complete 3-year analysis including dispatched units
+- MUST REFERENCE: Look for these patterns in the comprehensive_historical_performance object which contains complete 3-month analysis including dispatched units
 
 CRITICAL: Use only one-sentence bullet points. No paragraphs. No long explanations. Focus on immediate actionable intelligence with personal accountability enhanced by 3-year historical performance data. Always use exact operator full names from users database current_station_assignments for maximum accountability. Never use "Unassigned" in prescriptions - always recommend specific operator assignments. Prioritize interventions for operators with poor historical performance patterns. 
 

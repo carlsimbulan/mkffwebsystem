@@ -1224,22 +1224,13 @@ const todayAnnouncementsCount = announcements.filter(a => {
             }
 
             .dropdown-menu-item {
+                border: none;
+                background: transparent;
                 transition: all 0.2s ease;
-                border-left: 3px solid transparent;
             }
 
             .dropdown-menu-item:hover {
-                background: #f8f9fa;
-                border-left-color: #0d6efd;
-                transform: translateX(2px);
-            }
-
-            .dropdown-menu-item i {
-                transition: transform 0.2s ease;
-            }
-
-            .dropdown-menu-item:hover i {
-                transform: scale(1.1);
+                background-color: #f8f9fa !important;
             }
         `}
     </style>
