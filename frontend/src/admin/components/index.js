@@ -1,6 +1,7 @@
 // Chart Components
 export { StationBarChart } from './charts/StationBarChart';
 export { UnitPieChart } from './charts/UnitPieChart';
+export { DiagnosticChart } from './charts/DiagnosticChart';
 
 // Notification Components
 export { NotificationBell } from './notifications/NotificationBell';

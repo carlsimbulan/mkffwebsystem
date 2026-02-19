@@ -30,10 +30,21 @@ try {
     // Check if we need to list models or generate content
     if (isset($input['action']) && $input['action'] === 'list_models') {
         // List available models
-        $response = file_get_contents($GEMINI_V1_BASE . '/models?key=' . urlencode($GEMINI_API_KEY));
+        $context = stream_context_create([
+            'http' => [
+                'timeout' => 10,
+                'method' => 'GET',
+                'header' => "Content-Type: application/json\r\n"
+            ]
+        ]);
+        
+        $response = file_get_contents($GEMINI_V1_BASE . '/models?key=' . urlencode($GEMINI_API_KEY), false, $context);
         
         if ($response === false) {
-            throw new Exception('Failed to fetch models');
+            // Fallback to a known working model if API call fails
+            error_log('Failed to fetch models from Gemini API, using fallback model');
+            echo json_encode(['modelName' => 'models/gemini-1.5-flash']);
+            exit;
         }
         
         $data = json_decode($response, true);

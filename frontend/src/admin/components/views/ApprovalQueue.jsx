@@ -104,9 +104,11 @@ export function ApprovalQueue({
 
                                         {/* Status */}
                                         <td className="px-3 py-3 text-center">
-                                            <span className={`badge px-3 py-2 rounded-1 fw-semibold ${
-                                                isOverdue ? 'bg-danger' : 'bg-warning text-dark'
-                                            }`} style={{ fontSize: '0.75rem' }}>
+                                            <span className={`badge rounded-pill fw-normal ${
+                                                isOverdue 
+                                                    ? 'bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25' 
+                                                    : 'bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25'
+                                            }`} style={{fontSize: '0.7rem', padding: '6px 14px'}}>
                                                 {isOverdue ? 'OVERDUE' : 'PENDING QA'}
                                             </span>
                                         </td>

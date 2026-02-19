@@ -35,6 +35,7 @@ import {
     SettingsView,
     StationBarChart,
     UnitPieChart,
+    DiagnosticChart,
     NotificationBell,
     NotificationContent
 } from './components';

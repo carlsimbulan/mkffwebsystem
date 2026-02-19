@@ -1,5 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import ReactDOM from 'react-dom';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
+import { Bar, Pie } from 'react-chartjs-2';
+import { DiagnosticChart } from '../charts/DiagnosticChart';
+
+// Register Chart.js components
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement);
 
 const processStations = [
     "PCB Pairing", "Integrated Board Test", "Main Board Conformal Coating",
@@ -1335,6 +1341,9 @@ export function StationsOverview({
     const [isDelayHotspotsAiLoading, setIsDelayHotspotsAiLoading] = useState(false);
     const [currentAssignments, setCurrentAssignments] = useState({});
     const [historicalPerformanceDatabase, setHistoricalPerformanceDatabase] = useState({});
+    const [diagnosticChartData, setDiagnosticChartData] = useState(null);
+    const [diagnosticChartOptions, setDiagnosticChartOptions] = useState(null);
+    const [diagnosticChartSeries, setDiagnosticChartSeries] = useState(null);
 
     // Fetch users data early for operator name lookup
     useEffect(() => {
@@ -1385,6 +1394,73 @@ export function StationsOverview({
         
         fetchUsersForLookup();
     }, []);
+
+    // Brief text formatting for chart-focused display
+    const formatBriefText = (text) => {
+        if (!text) return '';
+        
+        let cleanedAnalysis = text.replace(/\*\*/g, '').replace(/\*/g, '');
+        
+        let diagnosis = '';
+        let forecast = '';
+        let prescription = '';
+        
+        const diagnosisMatch = cleanedAnalysis.match(/\[DIAGNOSIS\]\s*[:\-]?\s*(.+?)(?=\[FORECAST\]|$)/s);
+        const forecastMatch = cleanedAnalysis.match(/\[FORECAST\]\s*[:\-]?\s*(.+?)(?=\[PRESCRIPTION\]|$)/s);
+        const prescriptionMatch = cleanedAnalysis.match(/\[PRESCRIPTION\]\s*[:\-]?\s*(.+?)(?=$)/s);
+        
+        diagnosis = diagnosisMatch?.[1]?.trim() || '';
+        forecast = forecastMatch?.[1]?.trim() || '';
+        prescription = prescriptionMatch?.[1]?.trim() || '';
+        
+        // Extract only first bullet point from each section for brevity
+        const extractFirstBullet = (text) => {
+            if (!text) return '';
+            const bullets = text.split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0)
+                .map(line => line.replace(/^[-•*]\s*/, '').trim())
+                .filter(line => line.length > 0);
+            return bullets[0] || '';
+        };
+
+        const diagnosisBrief = extractFirstBullet(diagnosis);
+        const forecastBrief = extractFirstBullet(forecast);
+        const prescriptionBrief = extractFirstBullet(prescription);
+
+        return `
+            <style>
+                .brief-analysis {
+                    background: #f8fafc;
+                    border-radius: 8px;
+                    padding: 1rem;
+                    margin-top: 1rem;
+                    border-left: 4px solid #3b82f6;
+                }
+                .brief-item {
+                    font-size: 0.85rem;
+                    font-weight: 600;
+                    margin-bottom: 0.5rem;
+                    color: #374151;
+                }
+                .brief-item:last-child {
+                    margin-bottom: 0;
+                }
+                .brief-label {
+                    color: #3b82f6;
+                    font-weight: 700;
+                    text-transform: uppercase;
+                    font-size: 0.75rem;
+                    margin-right: 0.5rem;
+                }
+            </style>
+            <div class="brief-analysis">
+                ${diagnosisBrief ? `<div class="brief-item"><span class="brief-label">Root Cause:</span>${diagnosisBrief}</div>` : ''}
+                ${forecastBrief ? `<div class="brief-item"><span class="brief-label">Forecast:</span>${forecastBrief}</div>` : ''}
+                ${prescriptionBrief ? `<div class="brief-item"><span class="brief-label">Action:</span>${prescriptionBrief}</div>` : ''}
+            </div>
+        `;
+    };
 
     // Enhanced AI output formatting for new 3-section format
     const formatHotspotOutput = (text) => {
@@ -1963,7 +2039,7 @@ export function StationsOverview({
                     // Use full_name as primary key for easier AI lookup
                     historicalPerformanceDatabase[station.id][operatorFullName] = {
                         ...historicalData,
-                        original_operator_id: operatorId // Keep original ID for reference
+                        operator_full_name: operatorFullName
                     };
                     
                     // Also maintain backward compatibility with operator_id lookup
@@ -2205,20 +2281,27 @@ export function StationsOverview({
     body: JSON.stringify({ action: 'list_models' })
 });
 
+let modelData;
 if (!modelRes.ok) {
-    throw new Error(`Failed to fetch models: ${modelRes.status} ${modelRes.statusText}`);
+    // Fallback to default model if API fails
+    console.warn('Model API failed, using fallback model');
+    modelData = { modelName: 'models/gemini-1.5-flash' };
+    // Continue with fallback model instead of throwing error
+} else {
+    modelData = await modelRes.json();
+    console.log('Model Data:', modelData);
+
+    if (modelData.error) {
+        console.warn('Model fetch error, using fallback:', modelData.error);
+        // Continue with fallback model
+    } else if (!modelData.modelName) {
+        console.warn('No model returned, using fallback');
+        // Continue with fallback model
+    }
 }
 
-const modelData = await modelRes.json();
-console.log('Model Data:', modelData);
-
-if (modelData.error) {
-    throw new Error(`Model fetch error: ${modelData.error}`);
-}
-
-if (!modelData.modelName) {
-    throw new Error('No model returned from backend');
-}
+// Use fallback model if API failed or returned invalid data
+const modelName = modelData?.modelName || 'models/gemini-1.5-flash';
 
 const prompt = `You are a Senior Industrial AI Systems Engineer specializing in real-time manufacturing intelligence at MKFF Laserteknique International inc.
 
@@ -2272,7 +2355,7 @@ MANDATORY HISTORICAL CITATION RULES FOR DEEP DIVE:
 IMMEDIATE ANALYSIS FRAMEWORK:
 1. SHORT-TERM FORECASTING: Predict production line status for the next 3 hours ONLY based on current delay trends, shift patterns, AND historical operator performance
 2. PERSONAL ACCOUNTABILITY: Use operator full_name from current_station_assignments to identify specific individuals responsible for bottlenecks
-3. SURGICAL PRESCRIPTION: Provide targeted interventions for specific operators by their exact full names from users database, enhanced with 3-month historical context
+3. SURGICAL PRESCRIPTION: Provide targeted interventions for specific operators by their exact full names from users database, enhanced with 3-month deep dive analysis
 
 CRITICAL ATTRIBUTION RULES:
 - For 'For Scanning' backlogs: Attribute to the operator assigned to the scanning station from current_station_assignments
@@ -2318,7 +2401,28 @@ CRITICAL: Use only one-sentence bullet points. No paragraphs. No long explanatio
 
 MANDATORY HISTORICAL DATA USAGE: You MUST examine the comprehensive_historical_performance object in the payload. For every operator you mention, you MUST include their 3-year deep dive historical metrics (ng_rate_percentage, voltage_error_rate_percentage, consistency_score_percentage) with specific percentages and timeframes. The comprehensive_historical_performance object contains complete 3-year deep dive analysis including dispatched units and all historical records analyzed by station_name field. The system has already converted all email addresses (like james@mkff.com) to full names (like Lebron James) - you will only see full names like "Lebron James", "Shane Villars", "Carl Ivan Simbulan". If you cannot find historical data for an operator, explicitly state "no historical data available" but still provide current analysis.
 
-FINAL REMINDER: ALL OPERATOR IDENTIFIERS HAVE BEEN STANDARDIZED TO FULL NAMES. You will never see email addresses like "james@mkff.com" or usernames - only full names like "Lebron James", "Shane Villars", "Carl Ivan Simbulan". Always use the full_name provided in the historical metrics and current assignments. This is a professional industrial engineering report analyzing the 3-year digital footprint of operators. If a delay is detected for an operator, you MUST use the format "Based on a 3-year deep dive into the performance of [Full Name], a chronic pattern of [specific issue] has been identified" in your Diagnosis and Prescription sections. ALWAYS include specific 3-year historical percentages when available and mention "3-year deep dive" in your analysis.`;
+FINAL REMINDER: ALL OPERATOR IDENTIFIERS HAVE BEEN STANDARDIZED TO FULL NAMES. You will never see email addresses like "james@mkff.com" or usernames - only full names like "Lebron James", "Shane Villars", "Carl Ivan Simbulan". Always use the full_name provided in the historical metrics and current assignments. This is a professional industrial engineering report analyzing the 3-year digital footprint of operators. If a delay is detected for an operator, you MUST use the format "Based on a 3-year deep dive into the performance of [Full Name], a chronic pattern of [specific issue] has been identified" in your Diagnosis and Prescription sections. ALWAYS include specific 3-year historical percentages when available and mention "3-year deep dive" in your analysis.
+
+MANDATORY CHART DATA GENERATION:
+After your analysis, you MUST generate structured chart data in JSON format for visualization. Add this at the end of your response:
+
+[CHART_DATA]
+{
+  "labels": ["Station1", "Station2", "Station3"],
+  "delayData": [15, 25, 12],
+  "unitsData": [3, 5, 2],
+  "causeLabels": ["Operator Performance", "Voltage Issues", "Quality Failures", "Process Delays"],
+  "causeData": [35, 25, 20, 20]
+}
+
+CHART DATA RULES:
+- labels: Station names with delays
+- delayData: Average delay minutes per station
+- unitsData: Number of delayed units per station  
+- causeLabels: Root cause categories (max 5)
+- causeData: Percentage distribution of causes (must sum to 100)
+- Base data on actual analysis from delay_hotspots and historical_performance
+- Keep data realistic and proportional to actual issues identified`;
 
 const genRes = await fetch('http://localhost/mkffwebsystem/backend/api/gemini.php', {
     method: 'POST',
@@ -2337,6 +2441,38 @@ if (genData.error) {
     setDelayHotspotsAi({ __error: `AI Service Error: ${genData.error}` });
 } else if (genData.text) {
     setDelayHotspotsAi({ __complete_analysis: genData.text });
+    
+    // Extract chart data from AI response
+    const chartDataMatch = genData.text.match(/\[CHART_DATA\]([\s\S]*?)\n(?=\s*$)/s);
+    if (chartDataMatch) {
+        try {
+            const chartJson = chartDataMatch[1].trim();
+            const chartData = JSON.parse(chartJson);
+            console.log('Extracted Chart Data:', chartData);
+            setDiagnosticChartData(chartData);
+        } catch (parseError) {
+            console.warn('Failed to parse chart data:', parseError);
+            // Set default chart data based on delay hotspots
+            const defaultChartData = {
+                labels: delayHotspots.map(s => s.stationName || s.stationId),
+                delayData: delayHotspots.map(s => Math.round(s.avgDelayMinutes || 0)),
+                unitsData: delayHotspots.map(s => s.delayedUnits || 0),
+                causeLabels: ['Operator Performance', 'Technical Issues', 'Process Delays', 'Quality Problems'],
+                causeData: [40, 30, 20, 10]
+            };
+            setDiagnosticChartData(defaultChartData);
+        }
+    } else {
+        // Set default chart data if no chart data in response
+        const defaultChartData = {
+            labels: delayHotspots.map(s => s.stationName || s.stationId),
+            delayData: delayHotspots.map(s => Math.round(s.avgDelayMinutes || 0)),
+            unitsData: delayHotspots.map(s => s.delayedUnits || 0),
+            causeLabels: ['Operator Performance', 'Technical Issues', 'Process Delays', 'Quality Problems'],
+            causeData: [40, 30, 20, 10]
+        };
+        setDiagnosticChartData(defaultChartData);
+    }
 } else {
     setDelayHotspotsAi({ __error: 'No analysis returned from AI service' });
 }
@@ -2635,10 +2771,16 @@ return (
                 </div>
 
                 {delayHotspotsAi && delayHotspotsAi.__complete_analysis ? (
-                    <div 
-                        className="text-dark" 
-                        dangerouslySetInnerHTML={{ __html: formatHotspotOutput(delayHotspotsAi.__complete_analysis) }}
-                    />
+                    <>
+                        <DiagnosticChart 
+                            chartData={diagnosticChartData} 
+                            title="Delay Analysis - Root Cause Breakdown" 
+                        />
+                        <div 
+                            className="text-dark" 
+                            dangerouslySetInnerHTML={{ __html: formatBriefText(delayHotspotsAi.__complete_analysis) }}
+                        />
+                    </>
                 ) : delayHotspotsAi && delayHotspotsAi.__error ? (
                     <div className="alert alert-danger">
                         <strong>Analysis Error:</strong> {delayHotspotsAi.__error}
