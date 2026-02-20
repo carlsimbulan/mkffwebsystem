@@ -1430,34 +1430,115 @@ export function StationsOverview({
 
         return `
             <style>
-                .brief-analysis {
-                    background: #f8fafc;
-                    border-radius: 8px;
-                    padding: 1rem;
+                .diagnostic-boxes-grid {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 1rem;
                     margin-top: 1rem;
-                    border-left: 4px solid #3b82f6;
                 }
-                .brief-item {
-                    font-size: 0.85rem;
-                    font-weight: 600;
-                    margin-bottom: 0.5rem;
-                    color: #374151;
+                @media (max-width: 992px) {
+                    .diagnostic-boxes-grid {
+                        grid-template-columns: 1fr;
+                    }
                 }
-                .brief-item:last-child {
-                    margin-bottom: 0;
+                .diagnostic-box {
+                    background: white;
+                    border-radius: 12px;
+                    padding: 1.25rem;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                    border-left: 4px solid;
+                    transition: transform 0.2s ease, box-shadow 0.2s ease;
                 }
-                .brief-label {
-                    color: #3b82f6;
+                .diagnostic-box:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+                }
+                .diagnostic-box.root-cause {
+                    border-left-color: #dc3545;
+                    background: linear-gradient(135deg, #ffffff 0%, #fff5f5 100%);
+                }
+                .diagnostic-box.forecast {
+                    border-left-color: #ffc107;
+                    background: linear-gradient(135deg, #ffffff 0%, #fffbf0 100%);
+                }
+                .diagnostic-box.action {
+                    border-left-color: #28a745;
+                    background: linear-gradient(135deg, #ffffff 0%, #f0fff4 100%);
+                }
+                .diagnostic-box-header {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    margin-bottom: 0.75rem;
+                }
+                .diagnostic-box-icon {
+                    font-size: 1.5rem;
+                }
+                .diagnostic-box-title {
                     font-weight: 700;
-                    text-transform: uppercase;
                     font-size: 0.75rem;
-                    margin-right: 0.5rem;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                .diagnostic-box.root-cause .diagnostic-box-title {
+                    color: #dc3545;
+                }
+                .diagnostic-box.forecast .diagnostic-box-title {
+                    color: #f59e0b;
+                }
+                .diagnostic-box.action .diagnostic-box-title {
+                    color: #28a745;
+                }
+                .diagnostic-box-content {
+                    font-size: 0.85rem;
+                    line-height: 1.5;
+                    color: #374151;
+                    font-weight: 500;
+                }
+                .diagnostic-empty {
+                    text-align: center;
+                    padding: 2rem;
+                    color: #9ca3af;
+                    font-style: italic;
+                    font-size: 0.85rem;
                 }
             </style>
-            <div class="brief-analysis">
-                ${diagnosisBrief ? `<div class="brief-item"><span class="brief-label">Root Cause:</span>${diagnosisBrief}</div>` : ''}
-                ${forecastBrief ? `<div class="brief-item"><span class="brief-label">Forecast:</span>${forecastBrief}</div>` : ''}
-                ${prescriptionBrief ? `<div class="brief-item"><span class="brief-label">Action:</span>${prescriptionBrief}</div>` : ''}
+            <div class="diagnostic-boxes-grid">
+                ${diagnosisBrief ? `
+                    <div class="diagnostic-box root-cause">
+                        <div class="diagnostic-box-header">
+                            <span class="diagnostic-box-icon">⚠️</span>
+                            <span class="diagnostic-box-title">Root Cause</span>
+                        </div>
+                        <div class="diagnostic-box-content">${diagnosisBrief}</div>
+                    </div>
+                ` : ''}
+                
+                ${forecastBrief ? `
+                    <div class="diagnostic-box forecast">
+                        <div class="diagnostic-box-header">
+                            <span class="diagnostic-box-icon">📊</span>
+                            <span class="diagnostic-box-title">Impact Forecast</span>
+                        </div>
+                        <div class="diagnostic-box-content">${forecastBrief}</div>
+                    </div>
+                ` : ''}
+                
+                ${prescriptionBrief ? `
+                    <div class="diagnostic-box action">
+                        <div class="diagnostic-box-header">
+                            <span class="diagnostic-box-icon">✅</span>
+                            <span class="diagnostic-box-title">Action Items</span>
+                        </div>
+                        <div class="diagnostic-box-content">${prescriptionBrief}</div>
+                    </div>
+                ` : ''}
+                
+                ${!diagnosisBrief && !forecastBrief && !prescriptionBrief ? `
+                    <div class="diagnostic-empty" style="grid-column: 1 / -1;">
+                        No diagnostic data available
+                    </div>
+                ` : ''}
             </div>
         `;
     };
