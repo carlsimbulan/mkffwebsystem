@@ -47,7 +47,7 @@ const checkUnitDelay = (stationId, updatedAt, thresholds = {}) => {
     return { isDelayed: false, level: 'NORMAL', minutes: minutesInStation };
 };
 
-// Helper function to validate voltage tolerance (±1% of 115V = 113.85 to 116.15)
+// Helper function to validate voltage tolerance (�1% of 115V = 113.85 to 116.15)
 const getVoltageErrorStatus = (value) => {
     const num = parseFloat(value);
     if (isNaN(num)) return true;
@@ -96,7 +96,7 @@ const renderStationChecklist = (stationNumber, unit) => {
             return (
                 <div className="row g-2">
                     <div className="col-md-6">
-                        <small className="text-muted">Header Connector Upright (90°):</small>
+                        <small className="text-muted">Header Connector Upright (90�):</small>
                         <div className={`fw-bold ${isErrorValue(unit[`s1_header_seated_90_deg`]) ? 'text-danger' : 'text-success'}`}>
                             {formatDisplayValue(unit[`s1_header_seated_90_deg`])}
                         </div>
@@ -445,7 +445,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
             return text.split('\n')
                 .map(line => line.trim())
                 .filter(line => line.length > 0)
-                .map(line => line.replace(/^[-•*]\s*/, '').trim())
+                .map(line => line.replace(/^[-�*]\s*/, '').trim())
                 .filter(line => line.length > 0);
         };
 
@@ -554,12 +554,12 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 ${diagnosisBullets.length > 0 ? `
                     <div class="analysis-card diagnosis">
                         <div class="analysis-card-header">
-                            <span class="icon">⚠️</span>
+                            <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
                             <span>Root Cause</span>
                         </div>
                         ${diagnosisBullets.map(item => `
                             <div class="checklist-item">
-                                <div class="checklist-icon">✗</div>
+                                <div class="checklist-icon">?</div>
                                 <div class="checklist-text">${item}</div>
                             </div>
                         `).join('')}
@@ -569,12 +569,12 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 ${forecastBullets.length > 0 ? `
                     <div class="analysis-card forecast">
                         <div class="analysis-card-header">
-                            <span class="icon">📊</span>
+                            <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
                             <span>Impact Forecast</span>
                         </div>
                         ${forecastBullets.map(item => `
                             <div class="checklist-item">
-                                <div class="checklist-icon">⚡</div>
+                                <div class="checklist-icon">?</div>
                                 <div class="checklist-text">${item}</div>
                             </div>
                         `).join('')}
@@ -584,12 +584,12 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 ${prescriptionBullets.length > 0 ? `
                     <div class="analysis-card prescription">
                         <div class="analysis-card-header">
-                            <span class="icon">✅</span>
+                            <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
                             <span>Action Items</span>
                         </div>
                         ${prescriptionBullets.map(item => `
                             <div class="checklist-item">
-                                <div class="checklist-icon">→</div>
+                                <div class="checklist-icon">?</div>
                                 <div class="checklist-text">${item}</div>
                             </div>
                         `).join('')}
@@ -907,7 +907,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                 }
                 
                 .analysis-content li::before {
-                    content: "▶";
+                    content: "?";
                     position: absolute;
                     left: -2px;
                     top: 18px;
@@ -935,7 +935,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
             <div className="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3 px-2">
                 <div>
                     <h3 className="fw-bold text-dark mb-1">{processName}</h3>
-                    <p className="text-muted small mb-0">Operational View • ID: {stationMonitorId}</p>
+                    <p className="text-muted small mb-0">Operational View � ID: {stationMonitorId}</p>
                 </div>
                 <div className="d-flex align-items-center gap-3">
                     <div className={`takt-time-badge ${taktTimeStatus === 'ON_TRACK' ? 'takt-time-on-track' : 'takt-time-bottlenecked'}`}>
@@ -1146,7 +1146,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                                     </small>
                                                 </div>
                                             ) : (
-                                                <span className="text-muted small fst-italic">—</span>
+                                                <span className="text-muted small fst-italic">�</span>
                                             )}
                                         </td>
                                         <td className="px-3 py-3">
@@ -1419,7 +1419,7 @@ export function StationsOverview({
             const bullets = text.split('\n')
                 .map(line => line.trim())
                 .filter(line => line.length > 0)
-                .map(line => line.replace(/^[-•*]\s*/, '').trim())
+                .map(line => line.replace(/^[-�*]\s*/, '').trim())
                 .filter(line => line.length > 0);
             return bullets[0] || '';
         };
@@ -1507,7 +1507,7 @@ export function StationsOverview({
                 ${diagnosisBrief ? `
                     <div class="diagnostic-box root-cause">
                         <div class="diagnostic-box-header">
-                            <span class="diagnostic-box-icon">⚠️</span>
+                            <span class="diagnostic-box-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
                             <span class="diagnostic-box-title">Root Cause</span>
                         </div>
                         <div class="diagnostic-box-content">${diagnosisBrief}</div>
@@ -1517,7 +1517,7 @@ export function StationsOverview({
                 ${forecastBrief ? `
                     <div class="diagnostic-box forecast">
                         <div class="diagnostic-box-header">
-                            <span class="diagnostic-box-icon">📊</span>
+                            <span class="diagnostic-box-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
                             <span class="diagnostic-box-title">Impact Forecast</span>
                         </div>
                         <div class="diagnostic-box-content">${forecastBrief}</div>
@@ -1527,7 +1527,7 @@ export function StationsOverview({
                 ${prescriptionBrief ? `
                     <div class="diagnostic-box action">
                         <div class="diagnostic-box-header">
-                            <span class="diagnostic-box-icon">✅</span>
+                            <span class="diagnostic-box-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
                             <span class="diagnostic-box-title">Action Items</span>
                         </div>
                         <div class="diagnostic-box-content">${prescriptionBrief}</div>
@@ -1586,7 +1586,7 @@ export function StationsOverview({
                 .map(line => line.trim())
                 .filter(line => line.length > 0)
                 .filter(line => !line.toLowerCase().includes('executive summary'))
-                .map(line => line.replace(/^[-•*]\s*/, '').trim())
+                .map(line => line.replace(/^[-�*]\s*/, '').trim())
                 .filter(line => line.length > 0);
         };
 
@@ -1695,12 +1695,12 @@ export function StationsOverview({
                 ${diagnosisBullets.length > 0 ? `
                     <div class="analysis-card diagnosis">
                         <div class="analysis-card-header">
-                            <span class="icon">⚠️</span>
+                            <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
                             <span>Root Cause</span>
                         </div>
                         ${diagnosisBullets.map(item => `
                             <div class="checklist-item">
-                                <div class="checklist-icon">✗</div>
+                                <div class="checklist-icon">?</div>
                                 <div class="checklist-text">${item}</div>
                             </div>
                         `).join('')}
@@ -1710,12 +1710,12 @@ export function StationsOverview({
                 ${forecastBullets.length > 0 ? `
                     <div class="analysis-card forecast">
                         <div class="analysis-card-header">
-                            <span class="icon">📊</span>
+                            <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
                             <span>Impact Forecast</span>
                         </div>
                         ${forecastBullets.map(item => `
                             <div class="checklist-item">
-                                <div class="checklist-icon">⚡</div>
+                                <div class="checklist-icon">?</div>
                                 <div class="checklist-text">${item}</div>
                             </div>
                         `).join('')}
@@ -1725,12 +1725,12 @@ export function StationsOverview({
                 ${prescriptionBullets.length > 0 ? `
                     <div class="analysis-card prescription">
                         <div class="analysis-card-header">
-                            <span class="icon">✅</span>
+                            <span class="icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
                             <span>Action Items</span>
                         </div>
                         ${prescriptionBullets.map(item => `
                             <div class="checklist-item">
-                                <div class="checklist-icon">→</div>
+                                <div class="checklist-icon">?</div>
                                 <div class="checklist-text">${item}</div>
                             </div>
                         `).join('')}
@@ -2448,7 +2448,7 @@ CRITICAL ATTRIBUTION RULES:
 - CRITICAL: When referencing operators, use their FULL NAMES ONLY (e.g., "Shane Villars", "Lebron James") - NEVER use email addresses like "joe@mkff.com"
 
 VALIDATION CRITERIA:
-- Voltage Tolerance: 115V ±1% (113.85V - 116.15V)
+- Voltage Tolerance: 115V �1% (113.85V - 116.15V)
 - Quality Status: 'GO', 'Detected', 'Passed', 'SOLID GREEN' = GOOD
 - Quality Status: 'NO GO', 'FAIL', 'NOT DETECTED', '0V' = BAD
 - Historical Performance Thresholds: NG Rate >15%, Voltage Error Rate >10%, Consistency Score <80% = POOR PERFORMER
