@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+ï»¿import React, { useState, useMemo, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
 import { Bar, Pie } from 'react-chartjs-2';
@@ -47,7 +47,7 @@ const checkUnitDelay = (stationId, updatedAt, thresholds = {}) => {
     return { isDelayed: false, level: 'NORMAL', minutes: minutesInStation };
 };
 
-// Helper function to validate voltage tolerance (±1% of 115V = 113.85 to 116.15)
+// Helper function to validate voltage tolerance (Â±1% of 115V = 113.85 to 116.15)
 const getVoltageErrorStatus = (value) => {
     const num = parseFloat(value);
     if (isNaN(num)) return true;
@@ -96,7 +96,7 @@ const renderStationChecklist = (stationNumber, unit) => {
             return (
                 <div className="row g-2">
                     <div className="col-md-6">
-                        <small className="text-muted">Header Connector Upright (90°):</small>
+                        <small className="text-muted">Header Connector Upright (90Â°):</small>
                         <div className={`fw-bold ${isErrorValue(unit[`s1_header_seated_90_deg`]) ? 'text-danger' : 'text-success'}`}>
                             {formatDisplayValue(unit[`s1_header_seated_90_deg`])}
                         </div>
@@ -445,7 +445,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
             return text.split('\n')
                 .map(line => line.trim())
                 .filter(line => line.length > 0)
-                .map(line => line.replace(/^[-•*]\s*/, '').trim())
+                .map(line => line.replace(/^[-*]\s*/, '').trim())
                 .filter(line => line.length > 0);
         };
 
@@ -611,8 +611,8 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
             .filter(log => statusFilter === 'All' || log.status === statusFilter);
     }, [monitorMetrics.stationLogs, searchTerm, statusFilter]);
     
-    const stationIndex = parseInt(stationMonitorId.replace('Station', '')) - 1;
-    const processName = processStations[stationIndex] || stationMonitorId;
+    const stationIndex = stationMonitorId ? parseInt(stationMonitorId.replace('Station', '')) - 1 : -1;
+    const processName = processStations[stationIndex] || stationMonitorId || '';
 
     // Calculate Takt Time status for the station
     const taktTimeStatus = useMemo(() => {
@@ -632,10 +632,10 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
         }, 0) / inProgressLogs.length;
         
         const hasVoltageIssues = inProgressLogs.some(log => {
-            if (stationMonitorId.includes('Station2') || stationMonitorId.includes('Station 2')) {
+            if (stationMonitorId?.includes('Station2') || stationMonitorId?.includes('Station 2')) {
                 return log.s2_voltage && getVoltageErrorStatus(log.s2_voltage);
             }
-            if (stationMonitorId.includes('Station6') || stationMonitorId.includes('Station 6')) {
+            if (stationMonitorId?.includes('Station6') || stationMonitorId?.includes('Station 6')) {
                 return log.s6_voltage && getVoltageErrorStatus(log.s6_voltage);
             }
             return false;
@@ -770,6 +770,8 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
             setIsStationAiLoading(false);
         }
     };
+
+    if (!stationMonitorId) return null;
 
     return (
         <div className="pb-5 container-fluid px-0">
@@ -935,7 +937,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
             <div className="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3 px-2">
                 <div>
                     <h3 className="fw-bold text-dark mb-1">{processName}</h3>
-                    <p className="text-muted small mb-0">Operational View • ID: {stationMonitorId}</p>
+                    <p className="text-muted small mb-0">Operational View &middot; ID: {stationMonitorId}</p>
                 </div>
                 <div className="d-flex align-items-center gap-3">
                     <div className={`takt-time-badge ${taktTimeStatus === 'ON_TRACK' ? 'takt-time-on-track' : 'takt-time-bottlenecked'}`}>
@@ -1146,7 +1148,7 @@ const StationMonitorView = ({ stationMonitorId, calculateMetrics, handleEditClic
                                                     </small>
                                                 </div>
                                             ) : (
-                                                <span className="text-muted small fst-italic">—</span>
+                                                <span className="text-muted small fst-italic">â€”</span>
                                             )}
                                         </td>
                                         <td className="px-3 py-3">
@@ -1419,7 +1421,7 @@ export function StationsOverview({
             const bullets = text.split('\n')
                 .map(line => line.trim())
                 .filter(line => line.length > 0)
-                .map(line => line.replace(/^[-•*]\s*/, '').trim())
+                .map(line => line.replace(/^[-*]\s*/, '').trim())
                 .filter(line => line.length > 0);
             return bullets[0] || '';
         };
@@ -1586,7 +1588,7 @@ export function StationsOverview({
                 .map(line => line.trim())
                 .filter(line => line.length > 0)
                 .filter(line => !line.toLowerCase().includes('executive summary'))
-                .map(line => line.replace(/^[-•*]\s*/, '').trim())
+                .map(line => line.replace(/^[-*]\s*/, '').trim())
                 .filter(line => line.length > 0);
         };
 
@@ -2448,7 +2450,7 @@ CRITICAL ATTRIBUTION RULES:
 - CRITICAL: When referencing operators, use their FULL NAMES ONLY (e.g., "Shane Villars", "Lebron James") - NEVER use email addresses like "joe@mkff.com"
 
 VALIDATION CRITERIA:
-- Voltage Tolerance: 115V ±1% (113.85V - 116.15V)
+- Voltage Tolerance: 115V Â±1% (113.85V - 116.15V)
 - Quality Status: 'GO', 'Detected', 'Passed', 'SOLID GREEN' = GOOD
 - Quality Status: 'NO GO', 'FAIL', 'NOT DETECTED', '0V' = BAD
 - Historical Performance Thresholds: NG Rate >15%, Voltage Error Rate >10%, Consistency Score <80% = POOR PERFORMER
