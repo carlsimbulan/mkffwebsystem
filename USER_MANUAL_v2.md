@@ -580,20 +580,23 @@ The page will display all units currently with status "Pending Approval". Each r
 
 ##### 4.2.6.1 View NG Units
 
-> **[WHAT TO WRITE HERE]**
-> Navigate to **No Good Units** from the sidebar. All units with status "No Good (NG)" across all stations are listed here.
-> Columns: Assembly No., Model, Station, Remarks, Timestamp.
-> Include a screenshot.
+**Step 1:** Click **No Good Units** from the left sidebar navigation.
+
+The page displays all units across all 15 stations with status "No Good (NG)". Each row shows: Assembly No., Model, Station, Remarks, and the timestamp when the unit was last updated.
+
+*[Insert screenshot of the No Good Units list with all columns labeled]*
 
 ##### 4.2.6.2 Edit NG Unit
 
-> **[WHAT TO WRITE HERE]**
-> 1. Click the **Edit** button on an NG unit.
-> 2. The Edit Unit Modal opens.
-> 3. Update the status (e.g., back to "In Progress" if the issue was resolved) or add/update Remarks.
-> 4. Click **Save**.
->
-> Include a screenshot of the Edit Unit Modal.
+**Step 1:** In the No Good Units list, click the **Edit** button on any unit row.
+
+**Step 2:** The Edit Unit Modal opens showing the unit's current details.
+
+**Step 3:** Update the **Status** if the defect is resolved (e.g., back to "In Progress"), or update the **Remarks** field with notes about the defect.
+
+**Step 4:** Click **Save**. The unit is updated and the list refreshes automatically.
+
+*[Insert screenshot of the Edit Unit Modal with fields labeled]*
 
 ---
 
@@ -601,21 +604,23 @@ The page will display all units currently with status "Pending Approval". Each r
 
 ##### 4.2.7.1 View Units Ready for Dispatch
 
-> **[WHAT TO WRITE HERE]**
-> Navigate to **Shipment** from the sidebar. Lists all units at Station 15 (QC Stamping) with status "Completed" — these are cleared for shipment.
-> Include a screenshot of the Shipment list.
+**Step 1:** Click **Shipment** from the left sidebar navigation.
+
+The page lists all units at Station 15 (QC Stamping) with status "Completed" — these have passed all 15 production stations and are cleared for shipment. Each row shows: Assembly No., Model, Revision, and a Dispatch button.
+
+*[Insert screenshot of the Shipment list]*
 
 ##### 4.2.7.2 Dispatch a Unit
 
-> **[WHAT TO WRITE HERE]**
-> 1. Click the **Dispatch** button on a unit row.
-> 2. A PIN entry prompt appears.
-> 3. Enter the **Release PIN** (configured in Settings).
-> 4. Click **Confirm**.
-> 5. The unit status changes to "Dispatched" and is removed from the list.
-> 6. A success message appears.
->
-> Include a screenshot of the PIN entry prompt.
+**Step 1:** In the Shipment list, click the **Dispatch** button on the unit to release.
+
+**Step 2:** A PIN entry prompt appears.
+
+**Step 3:** Enter the **Release PIN** (configured in Settings).
+
+**Step 4:** Click **Confirm**. The unit status changes to "Dispatched" and is removed from the list. A success message appears.
+
+*[Insert screenshot of the PIN entry prompt]*
 
 ---
 
@@ -623,15 +628,19 @@ The page will display all units currently with status "Pending Approval". Each r
 
 ##### 4.2.8.1 View Inventory
 
-> **[WHAT TO WRITE HERE]**
-> Navigate to **Inventory**. All production units in the system are listed here grouped by batch. Each batch is based on the creation timestamp when QR codes were generated.
-> Columns: Assembly No., Model, Revision, Status, Current Station.
-> Include a screenshot.
+**Step 1:** Click **Inventory** from the left sidebar navigation.
+
+All production units in the system are listed here, grouped by batch. Each batch corresponds to QR codes generated at the same time. Columns: Assembly No., Model, Revision, Current Status, Current Station.
+
+*[Insert screenshot of the Inventory list with grouped batches]*
 
 ##### 4.2.8.2 Search Inventory
 
-> **[WHAT TO WRITE HERE]**
-> Use the **Search** bar at the top of the Inventory page to filter units by Assembly No. or Model name. Results update in real time. Pagination shows 10 items per page.
+**Step 1:** In the Inventory page, type in the **Search** bar at the top.
+
+**Step 2:** Enter the Assembly No. or Model name. The list filters in real time. Pagination shows 10 items per page — use the page navigation at the bottom to browse all results.
+
+*[Insert screenshot of the search bar with filtered results]*
 
 ---
 
