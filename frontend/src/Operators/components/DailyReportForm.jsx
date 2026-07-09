@@ -478,7 +478,16 @@ export function DailyReportForm({ currentStation, dailyReportData, setDailyRepor
                                     </div>
                                 </div>
                             )}
-
+                            {/* Submitted By */}
+                            <div className="card border-0 bg-light mb-3">
+                                <div className="card-body">
+                                    <h6 className="card-title fw-bold mb-2">
+                                        <i className="bi bi-person-fill me-2"></i>
+                                        Submitted By
+                                    </h6>
+                                    <p className="card-text mb-0">{selectedReport.submitted_by_name || selectedReport.submitted_by || 'N/A'}</p>
+                                </div>
+                            </div>
                             <div className="card border-0 bg-light">
                                 <div className="card-body">
                                     <h6 className="card-title fw-bold mb-2">

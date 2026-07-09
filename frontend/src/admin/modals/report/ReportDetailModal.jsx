@@ -85,7 +85,7 @@ export const ReportDetailModal = ({ report, onClose, API_BASE_URL = API_BASE_URL
                         
                         {/* --- PRINT ONLY HEADER (Plain Text) --- */}
                         <div className="print-only print-meta">
-                            <div className="print-meta-item">NAME: {report.submitted_by_name || 'N/A'}</div>
+                            <div className="print-meta-item">NAME: {report.submitted_by_name || report.submitted_by || 'N/A'}</div>
                             <div className="print-meta-item">STATION: {report.station}</div>
                             <div className="print-meta-item">DATE: {report.report_date}</div>
                             <div className="print-meta-item">OUTPUT/NG: {report.total_units_processed} / {report.total_ng}</div>
@@ -95,7 +95,7 @@ export const ReportDetailModal = ({ report, onClose, API_BASE_URL = API_BASE_URL
                         <div className="row g-4 mb-4 no-print">
                             <div className="col-md-4">
                                 <label className="report-label">Submitted By</label>
-                                <div className="report-value">{report.submitted_by_name}</div>
+                                <div className="report-value">{report.submitted_by_name || report.submitted_by || 'N/A'}</div>
                             </div>
                             <div className="col-md-4">
                                 <label className="report-label">Station</label>
