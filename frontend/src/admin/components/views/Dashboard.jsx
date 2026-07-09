@@ -519,75 +519,228 @@ export function Dashboard({
 
     // 📊 PDF Export Function
     const generateShiftReport = async () => {
+        const btn = document.getElementById('export-btn');
+        if (btn) { btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generating...'; btn.disabled = true; }
+
         try {
-            // ... (rest of the code remains the same)
-            // Dynamic imports to avoid bundling issues
-            const html2canvas = (await import('html2canvas')).default;
             const { jsPDF } = await import('jspdf');
-            
-            const dashboardElement = document.getElementById('dashboard-content');
-            if (!dashboardElement) {
-                alert('Dashboard content not found');
-                return;
-            }
-
-            // Show loading state
-            const originalButton = document.getElementById('export-btn');
-            if (originalButton) {
-                originalButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating...';
-                originalButton.disabled = true;
-            }
-
-            // Capture the dashboard
-            const canvas = await html2canvas(dashboardElement, {
-                scale: 2,
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: '#ffffff'
-            });
-
-            // Create PDF
-            const imgData = canvas.toDataURL('image/png');
             const pdf = new jsPDF('p', 'mm', 'a4');
-            const imgWidth = 210;
-            const pageHeight = 295;
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            let heightLeft = imgHeight;
-            let position = 0;
 
-            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-            heightLeft -= pageHeight;
+            const PAGE_W = 210;
+            const PAGE_H = 297;
+            const MARGIN = 14;
+            const COL2 = PAGE_W / 2 + 2;
+            const LINE_H = 6;
+            let y = MARGIN;
 
-            while (heightLeft >= 0) {
-                position = heightLeft - imgHeight;
-                pdf.addPage();
-                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+            const timeStr = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+            // Helper: add new page if near bottom
+            const checkPage = (needed = 10) => {
+                if (y + needed > PAGE_H - MARGIN) {
+                    pdf.addPage();
+                    y = MARGIN;
+                }
+            };
+
+            // Helper: draw a full-width section header bar
+            const sectionHeader = (title) => {
+                checkPage(12);
+                pdf.setFillColor(30, 64, 175); // dark blue
+                pdf.rect(MARGIN, y, PAGE_W - MARGIN * 2, 7, 'F');
+                pdf.setTextColor(255, 255, 255);
+                pdf.setFontSize(9);
+                pdf.setFont('helvetica', 'bold');
+                pdf.text(title.toUpperCase(), MARGIN + 2, y + 5);
+                pdf.setTextColor(30, 30, 30);
+                pdf.setFont('helvetica', 'normal');
+                y += 9;
+            };
+
+            // Helper: key-value row
+            const kvRow = (label, value, x = MARGIN, width = PAGE_W - MARGIN * 2) => {
+                checkPage(7);
+                pdf.setFontSize(8.5);
+                pdf.setFont('helvetica', 'bold');
+                pdf.text(label + ':', x, y);
+                pdf.setFont('helvetica', 'normal');
+                const valX = x + 55;
+                const maxWidth = width - 55;
+                const lines = pdf.splitTextToSize(String(value ?? 'N/A'), maxWidth);
+                pdf.text(lines, valX, y);
+                y += Math.max(LINE_H, lines.length * LINE_H);
+            };
+
+            // Helper: thin divider line
+            const divider = () => {
+                checkPage(4);
+                pdf.setDrawColor(200, 200, 200);
+                pdf.line(MARGIN, y, PAGE_W - MARGIN, y);
+                y += 3;
+            };
+
+            // ─── TITLE ───────────────────────────────────────────────
+            pdf.setFillColor(15, 23, 42);
+            pdf.rect(0, 0, PAGE_W, 22, 'F');
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFontSize(14);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('MKFF PRODUCTION SHIFT REPORT', PAGE_W / 2, 10, { align: 'center' });
+            pdf.setFontSize(8);
+            pdf.setFont('helvetica', 'normal');
+            pdf.text(`${dateStr}  |  ${timeStr}`, PAGE_W / 2, 17, { align: 'center' });
+            pdf.setTextColor(30, 30, 30);
+            y = 28;
+
+            // ─── LINE HEALTH ──────────────────────────────────────────
+            sectionHeader('1. Line Health Status');
+            const healthColors = { STABLE: [22,163,74], 'AT RISK': [217,119,6], BOTTLENECKED: [220,38,38], MONITORING: [14,165,233] };
+            const [r, g, b] = healthColors[lineHealthStatus.status] || [100,100,100];
+            pdf.setFillColor(r, g, b);
+            pdf.roundedRect(MARGIN, y, 50, 8, 2, 2, 'F');
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFontSize(9);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(lineHealthStatus.status, MARGIN + 25, y + 5.5, { align: 'center' });
+            pdf.setTextColor(30, 30, 30);
+            pdf.setFont('helvetica', 'normal');
+            y += 12;
+
+            // ─── PRODUCTION SUMMARY ───────────────────────────────────
+            sectionHeader('2. Production Summary');
+            const totalAll = (overallMetrics.completedUnits || 0) + (overallMetrics.pendingUnits || 0) + (overallMetrics.ngUnits || 0) + (overallMetrics.pendingApprovalUnits || 0);
+            kvRow('Total Scanned Units', totalAll);
+            kvRow('In Progress (WIP)', overallMetrics.pendingUnits || 0);
+            kvRow('Completed', overallMetrics.completedUnits || 0);
+            kvRow('No Good (NG)', overallMetrics.ngUnits || 0);
+            kvRow('Pending Approval', overallMetrics.pendingApprovalUnits || 0);
+            divider();
+
+            // ─── QUALITY METRICS ──────────────────────────────────────
+            sectionHeader('3. Quality Metrics');
+            kvRow('First Pass Yield (FPY)', `${fpy.pct.toFixed(2)}%  (${fpy.completed} passed / ${fpy.processed} processed)`);
+            kvRow('Total Defects (NG)', fpy.ng);
+            divider();
+
+            // ─── THROUGHPUT TREND ─────────────────────────────────────
+            sectionHeader('4. Throughput Trend (Last 12 Hours)');
+            kvRow('Completed This Window', throughputTrend.currentTotal);
+            kvRow('Completed Previous Window', throughputTrend.prevTotal);
+            const delta = throughputTrend.deltaPct;
+            kvRow('Trend vs Previous 12h', `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%  (${delta >= 0 ? 'UP' : 'DOWN'})`);
+            divider();
+
+            // ─── WORST STATION ────────────────────────────────────────
+            sectionHeader('5. Worst Performing Station');
+            if (worstStation && worstStation.stuckUnits > 0) {
+                kvRow('Station', `${worstStation.name} (${worstStation.id})`);
+                kvRow('Units In Progress (WIP)', worstStation.totalWIP);
+                kvRow('Delayed / Stuck Units', worstStation.stuckUnits);
+                kvRow('Average Delay', `${worstStation.avgDelay.toFixed(1)} minutes`);
+                const thresh = dynamicDelayThresholds[worstStation.id] || 10;
+                kvRow('Station Threshold', `${thresh} minutes`);
+                kvRow('Delay Severity', worstStation.avgDelay > thresh * 2 ? 'CRITICAL' : worstStation.avgDelay > thresh ? 'MODERATE' : 'NORMAL');
+            } else {
+                checkPage(7);
+                pdf.setFontSize(8.5);
+                pdf.setTextColor(22,163,74);
+                pdf.setFont('helvetica', 'bold');
+                pdf.text('All stations are within acceptable thresholds.', MARGIN, y);
+                pdf.setTextColor(30,30,30);
+                pdf.setFont('helvetica', 'normal');
+                y += LINE_H;
+            }
+            divider();
+
+            // ─── STATION-BY-STATION SUMMARY ───────────────────────────
+            sectionHeader('6. Station-by-Station Summary');
+
+            // Table header
+            checkPage(8);
+            pdf.setFillColor(241, 245, 249);
+            pdf.rect(MARGIN, y, PAGE_W - MARGIN * 2, 6.5, 'F');
+            pdf.setFontSize(8);
+            pdf.setFont('helvetica', 'bold');
+            pdf.setTextColor(71, 85, 105);
+            pdf.text('Station', MARGIN + 1, y + 4.5);
+            pdf.text('Process', MARGIN + 28, y + 4.5);
+            pdf.text('WIP', MARGIN + 90, y + 4.5);
+            pdf.text('Done', MARGIN + 110, y + 4.5);
+            pdf.text('NG', MARGIN + 130, y + 4.5);
+            pdf.text('Yield', MARGIN + 148, y + 4.5);
+            pdf.text('Status', MARGIN + 166, y + 4.5);
+            pdf.setTextColor(30, 30, 30);
+            pdf.setFont('helvetica', 'normal');
+            y += 8;
+
+            const stationList = stations.length > 0 ? stations : Array.from({ length: 15 }, (_, i) => ({ id: `Station${i+1}`, name: `Station ${i+1}` }));
+
+            stationList.forEach((s, idx) => {
+                checkPage(7);
+                const m = calculateMetrics ? (calculateMetrics(s.id) || {}) : {};
+                const wip = m.pendingUnits || 0;
+                const done = m.completedUnits || 0;
+                const ng = m.ngUnits || 0;
+                const total = done + ng;
+                const yieldPct = total > 0 ? `${((done / total) * 100).toFixed(0)}%` : '-';
+                const thresh = dynamicDelayThresholds[s.id] || 10;
+
+                // check if any unit is delayed
+                const hasDelay = (m.stationLogs || []).some(l => {
+                    if (l.status !== 'In Progress') return false;
+                    const elapsed = (new Date() - new Date(l.updated_at || l.created_at)) / 60000;
+                    return elapsed >= thresh;
+                });
+
+                const rowStatus = hasDelay ? 'DELAYED' : wip > 0 ? 'ACTIVE' : 'IDLE';
+                const statusColor = hasDelay ? [220, 38, 38] : wip > 0 ? [217, 119, 6] : [100, 116, 139];
+
+                if (idx % 2 === 0) {
+                    pdf.setFillColor(248, 250, 252);
+                    pdf.rect(MARGIN, y - 1, PAGE_W - MARGIN * 2, 6, 'F');
+                }
+
+                pdf.setFontSize(7.5);
+                pdf.setFont('helvetica', 'normal');
+                pdf.setTextColor(30, 30, 30);
+                pdf.text(s.id || `S${idx+1}`, MARGIN + 1, y + 3.5);
+                const processName = processStations[idx] || s.name || '';
+                pdf.text(pdf.splitTextToSize(processName, 58)[0], MARGIN + 28, y + 3.5);
+                pdf.text(String(wip), MARGIN + 92, y + 3.5);
+                pdf.text(String(done), MARGIN + 112, y + 3.5);
+                pdf.text(String(ng), MARGIN + 132, y + 3.5);
+                pdf.text(yieldPct, MARGIN + 149, y + 3.5);
+
+                // colored status pill
+                pdf.setTextColor(...statusColor);
+                pdf.setFont('helvetica', 'bold');
+                pdf.text(rowStatus, MARGIN + 167, y + 3.5);
+                pdf.setTextColor(30, 30, 30);
+                pdf.setFont('helvetica', 'normal');
+                y += 6;
+            });
+            divider();
+
+            // ─── FOOTER ───────────────────────────────────────────────
+            const totalPages = pdf.getNumberOfPages();
+            for (let p = 1; p <= totalPages; p++) {
+                pdf.setPage(p);
+                pdf.setFontSize(7.5);
+                pdf.setTextColor(150, 150, 150);
+                pdf.text(`MKFF Web Monitoring System  |  Shift Report  |  Generated: ${dateStr} ${timeStr}`, MARGIN, PAGE_H - 6);
+                pdf.text(`Page ${p} of ${totalPages}`, PAGE_W - MARGIN, PAGE_H - 6, { align: 'right' });
             }
 
-            // Add timestamp and metadata
-            const timestamp = new Date().toLocaleString();
-            pdf.setPage(1);
-            pdf.setFontSize(10);
-            pdf.setTextColor(100);
-            pdf.text(`Generated: ${timestamp}`, 10, pageHeight - 10);
-            pdf.text(`Line Health: ${lineHealthStatus.status}`, 10, pageHeight - 5);
-            pdf.text(`FPY: ${fpy.pct.toFixed(1)}%`, 70, pageHeight - 5);
-            pdf.text(`Worst Station: ${worstStation?.name || 'N/A'}`, 120, pageHeight - 5);
-
-            // Save the PDF
-            pdf.save(`shift-report-${new Date().toISOString().split('T')[0]}.pdf`);
+            const filename = `shift-report-${now.toISOString().split('T')[0]}.pdf`;
+            pdf.save(filename);
 
         } catch (error) {
             console.error('Error generating PDF:', error);
-            alert('Failed to generate report. Please try again.');
+            alert('Failed to generate report: ' + error.message);
         } finally {
-            // Restore button
-            const originalButton = document.getElementById('export-btn');
-            if (originalButton) {
-                originalButton.innerHTML = '<i class="bi bi-download me-2"></i>Generate Shift Report';
-                originalButton.disabled = false;
-            }
+            if (btn) { btn.innerHTML = '<i class="bi bi-download me-1"></i>Export PDF'; btn.disabled = false; }
         }
     };
 
@@ -1078,6 +1231,16 @@ CRITICAL: Use only bullet points. No paragraphs. No long explanations. Always us
                             </div>
                         )}
                     </div>
+                    {/* Export to PDF Button */}
+                    <button
+                        id="export-btn"
+                        className="btn btn-primary rounded-pill fw-semibold d-flex align-items-center gap-2"
+                        style={{ whiteSpace: 'nowrap', fontSize: '0.85rem', padding: '8px 18px' }}
+                        onClick={generateShiftReport}
+                    >
+                        <i className="bi bi-download me-1"></i>
+                        Export PDF
+                    </button>
                 </div>
             </div>
 

@@ -729,7 +729,13 @@ else {
             assemblyNo: parts[3].trim(),
             deviceSerialNo: '', // Device serial not in QR - will be auto-generated at Station 6
             accessoryKittingNo: scannedAccessory || '', // Use actual accessory from QR (index 9)
-            status: "In Progress"
+            status: "In Progress",
+            // Extract board numbers from QR parts[4]-[8]
+            mnbd_no: hasBoardNumbers ? (parts[4]?.trim() || '') : (dbUnit?.mnbd_board_no || ''),
+            cmbd_no: hasBoardNumbers ? (parts[5]?.trim() || '') : (dbUnit?.cmbd_board_no || ''),
+            lrbd_no: hasBoardNumbers ? (parts[6]?.trim() || '') : (dbUnit?.lrbd_board_no || ''),
+            pqbd_no: hasBoardNumbers ? (parts[7]?.trim() || '') : (dbUnit?.pqbd_board_no || ''),
+            bkbd_no: hasBoardNumbers ? (parts[8]?.trim() || '') : (dbUnit?.bkbd_board_no || ''),
         }));
         setProcessStatus('idle');
         return; // STOP DITO. Huwag nang ituloy sa handover checks.
@@ -788,7 +794,13 @@ setFormData(prev => ({
     deviceSerialNo: dbUnit?.device_serial_no || '', // Device serial not in QR - will be auto-generated at Station 6
     accessoryKittingNo: dbUnit?.accessory_kitting_no || (parts.length >= 10 ? parts[9]?.trim() : '') || '',
     status: "In Progress", 
-    remarks: dbUnit?.remarks || ""
+    remarks: dbUnit?.remarks || "",
+    // Extract board numbers: prefer DB values (already saved), fall back to QR parts[4]-[8]
+    mnbd_no: dbUnit?.mnbd_board_no || (hasBoardNumbers ? parts[4]?.trim() : '') || '',
+    cmbd_no: dbUnit?.cmbd_board_no || (hasBoardNumbers ? parts[5]?.trim() : '') || '',
+    lrbd_no: dbUnit?.lrbd_board_no || (hasBoardNumbers ? parts[6]?.trim() : '') || '',
+    pqbd_no: dbUnit?.pqbd_board_no || (hasBoardNumbers ? parts[7]?.trim() : '') || '',
+    bkbd_no: dbUnit?.bkbd_board_no || (hasBoardNumbers ? parts[8]?.trim() : '') || '',
 }));
             
             setProcessStatus('idle'); 
