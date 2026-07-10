@@ -648,26 +648,27 @@ All production units in the system are listed here, grouped by batch. Each batch
 
 ##### 4.2.9.1 Post an Announcement
 
-> **[WHAT TO WRITE HERE]**
-> 1. Navigate to **Announcements** from the sidebar.
-> 2. Click the **Post Announcement** button.
-> 3. The Announcement Modal opens.
-> 4. Type the announcement message in the text area.
-> 5. Click **Post**.
-> 6. The announcement is now visible to all users (Admin, IT Assistant, Operator).
->
-> Include a screenshot of the announcement compose modal.
+**Step 1:** Click **Announcements** from the left sidebar navigation.
+
+**Step 2:** Click the **Post Announcement** button at the top of the page.
+
+**Step 3:** The Announcement Modal opens. Type your message in the text area.
+
+**Step 4:** Click **Post**. The announcement is immediately visible to all users — Administrator, IT Assistant, and Operator.
+
+*[Insert screenshot of the Announcements page and the compose modal]*
 
 ##### 4.2.9.2 Delete an Announcement
 
-> **[WHAT TO WRITE HERE]**
-> 1. Find the announcement in the list.
-> 2. Click the **Delete** (trash) icon next to it.
-> 3. A confirmation modal appears.
-> 4. Click **Confirm Delete**.
-> 5. The announcement is permanently removed.
->
-> Include a screenshot of the delete confirmation modal.
+**Step 1:** In the Announcements list, find the announcement to remove.
+
+**Step 2:** Click the **Delete** (trash) icon next to it.
+
+**Step 3:** A confirmation modal appears.
+
+**Step 4:** Click **Confirm Delete**. The announcement is permanently removed.
+
+*[Insert screenshot of the delete confirmation modal]*
 
 ---
 
@@ -675,40 +676,49 @@ All production units in the system are listed here, grouped by batch. Each batch
 
 ##### 4.2.10.1 View Users
 
-> **[WHAT TO WRITE HERE]**
-> Navigate to **User Management**. A table lists all registered users with: ID, Avatar, Full Name, Username, Role, and Assigned Station.
-> Include a screenshot of the user list.
+**Step 1:** Click **User Management** from the left sidebar navigation.
+
+A table lists all registered system users showing: ID, Avatar, Full Name, Username, Role, and Assigned Station.
+
+*[Insert screenshot of the User Management table with all columns]*
 
 ##### 4.2.10.2 Add a User
 
-> **[WHAT TO WRITE HERE]**
-> 1. Click the **Add User** button.
-> 2. The Manage User Modal opens.
-> 3. Fill in: Full Name, Username, Password, Role (Administrator / IT Assistant / Operator), and Assigned Station.
-> 4. Optionally upload a profile avatar image.
-> 5. Click **Save**.
->
-> Include a screenshot of the Add User modal with fields labeled.
+**Step 1:** Click the **Add User** button at the top of the page.
+
+**Step 2:** The Manage User Modal opens. Fill in the following:
+- **Full Name** — the user's complete name
+- **Username** — the login username
+- **Password** — the login password
+- **Role** — Administrator, IT Assistant, or Operator
+- **Assigned Station** — for Operators, select their station (e.g., Station 1)
+- **Avatar** — optionally upload a profile photo
+
+**Step 3:** Click **Save**. The new account is created and appears in the user list.
+
+*[Insert screenshot of the Add User modal with fields labeled]*
 
 ##### 4.2.10.3 Edit a User
 
-> **[WHAT TO WRITE HERE]**
-> 1. Click the **Edit** (pencil) icon on a user row.
-> 2. The Manage User Modal opens pre-filled with the user's current data.
-> 3. Update any field as needed.
-> 4. Click **Save**.
->
-> Include a screenshot.
+**Step 1:** Click the **Edit** (pencil) icon on the user row you want to update.
+
+**Step 2:** The Manage User Modal opens pre-filled with the user's current data.
+
+**Step 3:** Update any field as needed (name, password, role, station, or avatar).
+
+**Step 4:** Click **Save**. Changes are applied immediately.
+
+*[Insert screenshot of the Edit User modal]*
 
 ##### 4.2.10.4 Delete a User
 
-> **[WHAT TO WRITE HERE]**
-> 1. Click the **Delete** (trash) icon on a user row.
-> 2. The Delete User Modal appears asking for confirmation.
-> 3. Click **Confirm Delete**.
-> 4. The user account is permanently removed.
->
-> Include a screenshot of the delete confirmation modal.
+**Step 1:** Click the **Delete** (trash) icon on the user row you want to remove.
+
+**Step 2:** The Delete User confirmation modal appears showing the user's name.
+
+**Step 3:** Click **Confirm Delete**. The user account is permanently removed.
+
+*[Insert screenshot of the delete confirmation modal]*
 
 ---
 
@@ -716,26 +726,35 @@ All production units in the system are listed here, grouped by batch. Each batch
 
 ##### 4.2.11.1 Unit Delay Alert
 
-> **[WHAT TO WRITE HERE]**
-> A ⚠️ **Unit Delay Alert** is triggered when a unit with status "In Progress" has been at a station longer than the configured threshold.
-> The bell icon in the top navigation shows a red badge with the count of active alerts.
-> Each alert shows: station name, Assembly No., elapsed time, and allowed limit.
-> Click the alert to be taken directly to the Station Monitor with the unit highlighted.
+A ⚠️ **Unit Delay Alert** is triggered automatically when a unit with status "In Progress" has been at a station longer than the configured threshold for that station. The bell icon in the top-right shows a red badge with the count of active alerts.
+
+Each alert displays: station name, Assembly No. of the unit, elapsed time, and the allowed time limit.
+
+**Step 1:** Click the **bell icon** in the top navigation to open the Notifications page.
+
+**Step 2:** Click on a Unit Delay Alert to navigate directly to the Station Monitor. The delayed unit will be highlighted in the unit list.
+
+*[Insert screenshot of the bell icon with red badge and the Unit Delay Alert notification card]*
 
 ##### 4.2.11.2 Quality Alert (No Good)
 
-> **[WHAT TO WRITE HERE]**
-> A 🚨 **Quality Alert** is triggered when a unit with status "No Good (NG)" has exceeded the station threshold. These are higher priority than delay alerts and are marked with a red siren icon.
-> Click the alert to navigate to the Station Monitor and highlight the NG unit.
+A 🚨 **Quality Alert** is triggered when a unit with status "No Good (NG)" has been at a station beyond the allowed threshold. These are higher priority than delay alerts.
+
+**Step 1:** Click the **bell icon** to view Quality Alerts on the Notifications page.
+
+**Step 2:** Click on a Quality Alert to navigate to the Station Monitor. The NG unit will be highlighted.
+
+*[Insert screenshot of a Quality Alert notification card]*
 
 ##### 4.2.11.3 Dismiss Notifications
 
-> **[WHAT TO WRITE HERE]**
-> Navigate to **Notifications** from the sidebar or by clicking the bell icon.
-> - Click **Dismiss All** to clear all active notifications.
-> - Individual alerts are cleared automatically once the unit is resolved or moved.
->
-> Include a screenshot of the Notifications page.
+**Step 1:** Click **Notifications** from the sidebar or click the bell icon.
+
+**Step 2:** Click the **Dismiss All** button to clear all active alerts at once.
+
+Individual alerts also disappear automatically once the unit is resolved, moved, or its status is updated.
+
+*[Insert screenshot of the Notifications page with the Dismiss All button visible]*
 
 ---
 
@@ -743,36 +762,43 @@ All production units in the system are listed here, grouped by batch. Each batch
 
 ##### 4.2.12.1 Configure Station Thresholds
 
-> **[WHAT TO WRITE HERE]**
-> 1. Navigate to **Settings** from the sidebar.
-> 2. Click the **Configure Thresholds** button in the Station Thresholds card.
-> 3. The Target Time Management modal opens showing all 15 stations.
-> 4. Edit the threshold value (in minutes) for each station.
-> 5. Click **Save**. Changes take effect immediately for all users.
->
-> Include a screenshot of the Configure Thresholds modal.
+**Step 1:** Click **Settings** from the left sidebar navigation.
+
+**Step 2:** Click the **Configure Thresholds** button in the Station Thresholds card.
+
+**Step 3:** The Target Time Management modal opens listing all 15 stations with their current threshold values in minutes.
+
+**Step 4:** Click on the threshold field for any station and type the new value in minutes.
+
+**Step 5:** Click **Save**. Changes take effect immediately for all users — delay alerts will use the new thresholds right away.
+
+*[Insert screenshot of the Configure Thresholds modal showing all 15 stations with editable fields]*
 
 ##### 4.2.12.2 View Release PIN
 
-> **[WHAT TO WRITE HERE]**
-> 1. In Settings, click the **View PIN** button in the Release PIN card.
-> 2. A security modal opens asking for your Admin Password.
-> 3. Enter your password and click **Verify**.
-> 4. The current Release PIN is displayed.
-> 5. Click **Close** when done.
->
-> Include a screenshot of the PIN reveal screen.
+**Step 1:** In the Settings page, click the **View PIN** button in the Release PIN card.
+
+**Step 2:** A security verification modal appears asking for your Admin Password.
+
+**Step 3:** Enter your Administrator password and click **Verify**.
+
+**Step 4:** The current Release PIN is displayed in large text on screen.
+
+**Step 5:** Click **Close** when done. This PIN is required to authorize shipment dispatches — keep it confidential.
+
+*[Insert screenshot of the PIN reveal screen after password verification]*
 
 ##### 4.2.12.3 Reset Release PIN
 
-> **[WHAT TO WRITE HERE]**
-> 1. In Settings, click the **Reset PIN** button.
-> 2. Enter the **Current PIN**, **New PIN**, and **Confirm New PIN**.
-> 3. The new PIN must be at least 4 characters.
-> 4. Click **Update PIN**.
-> 5. A success message confirms the PIN has been updated.
->
-> Include a screenshot of the Reset PIN modal.
+**Step 1:** In the Settings page, click the **Reset PIN** button in the Release PIN card.
+
+**Step 2:** The Reset PIN modal opens with three input fields.
+
+**Step 3:** Enter the **Current PIN**, then the **New PIN**, then **Confirm New PIN**. The new PIN must be at least 4 characters.
+
+**Step 4:** Click **Update PIN**. A success message confirms the change.
+
+*[Insert screenshot of the Reset PIN modal with all three fields labeled]*
 
 ---
 
@@ -780,109 +806,154 @@ All production units in the system are listed here, grouped by batch. Each batch
 
 #### 4.3.1 Login
 
-> **[WHAT TO WRITE HERE]**
-> Same login process as 4.1. After login, the IT Assistant lands on the Overview page at `/itassistant/overview`.
-> Include a screenshot of the IT Assistant overview page after login.
+**Step 1:** Open a browser and go to `http://localhost:3000`.
+
+**Step 2:** Enter the IT Assistant credentials and click **Login**.
+
+**Login Credentials for IT Assistant:**
+- Username: itassist1 *(replace with your actual IT Assistant username)*
+- Password: *(replace with your actual IT Assistant password)*
+
+**Step 3:** The system redirects to the IT Assistant Overview at `/itassistant/overview`.
+
+*[Insert screenshot of the IT Assistant Overview page right after login]*
+
+---
 
 #### 4.3.2 Overview Dashboard
 
-> **[WHAT TO WRITE HERE]**
-> The Overview Dashboard shows the same production metrics as the Admin dashboard:
-> - Summary cards: Total, Completed, In Progress, No Good, Pending Approval, For Scanning
-> - Throughput Trend Line Chart (last 12 hours)
-> - First Pass Yield (FPY)
-> - Process Stepper (scrollable view of all 15 stations)
-> - Unit Search / QR Scan input
->
-> Include a screenshot with labeled areas.
+The IT Assistant Overview Dashboard shows a complete real-time production summary. It includes:
+
+- Six summary cards: Total Scanned, For Scanning, In Progress, Completed, No Good, Pending Approval
+- Throughput Trend Line Chart — completed units per hour over the last 12 hours
+- First Pass Yield (FPY) — overall quality rate
+- Process Stepper — scrollable horizontal view of all 15 stations
+- Unit Search / QR Scan input — find any unit by Assembly No.
+
+*[Insert screenshot of the IT Assistant Overview Dashboard with labeled sections]*
+
+---
 
 #### 4.3.3 QR Code Generator
 
 ##### 4.3.3.1 Generate QR Codes
 
-> **[WHAT TO WRITE HERE]**
-> 1. Navigate to **QR Generator** from the sidebar.
-> 2. Fill in the form:
->    - **Model** — product model name (e.g., MKFF-X1)
->    - **Revision** — revision code (e.g., REV-01)
->    - **Base Unit Kitting No.** — base kit reference number
->    - **Accessory Kitting No.** — accessory kit reference number
->    - **Quantity** — number of QR codes to generate (1 to 100)
-> 3. Click **Generate QR Codes**.
-> 4. The system contacts the backend to generate unique Assembly Numbers (ASSY-XXXXX) and board serial numbers (MNBD, CMBD, LRBD, PQBD, BKBD).
-> 5. Generated QR codes appear in the list below the form.
->
-> Include a screenshot of the QR Generator form.
+**Step 1:** Click **QR Generator** from the left sidebar navigation.
+
+**Step 2:** Fill in the QR generation form:
+- **Model** — product model name (e.g., MKFF-X1)
+- **Revision** — revision code (e.g., REV-01)
+- **Base Unit Kitting No.** — base kit reference number
+- **Accessory Kitting No.** — accessory kit reference number
+- **Quantity** — number of QR codes to generate (1 to 100)
+
+**Step 3:** Click the **Generate QR Codes** button.
+
+**Step 4:** The system generates unique Assembly Numbers (ASSY-XXXXX) and board serial numbers (MNBD, CMBD, LRBD, PQBD, BKBD) for each unit.
+
+**Step 5:** Generated QR codes appear in the list below the form.
+
+*[Insert screenshot of the QR Generator form with all fields labeled]*
 
 ##### 4.3.3.2 Print / Save QR Codes
 
-> **[WHAT TO WRITE HERE]**
-> After generating:
-> - Each QR code can be individually downloaded or printed.
-> - The QR code encodes: Model | Revision | Base Kit | Assembly No. | Board serials | Accessory Kit.
-> - Physical QR code labels are attached to production units by the Operator.
->
-> Include a screenshot of the generated QR code list.
+**Step 1:** After generating, scroll down to the Generated QR List.
+
+**Step 2:** Use the download or print button next to each QR code to save or print it.
+
+**Step 3:** Attach the printed QR code labels to the physical production units. Operators will scan these when the units arrive at their station.
+
+*[Insert screenshot of the Generated QR List with download/print buttons visible]*
+
+---
 
 #### 4.3.4 Station Monitor
 
 ##### 4.3.4.1 Live Monitoring Table
 
-> **[WHAT TO WRITE HERE]**
-> The Live Monitoring Table shows all units currently active across all stations. It auto-refreshes every 1 second.
-> Columns: Assembly No., Model, Station, Status, Time in Station.
-> Delayed units are highlighted in yellow or red.
-> Include a screenshot.
+**Step 1:** Click **Station Monitor** from the left sidebar navigation.
+
+The Live Monitoring Table displays all units currently active across all 15 stations. It auto-refreshes every 1 second.
+
+Columns: Assembly No., Model, Current Station, Status, Time in Station. Delayed units are highlighted in yellow (MODERATE) or red (CRITICAL).
+
+*[Insert screenshot of the Live Monitoring Table with a delayed unit highlighted]*
 
 ##### 4.3.4.2 Unscanned Units Table
 
-> **[WHAT TO WRITE HERE]**
-> The Unscanned Units Table shows units that have been generated via QR but have not yet been scanned at any station. Their status is "For Scanning". This helps track which units in a batch have entered production.
-> Include a screenshot.
+**Step 1:** On the Station Monitor page, view the **Unscanned Units** section.
+
+This table shows all units generated via QR code that have not yet been scanned at any station. Their status is "For Scanning". This is used to track which units from a batch have entered the production line.
+
+*[Insert screenshot of the Unscanned Units Table]*
+
+---
 
 #### 4.3.5 Approvals
 
 ##### 4.3.5.1 View Pending Units
 
-> **[WHAT TO WRITE HERE]**
-> Navigate to **Approvals** from the sidebar. Lists all units with status "Pending Approval".
-> Include a screenshot.
+**Step 1:** Click **Approvals** from the left sidebar navigation.
+
+All units with status "Pending Approval" are listed here. Columns: Assembly No., Model, Current Station, Approve button.
+
+*[Insert screenshot of the IT Assistant Approvals list]*
 
 ##### 4.3.5.2 Approve a Unit
 
-> **[WHAT TO WRITE HERE]**
-> 1. Click **Approve** on a unit row.
-> 2. The Approval Confirmation Modal opens.
-> 3. Click **Confirm**.
-> 4. The unit returns to "In Progress" status at its station.
->
-> Include a screenshot.
+**Step 1:** Click the **Approve** button on the unit row.
+
+**Step 2:** The Approval Confirmation Modal opens showing the unit's details.
+
+**Step 3:** Click **Confirm**. The unit status changes to "In Progress" and is returned to its assigned station.
+
+*[Insert screenshot of the Approval Confirmation Modal]*
+
+---
 
 #### 4.3.6 Reports
 
 ##### 4.3.6.1 Filter Reports
 
-> **[WHAT TO WRITE HERE]**
-> Use the Date picker and Station dropdown to filter daily reports. Same functionality as the Admin Reports page.
+**Step 1:** Click **Reports** from the left sidebar navigation.
+
+**Step 2:** Use the **Date** picker to select the date of reports to view.
+
+**Step 3:** Use the **Station** dropdown to filter by station or select "All".
+
+*[Insert screenshot of the Reports filter controls and results table]*
 
 ##### 4.3.6.2 View Report Details
 
-> **[WHAT TO WRITE HERE]**
-> Click **View** on any report to open the Report Detail Modal with full contents and attachments.
+**Step 1:** Click the **View** button on any report row.
+
+**Step 2:** The Report Detail Modal opens showing: station, date, operator name, shift notes, issues encountered, and any file or image attachments.
+
+**Step 3:** Click **Close** to return to the reports list.
+
+*[Insert screenshot of the Report Detail Modal]*
+
+---
 
 #### 4.3.7 Announcements
 
-> **[WHAT TO WRITE HERE]**
-> The IT Assistant can view announcements posted by the Administrator. This is a read-only view.
-> New announcements posted today are highlighted. The count of today's announcements is shown in the sidebar badge.
-> Include a screenshot.
+**Step 1:** Click **Announcements** from the left sidebar navigation.
+
+The IT Assistant can read announcements posted by the Administrator. This is a read-only view. New announcements posted today are visually highlighted. The sidebar shows today's announcement count as a badge.
+
+*[Insert screenshot of the IT Assistant Announcements view]*
+
+---
 
 #### 4.3.8 Notifications
 
-> **[WHAT TO WRITE HERE]**
-> The IT Assistant receives the same delay and quality notifications as the Administrator.
-> Clicking a notification navigates to the Station Details view for the affected station and highlights the delayed unit.
-> Include a screenshot of the notification list.
+**Step 1:** Click the **bell icon** in the top navigation to view active alerts.
+
+The IT Assistant receives real-time delay alerts and quality alerts, same as the Administrator. Each notification shows: affected station, Assembly No., elapsed time, and the limit.
+
+**Step 2:** Click on any notification to navigate to the Station Details view for that station. The delayed or NG unit will be highlighted in the list.
+
+*[Insert screenshot of the IT Assistant notification list]*
 
 ---
 
@@ -890,111 +961,144 @@ All production units in the system are listed here, grouped by batch. Each batch
 
 #### 4.4.1 Login
 
-> **[WHAT TO WRITE HERE]**
-> Same login process as 4.1. After login, the Operator lands on the Station Home at `/operator/home`.
-> The system automatically loads data for the Operator's assigned station.
-> Include a screenshot of the Operator home after login.
+**Step 1:** Open a browser and go to `http://localhost:3000`.
+
+**Step 2:** Enter the Operator credentials and click **Login**.
+
+**Login Credentials for Operator:**
+- Username: operator1 *(replace with your actual Operator username)*
+- Password: *(replace with your actual Operator password)*
+
+**Step 3:** The system redirects to the Operator Station Home at `/operator/home`. The page automatically loads data for the Operator's assigned station.
+
+*[Insert screenshot of the Operator Home page right after login]*
+
+---
 
 #### 4.4.2 Home Dashboard
 
-> **[WHAT TO WRITE HERE]**
-> The Operator's Home Dashboard shows a summary of their assigned station:
-> - Station name and process description
-> - Count cards: Completed, In Progress, No Good units
-> - Yield Rate percentage
-> - **Station Doughnut Chart** — visual breakdown of unit statuses
-> - Quick navigation buttons to Unit Entry, Unit List, and History
->
-> Include a screenshot with labeled sections.
+The Operator Home Dashboard shows a real-time summary of their assigned station:
+
+- Station name and process description (e.g., Station 2 — Integrated Board Test)
+- Count cards: Completed, In Progress, No Good units at this station
+- Yield Rate percentage for this station
+- Station Doughnut Chart — visual breakdown of unit statuses
+- Quick navigation buttons to Unit Entry, Unit List, and History Log
+
+*[Insert screenshot of the Operator Home Dashboard with all sections labeled]*
+
+---
 
 #### 4.4.3 Unit Entry
 
 ##### 4.4.3.1 Scan QR Code
 
-> **[WHAT TO WRITE HERE]**
-> To receive a new unit at the station:
-> 1. Click on the **QR Scan / Unit Entry** section.
-> 2. Use a barcode scanner to scan the unit's QR code, OR manually type the Assembly No. in the search field.
-> 3. The system finds the unit and displays its current details: Assembly No., Model, Revision, current Status, and Station.
-> 4. Verify the unit information is correct before proceeding.
->
-> Include a screenshot of the scan input field and the matched unit card.
+**Step 1:** From the sidebar or Home Dashboard, go to the **Unit Entry** section.
+
+**Step 2:** Use a USB or Bluetooth QR scanner to scan the QR code on the physical unit. Alternatively, manually type the Assembly No. in the search field and press Enter.
+
+**Step 3:** The system finds the unit and displays its current details: Assembly No., Model, Revision, current Status, and Station.
+
+**Step 4:** Verify the information matches the physical unit before proceeding.
+
+*[Insert screenshot of the QR scan input and the matched unit card display]*
 
 ##### 4.4.3.2 Update Unit Status
 
-> **[WHAT TO WRITE HERE]**
-> After scanning the unit:
-> 1. Select the new **Status** from the dropdown:
->    - **In Progress** — unit is now being worked on at this station
->    - **Completed** — unit has passed this station's process
->    - **No Good (NG)** — unit has a defect; enter a remark describing the issue
->    - **Pending Approval** — unit needs admin/IT review before continuing
-> 2. Add **Remarks** if applicable (required for No Good status).
-> 3. Click **Update** or **Save**.
-> 4. The unit status is updated in real time across all connected users.
->
-> Include a screenshot of the status update form.
+**Step 1:** After scanning and verifying the unit, select the new status from the **Status** dropdown:
+- **In Progress** — the unit is now being processed at this station
+- **Completed** — the unit has passed this station and is ready to move forward
+- **No Good (NG)** — the unit has a defect; a remark is required
+- **Pending Approval** — the unit needs review by an Administrator or IT Assistant
+
+**Step 2:** Add **Remarks** in the remarks field if applicable. Required for No Good status.
+
+**Step 3:** Click **Update** or **Save**. The unit status is updated in real time and visible to all connected users.
+
+*[Insert screenshot of the status update dropdown and remarks field]*
+
+---
 
 #### 4.4.4 Unit List Table
 
 ##### 4.4.4.1 View Current Units
 
-> **[WHAT TO WRITE HERE]**
-> Navigate to **Unit List** from the sidebar. Shows all units currently at the Operator's assigned station.
-> Columns: Assembly No., Model, Status badge, Time in Station, Edit button.
-> Units exceeding the delay threshold are highlighted.
-> Include a screenshot with column labels.
+**Step 1:** Click **Unit List** from the left sidebar navigation.
+
+The table shows all units currently at the Operator's assigned station. Columns: Assembly No., Model, Status badge, Time in Station, Edit button.
+
+Units that have been at the station longer than the allowed threshold are highlighted — yellow for moderate and red for critical.
+
+*[Insert screenshot of the Unit List Table with all columns labeled and a highlighted delayed unit]*
 
 ##### 4.4.4.2 Edit a Unit
 
-> **[WHAT TO WRITE HERE]**
-> 1. Click the **Edit** button on a unit row.
-> 2. The Edit Unit Modal opens.
-> 3. Update the Status and/or Remarks as needed.
-> 4. Click **Save**.
->
-> Include a screenshot of the Edit Unit Modal.
+**Step 1:** In the Unit List, click the **Edit** button on any unit row.
+
+**Step 2:** The Edit Unit Modal opens showing the unit's current details.
+
+**Step 3:** Update the **Status** and/or **Remarks** as needed.
+
+**Step 4:** Click **Save**. The unit is updated immediately.
+
+*[Insert screenshot of the Edit Unit Modal with fields labeled]*
+
+---
 
 #### 4.4.5 Unit History Log
 
-> **[WHAT TO WRITE HERE]**
-> Navigate to **History Log** from the sidebar. Shows all units that have ever passed through this station with their complete status change history.
-> Columns: Assembly No., Model, Previous Status, New Status, Changed By, Timestamp.
-> Useful for traceability, quality audits, and shift handovers.
-> Include a screenshot of the history log table.
+**Step 1:** Click **History Log** from the left sidebar navigation.
+
+The History Log shows a complete record of all units ever processed at this station, including every status change. Columns: Assembly No., Model, Previous Status, New Status, Changed By (operator name), Timestamp.
+
+This page is useful for shift handovers, quality audits, and traceability.
+
+*[Insert screenshot of the Unit History Log table]*
+
+---
 
 #### 4.4.6 Daily Report
 
 ##### 4.4.6.1 Submit Daily Report
 
-> **[WHAT TO WRITE HERE]**
-> At the end of each shift, the Operator submits a daily report:
-> 1. Navigate to **Daily Report** from the sidebar.
-> 2. Click **Submit Daily Report**.
-> 3. The Submit Report Modal opens.
-> 4. Fill in:
->    - **Shift Summary** — describe what was accomplished this shift
->    - **Issues Encountered** — note any problems or delays
->    - **Attachment** — optionally attach a photo or file (image or PDF)
-> 5. Click **Submit**.
-> 6. The report is saved and becomes visible to Administrators and IT Assistants.
->
-> Include a screenshot of the Submit Report Modal with all fields labeled.
+At the end of each production shift, the Operator submits a daily report.
+
+**Step 1:** Click **Daily Report** from the left sidebar navigation.
+
+**Step 2:** Click the **Submit Daily Report** button.
+
+**Step 3:** The Submit Report Modal opens. Fill in the following:
+- **Shift Summary** — describe what was accomplished during the shift
+- **Issues Encountered** — note any problems, delays, or quality concerns
+- **Attachment** — optionally attach a photo or file (image or PDF)
+
+**Step 4:** Click **Submit**. The report is saved and immediately visible to Administrators and IT Assistants in their Reports section.
+
+*[Insert screenshot of the Submit Report Modal with all fields labeled]*
+
+---
 
 #### 4.4.7 Announcements
 
-> **[WHAT TO WRITE HERE]**
-> Operators can view announcements posted by the Administrator. This is read-only.
-> New announcements are highlighted. Badge count shows how many new announcements are posted today.
-> Include a screenshot.
+**Step 1:** Click **Announcements** from the left sidebar navigation.
+
+Operators can read announcements posted by the Administrator. This is a read-only view. New announcements posted today are highlighted in the list. The sidebar badge shows how many new announcements were posted today.
+
+*[Insert screenshot of the Operator Announcements view with a highlighted new announcement]*
+
+---
 
 #### 4.4.8 Notifications
 
-> **[WHAT TO WRITE HERE]**
-> Operators receive real-time delay alerts for units at their station.
-> The bell icon shows the count of active alerts.
-> Clicking a notification highlights the specific unit in the Unit List Table.
-> Include a screenshot of the notification bell and notification list.
+**Step 1:** Click the **bell icon** in the top navigation to view active alerts.
+
+Operators receive real-time delay alerts for units at their assigned station that have exceeded the allowed threshold. Each notification shows: station name, Assembly No., elapsed time, and allowed limit.
+
+**Step 2:** Click on any notification. The Unit List Table opens and the specific delayed unit is highlighted automatically.
+
+**Step 3:** Resolve the alert by updating the unit's status (e.g., mark as Completed or No Good).
+
+*[Insert screenshot of the Operator notification bell and the notification list]*
 
 ---
 
@@ -1003,8 +1107,7 @@ All production units in the system are listed here, grouped by batch. Each batch
 ---
 
 > **📌 REMINDERS BEFORE SUBMITTING:**
-> - Replace all `> [WHAT TO WRITE HERE]` blocks with your actual written content.
 > - Add screenshots to EVERY section — annotate them with arrows/labels.
 > - Fill in the cover page: Group Name, Professor, Course, Date.
-> - Remove the `>` quote formatting before final submission.
+> - Replace the sample login credentials with your actual default credentials.
 > - Export to Word or PDF using Typora, Pandoc, or copy-paste to Microsoft Word.
