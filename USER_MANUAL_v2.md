@@ -1106,8 +1106,3 @@ Operators receive real-time delay alerts for units at their assigned station tha
 
 ---
 
-> **📌 REMINDERS BEFORE SUBMITTING:**
-> - Add screenshots to EVERY section — annotate them with arrows/labels.
-> - Fill in the cover page: Group Name, Professor, Course, Date.
-> - Replace the sample login credentials with your actual default credentials.
-> - Export to Word or PDF using Typora, Pandoc, or copy-paste to Microsoft Word.
