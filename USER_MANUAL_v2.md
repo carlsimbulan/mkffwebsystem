@@ -5,10 +5,6 @@
 
 **System Name:** MKFF Web Monitoring System
 **Version:** 1.0
-**Prepared by:** [Your Group Name]
-**Date:** July 2026
-**Instructor:** [Your Professor's Name]
-**Course:** [Your Course Name]
 
 ---
 
